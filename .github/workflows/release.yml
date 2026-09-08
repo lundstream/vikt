@@ -11,14 +11,25 @@
 # needs a pull secret configured in whatever is pulling them.
 name: release
 
+# **Not on every push, and that is a parked problem rather than a preference.**
+#
+# `ghcr.io/<owner>/vikt-web` was first published from a *different* repository,
+# so the package is linked to that one and this repository's `GITHUB_TOKEN`
+# cannot write to it: `denied: permission_denied: read_package`. A token is
+# scoped to the repository it runs in, and package ownership does not follow a
+# rename.
+#
+# One of these fixes it, and neither can be done from a workflow:
+#
+#  - GitHub, Packages, `vikt-web`, Package settings, **Manage Actions access**:
+#    add this repository with the **Write** role. Same for `vikt-api`.
+#  - Or delete both packages and let the first run here create them.
+#
+# Until then this runs only when somebody asks for it, so a red cross does not
+# sit on every commit for a registry nothing currently pulls from: images are
+# built on the workstation and loaded onto the Docker host directly. Put the
+# `push:` trigger back once the packages accept a push from here.
 on:
-  push:
-    branches: ["main"]
-    # Docs-only pushes should not produce an image. The stack would pull an
-    # identical binary under a new tag and call it a deployment.
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   # A version tag, for a release worth naming and rolling back to.
   release:
     types: [published]
