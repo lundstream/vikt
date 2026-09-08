@@ -1,0 +1,36 @@
+# Development: Postgres only.
+#
+# The API and the web app run on the host with hot reload:
+#
+#   pnpm dev:db          # this file
+#   pnpm --filter api db:migrate
+#   pnpm dev             # tsx watch + vite --host, both on the host
+#
+# Vite binds 0.0.0.0 so the phone can reach it over the LAN, and proxies /api
+# to 127.0.0.1:3000. The API itself stays on loopback even in development.
+
+name: vikt-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vikt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-vikt}
+    ports:
+      # Published to the host on purpose: this is the development database and
+      # tsx/drizzle-kit run outside Docker. The production stack publishes
+      # nothing.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - vikt_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vikt} -d ${POSTGRES_DB:-vikt}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  vikt_dev_pgdata:

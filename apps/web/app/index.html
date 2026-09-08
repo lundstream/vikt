@@ -1,0 +1,109 @@
+<!doctype html>
+<!--
+  `lang` is the correct default here and is re-asserted at runtime from the i18n
+  layer (src/main.tsx), so LOCALE is the one place the app's language is decided.
+
+  It does **not** control the format of a native date input: browsers take that
+  from the OS locale, which is why a machine set to en-US shows mm/dd/yyyy in a
+  Swedish interface. What `lang` does drive is hyphenation, the spell-check
+  dictionary, and how a screen reader pronounces the page.
+-->
+<html lang="sv" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--
+      __APP_NAME__ is substituted at runtime, not at build time: in dev by
+      vite-plugin-app-name.ts, in production by the nginx container's
+      30-app-name.sh. Renaming the app is an env var, never a code edit.
+    -->
+    <title>__APP_NAME__</title>
+    <meta name="app-name" content="__APP_NAME__" />
+    <meta name="application-name" content="__APP_NAME__" />
+    <meta name="apple-mobile-web-app-title" content="__APP_NAME__" />
+    <meta name="theme-color" content="#16232B" />
+    <!--
+      Under /app/, inside the app's own scope (D93).
+
+      It resolved correctly from the root, but sharing a URL between the app and
+      a public landing page that must never be installable is an ambiguity
+      waiting to be resolved the wrong way, and the no-cache rule in nginx was
+      keyed to the root path.
+    -->
+    <link rel="manifest" href="/app/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <!--
+      Typefaces are self-hosted (src/styles/fonts.css). They used to come from
+      Google's CDN, which the service worker cannot precache, so the offline
+      PWA had no fonts at all. Preloaded because they are render-blocking for
+      the numbers, which are the content here.
+    -->
+    <link
+      rel="preload"
+      href="/fonts/Archivo-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/Inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <!--
+      Who runs this installation (D121). Substituted by 32-site-config.sh at
+      container start, like __APP_NAME__ above and for the same reason: these
+      are facts about a deployment, and the person who deploys Vikt is the
+      controller under the GDPR, not the person who wrote it.
+
+      In the HTML rather than in a bundle because the bundles carry content
+      hashes the service worker records, and rewriting bytes inside one leaves
+      the worker refusing its own cache.
+    -->
+    <script>
+      window.viktSiteConfig = {
+        contact: "__CONTACT_EMAIL__",
+        operator: "__OPERATOR__",
+        repo: "__REPO_URL__",
+        support: "__SUPPORT_URL__",
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      Dark is the default and stays on `<html>` in the markup, so the very first
+      paint is dark even before this runs: the phone gets used in the morning
+      before the lights are on, and a white flash at that hour is the one thing
+      worse than the wrong theme.
+
+      There is a switcher now (D117), and the choice lives on the account. This
+      script reads the **cached** copy, because `/api/me` cannot answer before
+      the first paint and a theme that settles 400 ms in is a flash. The cache
+      is written every time the account's value is seen; a device that has never
+      synced falls through to the OS, which is what the app did before.
+
+      Inline and blocking on purpose. A module import here would run after the
+      first paint and defeat the whole thing.
+    -->
+    <script>
+      (function () {
+        var choice = "system";
+        try {
+          var stored = localStorage.getItem("vikt.theme");
+          if (stored === "dark" || stored === "light" || stored === "system") choice = stored;
+        } catch (e) {
+          /* A private window. `system` is the right answer then. */
+        }
+        var dark =
+          choice === "dark" ||
+          (choice === "system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

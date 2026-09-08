@@ -1,0 +1,148 @@
+# The production stack, for Portainer.
+#
+# Same three services as `docker-compose.yml` and the same network shape. The
+# one difference is that this **pulls images** instead of building them, because
+# a Portainer host has no source tree and should not be compiling anything: a
+# stack that builds from git turns every redeploy into a pnpm install on a box
+# that is meant to be running things.
+#
+# Everything configurable is a stack environment variable, because that is the
+# form Portainer gives you: paste this file into a stack, fill the variables in
+# the panel underneath, deploy. Nothing here reads a `.env` file, since there is
+# no filesystem beside the compose file to read one from.
+#
+# Fill in the variables in the panel underneath the editor. CONTACT_EMAIL is
+# required wherever LANDING_ENABLED is true: the privacy page has to name
+# somebody the reader can write to, and the API refuses to boot without it.
+
+name: vikt
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      # A named volume, so Portainer's "remove stack" does not take the data
+      # with it and a `docker volume ls` shows what is being kept.
+      - vikt_pgdata:/var/lib/postgresql/data
+    networks:
+      # `backend` only: the database has no route off the host.
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    image: ${IMAGE_API:-ghcr.io/lundstream/vikt-api:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_NAME: ${APP_NAME:-Vikt}
+      LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      # Where recipients will click. Every link in every email is built from it,
+      # and in production the API refuses to boot on a localhost or private
+      # address, because "absolute" was not enough (D109, D113).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
+      # Reads and writes the encrypted mail password and the backups (D102).
+      # Without it the app runs and cannot store an SMTP password.
+      SECRET_KEY: ${SECRET_KEY:-}
+      HOST: 0.0.0.0
+      PORT: 3000
+      # The immediate peer allowed to speak for a client: the `edge` subnet,
+      # pinned below. NOT a hop count (D14). Verify from a cellular IP.
+      TRUST_PROXY: ${TRUST_PROXY:-172.31.240.0/24}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # Where the scheduled backup writes (D103). Bind it somewhere off this
+      # host if the backups are to survive the host.
+      - vikt_backups:/backups
+    networks:
+      - backend
+      # `edge` so nginx can reach it, and so the food-database lookups have
+      # outbound internet. Still no published ports.
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  nginx:
+    image: ${IMAGE_WEB:-ghcr.io/lundstream/vikt-web:latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # Substituted into the built index.html and manifest at container start,
+      # so renaming the app needs no rebuild (D13).
+      APP_NAME: ${APP_NAME:-Vikt}
+      LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      # Who runs this installation (D121). The GDPR controller is whoever
+      # deploys Vikt, so these are settings and not constants in the source.
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      OPERATOR: ${OPERATOR:-}
+      REPO_URL: ${REPO_URL:-https://github.com/lundstream/vikt}
+      SUPPORT_URL: ${SUPPORT_URL:-}
+    ports:
+      # `WEB_BIND` is the one line to get right, and it depends on where the
+      # reverse proxy is:
+      #
+      #  - **Nginx Proxy Manager in a container on this host**: leave the bind
+      #    at 127.0.0.1 and put this service on NPM's network instead (see the
+      #    commented block below), then point NPM at `http://vikt-nginx:80`. A
+      #    container cannot reach the host's loopback, so a proxy container and
+      #    a loopback bind is the combination that looks right and refuses every
+      #    request.
+      #  - **A proxy elsewhere on the LAN**: set WEB_BIND to 0.0.0.0 and let the
+      #    host firewall decide who may reach it. Do not skip the firewall: this
+      #    port answers without TLS and without the forwarded-header validation
+      #    that only happens behind the proxy.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+    networks:
+      - edge
+      # Uncomment, along with the `npm` network at the bottom, when the reverse
+      # proxy is a container on this host. Then NPM reaches this by name and
+      # nothing needs publishing at all.
+      # - npm
+
+networks:
+  # Postgres and the API. No gateway, so nothing here can reach the internet
+  # and nothing on the internet can reach it.
+  backend:
+    internal: true
+  # nginx and the API. The subnet is pinned so TRUST_PROXY can name the peer
+  # exactly rather than trusting every private address. Change both together.
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.31.240.0/24}
+  # The reverse proxy's own network, created outside this stack. Uncomment with
+  # the service entry above, and set NPM_NETWORK to its real name.
+  # npm:
+  #   external: true
+  #   name: ${NPM_NETWORK:-npm_default}
+
+volumes:
+  vikt_pgdata:
+  vikt_backups:

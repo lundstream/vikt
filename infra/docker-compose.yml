@@ -1,0 +1,130 @@
+# Production stack: postgres + api + nginx.
+#
+#   cd infra && cp .env.example .env && $EDITOR .env
+#   docker compose up -d --build
+#
+# Only nginx publishes a port, and only to loopback on the host — Nginx Proxy
+# Manager in front of it terminates TLS and Cloudflare sits in front of that.
+# The API publishes nothing, which is the container equivalent of binding to
+# loopback: the only route to it is from nginx over the `edge` network
+# (DECISIONS.md D12). Postgres sits on `backend`, which is internal, so it has
+# no route off the host at all.
+
+name: vikt
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in infra/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in infra/.env}
+    volumes:
+      - vikt_pgdata:/var/lib/postgresql/data
+    networks:
+      # `backend` only: the database has no route off the host.
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_NAME: ${APP_NAME:-Vikt}
+      # Whether this installation serves a public landing page (D94). nginx
+      # needs it as well as the API: the API decides whether the endpoint
+      # exists, nginx decides whether the page is served at all.
+      LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/.env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in infra/.env}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      # Where recipients will click (D109, D113). Every link in every email is
+      # built from it, and in production the API refuses to boot on a localhost
+      # or private address. Absent from this file until now, which meant a
+      # deployment from it could send an invite with no link in it at all.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in infra/.env}
+      # Reads and writes the encrypted SMTP password and the backups (D102).
+      # Optional: without it the app runs and cannot store a mail password, so
+      # mail stays off rather than the boot failing.
+      SECRET_KEY: ${SECRET_KEY:-}
+      # Nothing is published for this service, so 0.0.0.0 here means "reachable
+      # from nginx over the compose network" and nothing more.
+      HOST: 0.0.0.0
+      PORT: 3000
+      # The immediate peer allowed to speak for a client: the `edge` subnet,
+      # which is pinned below so this value is stable. NOT a hop count — see
+      # DECISIONS.md D14. Verify from a cellular IP, not from the LAN.
+      TRUST_PROXY: ${TRUST_PROXY:-172.31.240.0/24}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - backend
+      # `edge` so nginx can reach it, and so phase 3's food-database lookups
+      # have outbound internet. Still no published ports.
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: infra/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # Substituted into the built index.html and manifest at container start,
+      # so renaming the app is `APP_NAME=... docker compose up -d` with no
+      # rebuild (DECISIONS.md D13).
+      APP_NAME: ${APP_NAME:-Vikt}
+      LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      # Who runs this installation (D121).
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      OPERATOR: ${OPERATOR:-}
+      REPO_URL: ${REPO_URL:-https://github.com/lundstream/vikt}
+      SUPPORT_URL: ${SUPPORT_URL:-}
+    ports:
+      # Loopback on the Docker host. NPM proxies to it.
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    networks:
+      - edge
+
+networks:
+  # Postgres and the API. No gateway, so nothing here can reach the internet
+  # and nothing on the internet can reach it.
+  backend:
+    internal: true
+  # nginx and the API. nginx is the only service that publishes a port, and it
+  # publishes only to loopback on the Docker host.
+  #
+  # The subnet is pinned so TRUST_PROXY can name the peer exactly rather than
+  # trusting every private address. Change both together.
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.240.0/24
+
+volumes:
+  vikt_pgdata:

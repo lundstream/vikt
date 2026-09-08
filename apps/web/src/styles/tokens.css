@@ -1,0 +1,126 @@
+/**
+ * Design tokens — CLAUDE.md §5 and `docs/Vikt-grafisk-profil.pdf` (D86).
+ *
+ * Two layers, and the separation is the whole point of this file.
+ *
+ * **The palette** carries the profile's own names. They are Norrland words so
+ * that they can be said out loud in a conversation about a screen, and they
+ * name colours and nothing else: `--lingon` is a red, it is not a meaning.
+ *
+ * **The semantic layer** names meanings and points them at the palette. Every
+ * component uses these and only these — `text-logged`, `bg-reward`,
+ * `stroke-trend` — so that the question "what colour is this" is never asked in
+ * a component, and the question "what does this colour mean" has exactly one
+ * answer per app rather than one per file.
+ *
+ * That is not tidiness. The rule the profile is built on is that **a colour
+ * always stands for an area, never for a feeling**: Gran is not "good", Gran is
+ * "logged". A component that reached for `--gran` directly would be free to use
+ * it because it liked the green, and the meaning would erode one file at a time.
+ *
+ * ## Dark is primary
+ *
+ * The phone gets used in the morning before the lights are on, so the dark
+ * values are the ones the profile specifies and the ones written here first.
+ * The light theme re-points the same semantic names at the light variants.
+ *
+ * ## Why these are real colours and not RGB channels
+ *
+ * They used to be space-separated triples (`22 35 43`) so that Tailwind's
+ * `<alpha-value>` could build `rgb(...)` around them. That worked for anyone
+ * going through a Tailwind class and broke silently for everyone who did not:
+ *
+ *  - `bg-[var(--logged)]` compiled to `background-color: 22 35 43`, which is
+ *    not a colour, so the browser dropped the declaration. Seven files.
+ *  - `bg-[var(--ink)]/70` emitted **no rule at all**, which is how the
+ *    celebration dialog shipped with a fully transparent backdrop.
+ *
+ * Neither errored. The class-name guard catches them now, but the better fix
+ * is a representation where the mistake is not possible: a token that is a
+ * real colour works wherever CSS accepts a colour, including in the hands of
+ * someone who has never read this file. Opacity comes from `color-mix()` in
+ * the Tailwind config, which is supported everywhere this app runs.
+ */
+
+:root {
+  /* ---------------------------------------------------------- the palette */
+  /* Light variants. The profile gives these for the accents and Papper. */
+  --natt: #edf1f2; /* Papper: the page */
+  --skymning: #e4e9eb; /* one step up from the page, for cards */
+  --dis: #d6dee0; /* fields, raised surfaces, hairlines */
+  --sten: #5c6b72; /* darkened from #6B7B82 to hold 4.5:1 on Papper */
+  --sno: #16232b; /* the text colour; on light it is the dark one */
+
+  --lingon: #b0203c;
+  --gran: #3d5943;
+  --is: #5c8a96;
+  --honung: #a8761e;
+  --blabar: #2e6fa8;
+
+  /* ------------------------------------------------- what the colours mean */
+  /* Surfaces and text. Named for their job on the page, not for their hue. */
+  --paper: var(--natt);
+  --card: var(--skymning);
+  --field: var(--dis);
+  --edge: var(--dis);
+  --ink: var(--sno);
+  --muted: var(--sten);
+
+  /* The five areas. One colour, one meaning, everywhere in the app. */
+  --trend: var(--lingon); /* the trend line and the wordmark. Nothing else. */
+  --logged: var(--gran); /* logged, chosen, saved, streaks */
+  --data: var(--is); /* raw readings, secondary series, measurements */
+  --reward: var(--honung); /* the pot, rewards, milestones */
+  /**
+   * Nutrition. Blue as of profile v1.1, which moved Blåbär off the violet it
+   * shared too much hue with: at a glance a violet bar and the ice of a
+   * secondary series read as the same family, and the whole point of the accent
+   * is that an area is identifiable without reading its label.
+   */
+  --nutrition: var(--blabar);
+  /**
+   * Uncertainty gets no accent, deliberately.
+   *
+   * An estimate, an incomplete total and "inte än" are all Sten with a dashed
+   * edge or a `≈` prefix. Giving uncertainty a colour of its own would make it
+   * a category of thing, and it is not: it is an absence of information about
+   * something that already has a category.
+   */
+  --uncertain: var(--sten);
+
+  color-scheme: light;
+}
+
+/**
+ * Dark, which is the primary theme and the one the profile specifies.
+ *
+ * Only the palette moves. Every semantic name above keeps pointing at the same
+ * palette entry, which is what makes "Gran means logged" true in both themes
+ * without either theme knowing about the other.
+ */
+.dark {
+  --natt: #0f1418;
+  --skymning: #16232b;
+  --dis: #1e2d36;
+  --sten: #6b7b82;
+  --sno: #edf1f2;
+
+  --lingon: #e0455f;
+  --gran: #86ae8b;
+  --is: #9fc3cc;
+  --honung: #e2b25a;
+  --blabar: #5fa8e6;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

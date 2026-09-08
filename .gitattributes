@@ -1,0 +1,38 @@
+# Line endings and binaries.
+#
+# The tree is developed on Windows and deployed on Debian, so text is
+# normalised to LF in the repository and checked out however the platform
+# wants it. Without this, every file touched on Windows arrives in a diff as
+# wholly rewritten, which makes review useless exactly when it matters.
+
+* text=auto eol=lf
+
+# Shell scripts and anything the container runs must keep LF even on Windows:
+# a CRLF shebang line is a "bad interpreter" error at runtime.
+*.sh text eol=lf
+*.bash text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf
+
+# ------------------------------------------------------------------ binary
+# Marked so git never tries to diff, merge or normalise them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+
+# SVG is text and benefits from diffing, so it is deliberately not listed above.
+
+# `pnpm-lock.yaml` is generated: keep it in the repository, keep it out of
+# review. A lockfile conflict is resolved by regenerating, never by hand.
+pnpm-lock.yaml -diff linguist-generated

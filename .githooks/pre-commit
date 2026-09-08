@@ -1,0 +1,29 @@
+#!/bin/sh
+# Lint and typecheck before every commit.
+#
+# Installed by `git config core.hooksPath .githooks`, which the `prepare` script
+# in package.json runs on `pnpm install`. Committed to the repository so it is
+# the same hook for everyone rather than a note in a README.
+#
+# Why this and not the whole suite: lint and typecheck take a few seconds and
+# catch the class of mistake that actually reached `main` — dead imports, a
+# service that took its arguments in the wrong order, a placeholder that never
+# got substituted. The test suite needs Postgres and takes long enough that a
+# hook running it would be disabled within a week, and CI runs it on every push
+# anyway. A hook people turn off is worse than no hook, because it is believed.
+#
+# To bypass it deliberately: `git commit --no-verify`.
+set -e
+
+# Nothing staged, nothing to check. `git commit` will refuse on its own.
+if git diff --cached --quiet; then
+  exit 0
+fi
+
+echo "pre-commit: lint"
+pnpm lint
+
+echo "pre-commit: typecheck"
+pnpm typecheck
+
+echo "pre-commit: ok"

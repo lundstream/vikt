@@ -1,0 +1,90 @@
+# Lint, typecheck and the whole test suite, on every push and pull request.
+#
+# This exists because STATE.md said "lint and typecheck clean" for a pass in
+# which `HEAD` had 27 lint errors. The claim was written by hand and nothing
+# checked it. From here on the verification line in STATE.md cites a run of this
+# workflow instead, because a green check is a fact and a sentence is a memory.
+#
+# Postgres is a service container rather than a mock: the API tests run against
+# a real database by design (see `apps/api/test/database.ts`), since the things
+# most likely to be wrong are the `ON CONFLICT` clauses, the unique indexes and
+# the cascades, and none of those exist in a fake. The harness creates and
+# migrates `vikt_test` itself, so nothing here needs to run migrations.
+#
+# `pnpm --filter api contract:food` is deliberately absent. It hits the live
+# Open Food Facts and Livsmedelsverket APIs, and a build that fails because
+# somebody else's server is down is a build that teaches people to ignore red.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A new push to the same branch cancels the run it superseded. The old result
+# is about code nobody is looking at any more.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vikt
+          POSTGRES_PASSWORD: vikt
+          POSTGRES_DB: vikt
+        ports:
+          - 5432:5432
+        # Without this the first test connects before Postgres is listening and
+        # the whole job fails on something that is only a race.
+        options: >-
+          --health-cmd "pg_isready -U vikt -d vikt"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # The harness swaps the database name for `vikt_test`, so this is the
+      # credential source rather than the database actually used.
+      DATABASE_URL: postgres://vikt:vikt@127.0.0.1:5432/vikt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Read from `packageManager` in package.json, so the version cannot
+          # drift from the one used locally.
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # `--frozen-lockfile` so a lockfile that disagrees with package.json
+      # fails here rather than silently resolving to something else.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # Runs last because it needs the build. It fails if `__PLACEHOLDER__`
+      # survives into `dist/` anywhere it is not meant to.
+      - name: Build
+        run: pnpm build
+
+      - name: Check the build for unsubstituted placeholders
+        run: pnpm --filter web check:placeholders

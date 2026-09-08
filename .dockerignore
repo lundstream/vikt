@@ -1,0 +1,19 @@
+# The build context is the repo root. Without this, `COPY apps/web apps/web`
+# drops the host's node_modules on top of the one pnpm just installed in the
+# image, and the build fails on a missing binary.
+**/node_modules
+**/dist
+**/build
+**/.vite
+**/coverage
+**/*.tsbuildinfo
+
+# Never bake secrets into an image layer.
+.env
+**/.env
+!infra/.env.example
+
+.git
+.gitignore
+infra/data
+**/.DS_Store

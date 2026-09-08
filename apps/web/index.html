@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  The landing page (D90).
+
+  A separate entry from the app, deliberately. The app lives under /app/ with a
+  service worker scoped to /app/, and this page is outside that scope — it never
+  registers a worker, is never cached by one, and cannot be served stale to
+  someone who has installed the app. That separation is the reason for the move,
+  not a side effect of it.
+
+  It shares the app's stylesheet and tokens, so the two look like one product
+  without this page importing anything that talks to the API beyond the one
+  public endpoint the form posts to.
+-->
+<html lang="sv" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>__APP_NAME__ — Gör det lättare</title>
+    <meta
+      name="description"
+      content="Vikt är en självhostad vikt- och vanelogg. Trendlinje i stället för dagens våg, och underhållsnivå räknad ur dina egna siffror."
+    />
+    <meta name="theme-color" content="#16232B" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+
+    <!--
+      No manifest link and no service worker registration on this page. An
+      installed app must never be able to serve the landing page from a cache,
+      and a visitor to the landing page must never be prompted to install
+      something they have not looked at yet.
+    -->
+
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/Archivo-latin.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/Inter-latin.woff2" />
+    <!--
+      Who runs this installation (D121). Substituted by 32-site-config.sh at
+      container start, like __APP_NAME__ above and for the same reason: these
+      are facts about a deployment, and the person who deploys Vikt is the
+      controller under the GDPR, not the person who wrote it.
+
+      In the HTML rather than in a bundle because the bundles carry content
+      hashes the service worker records, and rewriting bytes inside one leaves
+      the worker refusing its own cache.
+    -->
+    <script>
+      window.viktSiteConfig = {
+        contact: "__CONTACT_EMAIL__",
+        operator: "__OPERATOR__",
+        repo: "__REPO_URL__",
+        support: "__SUPPORT_URL__",
+      };
+    </script>
+  </head>
+  <body>
+    <div id="landing"></div>
+    <script type="module" src="/src/landing/main.tsx"></script>
+  </body>
+</html>

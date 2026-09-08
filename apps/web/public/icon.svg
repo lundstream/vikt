@@ -1,0 +1,18 @@
+<!--
+  The mark, per graphic profile v1.1 page 7.
+
+  An S: nearly level leaving the start, steep through the middle, level again
+  into the end dot. The shape of a real trend rather than a diagonal, and the
+  same picture as the hero on Översikt at icon size.
+
+  No raw-reading dots: v1.1 removed them because "råpunkter blir brus i
+  ikonstorlek", which is what D91 had already found at 24 px.
+
+  The palette is baked in because the OS renders this file with no stylesheet to
+  ask. Dark values, since dark is primary and the square is Skymning.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect width="48" height="48" rx="10" fill="#16232B"/>
+  <path d="M10 15 C 22 15, 26 33, 38 33" fill="none" stroke="#E0455F" stroke-width="4.5" stroke-linecap="round"/>
+  <circle cx="38" cy="33" r="5" fill="#E0455F"/>
+</svg>

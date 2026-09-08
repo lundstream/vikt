@@ -1,0 +1,109 @@
+# Builds the two production images and pushes them to GHCR.
+#
+# Why images rather than a Portainer stack that builds from git: building needs
+# the whole source tree and a pnpm install on the Docker host, which turns a
+# redeploy into several minutes of CPU on a box that is meant to be running
+# things, not compiling them. A tagged image is pulled in seconds, and a
+# rollback is the previous tag rather than a git checkout.
+#
+# The images are public once the repository is, so Portainer needs no registry
+# credentials at all. While it is private they are private too, and the stack
+# needs a pull secret configured in whatever is pulling them.
+name: release
+
+on:
+  push:
+    branches: ["main"]
+    # Docs-only pushes should not produce an image. The stack would pull an
+    # identical binary under a new tag and call it a deployment.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  # A version tag, for a release worth naming and rolling back to.
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      # The only write this job needs. Deliberately not `packages: write` plus
+      # everything else the default token carries.
+      packages: write
+
+    strategy:
+      # Both images every time, and one failing does not cancel the other: a
+      # half-published pair is easier to reason about than a cancelled one.
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: infra/api.Dockerfile
+          - name: web
+            dockerfile: infra/web.Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR wants a lowercase path and the owner is not. `Vikt` would be
+      # rejected at push time, which is a late and confusing place to find out.
+      - name: Work out the image name
+        id: image
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "ref=${{ env.REGISTRY }}/${owner}/vikt-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.ref }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # The repo root, because both Dockerfiles copy the workspace.
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # A registry cache rather than GitHub's, so the layers are reachable
+          # from a local `docker build` too when something needs reproducing.
+          cache-from: type=registry,ref=${{ steps.image.outputs.ref }}:buildcache
+          cache-to: type=registry,ref=${{ steps.image.outputs.ref }}:buildcache,mode=max
+
+      # What to put in the stack. Printed rather than assumed, because the
+      # commit tag is the one worth pinning and it is not the one anybody
+      # remembers.
+      - name: What was published
+        run: |
+          echo "### \`vikt-${{ matrix.name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

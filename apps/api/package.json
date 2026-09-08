@@ -1,0 +1,48 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "invite": "tsx src/scripts/invite.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "seed:dev": "tsx src/scripts/seed-dev.ts",
+    "contract:food": "tsx src/scripts/contract-check.ts",
+    "import:livsmedelsverket": "tsx src/scripts/import-livsmedelsverket.ts",
+    "admin": "tsx src/scripts/make-admin.ts",
+    "mail:worker": "tsx src/scripts/mail-worker.ts",
+    "mail:samples": "tsx src/scripts/send-samples.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/helmet": "^13.0.1",
+    "@fastify/proxy-addr": "^5.1.0",
+    "@node-rs/argon2": "^2.0.2",
+    "altcha-lib": "^2.4.0",
+    "drizzle-orm": "^0.38.3",
+    "fastify": "5.12.1",
+    "fastify-plugin": "^5.0.1",
+    "fastify-type-provider-zod": "^4.0.2",
+    "nodemailer": "^10.0.0",
+    "postgres": "^3.4.5",
+    "shared": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/nodemailer": "^8.0.1",
+    "drizzle-kit": "^0.30.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
+  }
+}

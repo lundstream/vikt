@@ -1,0 +1,84 @@
+# Written before `git init`, deliberately.
+#
+# A gitignore added afterwards protects nothing: git does not un-track a file
+# because a pattern appeared later, and it cannot remove one from a commit that
+# already happened. Everything below is either a secret, someone's body data, or
+# a build artefact, and the first two are permanent once pushed.
+
+# ------------------------------------------------------------------ secrets
+.env
+.env.*
+!.env.example
+*.env
+secrets/
+*.secret
+
+# Certificates and keys. `pnpm dev:certs` regenerates the development pair, and
+# the private key must never be committed even though it is only trusted on the
+# machine that made it.
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+infra/certs/
+
+# --------------------------------------------------------------- user data
+# Photos are private by design (D10) and live on a volume outside the web root.
+# Nothing about them belongs in a repository.
+uploads/
+photos/
+infra/data/
+infra/backups/
+
+# Database dumps and exports. A dump of the development database is a copy of
+# the owner's real weights and food log.
+*.sql.gz
+*.dump
+*.sqlite
+*.sqlite3
+dump*.sql
+backup*.sql
+export/
+
+# ------------------------------------------------------- build and tooling
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.pnpm-store/
+*.tsbuildinfo
+.turbo/
+
+# Verification output. Screenshots taken during a verification pass are of a
+# real dashboard, so they are user data as much as they are artefacts.
+#
+# `docs/screens/` and `apps/web/public/screens/` are the exception and are
+# committed: they are product assets, taken from the test account rather than
+# from anyone's own log, and the README and the landing page need them.
+screenshots/
+shots/
+shots-*/
+scratchpad/
+tmp/
+temp/
+*.local
+
+# -------------------------------------------------------- editors and OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# ------------------------------------------------------- this installation
+# INFRA.md and its companions hold addresses, hosts and the record of running
+# Vikt on one particular server. DECISIONS.md and CLAUDE.md are about the
+# program and are useful to anybody who clones this; these are not, and one of
+# them is a session log naming the owner's phone.
+INFRA.md
+INFRA-STATE.md

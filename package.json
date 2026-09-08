@@ -1,0 +1,30 @@
+{
+  "name": "vikt-app",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "dev": "pnpm --parallel --filter api --filter web dev",
+    "dev:db": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "dev:db:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "build": "pnpm --filter api build && pnpm --filter web build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "invite": "pnpm --filter api invite",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "dev:certs": "node scripts/dev-certs.mjs",
+    "dev:tunnel": "cloudflared tunnel --url https://localhost:5173 --no-tls-verify"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  }
+}

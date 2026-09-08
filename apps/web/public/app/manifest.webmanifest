@@ -1,0 +1,31 @@
+{
+  "name": "__APP_NAME__",
+  "short_name": "__APP_NAME__",
+  "id": "/app/",
+  "description": "__APP_NAME__ \u2014 weight and habit tracking",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#0F1418",
+  "theme_color": "#16232B",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": [
+    "health",
+    "lifestyle"
+  ],
+  "lang": "sv-SE"
+}

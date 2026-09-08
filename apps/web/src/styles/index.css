@@ -1,0 +1,330 @@
+@import "./tokens.css";
+@import "./fonts.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    min-height: 100dvh;
+    font-size: theme("fontSize.body[0]");
+    line-height: 1.5;
+  }
+
+  /**
+   * Numbers are the content of this app, so they are set in Archivo with real
+   * tabular lining figures: every digit occupies the same advance width, and a
+   * value counting up does not make the text beside it shuffle sideways.
+   *
+   * Applied to the figure elements themselves as well as to `.num`, because a
+   * number that reaches a screen without the `.num` class is still a number.
+   */
+  .num,
+  .text-figure,
+  .text-figure-sm,
+  .text-metric,
+  .text-metric-sm,
+  input[inputmode="decimal"],
+  input[inputmode="numeric"],
+  input[type="number"],
+  input[type="date"] {
+    font-family: theme("fontFamily.num");
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  /**
+   * Keyboard focus stays visible everywhere. Quality floor, CLAUDE.md §5.
+   *
+   * The ring is `--ink` on light and would be nearly invisible against the
+   * dark ground, so dark mode swaps it for `--data`, the ice used for raw
+   * readings: bright enough to read on Natt and not reserved for the trend.
+   */
+  :focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    --tw-ring-color: var(--ink);
+    --tw-ring-offset-color: var(--paper);
+  }
+
+  .dark :focus-visible {
+    --tw-ring-color: var(--data);
+  }
+
+  /* Selection follows the theme rather than the OS default blue. */
+  ::selection {
+    background: color-mix(in srgb, var(--logged) 35%, transparent);
+  }
+}
+
+@layer components {
+  /**
+   * Text inputs and textareas.
+   *
+   * `bg-transparent` was wrong: on a `<select>` it made the option list fall
+   * back to the browser's white popup while the text inherited `--ink`, which
+   * in dark mode is nearly white. An explicit surface costs nothing and means
+   * every control sits on the same ground on both themes.
+   */
+  .field {
+    @apply w-full rounded-lg border border-edge bg-card px-3 py-2.5 text-body
+           text-ink transition-colors placeholder:text-muted;
+  }
+
+  .field:focus {
+    @apply border-muted;
+  }
+
+  /** A `<select>`, matching `.field` exactly apart from the chevron. */
+  .select {
+    @apply w-full appearance-none rounded-lg border border-edge bg-card px-3 py-2.5
+           pr-9 text-body text-ink transition-colors;
+
+    /* `currentColor` does not resolve inside a data URI, so the chevron is a
+       literal colour and each theme gets its own. Light first; the dark
+       override is below. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235c6b72' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1.15rem;
+  }
+
+  .dark .select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7b82' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  }
+
+  /**
+   * The option list is drawn by the OS, and only `background-color` and
+   * `color` are honoured. Setting them is what stops Android rendering a white
+   * popup with near-white text on the dark theme.
+   */
+  .select option {
+    background-color: var(--paper);
+    color: var(--ink);
+  }
+
+  /**
+   * The wordmark's own type (profile, page 7): Archivo, bold, and about 112%
+   * width. `font-stretch` is what the profile means by "utökad bredd" and
+   * Archivo is a variable font with a real width axis, so this widens the
+   * letterforms rather than scaling them.
+   */
+  .wordmark {
+    font-family: theme("fontFamily.num");
+    font-weight: 700;
+    font-stretch: 112%;
+    font-variation-settings: "wdth" 112;
+    letter-spacing: -0.01em;
+  }
+
+  /**
+   * A `<select>` that matches the other controls.
+   *
+   * `.field` sets `bg-transparent`, which is right for a text input and wrong
+   * here: a select with no background renders its option list against the
+   * browser's default white, while the option text inherits `--ink`, which in
+   * dark mode is nearly white. The result is pale text on a pale popup, which
+   * reads as several options being greyed out and disabled for no stated
+   * reason. Nothing was ever disabled.
+   *
+   * So the background is explicit, the options are given their own colours for
+   * the browsers that honour them, and the native arrow is replaced with one
+   * drawn in `currentColor` so it follows the theme like everything else.
+   */
+  .select {
+    @apply w-full appearance-none rounded-md border border-edge bg-paper px-3 py-2
+           pr-9 text-base text-ink;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7B82' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1.15rem;
+  }
+
+  .select option {
+    @apply bg-paper text-ink;
+  }
+
+  /**
+   * A `<select>` that matches the other controls.
+   *
+   * `.field` sets `bg-transparent`, which is right for a text input and wrong
+   * here: a select with no background renders its option list against the
+   * browser's default white, while the option text inherits `--ink`, which in
+   * dark mode is nearly white. The result is pale text on a pale popup, which
+   * reads as several options being greyed out and disabled for no stated
+   * reason. Nothing was ever disabled.
+   *
+   * So the background is explicit, the options are given their own colours for
+   * the browsers that honour them, and the native arrow is replaced with one
+   * drawn in `currentColor` so it follows the theme like everything else.
+   */
+  .select {
+    @apply w-full appearance-none rounded-md border border-edge bg-paper px-3 py-2
+           pr-9 text-base text-ink;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7B82' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1.15rem;
+  }
+
+  .select option {
+    @apply bg-paper text-ink;
+  }
+
+  /**
+   * A `<select>` that matches the other controls.
+   *
+   * `.field` sets `bg-transparent`, which is right for a text input and wrong
+   * here: a select with no background renders its option list against the
+   * browser's default white, while the option text inherits `--ink`, which in
+   * dark mode is nearly white. The result is pale text on a pale popup, which
+   * reads as several options being greyed out and disabled for no stated
+   * reason. Nothing was ever disabled.
+   *
+   * So the background is explicit, the options are given their own colours for
+   * the browsers that honour them, and the native arrow is replaced with one
+   * drawn in `currentColor` so it follows the theme like everything else.
+   */
+  .select {
+    @apply w-full appearance-none rounded-md border border-edge bg-paper px-3 py-2
+           pr-9 text-base text-ink;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7B82' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1.15rem;
+  }
+
+  .select option {
+    @apply bg-paper text-ink;
+  }
+
+  /**
+   * A `<select>` that matches the other controls.
+   *
+   * `.field` sets `bg-transparent`, which is right for a text input and wrong
+   * here: a select with no background renders its option list against the
+   * browser's default white, while the option text inherits `--ink`, which in
+   * dark mode is nearly white. The result is pale text on a pale popup, which
+   * reads as several options being greyed out and disabled for no stated
+   * reason. Nothing was ever disabled.
+   *
+   * So the background is explicit, the options are given their own colours for
+   * the browsers that honour them, and the native arrow is replaced with one
+   * drawn in `currentColor` so it follows the theme like everything else.
+   */
+  .select {
+    @apply w-full appearance-none rounded-md border border-edge bg-paper px-3 py-2
+           pr-9 text-base text-ink;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7B82' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1.15rem;
+  }
+
+  .select option {
+    @apply bg-paper text-ink;
+  }
+
+  .label {
+    @apply mb-1.5 block text-note font-medium text-muted;
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-ink
+           px-4 py-2.5 text-body font-medium text-paper transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
+   * The quieter sibling, for a second action on a screen that already has a
+   * primary one: "add an activity" beside "save the day". Same height, so the
+   * two line up and both clear a thumb.
+   */
+  .btn-secondary {
+    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg border
+           border-edge bg-transparent px-4 py-2.5 text-body font-medium text-ink
+           transition-colors hover:border-muted
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
+   * Checkboxes. `accent-color` is the only cross-browser way to theme a native
+   * one, and without it Android draws the OS blue on both themes.
+   */
+  .check {
+    @apply size-4 shrink-0 rounded accent-logged;
+  }
+
+  /**
+   * A quiet grouping surface. Used sparingly and deliberately not a card: §5
+   * warns against chopping the dashboard into identical rounded boxes, so this
+   * is one step of separation for one block, not a pattern to repeat.
+   */
+  .panel {
+    @apply rounded-card bg-card p-4;
+  }
+
+  /* --------------------------------------------- the profile's components */
+
+  /**
+   * A scale button that has been chosen (profile, page 6).
+   *
+   * Gran, "eftersom valt betyder loggat" — choosing a value on Dagen *is* the
+   * log for that scale, so the selected state is the same colour as every other
+   * logged thing in the app rather than a highlight colour of its own.
+   */
+  .scale-option {
+    @apply min-h-11 flex-1 rounded-lg border border-edge bg-card text-note text-ink
+           transition-colors;
+  }
+
+  .scale-option[aria-pressed="true"],
+  .scale-option[data-selected="true"] {
+    @apply border-logged bg-logged/15 text-ink;
+  }
+
+  /**
+   * Status tags (profile, page 6).
+   *
+   * Only one of them has a colour. Logged is Gran; everything uncertain is Sten
+   * with a dashed edge or a `≈` prefix, because **uncertainty is not an area**
+   * and giving it an accent would make it one. The shape carries the meaning as
+   * well as the colour does, which is the profile's rule that colour is never
+   * alone in saying what something is.
+   */
+  .tag {
+    @apply inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-micro;
+  }
+
+  .tag-logged {
+    @apply border-logged/40 text-logged;
+  }
+
+  .tag-estimate {
+    @apply border-dashed border-uncertain text-uncertain;
+  }
+
+  .tag-quiet {
+    @apply border-uncertain/40 text-uncertain;
+  }
+
+  /**
+   * An incomplete figure (profile, page 6: "en ofullständig summa dämpas och
+   * säger minst").
+   *
+   * Dimmed rather than recoloured, for the same reason: the number is still the
+   * same kind of number, there is just less of it known.
+   */
+  .figure-partial {
+    @apply text-uncertain;
+  }
+}
