@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { createUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
+import { testDatabaseUrl } from "./database.js";
 import { adminLog, backupSettings, users } from "../src/db/schema.js";
 import {
   listBackupRuns,
@@ -63,6 +64,23 @@ const withDump = ENDPOINT === "" || !hasPgDump ? describe.skip : describe;
 
 if (ENDPOINT !== "" && !hasPgDump) {
   console.warn("backup-s3-live: pg_dump is not on PATH, so the full-run tests are skipped");
+}
+
+/**
+ * A config whose `DATABASE_URL` `pg_dump` can actually reach.
+ *
+ * `testEnv()` sets it to `postgres://unused-in-tests` on purpose: the suite
+ * talks to the database through the transaction the harness opens, and a real
+ * URL there would invite something to open a second connection outside it.
+ * `pg_dump` is the one thing that genuinely shells out, so it gets the real
+ * address — and only here.
+ *
+ * This cost a CI failure worth keeping in mind: the tests skipped on the
+ * workstation for want of `pg_dump`, so the first run that reached this line
+ * was the one in CI. A test that has never executed is not a passing test.
+ */
+function dumpableConfig<T extends { DATABASE_URL: string }>(config: T): T {
+  return { ...config, DATABASE_URL: testDatabaseUrl() };
 }
 
 /** The encryption key these tests store credentials under. */
@@ -237,7 +255,7 @@ withDump("a backup run to S3", () => {
     const actor = await admin();
     await configure(actor, "run");
 
-    const outcome = await runBackup(db, app.config, actor, KEY);
+    const outcome = await runBackup(db, dumpableConfig(app.config), actor, KEY);
     expect(outcome.ok ? "" : outcome.reason).toBe("");
     expect(outcome.ok).toBe(true);
 
@@ -279,7 +297,7 @@ withDump("a backup run to S3", () => {
       // retainDays of 0 disables pruning entirely, so 1 with objects whose
       // LastModified is "now" proves the age rule keeps recent ones.
       await configure(actor, "prune", 1);
-      const outcome = await runBackup(db, app.config, actor, KEY);
+      const outcome = await runBackup(db, dumpableConfig(app.config), actor, KEY);
       expect(outcome.ok).toBe(true);
 
       const after = await listBackups(client, where);
