@@ -157,10 +157,17 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 17 commits:
+between what is built and what is running. 24 commits:
 
 | | |
 |---|---|
+| `7c3d682` | Give the S3 run tests a database pg_dump can reach |
+| `ca8c17d` | Three button tiers, and the outline one is not among them |
+| `e791bca` | Start MinIO as a step, not a service container |
+| `00d2f8e` | Back up to S3, and reach a Windows share by mounting it on the host |
+| `4426cf1` | A backup destination can no longer take the API down |
+| `5876ea8` | Graphic profile v1.3 supersedes v1.2 |
+| `f02717d` | Correct the deploy handover |
 | `428429a` | Verify the pass through the interface, and fix what that turned up |
 | `ffb4176` | Back up to an SMB share, by speaking it rather than mounting it |
 | `72cd0c0` | Tell the admin a request arrived, and let them turn that off |
@@ -228,13 +235,14 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1312 tests**: 478 shared, 239 web, 595 api. Lint clean, all three packages
+**1321 tests**: 478 shared, 234 web, 609 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-The API suite is also run with `SECRET_KEY` unset, which is what CI has. That is
-not a nicety: three of this pass's tests passed on the workstation and failed in
-CI, because saving a share password is refused where there is no key to store it
-under, and the workstation's `.env` had one. They supply their own key now.
+**In CI the api suite runs 609 with none skipped**, which is the number that
+matters: the nine S3 tests execute against a real MinIO with default settings
+rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
+say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
+of which have caught tests that passed only on this workstation.
 
 **Exercised through the interface**, at 360 px and at 1280 px, on the production
 build served by `vite preview`:
