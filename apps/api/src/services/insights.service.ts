@@ -121,6 +121,19 @@ function assembleMacros(input: {
       window.map((day) => (day[key].complete ? day[key].grams : null)),
     );
 
+    /**
+     * Days with **anything at all** on them, which is a fact about the day and
+     * not about this macro (D122).
+     *
+     * `day[key].coverage` is the wrong question and was the first thing tried:
+     * a day of six entries that all omit fibre reports fibre coverage 0, which
+     * is indistinguishable from a day nobody logged. That is the very
+     * distinction the interface is trying to draw, so asking the macro cannot
+     * answer it. `kcal` is the day's own total and is non-null exactly when
+     * something was logged.
+     */
+    const daysLogged = window.filter((day) => day.kcal !== null).length;
+
     return {
       targetG: override ?? derivedG,
       overridden: override !== null,
@@ -131,6 +144,7 @@ function assembleMacros(input: {
       // Below a few days an "average" is one dinner wearing a week's clothes.
       weeklyMeanG: weekly.days >= MIN_DAYS_FOR_WEEKLY ? weekly.mean : null,
       weeklyDays: weekly.days,
+      weeklyDaysLogged: daysLogged,
     };
   };
 

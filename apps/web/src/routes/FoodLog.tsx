@@ -141,6 +141,25 @@ export function FoodLog() {
   const [query, setQuery] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [pending, setPending] = useState<FoodItem | null>(null);
+
+  /**
+   * Picking a food ends the search (D122).
+   *
+   * The results list used to stay behind the portion sheet and still be there
+   * when it closed, so logging two things in a row meant clearing the field by
+   * hand between them. The query is what drives the list, so clearing it is
+   * what dismisses it; `searchEnabled` goes back to false so a keystroke does
+   * not re-run the search that was just answered.
+   *
+   * Focus needs no work here: the amount field inside the sheet carries
+   * `autoFocus`, which is the right place for it — the sheet owns the field, so
+   * the sheet decides what is focused when it opens.
+   */
+  function choose(item: FoodItem) {
+    setPending(item);
+    setQuery("");
+    setSearchEnabled(false);
+  }
   const [flash, setFlash] = useState<string | null>(null);
   /**
    * Which row is being saved, by id.
@@ -367,7 +386,7 @@ export function FoodLog() {
                   <button
                     type="button"
                     className="flex w-full items-center justify-between gap-4 py-3 text-left"
-                    onClick={() => setPending(item)}
+                    onClick={() => choose(item)}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-base text-ink">{item.name}</span>

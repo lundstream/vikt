@@ -1057,6 +1057,9 @@ export const sv = {
   "macro.viewLabel": "Period",
   "macro.viewToday": "I dag",
   "macro.viewWeek": "7 dagar",
+  "macro.noDaysLogged": "Inget loggat den här veckan.",
+  "macro.tooFewComplete":
+    "För få dagar med {name}uppgifter: {days} av {logged} loggade dagar har fullständiga uppgifter, det behövs {needed}.",
   "macro.overDays": "snitt över {days} dagar",
   "macro.weekIsTheVerdict":
     "Sjudagarssnittet är det som jämförs med rekommendationen, eftersom värdena gäller genomsnittet över minst en vecka.",

@@ -324,7 +324,7 @@ function Capabilities() {
       </Capability>
 
       <Capability
-        title="Logga mat på ett tryck"
+        title="Logga mat med ett tryck"
         icon={
           <HeadingIcon tint="bg-nutrition/15 text-nutrition">
             <ForkIcon className="size-5" />

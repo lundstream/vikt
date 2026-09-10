@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { InsightsResponse, MacroLineDto, MacroTargetsDto } from "shared";
-import { formatDecimal, formatKcal } from "shared";
+import { MIN_DAYS_FOR_WEEKLY, formatDecimal, formatKcal } from "shared";
 import { Tooltip } from "./Tooltip.js";
 import { t, type TranslationKey } from "../i18n/index.js";
 
@@ -300,10 +300,36 @@ function MacroRow({
         ? t("macro.atLeastOfTarget", { amount: grams(amount), target: grams(line.targetG) })
         : t("macro.gramsOfTarget", { amount: grams(amount), target: grams(line.targetG) });
 
+  /**
+   * When a mean is withheld, say which of the two reasons it is (D122).
+   *
+   * "Inte än" on its own was reported against fibre, next to three macros that
+   * rendered fine — a reader cannot tell from that whether they have logged
+   * nothing, or whether what they logged does not carry the figure. They are
+   * different situations with different things to do about them, and fibre is
+   * where the second one lives: crowdsourced food data omits fibre far more
+   * often than protein, so the same week can withhold one and show three.
+   *
+   * The same line applies to all four rather than to fibre alone. A rule that
+   * only fires for the macro that prompted it is a rule nobody remembers when
+   * the next one goes quiet.
+   */
+  const weeklyReason =
+    view === "week" && line.weeklyMeanG === null
+      ? line.weeklyDaysLogged === 0
+        ? t("macro.noDaysLogged")
+        : t("macro.tooFewComplete", {
+            name: label.toLowerCase(),
+            days: line.weeklyDays,
+            logged: line.weeklyDaysLogged,
+            needed: MIN_DAYS_FOR_WEEKLY,
+          })
+      : null;
+
   const footnote =
     view === "week"
       ? line.weeklyMeanG === null
-        ? null
+        ? weeklyReason
         : t("macro.overDays", { days: line.weeklyDays })
       : showCoverage && partialToday
         ? t("macro.partial", { percent: Math.round(line.todayCoverage * 100) })
