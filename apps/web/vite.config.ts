@@ -97,8 +97,22 @@ const BUILD_ID = `${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}
  */
 const PUBLIC_PAGES = ["/integritet", "/villkor"];
 
+/**
+ * `/kod`, which is the same bundle again but behind a flag (D127).
+ *
+ * nginx serves it only where `REQUEST_ENABLED` is on and returns 404 otherwise.
+ * Mirrored here rather than always-on, because "the path does not exist unless
+ * it is switched on" is the whole point of that decision, and a dev server that
+ * served it unconditionally would be the one place the flag could be believed
+ * to work without ever having been tried.
+ */
+function requestEnabled(): boolean {
+  return ["true", "1", "yes"].includes((process.env.REQUEST_ENABLED ?? "").trim().toLowerCase());
+}
+
 function rewritePublicPage(url: string): string | null {
   const path = url.split("?")[0]?.replace(/\/+$/, "") ?? "";
+  if (path === "/kod") return requestEnabled() ? "/index.html" : null;
   return PUBLIC_PAGES.includes(path) ? "/index.html" : null;
 }
 
@@ -110,16 +124,37 @@ function nginxLikePreviewPlugin(): Plugin {
 
     // Dev too: the same two paths, the same rewrite.
     configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const rewritten = rewritePublicPage(req.url ?? "");
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        if ((url.split("?")[0]?.replace(/\/+$/, "") ?? "") === "/kod" && !requestEnabled()) {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+        const rewritten = rewritePublicPage(url);
         if (rewritten) req.url = rewritten;
         next();
       });
     },
 
     configurePreviewServer(server) {
-      server.middlewares.use((req, _res, next) => {
+      server.middlewares.use((req, res, next) => {
         const url = req.url ?? "";
+
+        /**
+         * `/kod` with the flag off is a 404, not a fallback (D127).
+         *
+         * The preview server's SPA fallback answers any unknown path with the
+         * landing HTML, so without this the path existed whatever the flag
+         * said, and the one thing the flag is for could never be tried here.
+         * nginx returns 404; so does this.
+         */
+        if ((url.split("?")[0]?.replace(/\/+$/, "") ?? "") === "/kod" && !requestEnabled()) {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+
         const rewritten = rewritePublicPage(url);
         if (rewritten) {
           req.url = rewritten;
@@ -140,9 +175,54 @@ function nginxLikePreviewPlugin(): Plugin {
         const navigation = (req.headers.accept ?? "").includes("text/html");
         if (!named && !navigation) return next();
 
+        /**
+         * Ask for it uncompressed, because this rewrites the bytes.
+         *
+         * sirv serves a gzipped body when the client accepts one, and the
+         * substitution below is a string replace: run over gzip it produces
+         * bytes that are still labelled `Content-Encoding: gzip` and are no
+         * longer valid gzip. The browser then fails the navigation with
+         * `ERR_CONTENT_DECODING_FAILED` and renders nothing at all, while
+         * `curl` — which does not ask for compression unless told to — sees a
+         * perfectly good page. That difference is why this survived: every
+         * check of the preview server had been made with curl.
+         *
+         * Only these responses are affected. Scripts and stylesheets are not
+         * intercepted and stay compressed.
+         */
+        // `identity` rather than deleting it: a missing header is read as
+        // "anything goes" by some compressors, while `identity` is the
+        // explicit way to ask for the bytes as they are.
+        req.headers["accept-encoding"] = "identity";
+
         const write = res.write.bind(res);
         const end = res.end.bind(res);
+        const writeHead = res.writeHead.bind(res);
         const chunks: Buffer[] = [];
+
+        /**
+         * The substitution changes the body's length, so the original
+         * `Content-Length` must never reach the client.
+         *
+         * `__APP_NAME__` is twelve characters and "Vikt" is four, so a static
+         * file served with the length sirv measured leaves the browser waiting
+         * for eight bytes per occurrence that will never arrive. The page then
+         * sits at `readyState: "loading"` forever, which looks like a hung app
+         * and is a hung preview server. Dropping the header makes Node use
+         * chunked encoding, which is correct whatever the substitution does.
+         */
+        res.writeHead = ((status: number, ...rest: unknown[]) => {
+          res.removeHeader("Content-Length");
+          const headers = rest.find((value) => value && typeof value === "object");
+          if (headers && !Array.isArray(headers)) {
+            for (const key of Object.keys(headers as Record<string, unknown>)) {
+              if (key.toLowerCase() === "content-length") {
+                delete (headers as Record<string, unknown>)[key];
+              }
+            }
+          }
+          return (writeHead as (...args: unknown[]) => typeof res)(status, ...rest);
+        }) as typeof res.writeHead;
 
         res.write = ((chunk: unknown, ...rest: unknown[]) => {
           if (typeof chunk === "string" || Buffer.isBuffer(chunk)) {
@@ -158,9 +238,19 @@ function nginxLikePreviewPlugin(): Plugin {
           }
           const body = Buffer.concat(chunks).toString("utf8");
           const filled = body.replaceAll(APP_NAME_PLACEHOLDER, appName);
-          res.setHeader("Content-Length", Buffer.byteLength(filled));
           res.write = write;
           res.end = end;
+          res.writeHead = writeHead;
+
+          /**
+           * No `Content-Length` is set here either.
+           *
+           * Setting one after `writeHead` has run throws
+           * `ERR_HTTP_HEADERS_SENT` from inside a stream callback, which is an
+           * uncaught exception that kills the preview server on its first
+           * static file. The header was stripped above instead, so this
+           * response is chunked and needs no length.
+           */
           return end(filled, ...(rest as []));
         }) as typeof res.end;
 

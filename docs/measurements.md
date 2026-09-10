@@ -17,18 +17,27 @@ Production build, 360x740, 4x CPU throttling, ~80 ms latency on 1.6 Mbps, on the
 bundle whose asset hash was confirmed served before any number was taken.
 Measuring on a dev server measures the dev server.
 
-| | previous | now (in-app) | now (wall) |
-|---|---|---|---|
-| repeat food, cold open to logged | 2 taps, 102 ms | **2 taps, 59 ms** | 62 ms |
-| saved meal, cold open to logged | 1 tap, 183 ms | **1 tap, 176 ms** | 179 ms |
+| | two passes ago | last pass | now (in-app) | now (wall) |
+|---|---|---|---|---|
+| repeat food, cold open to logged | 2 taps, 102 ms | 2 taps, 59 ms | **2 taps, 47 ms** | 50 ms |
+| saved meal, cold open to logged | 1 tap, 183 ms | 1 tap, 176 ms | **1 tap, 146 ms** | 149 ms |
 
-Two columns because the harness changed, and the numbers should not silently
-improve by a change of method. *In-app* is measured inside the page, from the
-click to the confirmation appearing, and is the honest latency. *Wall* is
-measured from Node around the whole call and still carries one CDP round trip,
-which is what the earlier figures included, so compare that column with the
-previous one. The saved-meal path is unchanged; the repeat path is faster, and
-most of the old 102 ms was the second round trip rather than the app.
+*In-app* is measured inside the page, from the click to the confirmation
+appearing, and is the honest latency. *Wall* is measured from Node around the
+whole call and still carries one CDP round trip, which is what the oldest
+figures included, so compare that column with the leftmost one. The columns are
+kept because the harness changed once, and numbers should not silently improve
+by a change of method.
+
+**The tap counts are what the landing page quotes, and they have not moved.**
+Two taps to repeat something, one to log a saved meal, through four passes.
+
+Re-measured after the pass that folded Framsteg's lists, moved the request form
+off the landing page, put Markdown in announcements and added the SMB backup
+destination. None of that is on this path — it is the food screen's "Senast
+loggat" and its saved meals, both untouched — but that is a reason to expect no
+change rather than a reason not to look. Both figures came out faster, which on
+an unchanged path is the machine and the run, not an improvement to claim.
 
 ---
 

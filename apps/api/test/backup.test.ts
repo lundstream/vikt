@@ -142,9 +142,9 @@ describe("an SMB destination", () => {
 
   it("stores the host and share, and says a password is set", async () => {
     const { db } = ctx();
-    expect(await writeBackupSettings(db, await actorHere(), SMB)).toEqual({ ok: true });
+    expect(await writeBackupSettings(db, await actorHere(), SMB, KEY)).toEqual({ ok: true });
 
-    const settings = await readBackupSettings(db);
+    const settings = await readBackupSettings(db, KEY);
     expect(settings.destinationKind).toBe("smb");
     expect(settings.smbHost).toBe("nas.example.test");
     expect(settings.smbShare).toBe("backups");
@@ -160,7 +160,7 @@ describe("an SMB destination", () => {
   /** It is stored encrypted, not as text somebody with the row can read. */
   it("does not keep the password in the clear", async () => {
     const { db } = ctx();
-    await writeBackupSettings(db, await actorHere(), SMB);
+    await writeBackupSettings(db, await actorHere(), SMB, KEY);
 
     const [row] = await db.select().from(backupSettings);
     expect(row!.credentialsEncrypted).not.toContain("hemligt");
@@ -177,12 +177,12 @@ describe("an SMB destination", () => {
   it("keeps the password when other settings are saved", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB);
+    await writeBackupSettings(db, who, SMB, KEY);
 
     const { smbPassword: _ignored, ...withoutPassword } = SMB;
-    await writeBackupSettings(db, who, { ...withoutPassword, retainDays: 7 });
+    await writeBackupSettings(db, who, { ...withoutPassword, retainDays: 7 }, KEY);
 
-    const settings = await readBackupSettings(db);
+    const settings = await readBackupSettings(db, KEY);
     expect(settings.retainDays).toBe(7);
     expect(settings.smbPasswordSet).toBe(true);
   });
@@ -191,10 +191,10 @@ describe("an SMB destination", () => {
   it("clears the password when one is sent explicitly empty", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB);
-    await writeBackupSettings(db, who, { ...SMB, smbPassword: "" });
+    await writeBackupSettings(db, who, SMB, KEY);
+    await writeBackupSettings(db, who, { ...SMB, smbPassword: "" }, KEY);
 
-    expect((await readBackupSettings(db)).smbPasswordSet).toBe(false);
+    expect((await readBackupSettings(db, KEY)).smbPasswordSet).toBe(false);
   });
 
   /**
@@ -206,7 +206,7 @@ describe("an SMB destination", () => {
   it("forgets the credentials when the destination stops being a share", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB);
+    await writeBackupSettings(db, who, SMB, KEY);
 
     await writeBackupSettings(db, who, {
       destinationKind: "local",
@@ -219,7 +219,7 @@ describe("an SMB destination", () => {
     expect(row!.credentialsEncrypted).toBe("");
     expect(row!.smbHost).toBe("");
 
-    const settings = await readBackupSettings(db);
+    const settings = await readBackupSettings(db, KEY);
     expect(settings.smbPasswordSet).toBe(false);
   });
 
@@ -245,9 +245,9 @@ describe("an SMB destination", () => {
   it("records a failure rather than throwing when the share is unreachable", async () => {
     const { app, db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, { ...SMB, smbHost: "127.0.0.1", smbShare: "nope" });
+    await writeBackupSettings(db, who, { ...SMB, smbHost: "127.0.0.1", smbShare: "nope" }, KEY);
 
-    const outcome = await runBackup(db, app.config, who);
+    const outcome = await runBackup(db, app.config, who, KEY);
 
     expect(outcome.ok).toBe(false);
     const [run] = await listBackupRuns(db, 1);

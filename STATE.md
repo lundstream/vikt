@@ -141,10 +141,17 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 9 commits:
+between what is built and what is running. 16 commits:
 
 | | |
 |---|---|
+| `ffb4176` | Back up to an SMB share, by speaking it rather than mounting it |
+| `72cd0c0` | Tell the admin a request arrived, and let them turn that off |
+| `db1f18d` | Announcements take a small Markdown subset, parsed not sanitised |
+| `37b85c8` | Asking for a code becomes its own deployment mode, at /kod |
+| `a601b3a` | Framsteg leads with the figures and folds the setup away |
+| `8a80a78` | Enable react-hooks lint rules, and fix what they found |
+| `b6cb9bd` | Record items 1 and 2, and what the brief still has open |
 | `1b4806d` | A logged row opens onto its macros, amount and source |
 | `ea18cc5` | Copy a past day's food forward to today |
 | `443f3ac` | Restart dev when needed, and hand the deploy over in writing |
@@ -169,31 +176,33 @@ Windows and the kill has to be by port.
 
 ## Still open from the briefs
 
-Finished on `dev`: the branching rule and this deploy list, both chart defects,
-the macro reason line, dismissing the food search on a pick, the button audit
-with the Honung tier and its guard, the Phase 11 reminder design, the
-bounce-handling backlog entry, the "med ett tryck" copy fix, copying a past day
-forward, and the expandable food rows.
+**Finished on `dev` this pass.** Each was a numbered item and each is whole:
 
-**Not started.** Each is a numbered item of its own and none is half-built:
-
-- **Framsteg** (3): "Lägg till milstolpe" and "Ny sparregel" into modals,
-  existing milestones and savings rules behind counted disclosures, the page
-  leading with the header card, then the next milestone, then the pot.
-- **`/kod` behind `REQUEST_ENABLED`** (4), off by default, documented as a
+- **Rules of hooks** is enabled and error-level, `exhaustive-deps` is a warning,
+  and the three things it found are fixed. It was never installed, which is why
+  a `useState` below an early return reached runtime last pass.
+- **Framsteg** leads with the header card and the pot, and folds its two lists
+  behind counted disclosures with the create forms in sheets (D126).
+- **`/kod` behind `REQUEST_ENABLED`**, off by default, documented as a
   deployment mode beside `LANDING_ENABLED`, with the hero line replaced and
-  `/integritet` updated.
-- **Markdown in announcements** (5): a small subset, sanitised, in the app, the
-  HTML mail and the plain-text part, with a preview in the editor.
-- **Mail to the admin on an access request** (6), with an unread marker and a
-  per-admin opt-out.
-- **Backup to SMB** (7), over the protocol from Node rather than a mount.
+  `/integritet` updated (D127).
+- **Markdown in announcements**: a small subset, parsed rather than sanitised,
+  rendered in the app, the HTML mail and the plain-text part, with a preview in
+  the editor and the copy guards run over the output (D128).
+- **Mail to the admin on an access request**, with a dot on the admin entry
+  while anything is pending and a per-admin opt-out that is on by default
+  (D129).
+- **Backup to an SMB share**, spoken from Node rather than mounted, with the
+  credentials encrypted at rest and a test-connection button that writes and
+  deletes a probe file (D130).
 
-**Verification not run** (8): the screenshot pass and the fast-path
-re-measurement belong after item 3, since Framsteg is one of the screens they
-cover. The expanded row and the copy actions do not touch the two-tap repeat
-path — that path is Senast loggat, which is unchanged — but that is reasoning,
-not a measurement, and the brief asks for a measurement.
+**Found while verifying, and fixed** (D131): `/kod` was a 404 in the dev and
+preview servers because their nginx mirror had not been updated, and then it
+existed unconditionally because the SPA fallback answers any unknown path. Both
+now honour the flag. The preview server was also truncating every static
+response, because the app-name substitution shortens the body and the
+`Content-Length` sirv had already sent was too large; pages sat at
+`readyState: "loading"` forever.
 
 **Blocked, not skipped:** removing the probe request
 `human-check-probe@example.test` needs the production database, and the
@@ -202,8 +211,31 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1239 tests**: 464 shared, 205 web, 570 api. Lint clean, all three packages
+**1312 tests**: 478 shared, 239 web, 595 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
+
+The API suite is also run with `SECRET_KEY` unset, which is what CI has. That is
+not a nicety: three of this pass's tests passed on the workstation and failed in
+CI, because saving a share password is refused where there is no key to store it
+under, and the workstation's `.env` had one. They supply their own key now.
+
+**Exercised through the interface**, at 360 px and at 1280 px, on the production
+build served by `vite preview`:
+
+- the landing page, with one action and the sentence that replaced the second
+  button;
+- `/kod` with `REQUEST_ENABLED` on, and the same path returning **404** with it
+  off;
+- Framsteg with both lists folded and with both open;
+- Mat on a past day, with a row expanded: the estimate marker on the collapsed
+  line, the macros with "Inte än" where the entry carries no fibre, and the
+  copy-forward action inside the disclosure;
+- Nyheter with a formatted post: two heading levels, bold, a bullet list and a
+  link, rendered as elements rather than as characters;
+- Administration, Förfrågningar and Backup, the latter with the share fields
+  shown and the test-connection button beside Spara.
+
+No horizontal overflow on any of the eighteen shots, and nothing blank.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file

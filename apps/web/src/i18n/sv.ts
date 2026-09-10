@@ -567,11 +567,11 @@ export const sv = {
   /* --- admin: backups (D103) ---------------------------------------------- */
   "admin.tabBackup": "Backup",
   "backup.what":
-    "En backup är en krypterad kopia av hela databasen. Den skrivs till katalogen nedan och krypteras innan den lämnar processen, så filen går inte att läsa utan SECRET_KEY.",
+    "En backup är en krypterad kopia av hela databasen. Den skrivs dit du väljer nedan och krypteras innan den lämnar processen, så filen går inte att läsa utan SECRET_KEY.",
   "backup.lastRun": "Senaste körning",
   "backup.nextRun": "Nästa körning",
   "backup.noSchedule": "Ingen schemalagd",
-  "backup.destination": "Katalog",
+  "backup.destination": "Skrivs till",
   "backup.runNow": "Kör nu",
   "backup.running": "Kör…",
   "backup.failed": "Misslyckades",

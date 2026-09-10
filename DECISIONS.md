@@ -4880,3 +4880,54 @@ Pruning over SMB follows the local rule — by age, not by count — with one
 addition: a file whose modification time the share will not report is left
 alone. Deleting on a guess is the one mistake here that cannot be undone, and a
 destination filling up is a problem somebody can see.
+
+### D131 — The preview server was serving truncated responses, and /kod did not exist in it
+
+Found while taking the verification screenshots for this pass, which is exactly
+what a verification pass is for. Three defects in the dev and preview servers,
+none of which any test could have caught, because they are in the tooling that
+stands in for nginx.
+
+**`/kod` was a 404 in dev and in preview.** `PUBLIC_PAGES` in `vite.config.ts`
+mirrors nginx's `location =` blocks for `/integritet` and `/villkor`, and D127
+added a third path to nginx without adding it here. The page shipped, the tests
+passed, and it could not be opened on a development machine.
+
+**And then it existed unconditionally.** The preview server's SPA fallback
+answers any unknown path with the landing HTML, so once the rewrite was added
+the flag decided nothing: `/kod` was served whether `REQUEST_ENABLED` was on or
+off. The one property D127 is about — that the path does not exist unless it is
+switched on — was the one property that could not be tried locally. Both servers
+now return 404 for it when the flag is off, which is what nginx does.
+
+**The app-name substitution truncated every static response.** The preview
+server buffers a response, replaces `__APP_NAME__` with the configured name, and
+writes it back. `__APP_NAME__` is twelve characters and "Vikt" is four, so the
+`Content-Length` sirv had already sent was too large by eight bytes per
+occurrence, and the browser sat waiting for bytes that were never coming.
+
+The symptom was a page stuck at `readyState: "loading"` forever, `curl` taking
+six seconds and exiting 56, and a screenshot run that timed out with nothing
+written. The first attempt at a fix — skipping the length when the headers had
+already gone out — turned a crash into a hang, which was worse, because a crash
+says what is wrong. The actual fix strips `Content-Length` in `writeHead`, so
+the rewritten body is chunked and its length is nobody's business.
+
+**What made this take four attempts is worth writing down.** Every check of the
+preview server had been made with `curl`, and `curl` does not ask for
+compression unless told to. The browser does, so the browser was getting a
+different response from the one every check had looked at, and the failure it
+reported — `ERR_CONTENT_DECODING_FAILED` — pointed at compression rather than at
+the length header that was actually wrong. Chasing the encoding was a detour:
+the served gzip turned out to be valid once the length was fixed. The lesson is
+the check, not the bug. **A server is verified with the client that will use
+it.**
+
+The same pass also lost twenty minutes to five abandoned screenshot processes
+still attached to the same CDP session, silently consuming each other's
+replies — `pkill -f` is a no-op on Windows, which CLAUDE.md §7 already says
+about dev servers and evidently needs saying about everything else too.
+
+Left as it was found: the SPA fallback still answers unknown paths under `/`
+with the landing page, where nginx would 404. That is a divergence worth
+knowing about and it is not what this pass was for.
