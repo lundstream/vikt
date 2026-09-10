@@ -66,7 +66,7 @@ Cleared back to empty when a merge ships, not before.
 
 | Variabel | Vad den gör | Krävs? |
 |---|---|---|
-| `CONTACT_EMAIL` | Adressen `/integritet` namnger som personuppgiftsansvarig. Bygget lämnar `__CONTACT_EMAIL__` i `index.html` och `32-site-config.sh` fyller i den vid start (D121). | **Ja** när `LANDING_ENABLED=true`. API:t vägrar starta utan den i produktion. |
+| `CONTACT_EMAIL` | Adressen `/integritet` namnger som personuppgiftsansvarig. Bygget lämnar `__CONTACT_EMAIL__` i `index.html` och `32-site-config.sh` fyller i den vid start (D121). | **Ja** när `LANDING_ENABLED` eller `REQUEST_ENABLED` är `true`. API:t vägrar starta utan den i produktion. |
 | `OPERATOR` | Vem som driver installationen, i sidfoten och på `/integritet`. | Nej, men sidan blir vagare utan. |
 | `REPO_URL` | Vart GitHub-länken pekar. | Nej, har ett förval. |
 | `SUPPORT_URL` | Länken "Bjud på en öl". Tom betyder att länken utgår helt. | Nej. |
@@ -89,7 +89,7 @@ kolumnen bryr sig inte om att den finns.
 
 ### Manuella steg på Portainer-värden
 
-- Sätt de fyra variablerna ovan i stacken `vikt` innan avbilden byts.
+- Sätt variablerna ovan i stacken `vikt` innan avbilden byts.
 - **Backupmålet behöver inget nytt på värden.** SMB talas direkt av API:t, så
   containern behöver varken mount eller `SYS_ADMIN`. Vill du hellre montera
   utdelningen på värden fungerar det som förut: välj "Katalog på maskinen" och peka
@@ -141,10 +141,11 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 16 commits:
+between what is built and what is running. 17 commits:
 
 | | |
 |---|---|
+| `428429a` | Verify the pass through the interface, and fix what that turned up |
 | `ffb4176` | Back up to an SMB share, by speaking it rather than mounting it |
 | `72cd0c0` | Tell the admin a request arrived, and let them turn that off |
 | `db1f18d` | Announcements take a small Markdown subset, parsed not sanitised |
