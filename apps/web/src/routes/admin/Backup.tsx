@@ -22,6 +22,12 @@ type Settings = {
   destinationPath: string;
   scheduleMinute: number | null;
   retainDays: number;
+  smbHost: string;
+  smbShare: string;
+  smbDomain: string;
+  smbUsername: string;
+  /** Whether one is stored, never the password itself (D130). */
+  smbPasswordSet: boolean;
   updatedAt: string | null;
   updatedByEmail: string | null;
 };
@@ -80,17 +86,38 @@ export function Backup() {
     retry: false,
   });
 
+  const [kind, setKind] = useState<"local" | "smb">("local");
   const [path, setPath] = useState("");
   const [clock, setClock] = useState("");
   const [retain, setRetain] = useState("30");
+  const [host, setHost] = useState("");
+  const [share, setShare] = useState("");
+  const [domain, setDomain] = useState("");
+  const [username, setUsername] = useState("");
+  /**
+   * Empty means "leave the stored one alone" (D130).
+   *
+   * The screen never receives the password, so there is nothing to prefill and
+   * nothing to send back unless somebody types a new one. Clearing it is its
+   * own control below, because "clear" and "leave alone" are two intentions and
+   * an empty box cannot be both.
+   */
+  const [password, setPassword] = useState("");
+  const [clearPassword, setClearPassword] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loaded.data) return;
-    setPath(loaded.data.settings.destinationPath);
-    setClock(toClock(loaded.data.settings.scheduleMinute));
-    setRetain(String(loaded.data.settings.retainDays));
+    const settings = loaded.data.settings;
+    setKind(settings.destinationKind === "smb" ? "smb" : "local");
+    setPath(settings.destinationPath);
+    setClock(toClock(settings.scheduleMinute));
+    setRetain(String(settings.retainDays));
+    setHost(settings.smbHost);
+    setShare(settings.smbShare);
+    setDomain(settings.smbDomain);
+    setUsername(settings.smbUsername);
   }, [loaded.data]);
 
   const save = useMutation({
@@ -100,10 +127,20 @@ export function Backup() {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          destinationKind: "local",
+          destinationKind: kind,
           destinationPath: path,
           scheduleMinute: fromClock(clock),
           retainDays: Number(retain) || 30,
+          ...(kind === "smb"
+            ? {
+                smbHost: host,
+                smbShare: share,
+                smbDomain: domain,
+                smbUsername: username,
+                // Absent leaves it alone; an explicit empty string clears it.
+                ...(clearPassword ? { smbPassword: "" } : password === "" ? {} : { smbPassword: password }),
+              }
+            : {}),
         }),
       });
       if (!response.ok) {
@@ -115,12 +152,42 @@ export function Backup() {
     onSuccess: () => {
       setProblem(null);
       setNotice(t("backup.saved"));
+      setPassword("");
+      setClearPassword(false);
       void queryClient.invalidateQueries({ queryKey: ["admin", "backup"] });
     },
     onError: (error: Error) => {
       setNotice(null);
       setProblem(error.message);
     },
+  });
+
+  /**
+   * Writes a probe file to the destination and deletes it again (D130).
+   *
+   * It tests what is **saved**, not what is typed, which is why it sits below
+   * the save button rather than beside the fields: a test of unsaved values
+   * would pass and then the schedule would run against the old ones.
+   */
+  const test = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/backup/test", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      return response.json() as Promise<{
+        ok: boolean;
+        wrote: string | null;
+        reason: string | null;
+      }>;
+    },
+    onSuccess: (result) => {
+      setNotice(result.ok ? t("backup.testOk") : null);
+      setProblem(result.ok ? null : `${t("backup.testFailed")} ${result.reason ?? ""}`.trim());
+      void queryClient.invalidateQueries({ queryKey: ["admin", "log"] });
+    },
+    onError: () => setProblem(t("backup.testFailed")),
   });
 
   const run = useMutation({
@@ -244,27 +311,151 @@ export function Backup() {
       ) : null}
 
       <form onSubmit={submit} className="panel max-w-md space-y-4">
+        {/*
+          Where it goes, chosen before anything is typed, because the fields
+          below mean different things for each and a form that showed both at
+          once would be asking for a path and a share at the same time.
+        */}
         <label className="block text-micro text-muted">
-          {t("backup.path")}
-          <input
-            id="backup-path"
-            className="field mt-1 w-full"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-          />
+          {t("backup.kind")}
+          <select
+            id="backup-kind"
+            data-testid="backup-kind"
+            className="select mt-1 w-full"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as "local" | "smb")}
+          >
+            <option value="local">{t("backup.kindLocal")}</option>
+            <option value="smb">{t("backup.kindSmb")}</option>
+          </select>
         </label>
 
-        {/*
-          Three examples and a failure mode, because "Katalog att skriva till"
-          on its own does not say whether a UNC path works, whether the
-          directory has to exist, or what happens when it cannot be written.
-          The SMB answer is the useful one: mount it, and it becomes local.
-        */}
-        <div className="space-y-1 text-micro text-muted">
-          <p>{t("backup.pathHelp")}</p>
-          <p>{t("backup.pathExamples")}</p>
-          <p>{t("backup.pathUnwritable")}</p>
-        </div>
+        {kind === "smb" ? (
+          <div className="space-y-4" data-testid="backup-smb-fields">
+            <div className="flex gap-4">
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.smbHost")}
+                <input
+                  id="backup-smb-host"
+                  className="field mt-1 w-full"
+                  placeholder="nas.local"
+                  value={host}
+                  onChange={(event) => setHost(event.target.value)}
+                />
+              </label>
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.smbShare")}
+                <input
+                  id="backup-smb-share"
+                  className="field mt-1 w-full"
+                  placeholder="backup"
+                  value={share}
+                  onChange={(event) => setShare(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label className="block text-micro text-muted">
+              {t("backup.smbFolder")}
+              <input
+                id="backup-path"
+                className="field mt-1 w-full"
+                placeholder="vikt"
+                value={path}
+                onChange={(event) => setPath(event.target.value)}
+              />
+            </label>
+
+            <div className="flex gap-4">
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.smbUser")}
+                <input
+                  id="backup-smb-user"
+                  className="field mt-1 w-full"
+                  autoComplete="off"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </label>
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.smbDomain")}
+                <input
+                  id="backup-smb-domain"
+                  className="field mt-1 w-full"
+                  autoComplete="off"
+                  value={domain}
+                  onChange={(event) => setDomain(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label className="block text-micro text-muted">
+              {t("backup.smbPassword")}
+              <input
+                id="backup-smb-password"
+                data-testid="backup-smb-password"
+                className="field mt-1 w-full"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                disabled={clearPassword}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+
+            {/*
+              The stored password is never sent to this screen, so there is
+              nothing to prefill: an empty box means "leave it alone". Clearing
+              it is a separate control, because "clear" and "leave alone" are
+              two intentions and one empty field cannot express both.
+            */}
+            {data?.settings.smbPasswordSet ? (
+              <>
+                <p className="text-micro text-muted">{t("backup.smbPasswordSet")}</p>
+                <label className="flex items-center gap-2 text-micro text-muted">
+                  <input
+                    type="checkbox"
+                    className="check"
+                    data-testid="backup-smb-clear"
+                    checked={clearPassword}
+                    onChange={(event) => setClearPassword(event.target.checked)}
+                  />
+                  {t("backup.smbPasswordClear")}
+                </label>
+              </>
+            ) : null}
+
+            <div className="space-y-1 text-micro text-muted">
+              <p>{t("backup.smbHelp")}</p>
+              <p>{t("backup.smbVersion")}</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label className="block text-micro text-muted">
+              {t("backup.path")}
+              <input
+                id="backup-path"
+                className="field mt-1 w-full"
+                value={path}
+                onChange={(event) => setPath(event.target.value)}
+              />
+            </label>
+
+            {/*
+              Examples and a failure mode, because "Katalog att skriva till" on
+              its own does not say whether the directory has to exist or what
+              happens when it cannot be written. A share the host already
+              mounts is still the answer for a server this client cannot talk
+              to, and it is a local path like any other.
+            */}
+            <div className="space-y-1 text-micro text-muted">
+              <p>{t("backup.pathHelp")}</p>
+              <p>{t("backup.pathExamples")}</p>
+              <p>{t("backup.pathUnwritable")}</p>
+            </div>
+          </>
+        )}
 
         <div className="flex gap-4">
           <label className="block flex-1 text-micro text-muted">
@@ -292,14 +483,30 @@ export function Backup() {
 
         <p className="text-micro text-muted">{t("backup.timeHint")}</p>
 
-        <button
-          type="submit"
-          data-testid="save-backup"
-          className="btn w-auto px-6"
-          disabled={save.isPending}
-        >
-          {t("profile.save")}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            data-testid="save-backup"
+            className="btn w-auto px-6"
+            disabled={save.isPending}
+          >
+            {t("profile.save")}
+          </button>
+
+          {/*
+            Tests what is saved, not what is typed. A test of unsaved values
+            would pass and then the schedule would run against the old ones.
+          */}
+          <button
+            type="button"
+            data-testid="test-backup"
+            className="btn-secondary w-auto px-6"
+            disabled={test.isPending}
+            onClick={() => test.mutate()}
+          >
+            {test.isPending ? t("backup.testing") : t("backup.test")}
+          </button>
+        </div>
       </form>
 
       <p className="mt-6 max-w-prose text-micro text-muted">{t("backup.restoreHint")}</p>

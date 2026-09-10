@@ -141,6 +141,14 @@ export default tseslint.config(
             "nextRunAt",
             "runBackup",
             "latestBackupFile",
+            /**
+             * Writes a probe file to the one destination this installation has
+             * and deletes it again (D130). Like every other backup function it
+             * takes an `actor` for the audit row, which is who pressed the
+             * button rather than whose data is being written, because the
+             * answer to that is everybody's.
+             */
+            "testBackupDestination",
 
             /**
              * Announcements are per installation (D108): one notice, everybody

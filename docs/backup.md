@@ -58,13 +58,41 @@ infra/restore-check.sh vikt.dump
 
 Only once the scratch restore matches should anything touch the live database.
 
+### Where backups can go
+
+**A directory, or a Windows share.** Choose under Administration, Backup.
+
+A **directory** is any path the API container can write, and that includes a
+share the host already mounts. Point it somewhere that does not die with the
+machine the database is on.
+
+A **share** is spoken directly, over SMB, with the host, share name, folder,
+username and password set in the admin screen (D130). Nothing is mounted and
+the container needs no extra capabilities, which is the point: mounting inside
+a container requires `CAP_SYS_ADMIN`, and granting that so a backup can be
+written is a bad trade to make by accident.
+
+The password is encrypted at rest under `SECRET_KEY`, the same way the SMTP
+password is, and is never sent back to the browser. Saving other settings leaves
+it alone; clearing it is its own checkbox.
+
+**Press "Testa anslutningen" after configuring one.** It writes a small file to
+the destination and deletes it again, which is the only way to find out that the
+host, share, folder, username and password are together a place this process can
+write. Each of them can be individually plausible and collectively wrong. The
+result goes in the admin log either way, so a pass dates the last time the
+destination was known to work.
+
+**The client speaks SMB 2.0.2.** Samba and every Windows since Vista accept it.
+A server hardened to require SMB 3 will refuse the connection, and the test
+button says so in as many words. The way round it is the directory option above:
+mount the share on the host and point a path at it.
+
 ### What is not implemented
 
-**Only a local destination.** SMB and S3 appear in the settings because that is
-the column that would have to change, and the app **refuses** them with a reason
-rather than accepting the setting and doing nothing. Point the local path at a
-mount that lives somewhere other than the Proxmox host: an NFS mount, a NAS
-share, anything that does not die with the hypervisor.
+**S3.** It appears in the settings because that is the column that would have to
+change, and the app **refuses** it with a reason rather than accepting the
+setting and doing nothing.
 
 **Uploads are not in it.** The app's backup is the database. Photos live on disk
 outside it by D10, and Phase 7 has not shipped, so there is nothing there yet;

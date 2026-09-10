@@ -79,6 +79,9 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 ### Migrationer som kommer att köras
 
+`0022_backup_smb` lägger till `smb_host`, `smb_share` och `smb_domain` på
+`backup_settings`, alla med `DEFAULT ''`. Additiv som de andra.
+
 `0021_request_mail` lägger till kolumnen `request_mail` på `profiles`, med
 `DEFAULT true`. Den är additiv och körs av API-containerns entrypoint vid start,
 som alla andra. Ingen befintlig rad ändras, och en avbild som inte känner till
@@ -87,6 +90,10 @@ kolumnen bryr sig inte om att den finns.
 ### Manuella steg på Portainer-värden
 
 - Sätt de fyra variablerna ovan i stacken `vikt` innan avbilden byts.
+- **Backupmålet behöver inget nytt på värden.** SMB talas direkt av API:t, så
+  containern behöver varken mount eller `SYS_ADMIN`. Vill du hellre montera
+  utdelningen på värden fungerar det som förut: välj "Katalog på maskinen" och peka
+  den på monteringen.
 - **`REQUEST_ENABLED` behöver inte sättas.** Utan den är formuläret borta, vilket är
   det avsedda läget. Sätt den till `true` bara om du vill kunna skicka adressen
   `/kod` till någon. Ingenting länkar dit.
@@ -126,6 +133,10 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - Den som administrerar får ett mejl när någon ber om en inbjudningskod, och en prick
   vid Administration så länge något väntar på svar. Mejlet kan stängas av under
   Inställningar. Pricken och listan finns kvar oavsett.
+- Backupen kan skrivas direkt till en Windows-utdelning. Server, utdelning, mapp,
+  användarnamn och lösenord ställs in under Administration, Backup, och lösenordet
+  lagras krypterat. Knappen "Testa anslutningen" skriver en liten fil och tar bort
+  den igen, så att man ser att det fungerar innan nattens körning.
 
 ## On `dev`, not yet on `main`
 

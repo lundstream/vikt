@@ -204,6 +204,13 @@ infra/backup.sh                                    # from cron
 infra/restore-check.sh /var/backups/vikt/<file>    # safe on the live host
 ```
 
+The app also runs its own scheduled backup, configured under Administration,
+Backup. It writes either to a directory or straight to a Windows share over SMB,
+with the credentials stored encrypted under `SECRET_KEY`; a share needs no mount
+and no extra container capabilities, because mounting inside a container
+requires `CAP_SYS_ADMIN` and that is not a thing to grant for a backup (D130).
+The dump is encrypted before it leaves the process either way.
+
 See [docs/backup.md](docs/backup.md) for where they go, how long they are kept,
 and the step-by-step restore. A backup that has never been restored is a hope.
 

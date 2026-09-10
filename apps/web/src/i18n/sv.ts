@@ -583,7 +583,26 @@ export const sv = {
   "backup.pathHelp":
     "En katalog på maskinen, till exempel /var/backups/vikt. Peka den på något som inte dör med servern: en monterad NFS- eller SMB-resurs fungerar, eftersom den ser ut som en vanlig katalog.",
   "backup.pathExamples":
-    "Lokalt: /var/backups/vikt. SMB monterad: /mnt/nas/vikt (montera //nas/backup i fstab först). S3: s3://mitt-konto/vikt, ännu inte implementerat och sparas inte.",
+    "Lokalt: /var/backups/vikt. Monterad resurs: /mnt/nas/vikt, om värden redan monterar den. S3: ännu inte implementerat och sparas inte.",
+  "backup.kind": "Var backupen hamnar",
+  "backup.kindLocal": "Katalog på maskinen",
+  "backup.kindSmb": "Windows-utdelning (SMB)",
+  "backup.smbHost": "Server",
+  "backup.smbShare": "Utdelning",
+  "backup.smbFolder": "Mapp i utdelningen",
+  "backup.smbDomain": "Domän (valfritt)",
+  "backup.smbUser": "Användarnamn",
+  "backup.smbPassword": "Lösenord",
+  "backup.smbPasswordSet": "Ett lösenord är sparat. Lämna fältet tomt för att behålla det.",
+  "backup.smbPasswordClear": "Ta bort det sparade lösenordet",
+  "backup.smbHelp":
+    "Appen pratar SMB direkt, så resursen behöver inte monteras och containern behöver inga extra rättigheter. Dumpen krypteras innan den lämnar maskinen.",
+  "backup.smbVersion":
+    "Klienten talar SMB 2.0.2. Kräver servern SMB 3 går anslutningen inte igenom, och då är vägen runt att montera resursen på värden och peka en katalog hit i stället.",
+  "backup.test": "Testa anslutningen",
+  "backup.testing": "Testar…",
+  "backup.testOk": "Det gick bra. En liten fil skrevs och togs bort igen.",
+  "backup.testFailed": "Det gick inte.",
   "backup.pathUnwritable":
     "Går katalogen inte att skriva till skapas den om den saknas, och annars misslyckas körningen med felet från filsystemet. Den raden syns här och ingen halv fil blir kvar.",
   "backup.time": "Tid på dygnet",

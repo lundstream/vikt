@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createDecipheriv, createCipheriv, hkdfSync, randomBytes } from "node:crypto";
@@ -6,9 +6,10 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
-import { users } from "../src/db/schema.js";
+import { adminLog, backupSettings, users } from "../src/db/schema.js";
 import {
   listBackupRuns,
+  testBackupDestination,
   nextRunAt,
   readBackupSettings,
   runBackup,
@@ -88,24 +89,171 @@ describe("backup settings", () => {
   });
 
   /**
-   * The two destinations that are named and not built. Refused with a reason,
+   * The destination that is still named and not built. Refused with a reason,
    * rather than accepted and silently doing nothing, which is the failure mode
-   * this whole pass exists to correct.
+   * this whole pass exists to correct. SMB is implemented now (D130); S3 is
+   * still the boundary.
    */
   it("refuses a destination it cannot actually write to", async () => {
     const { db } = ctx();
-    for (const kind of ["smb", "s3"] as const) {
-      expect(
-        await writeBackupSettings(db, await actor(), {
-          destinationKind: kind,
-          destinationPath: "//nas/backups",
-          scheduleMinute: null,
-          retainDays: 30,
-        }),
-      ).toEqual({ ok: false, reason: "unsupported_destination" });
-    }
+    expect(
+      await writeBackupSettings(db, await actor(), {
+        destinationKind: "s3",
+        destinationPath: "s3://nas/backups",
+        scheduleMinute: null,
+        retainDays: 30,
+      }),
+    ).toEqual({ ok: false, reason: "unsupported_destination" });
+
     expect((await readBackupSettings(db)).destinationPath).toBe("");
   });
+});
+
+/**
+ * The share destination (D130).
+ *
+ * None of these reach a real server: there is no SMB server in CI and there
+ * should not be one. What they hold is everything up to the socket — that the
+ * credentials round-trip through the encrypted column, that the password never
+ * comes back out of the API, that saving other settings does not wipe it, and
+ * that switching away from the share does not leave it lying about.
+ */
+describe("an SMB destination", () => {
+  const ctx = useTestApp();
+
+  async function actorHere() {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, user.userId));
+    return { id: user.userId, email: user.email };
+  }
+
+  const SMB = {
+    destinationKind: "smb" as const,
+    destinationPath: "vikt",
+    scheduleMinute: 180,
+    retainDays: 30,
+    smbHost: "nas.example.test",
+    smbShare: "backups",
+    smbDomain: "",
+    smbUsername: "vikt",
+    smbPassword: "hemligt",
+  };
+
+  it("stores the host and share, and says a password is set", async () => {
+    const { db } = ctx();
+    expect(await writeBackupSettings(db, await actorHere(), SMB)).toEqual({ ok: true });
+
+    const settings = await readBackupSettings(db);
+    expect(settings.destinationKind).toBe("smb");
+    expect(settings.smbHost).toBe("nas.example.test");
+    expect(settings.smbShare).toBe("backups");
+    expect(settings.smbUsername).toBe("vikt");
+    expect(settings.smbPasswordSet).toBe(true);
+
+    // The password itself is not in the shape at all, so no screen and no
+    // endpoint can accidentally send it back.
+    expect(Object.keys(settings)).not.toContain("smbPassword");
+    expect(JSON.stringify(settings)).not.toContain("hemligt");
+  });
+
+  /** It is stored encrypted, not as text somebody with the row can read. */
+  it("does not keep the password in the clear", async () => {
+    const { db } = ctx();
+    await writeBackupSettings(db, await actorHere(), SMB);
+
+    const [row] = await db.select().from(backupSettings);
+    expect(row!.credentialsEncrypted).not.toContain("hemligt");
+    expect(row!.credentialsEncrypted.startsWith("v1.")).toBe(true);
+  });
+
+  /**
+   * An absent password leaves the stored one alone.
+   *
+   * The screen never receives the password, so it cannot send it back, and a
+   * form that read an empty field as "clear it" would wipe the password every
+   * time somebody changed the retention window.
+   */
+  it("keeps the password when other settings are saved", async () => {
+    const { db } = ctx();
+    const who = await actorHere();
+    await writeBackupSettings(db, who, SMB);
+
+    const { smbPassword: _ignored, ...withoutPassword } = SMB;
+    await writeBackupSettings(db, who, { ...withoutPassword, retainDays: 7 });
+
+    const settings = await readBackupSettings(db);
+    expect(settings.retainDays).toBe(7);
+    expect(settings.smbPasswordSet).toBe(true);
+  });
+
+  /** And an explicit empty string is how it is cleared. */
+  it("clears the password when one is sent explicitly empty", async () => {
+    const { db } = ctx();
+    const who = await actorHere();
+    await writeBackupSettings(db, who, SMB);
+    await writeBackupSettings(db, who, { ...SMB, smbPassword: "" });
+
+    expect((await readBackupSettings(db)).smbPasswordSet).toBe(false);
+  });
+
+  /**
+   * Switching back to a local destination drops the credentials.
+   *
+   * Keeping a share's password after somebody stopped using that share is
+   * storing a secret for no purpose anybody could name.
+   */
+  it("forgets the credentials when the destination stops being a share", async () => {
+    const { db } = ctx();
+    const who = await actorHere();
+    await writeBackupSettings(db, who, SMB);
+
+    await writeBackupSettings(db, who, {
+      destinationKind: "local",
+      destinationPath: "/var/backups/vikt",
+      scheduleMinute: null,
+      retainDays: 30,
+    });
+
+    const [row] = await db.select().from(backupSettings);
+    expect(row!.credentialsEncrypted).toBe("");
+    expect(row!.smbHost).toBe("");
+
+    const settings = await readBackupSettings(db);
+    expect(settings.smbPasswordSet).toBe(false);
+  });
+
+  /**
+   * A password cannot be stored where there is no key to store it under, and
+   * that is refused rather than silently dropped: a destination saved without
+   * its password is one that fails at three in the morning with a logon error.
+   */
+  it("refuses to save a share when SECRET_KEY is absent", async () => {
+    const { db } = ctx();
+    expect(await writeBackupSettings(db, await actorHere(), SMB, {})).toEqual({
+      ok: false,
+      reason: "no_secret_key",
+    });
+  });
+
+  /**
+   * A run against a host that is not there fails with a row and a reason, and
+   * nothing about it is a crash. The reason names the SMB 2.0.2 limit, because
+   * a server that requires SMB 3 is the one refusal an operator cannot debug
+   * from a socket error.
+   */
+  it("records a failure rather than throwing when the share is unreachable", async () => {
+    const { app, db } = ctx();
+    const who = await actorHere();
+    await writeBackupSettings(db, who, { ...SMB, smbHost: "127.0.0.1", smbShare: "nope" });
+
+    const outcome = await runBackup(db, app.config, who);
+
+    expect(outcome.ok).toBe(false);
+    const [run] = await listBackupRuns(db, 1);
+    expect(run!.status).toBe("failed");
+    expect(run!.error).toBeTruthy();
+  }, 30_000);
 });
 
 describe("running a backup", () => {
@@ -216,5 +364,102 @@ describe("the backup file format", () => {
     expect(source).toContain("vikt.backup.file");
     expect(source).toContain("vikt.secrets.v1");
     void writeFile;
+  });
+});
+
+/**
+ * The test-connection button (D130).
+ *
+ * It writes a small file and deletes it again, rather than only checking that
+ * the destination looks plausible. A share that authenticates and then refuses
+ * to accept a file is a real configuration, and it is exactly the one a
+ * connect-only check would call healthy.
+ *
+ * Exercised against a local destination, which is the half that can be tested
+ * without a server: the writing, the deleting, the audit row and the refusal
+ * when nothing is configured are the same code for both.
+ */
+describe("testing the destination", () => {
+  const ctx = useTestApp();
+
+  async function actorHere() {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, user.userId));
+    return { id: user.userId, email: user.email };
+  }
+
+  it("writes a probe and leaves nothing behind", async () => {
+    const { db } = ctx();
+    const who = await actorHere();
+    const directory = await mkdtemp(path.join(tmpdir(), "vikt-probe-"));
+
+    try {
+      await writeBackupSettings(db, who, {
+        destinationKind: "local",
+        destinationPath: directory,
+        scheduleMinute: null,
+        retainDays: 30,
+      });
+
+      const outcome = await testBackupDestination(db, who);
+      expect(outcome.ok).toBe(true);
+
+      // The whole point: it wrote, and then it did not leave the file there.
+      const left = await readdir(directory);
+      expect(left).toEqual([]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  /** Recorded either way, because a pass dates the last time it was known to work. */
+  it("records the result in the admin log", async () => {
+    const { app, db } = ctx();
+    const who = await actorHere();
+    const directory = await mkdtemp(path.join(tmpdir(), "vikt-probe-"));
+
+    try {
+      await writeBackupSettings(db, who, {
+        destinationKind: "local",
+        destinationPath: directory,
+        scheduleMinute: null,
+        retainDays: 30,
+      });
+      await testBackupDestination(db, who);
+
+      const rows = await app.db.select().from(adminLog);
+      expect(rows.map((row) => row.action)).toContain("backup.test");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  /** And says so, rather than passing, when there is nowhere to write. */
+  it("fails when no destination is configured", async () => {
+    const { db } = ctx();
+    const outcome = await testBackupDestination(db, await actorHere());
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.reason).toContain("No destination");
+  });
+
+  /** A path that cannot be created is a failure with the filesystem's own reason. */
+  it("fails with a reason when the path cannot be written", async () => {
+    const { db } = ctx();
+    const who = await actorHere();
+    const file = path.join(await mkdtemp(path.join(tmpdir(), "vikt-probe-")), "a-file");
+    await writeFile(file, "not a directory");
+
+    await writeBackupSettings(db, who, {
+      destinationKind: "local",
+      // A path *under* a regular file, which cannot be a directory.
+      destinationPath: path.join(file, "nested"),
+      scheduleMinute: null,
+      retainDays: 30,
+    });
+
+    const outcome = await testBackupDestination(db, who);
+    expect(outcome.ok).toBe(false);
   });
 });

@@ -4814,3 +4814,69 @@ whose blast radius is unclear is one people leave alone out of caution.
 set at any time, and a column that existed only for current admins would have to
 be created at the moment somebody is promoted; a boolean with a default costs one
 byte per row and removes that whole case.
+
+### D130 — SMB is spoken, not mounted
+
+D103 built the backup schedule with `local` as the only destination and `smb`
+and `s3` refused with a reason. SMB is the one people actually want: the point
+of a backup is that it survives the machine the database is on, and for a
+self-hoster the thing that survives is usually a NAS.
+
+**The mechanism was the decision, and it was made before any of this was
+written.** There are two ways to reach a share from a container:
+
+**Mounting it inside the container is not acceptable.** `mount -t cifs` requires
+`CAP_SYS_ADMIN`, which is most of the way to root on the host. Granting that so
+a backup can be written is a bad trade, and worse, it is a trade a self-hoster
+following the README would make without knowing they had made it. A capability
+in a compose file is invisible in a way an admin screen is not.
+
+**Speaking the protocol from Node needs nothing.** No mount, no capability, no
+privileged container, no host-side fstab entry. It also puts the host, share,
+username and password in the admin screen beside everything else that is
+configured there, under the same encrypted-secret pattern as the SMTP password
+(D102), rather than in a file the app cannot see and cannot check.
+
+So: `@marsaud/smb2`, whose surface is fs-shaped — `createWriteStream`, `unlink`,
+`readdir`, `stat` — which is exactly what a backup needs and nothing more.
+
+**The mounted path is kept, and is the documented fallback.** It was never a
+separate feature: a mount is a `local` destination pointed at a path that
+happens to be one, and nothing in `backup-smb.ts` is involved. That matters
+because this client speaks **SMB 2.0.2**. Samba and every Windows since Vista
+accept it; a server hardened to require SMB 3 refuses the connection. That is a
+clean refusal at connect time rather than a corrupt backup, the error names the
+limit in as many words, and the mounted path is the way through it.
+
+**Encryption happens before the destination sees anything**, which is what makes
+an SMB 2.0.2 transport acceptable here and would not make it acceptable for a
+password. What crosses the network is ciphertext with a GCM tag. `dumpEncrypted`
+takes a stream rather than a path for this: a local file and a file on a share
+are both a `Writable`, and everything else about the dump is identical. The byte
+count is kept as the bytes go past rather than read back with `stat`, because a
+destination that cannot be stat'ed afterwards is the case this was extended for.
+
+**"Test connection" writes and deletes a probe file.** Not a connect check: a
+share that authenticates and then refuses to accept a file is a real
+configuration, and it is the one a connect-only check would call healthy. It
+tests what is **saved** rather than what is typed, and sits below the save
+button for that reason — a probe against unsaved values would pass and the
+schedule would then run against the old ones. Logged either way, because a pass
+dates the last time the destination was known to work.
+
+**The password is never sent to the browser.** The screen gets `smbPasswordSet`,
+a boolean. An empty password field therefore means "leave the stored one alone",
+because that is the only thing it can honestly mean; clearing it is a separate
+checkbox, since one empty box cannot express two intentions. Without that,
+changing the retention window would wipe the password, silently, and the
+scheduled run at three in the morning would be what found out.
+
+**Saving a share with no `SECRET_KEY` is refused**, not stored in the clear and
+not quietly dropped. And switching back to a local destination erases the
+credentials, because keeping a share's password after somebody stopped using
+that share is storing a secret for no purpose anybody could name.
+
+Pruning over SMB follows the local rule — by age, not by count — with one
+addition: a file whose modification time the share will not report is left
+alone. Deleting on a guess is the one mistake here that cannot be undone, and a
+destination filling up is a problem somebody can see.

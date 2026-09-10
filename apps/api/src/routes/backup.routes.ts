@@ -11,6 +11,7 @@ import {
   nextRunAt,
   readBackupSettings,
   runBackup,
+  testBackupDestination,
   writeBackupSettings,
 } from "../services/backup.service.js";
 
@@ -48,8 +49,18 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
               destinationPath: z.string(),
               scheduleMinute: z.number().int().nullable(),
               retainDays: z.number().int(),
-              updatedAt: z.string().nullable(),
-              updatedByEmail: z.string().nullable(),
+              smbHost: z.string(),
+              smbShare: z.string(),
+              smbDomain: z.string(),
+              smbUsername: z.string(),
+              /**
+               * Whether a password is stored and readable, never the password
+               * (D130). The screen has to be able to say "a password is set"
+               * and "the stored one cannot be read with this key"; neither of
+               * those needs the value, and an endpoint that returned it would
+               * put it in every browser cache that touched this screen.
+               */
+              smbPasswordSet: z.boolean(),
             }),
             runs: z.array(runSchema),
             nextRunAt: z.string().nullable(),
@@ -85,6 +96,17 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
           /** Minutes past midnight, or null for no schedule. */
           scheduleMinute: z.number().int().min(0).max(1439).nullable(),
           retainDays: z.number().int().min(1).max(3650),
+          smbHost: z.string().trim().max(255).optional(),
+          smbShare: z.string().trim().max(255).optional(),
+          smbDomain: z.string().trim().max(255).optional(),
+          smbUsername: z.string().trim().max(255).optional(),
+          /**
+           * Absent leaves the stored password alone; an explicit empty string
+           * clears it (D130). The screen never receives the password, so it
+           * cannot send it back, and reading an absent field as "clear it"
+           * would wipe the password every time somebody changed the schedule.
+           */
+          smbPassword: z.string().max(255).optional(),
         }),
         response: {
           200: z.object({ ok: z.literal(true) }),
@@ -101,11 +123,53 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
         return reply.code(422).send({
           error: result.reason,
           message:
-            "Only a local destination is implemented. SMB and S3 are named in the " +
-            "settings but not built, and this refuses rather than silently doing nothing.",
+            result.reason === "no_secret_key"
+              ? "SECRET_KEY is not set, so the share password cannot be stored encrypted. " +
+                "It is refused rather than saved in the clear or quietly dropped."
+              : "Only local and SMB destinations are implemented. S3 is named in the " +
+                "settings but not built, and this refuses rather than silently doing nothing.",
         });
       }
       return { ok: true as const };
+    },
+  );
+
+  /**
+   * Write a probe file to the destination and delete it again (D130).
+   *
+   * The one question an admin cannot answer any other way: whether the host,
+   * share, folder, username and password are, together, a place this process
+   * can write. Every one of them can be individually plausible and collectively
+   * wrong, and the alternative to this button is finding out from a failed run
+   * at three in the morning.
+   *
+   * A separate endpoint rather than a flag on the save, because it is worth
+   * pressing without changing anything: a share that worked last month and does
+   * not today is a thing to be able to check.
+   */
+  app.post(
+    "/admin/backup/test",
+    {
+      preHandler: app.requireAdmin,
+      schema: {
+        response: {
+          200: z.object({
+            ok: z.boolean(),
+            /** The probe's file name when it worked, so the log line matches. */
+            wrote: z.string().nullable(),
+            reason: z.string().nullable(),
+          }),
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const actor = await actorFor(app, request.userId!);
+      const outcome = await testBackupDestination(app.db, actor);
+
+      return outcome.ok
+        ? { ok: true, wrote: outcome.wrote, reason: null }
+        : { ok: false, wrote: null, reason: outcome.reason };
     },
   );
 

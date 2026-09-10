@@ -1236,23 +1236,47 @@ export const backupSettings = pgTable("backup_settings", {
   /**
    * Where backups go.
    *
-   * Only `local` is implemented. `smb` and `s3` are in the enum because the
-   * column is the thing that would have to change to add them and a migration
-   * later is worse than a value that is refused today with a clear reason. The
-   * service says plainly that it cannot use them rather than pretending.
+   * `local` and `smb` are implemented (D103, D130). `s3` is still in the enum
+   * because the column is the thing that would have to change to add it, and a
+   * migration later is worse than a value that is refused today with a clear
+   * reason. The service says plainly that it cannot use it rather than
+   * pretending.
    */
   destinationKind: text("destination_kind", { enum: ["local", "smb", "s3"] })
     .notNull()
     .default("local"),
 
-  /** A filesystem path for `local`, a share or bucket URL for the others. */
+  /**
+   * A filesystem path for `local`, a folder inside the share for `smb`.
+   *
+   * Empty means the root of the share. It keeps its column and changes what it
+   * is relative to, which is why adding SMB needed no migration for it (D130).
+   */
   destinationPath: text("destination_path").notNull().default(""),
 
   /**
    * Credentials for a destination that needs them, encrypted like the mail
    * password. Empty for `local`, which needs none.
+   *
+   * For `smb` this holds one JSON object, `{ username, password }`, encrypted
+   * as a whole under `SECRET_USES.backupDestination` (D130). One value rather
+   * than two columns because the two are only ever read together, and a
+   * username that survived a lost key without its password would be a
+   * half-configured destination that looks configured.
    */
   credentialsEncrypted: text("credentials_encrypted").notNull().default(""),
+
+  /**
+   * The SMB destination (D130). Empty for every other kind.
+   *
+   * Not secrets, so they are plain columns: the screen shows them back, and an
+   * operator checking where the backups go should not have to decrypt anything
+   * to find out. `smbDomain` is usually empty; a Windows domain account needs
+   * it and a Samba share almost never does.
+   */
+  smbHost: text("smb_host").notNull().default(""),
+  smbShare: text("smb_share").notNull().default(""),
+  smbDomain: text("smb_domain").notNull().default(""),
 
   /** Minutes past midnight, local time, or null for no schedule at all. */
   scheduleMinute: integer("schedule_minute"),
