@@ -193,7 +193,9 @@ export function DailyLog() {
     if (storedMeasurement) setShowMeasurements(true);
   }, [today, day.data, storedMeasurement]);
 
-  const activities = day.data?.activities ?? [];
+  // Memoised for its identity: see the same pattern in Dashboard. The fallback
+  // is a new array each render, and `activityKcalTotal` below depends on it.
+  const activities = useMemo(() => day.data?.activities ?? [], [day.data?.activities]);
 
   /**
    * Null when no session on the day could be estimated — which happens whenever

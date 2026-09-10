@@ -42,6 +42,7 @@ export function News() {
     // a new object every render. `seen` is a stable mutation object and is
     // deliberately not a dependency: listing it would re-run this on every
     // settled mutation, which is exactly the loop this is trying not to be.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unreadKey]);
 
   return (

@@ -97,7 +97,13 @@ export function Dashboard() {
   const today = todayLocalDate(timezone);
   const insights = useInsights(today);
 
-  const readings: WeightEntry[] = weightLog.data ?? [];
+  /**
+   * Memoised for its identity, not for its cost. `?? []` mints a fresh array
+   * on every render while the query has no data, and two memos below depend on
+   * this value — so without it they recompute on every render of an empty
+   * dashboard, which is exactly the state a new account is in.
+   */
+  const readings = useMemo<WeightEntry[]>(() => weightLog.data ?? [], [weightLog.data]);
 
   /**
    * The last few, newest first. Deliberately short: the chart is the hero (§5)

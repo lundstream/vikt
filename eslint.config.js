@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 import isolation from "./eslint-rules/user-id-first-param.js";
 import ownership from "./eslint-rules/derived-data-owner.js";
 
@@ -250,6 +251,30 @@ export default tseslint.config(
     files: ["scripts/**/*.mjs", "**/scripts/**/*.mjs", "infra/**/*.mjs"],
     languageOptions: {
       globals: { process: "readonly", console: "readonly", Buffer: "readonly" },
+    },
+  },
+
+  /**
+   * Rules of hooks.
+   *
+   * A `useState` was placed below an early `return null`, so the screen ran a
+   * different number of hooks depending on whether a query had resolved. React
+   * threw "Rendered more hooks than during the previous render" at runtime and
+   * every render test failed on missing elements rather than on the cause,
+   * which cost an afternoon. The rule is static and would have named the line.
+   *
+   * `exhaustive-deps` is a warning rather than an error on purpose: a stale
+   * closure is a real defect but the rule cannot tell an intentionally narrow
+   * dependency list from a forgotten one, and `eslint .` does not fail on
+   * warnings. Rules of hooks has no such judgement in it — a conditional hook
+   * is always wrong — so it is an error.
+   */
+  {
+    files: ["apps/web/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
 
