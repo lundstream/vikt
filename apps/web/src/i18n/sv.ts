@@ -401,6 +401,9 @@ export const sv = {
   "announce.defaultBody":
     "Vikt är nere för underhåll {weekday} {date} kl {from} till {to}. Du kan logga som vanligt under tiden, det sparas på telefonen och skickas när appen är tillbaka.",
 
+  "settings.requestMail": "Mejla mig när någon ber om en kod",
+  "settings.requestMailHint":
+    "Gäller bara dig som administrerar. Förfrågan hamnar i listan under Administration oavsett, och pricken vid Administration visas också oavsett. Det här handlar bara om mejlet.",
   "settings.newsMail": "Mejla mig när något nytt kommer",
   "settings.newsMailHint":
     "Gäller nyheter. Driftmeddelanden mejlas oavsett, eftersom de handlar om tjänsten du använder.",

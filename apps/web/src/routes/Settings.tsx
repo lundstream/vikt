@@ -11,7 +11,7 @@ import { queueDegraded } from "../lib/queue/enqueue.js";
 import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
-import { NewsMailToggle } from "../components/NewsMailToggle.js";
+import { NewsMailToggle, RequestMailToggle } from "../components/NewsMailToggle.js";
 import { InstallApp } from "../components/InstallApp.js";
 import { ThemeChoice } from "../components/ThemeChoice.js";
 
@@ -187,6 +187,7 @@ export function Settings() {
         something they might find interesting, and /integritet says both.
       */}
       <NewsMailToggle />
+      <RequestMailToggle />
 
       {/* The look of the app, per account rather than per device (D117). */}
       <ThemeChoice />

@@ -116,6 +116,19 @@ export const meResponseSchema = z.object({
    * cached by an older build still parses and the app still opens offline.
    */
   isAdmin: z.boolean().default(false),
+  /**
+   * How many invite requests are waiting for an answer (D129).
+   *
+   * Zero for everybody who is not an admin, and computed rather than stored:
+   * it is a count of rows in a state, and a stored copy of that is a second
+   * thing to keep in step.
+   *
+   * On `/me` for the same reason `isAdmin` is: the navigation has to decide
+   * during the first paint whether to mark the admin entry, and a second
+   * request would make the marker appear a moment late. Defaulted so an
+   * identity cached by an older build still parses.
+   */
+  pendingRequests: z.number().int().min(0).default(0),
   profile: z.object({
     /** Null until the user fills it in (D105). Not a zero, never a default. */
     heightCm: z.number().nullable(),
@@ -129,6 +142,11 @@ export const meResponseSchema = z.object({
     soberAssumeUnloggedDry: z.boolean(),
     /** Whether news announcements are also mailed (D108). Opt-out. */
     newsMail: z.boolean().default(true),
+    /**
+     * Whether this admin is mailed about a new invite request (D129). Read
+     * only for an admin, opt-out, and defaulted for an older cached identity.
+     */
+    requestMail: z.boolean().default(true),
     /**
      * Which theme to use (D117). Defaulted so an identity cached by an older
      * build still parses and the app still opens offline.
@@ -196,6 +214,8 @@ export const updateProfileSchema = z
     soberAssumeUnloggedDry: z.boolean(),
     /** Whether news announcements are also mailed (D108). Opt-out. */
     newsMail: z.boolean(),
+    /** Whether an admin is mailed about a new invite request (D129). Opt-out. */
+    requestMail: z.boolean(),
     /** Which theme to use: system, dark or light (D117). */
     theme: themeSchema,
     /**

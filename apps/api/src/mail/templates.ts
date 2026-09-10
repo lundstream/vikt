@@ -23,6 +23,7 @@ export type MailTemplate =
   | "invite_requested"
   | "invite_approved"
   /** Announcements, one per kind, so the admin queue says which (D108). */
+  | "invite_request_admin"
   | "announcement_maintenance"
   | "announcement_news"
   | "announcement_notice"
@@ -239,6 +240,48 @@ Adressen används bara för det här. Säger vi nej raderas den.`;
   return {
     template: "invite_requested",
     subject: "Din förfrågan om åtkomst till Vikt har kommit fram",
+    text,
+    html: wrap(text),
+  };
+}
+
+/**
+ * The other side of that receipt: an admin has something to answer (D129).
+ *
+ * A request sits in a list nobody has a reason to open, which is how a person
+ * who asked politely waits three weeks for an answer that was one click away.
+ * This is the whole point of the feature, so it is written to be actionable in
+ * one read: who asked, what they said, and a link that lands on the list.
+ *
+ * **The address and the line are quoted, not summarised.** The decision is made
+ * by reading them, and a mail that says "somebody asked" only moves the reading
+ * somewhere else.
+ *
+ * The link goes to the requests tab, not to a per-request page: there is no
+ * such page, the tab is the default view of the admin screen, and a request is
+ * answered from the row.
+ */
+export function inviteRequestAdminMail(input: {
+  name: string | null;
+  email: string;
+  reason: string | null;
+  link: string;
+}): RenderedMail {
+  const who = input.name === null ? input.email : `${input.name} (${input.email})`;
+
+  const text = [
+    `${who} har bett om en inbjudningskod till Vikt.`,
+    input.reason === null ? null : `Så här skrev de:\n\n${input.reason}`,
+    `Svara här:\n${input.link}`,
+    "Godkänner du skickas en kod. Nekar du raderas raden, och inget mejl går ut.",
+    "Vill du inte ha de här mejlen kan du stänga av dem under Inställningar.",
+  ]
+    .filter((part) => part !== null)
+    .join("\n\n");
+
+  return {
+    template: "invite_request_admin",
+    subject: "Någon har bett om en kod till Vikt",
     text,
     html: wrap(text),
   };

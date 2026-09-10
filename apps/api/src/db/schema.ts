@@ -219,6 +219,16 @@ export const profiles = pgTable("profiles", {
    */
   newsMail: boolean("news_mail").notNull().default(true),
   /**
+   * Whether this account is mailed when somebody asks for an invite code
+   * (D129). Only ever read for an admin, and default on.
+   *
+   * On every profile rather than only on admins', because `is_admin` can be set
+   * at any time and a preference that existed only for current admins would
+   * have to be created at the moment somebody is promoted. A column with a
+   * default costs one boolean per row and removes that whole case.
+   */
+  requestMail: boolean("request_mail").notNull().default(true),
+  /**
    * Which theme to use: `system`, `dark` or `light` (D117).
    *
    * On the account rather than in `localStorage`, because it is a preference

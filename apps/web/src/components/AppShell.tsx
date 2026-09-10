@@ -321,6 +321,8 @@ function Sidebar() {
   const me = useMe();
   const signOut = useLogout();
   const unread = useAnnouncements().data?.unread ?? 0;
+  /** Requests waiting for an answer, zero for anyone who is not an admin (D129). */
+  const pending = me.data?.pendingRequests ?? 0;
 
   return (
     <nav
@@ -362,6 +364,24 @@ function Sidebar() {
               <span
                 data-testid="side-unread"
                 aria-label={t("news.unread")}
+                className="pointer-events-none absolute right-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
+              />
+            ) : null}
+
+            {/*
+              The same dot again, for requests waiting to be answered (D129).
+
+              Gran, like the news one, because it marks a thing to look at
+              rather than a problem: somebody has asked politely and is waiting,
+              which is work rather than a failure. A dot and not a count, for
+              the reason D108 gives: the number is never large enough to be
+              information, and a numbered badge is the shape of an app that
+              wants attention rather than one that has something to say.
+            */}
+            {destination.to === "/admin" && pending > 0 ? (
+              <span
+                data-testid="side-pending"
+                aria-label={t("admin.pending")}
                 className="pointer-events-none absolute right-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
               />
             ) : null}
@@ -415,6 +435,7 @@ function BottomBar() {
   const { pathname, search } = useLocation();
   const unread = useAnnouncements().data?.unread ?? 0;
   const me = useMe();
+  const pending = me.data?.pendingRequests ?? 0;
   const reachable = destinationsFor(me.data?.isAdmin ?? false).filter(inBar);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -493,7 +514,7 @@ function BottomBar() {
                 attention rather than one that has something to say. Gran,
                 because it marks a thing to look at rather than a problem.
               */}
-              {unread > 0 ? (
+              {unread > 0 || pending > 0 ? (
                 <span
                   data-testid="more-unread"
                   aria-label={t("news.unread")}
@@ -525,6 +546,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const signOut = useLogout();
   const me = useMe();
   const { pathname } = useLocation();
+  const pending = me.data?.pendingRequests ?? 0;
 
   const links = destinationsFor(me.data?.isAdmin ?? false).filter(
     (destination) => !inBar(destination),
@@ -534,7 +556,20 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Sheet open={open} onClose={onClose} title={t("nav.more")} testId="more-sheet">
       <ul className="divide-y divide-edge border-y border-edge">
         {links.map((destination) => (
-          <li key={destination.to}>
+          <li key={destination.to} className="relative">
+            {/*
+              The dot the Mer button carries, on the row it is actually about
+              (D129). Without it the button says "something in here" and the
+              sheet does not say which of five things, which is the state the
+              news dot was never in because Nyheter is in the bar on a phone.
+            */}
+            {destination.to === "/admin" && pending > 0 ? (
+              <span
+                data-testid="more-pending"
+                aria-label={t("admin.pending")}
+                className="pointer-events-none absolute right-1 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
+              />
+            ) : null}
             <DestinationRow
               destination={destination}
               current={pathname === destination.to}

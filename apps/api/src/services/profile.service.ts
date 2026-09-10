@@ -59,6 +59,7 @@ export async function editProfile(
       ? { addExerciseToTarget: input.addExerciseToTarget }
       : {}),
     ...(input.newsMail !== undefined ? { newsMail: input.newsMail } : {}),
+    ...(input.requestMail !== undefined ? { requestMail: input.requestMail } : {}),
     ...(input.theme !== undefined ? { theme: input.theme } : {}),
     ...(input.soberAssumeUnloggedDry !== undefined
       ? { soberAssumeUnloggedDry: input.soberAssumeUnloggedDry }

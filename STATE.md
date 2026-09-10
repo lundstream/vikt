@@ -79,7 +79,10 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 ### Migrationer som kommer att köras
 
-Inga. Senaste tillämpade är `0020_profile_theme`, och produktionen har alla 21.
+`0021_request_mail` lägger till kolumnen `request_mail` på `profiles`, med
+`DEFAULT true`. Den är additiv och körs av API-containerns entrypoint vid start,
+som alla andra. Ingen befintlig rad ändras, och en avbild som inte känner till
+kolumnen bryr sig inte om att den finns.
 
 ### Manuella steg på Portainer-värden
 
@@ -120,6 +123,9 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - Nyheter kan nu innehålla rubriker, fetstil, punktlistor, numrerade listor och
   länkar. Det gäller både i appen och i mejlet. Den som skriver ett meddelande ser
   hur det kommer att se ut innan det sparas.
+- Den som administrerar får ett mejl när någon ber om en inbjudningskod, och en prick
+  vid Administration så länge något väntar på svar. Mejlet kan stängas av under
+  Inställningar. Pricken och listan finns kvar oavsett.
 
 ## On `dev`, not yet on `main`
 

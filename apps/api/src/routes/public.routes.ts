@@ -237,6 +237,7 @@ export const publicRoutes: FastifyPluginAsyncZod = async (app) => {
 
       await requestInvite(
         app.db,
+        app.config,
         request.body.email,
         request.body.name.trim(),
         request.body.reason?.trim() || null,

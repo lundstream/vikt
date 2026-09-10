@@ -1,8 +1,12 @@
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db/index.js";
-import { inviteRequests } from "../db/schema.js";
+import { inviteRequests, profiles, users } from "../db/schema.js";
 import { queueMail } from "../mail/queue.js";
-import { inviteApprovedMail, inviteRequestedMail } from "../mail/templates.js";
+import {
+  inviteApprovedMail,
+  inviteRequestAdminMail,
+  inviteRequestedMail,
+} from "../mail/templates.js";
 import type { Env } from "../env.js";
 import { mintInvite } from "./invite.service.js";
 import { linkTo } from "../lib/links.js";
@@ -35,6 +39,7 @@ export type RequestOutcome = "queued" | "already_pending";
  */
 export async function requestInvite(
   db: Db,
+  env: Env,
   email: string,
   name: string | null,
   reason: string | null,
@@ -52,7 +57,65 @@ export async function requestInvite(
   if (inserted.length === 0) return "already_pending";
 
   await queueMail(db, address, inviteRequestedMail());
+  await notifyAdmins(db, env, { name, email: address, reason });
   return "queued";
+}
+
+/**
+ * Tells the admins there is something to answer (D129).
+ *
+ * The receipt above promises a person will read the request. Nothing made that
+ * person aware of it: the row went into a list that has no reason to be opened,
+ * which is how somebody who asked politely waits three weeks for an answer that
+ * was one click away.
+ *
+ * **Through the queue, like everything else** (D104). It is not sent here, so a
+ * mail server that is down or unconfigured cannot turn a stranger's request
+ * into a 500 on a public endpoint. The drainer retries; the request is already
+ * stored either way.
+ *
+ * **Failures are swallowed on purpose.** The visitor is not the person this
+ * mail is for, and the thing they asked for has already happened. An
+ * installation with no `PUBLIC_BASE_URL` cannot build the link, and that is a
+ * reason to skip the notification rather than a reason to refuse the request.
+ * The row is still in the list, and the marker on the admin entry still
+ * appears, because that is computed from the rows rather than from this.
+ */
+async function notifyAdmins(
+  db: Db,
+  env: Env,
+  request: { name: string | null; email: string; reason: string | null },
+): Promise<void> {
+  try {
+    const link = linkTo(env, "/app/admin");
+
+    const admins = await db
+      .select({ email: users.email })
+      .from(users)
+      .innerJoin(profiles, eq(profiles.userId, users.id))
+      .where(and(eq(users.isAdmin, true), eq(profiles.requestMail, true), isNull(users.disabledAt)));
+
+    for (const admin of admins) {
+      await queueMail(db, admin.email, inviteRequestAdminMail({ ...request, link }));
+    }
+  } catch {
+    // Nothing to tell the visitor, and nothing they could do about it.
+  }
+}
+
+/**
+ * How many requests are waiting, for the marker on the admin entry (D129).
+ *
+ * Counted rather than stored: it is the number of rows in a state, and a stored
+ * copy would be a second thing to keep in step with the first.
+ */
+export async function countPendingInviteRequests(db: Db): Promise<number> {
+  const [row] = await db
+    .select({ pending: count() })
+    .from(inviteRequests)
+    .where(eq(inviteRequests.status, "pending"));
+
+  return row?.pending ?? 0;
 }
 
 export async function listInviteRequests(db: Db) {

@@ -4768,3 +4768,49 @@ and a heading style with `text-transform` would shout one written in sentence
 case. `copy-style.test.ts` runs its own dash rule and its own `shoutedWords`
 over both string renderers, and the render test asserts no `uppercase` class
 reaches the DOM.
+
+### D129 — The admin is told a request arrived, and can turn that off
+
+The receipt somebody gets for asking says a person will read their request.
+Nothing made that person aware of it. The row went into a list that has no
+reason to be opened on any particular day, which is how somebody who asked
+politely waits three weeks for an answer that was one click away. The feature
+was half built: it stored the request and told the asker, and never told the
+one person who could act.
+
+**Mail, through the queue** (D104). Not sent inline: a mail server that is down
+or unconfigured must not turn a stranger's request into a 500 on a public
+endpoint. The drainer retries, and the request is stored either way.
+
+**Failures are swallowed on purpose.** The visitor is not the person this mail
+is for, and the thing they asked for has already happened. An installation with
+no `PUBLIC_BASE_URL` cannot build the link, and that is a reason to skip the
+notification rather than a reason to refuse the request.
+
+**It quotes rather than summarises.** Who asked, the address, and the line they
+wrote, because the decision is made by reading those and a mail that says
+"somebody asked" only moves the reading somewhere else. The link goes to the
+requests tab, which is the admin screen's default view; there is no per-request
+page and a request is answered from its row.
+
+**A dot on the admin entry, not a count.** Same reasoning as the news marker
+(D108): the number is never large enough to be information, and a numbered badge
+is the shape of an app that wants attention rather than one that has something
+to say. Gran, because a request waiting is work rather than a failure. It is
+counted from the rows on `/me` rather than stored, so it is right whether or not
+the mail was sent, whether or not this admin opted out, and whether or not the
+mail server works. It rides on `/me` for the same reason `isAdmin` does: the
+navigation decides during the first paint, and a second request would make the
+marker appear a moment late.
+
+**The opt-out is per admin and default on**, like the news mail and for the
+mirror of its reason: news is something you might find interesting, and this is
+work waiting for you. The default has to be the one where the thing gets
+noticed. The hint says what turning it off does not do — the request still
+arrives, the list still holds it, the dot still appears — because a preference
+whose blast radius is unclear is one people leave alone out of caution.
+
+`request_mail` is on every profile rather than only on admins'. `is_admin` can be
+set at any time, and a column that existed only for current admins would have to
+be created at the moment somebody is promoted; a boolean with a default costs one
+byte per row and removes that whole case.

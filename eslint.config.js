@@ -78,6 +78,14 @@ export default tseslint.config(
             "approveInviteRequest",
             "rejectInviteRequest",
             "deleteInviteRequest",
+            /**
+             * How many requests are waiting (D129). Installation-wide: there is
+             * one queue of requests, every admin sees the same number, and the
+             * rows it counts belong to people who do not have accounts yet.
+             * `getMe` asks it only for an admin, and `requireAdmin` guards
+             * every route that acts on what it counts.
+             */
+            "countPendingInviteRequests",
 
             /**
              * Password reset is pre-session by definition: the caller has lost
