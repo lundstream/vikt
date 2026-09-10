@@ -4631,3 +4631,44 @@ changes with the mode rather than with where in the row the thumb lands.
 D44's rule, in the smallest place it applies. A fibre figure nobody recorded is
 not a fibre figure of zero, and rendering it as `0 g` would put a fabricated
 number next to three real ones.
+
+### D126 — Framsteg leads with distance and folds the setup away
+
+Framsteg opened on four blocks in this order: the header card, the sober count,
+the pot, the milestone list with an empty create form under it, and a second
+empty create form under that. Two of the five were things to type in, and they
+were on screen every visit whether or not anybody wanted to add anything. On a
+360 px phone the pot chart — the one figure that changes daily — started below
+the fold.
+
+**The lists are reference material.** A milestone list changes when somebody
+changes it; a savings rule list changes less often than that. §5 calls that
+reference material and folds it, which is what `Disclosure` is for and what
+"Senast loggat" on the food screen already does. Both are folded by default,
+each with its row count beside the label, because a count is what makes a fold
+safe to leave folded.
+
+**Creating is a button and a sheet.** An empty form is not information. It is a
+tool, and §5's rule for occasional tools is that they cost one tap and give the
+screen back. Both create forms move into `Sheet`, which brings Escape, focus
+return and a scroll lock with it rather than three more inline copies of that
+behaviour. Each closes on success: the milestone appearing in the list behind it
+and the count going up by one is the acknowledgement, so there is no toast.
+
+**The add buttons stay outside their folds.** Adding a milestone is not
+something you do to the list of milestones, so it must not cost a fold first,
+and the disclosure's own doc warns against being the only route to a control.
+
+**There is no separate "next milestone" block**, because D60 already put every
+unreached milestone in the header card, nearest first, with its distance in its
+own unit and its projected date. Lifting the nearest one out would put a border
+between two halves of one answer and reintroduce the `[0]` framing D60 was
+written to remove. The card *is* the distance.
+
+**The order below the card is how often the answer has changed since last
+time.** The pot moves daily and answers "can I afford the reward yet". The sober
+count moves daily too but is a single figure and reads fine below a chart. The
+two lists move when somebody moves them. The savings rules left the pot panel in
+the same change: they were hanging off the bottom of a chart, and the retroactive
+note (D54) belongs beside the rules it warns about rather than beside the
+balance.

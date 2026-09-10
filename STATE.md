@@ -105,6 +105,10 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - Tryck på en loggad rad i Mat för att se protein, kolhydrater, fett och fiber för
   just den raden, hur mycket det var och varifrån siffrorna kommer. Ändra, ta bort
   och "Logga i dag" ligger numera där, i den öppnade raden.
+- Framsteg är omstuvad: potten och nykterhetsräknaren ligger ovanför listorna, och
+  milstolpar och sparregler är hopfällda med antal bredvid rubriken. Tryck för att
+  fälla ut. "Lägg till milstolpe" och "Ny sparregel" öppnar ett formulär i ett eget
+  fönster i stället för att stå framme hela tiden.
 
 ## On `dev`, not yet on `main`
 
