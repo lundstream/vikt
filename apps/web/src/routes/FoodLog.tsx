@@ -111,7 +111,7 @@ export function FoodLog() {
    * this file because that is what every call site below already means by it:
    * the day the entries belong to.
    */
-  const { date: today, isToday } = useLogDate();
+  const { date: today, today: deviceToday, isToday } = useLogDate();
   const dayWord = isToday ? t("quick.today").toLowerCase() : t("food.dayThis");
 
   const recent = useRecentFoods(12);
@@ -141,6 +141,9 @@ export function FoodLog() {
   const [query, setQuery] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [pending, setPending] = useState<FoodItem | null>(null);
+
+  /** True while a whole day is being copied forward (D124). */
+  const [copyingDay, setCopyingDay] = useState(false);
 
   /**
    * Picking a food ends the search (D122).
@@ -240,6 +243,92 @@ export function FoodLog() {
       announce(saveProblem(error), true);
     } finally {
       setSavingId(null);
+    }
+  }
+
+  /**
+   * Copies one past entry onto **the device's own today** (D124).
+   *
+   * The date is `deviceToday`, not the selected `today`, and that is the whole
+   * difference between this and "Igen" below. Both put a row in the log; they
+   * put it on different days:
+   *
+   *  - **"Igen", under Senast loggat**, writes to the day being *viewed*. That
+   *    is backfilling — somebody filling in last Tuesday wants last Tuesday.
+   *  - **"Logga i dag", on a past day's rows**, writes to *today*. That is
+   *    somebody looking at yesterday and eating the same thing again.
+   *
+   * Passing the device's own day is also what makes `dateSource` come out as
+   * `device` rather than `chosen` without this function saying so: `enqueue`
+   * compares the supplied date against the boundary the device would have
+   * computed, and equality means `device` (D61). Writing "today" here is
+   * therefore a statement about a clock, which is exactly what it is.
+   *
+   * A fresh `clientUuid` per copy, because this is a new row and not an
+   * amendment of the one being copied.
+   */
+  async function copyToToday(entry: FoodEntry) {
+    setSavingId(entry.id);
+    try {
+      await saveEntry.mutateAsync({
+        clientUuid: clientUuid(),
+        localDate: deviceToday,
+        mealSlot: entry.mealSlot,
+        foodItemId: entry.foodItemId,
+        freetext: entry.foodItemId ? null : entry.name,
+        grams: entry.grams,
+        kcal: entry.foodItemId ? null : entry.kcal,
+        confidence: entry.confidence,
+        confirmed: true,
+      });
+      announce(t("food.copiedToToday", { name: entry.name }));
+    } catch (error) {
+      announce(saveProblem(error), true);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  /**
+   * The whole day, for somebody who ate the same as yesterday.
+   *
+   * Sequential rather than `Promise.all`: each write goes through the offline
+   * queue, and a burst of parallel IndexedDB transactions on a phone is how
+   * D118's stall was reached. One at a time is fast enough for a day's worth of
+   * rows and cannot wedge the store.
+   *
+   * A partial result is reported as a partial result. If the fourth of six
+   * fails there is no undo here and no pretending: the count says how many
+   * landed, and the rest are still on the day being viewed to try again.
+   */
+  async function copyDayToToday(entries: FoodEntry[]) {
+    setCopyingDay(true);
+    let copied = 0;
+    try {
+      for (const entry of entries) {
+        await saveEntry.mutateAsync({
+          clientUuid: clientUuid(),
+          localDate: deviceToday,
+          mealSlot: entry.mealSlot,
+          foodItemId: entry.foodItemId,
+          freetext: entry.foodItemId ? null : entry.name,
+          grams: entry.grams,
+          kcal: entry.foodItemId ? null : entry.kcal,
+          confidence: entry.confidence,
+          confirmed: true,
+        });
+        copied += 1;
+      }
+      announce(t("food.copiedDay", { n: copied }));
+    } catch (error) {
+      announce(
+        copied === 0
+          ? saveProblem(error)
+          : t("food.copiedDayPartial", { n: copied, total: entries.length }),
+        true,
+      );
+    } finally {
+      setCopyingDay(false);
     }
   }
 
@@ -561,7 +650,14 @@ export function FoodLog() {
         ) : null}
 
         {todayEntries.data && todayEntries.data.length > 0 ? (
-          <TodaySection entries={todayEntries.data} onSaved={announce} today={today} />
+          <TodaySection
+            entries={todayEntries.data}
+            onSaved={announce}
+            today={today}
+            onCopyToToday={isToday ? undefined : copyToToday}
+            onCopyDay={isToday ? undefined : copyDayToToday}
+            copyingDay={copyingDay}
+          />
         ) : null}
       </main>
 
@@ -689,10 +785,22 @@ function TodaySection({
   entries,
   today,
   onSaved,
+  onCopyToToday,
+  onCopyDay,
+  copyingDay = false,
 }: {
   entries: FoodEntry[];
   today: string;
   onSaved: (message: string) => void;
+  /**
+   * Copies one row onto the device's own today. **Undefined while viewing
+   * today**, which is what hides the action rather than a flag: offering to
+   * copy today's lunch to today is an action with no effect, and a control
+   * that does nothing is worse than one that is absent (D124).
+   */
+  onCopyToToday?: (entry: FoodEntry) => Promise<void>;
+  onCopyDay?: (entries: FoodEntry[]) => Promise<void>;
+  copyingDay?: boolean;
 }) {
   const createTemplate = useCreateTemplate();
   const deleteEntry = useDeleteFoodEntry();
@@ -738,11 +846,30 @@ function TodaySection({
     <section aria-label={t("food.today")} className="border-t border-edge pt-6">
       <h2 className="mb-2 text-note text-muted">{t("food.today")}</h2>
 
+      {/*
+        The whole day at once, for somebody who ate the same as yesterday
+        (D124). Secondary, not primary: the screen's primary action is logging
+        something new, and this is a shortcut past that rather than the thing
+        the page is for.
+      */}
+      {onCopyDay && entries.length > 0 ? (
+        <button
+          type="button"
+          data-testid="copy-day-to-today"
+          className="btn-secondary mb-3 w-auto px-4"
+          disabled={copyingDay}
+          onClick={() => void onCopyDay(entries)}
+        >
+          {copyingDay ? t("food.copyingDay") : t("food.copyDayToToday")}
+        </button>
+      ) : null}
+
       <ul className="divide-y divide-edge border-y border-edge">
         {entries.map((entry) => (
           <EntryRow
             key={entry.id}
             entry={entry}
+            onCopyToToday={onCopyToToday}
             selectable={saving}
             selected={selected.has(entry.id)}
             onToggle={() =>
@@ -811,6 +938,7 @@ function EntryRow({
   selected,
   onToggle,
   onDelete,
+  onCopyToToday,
 }: {
   entry: FoodEntry;
   /** True while a meal is being assembled, when the row is a choice. */
@@ -818,7 +946,10 @@ function EntryRow({
   selected: boolean;
   onToggle: () => void;
   onDelete: () => Promise<unknown>;
+  /** Present only on a past day. See `TodaySection` (D124). */
+  onCopyToToday?: (entry: FoodEntry) => Promise<void>;
 }) {
+  const [copying, setCopying] = useState(false);
   const update = useUpdateFoodEntry();
   const [editing, setEditing] = useState(false);
   const [grams, setGrams] = useState(() => formatDecimal(entry.grams, { decimals: 0 }));
@@ -863,6 +994,27 @@ function EntryRow({
         </span>
 
         <span className="flex shrink-0 items-center gap-1">
+          {/*
+            Only on a past day, and worded so it cannot be confused with "Igen"
+            under Senast loggat (D124). The two do the same thing to different
+            days: "Igen" logs to the day being viewed, which is backfilling;
+            this logs to today. Naming the day in the label is what makes that
+            legible, so neither is just "log this again".
+          */}
+          {onCopyToToday ? (
+            <button
+              type="button"
+              data-testid={`copy-entry-${entry.id}`}
+              className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+              disabled={copying}
+              onClick={() => {
+                setCopying(true);
+                void onCopyToToday(entry).finally(() => setCopying(false));
+              }}
+            >
+              {t("food.copyToToday")}
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid={`edit-entry-${entry.id}`}

@@ -922,6 +922,17 @@ export const sv = {
   "pantry.countedNote": "{count} av dem hamnar i ingredienslistan när de används.",
 
   "food.recent": "Senast loggat",
+  /*
+    "Igen" logs to the day being viewed; these log to today. The labels have to
+    carry that difference on their own, because the two sit on the same screen
+    (D124).
+  */
+  "food.copyToToday": "Logga i dag",
+  "food.copyDayToToday": "Logga hela dagen i dag",
+  "food.copyingDay": "Loggar…",
+  "food.copiedToToday": "{name} loggad i dag.",
+  "food.copiedDay": "{n} rader loggade i dag.",
+  "food.copiedDayPartial": "{n} av {total} rader loggades i dag. Resten ligger kvar på dagen du tittar på.",
   "food.again": "Igen",
   "food.meals": "Sparade måltider",
   "food.itemOne": "1 rad",

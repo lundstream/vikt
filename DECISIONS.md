@@ -4535,3 +4535,56 @@ would check that a file mentions a name it also defines. It checks two things �
 which files carry `btn-impact`, and which files open `ConfirmSheet`, since a
 shared component rendering the style for anyone would otherwise be a hole
 straight through the list.
+
+### D124 — Two ways to log a food again, onto two different days
+
+Browsing a past day on Mat now offers "Logga i dag" on each row, and "Logga
+hela dagen i dag" above the list. Both sit on the same screen as "Igen" under
+Senast loggat, and the three do nearly the same thing to different days:
+
+- **"Igen"** writes to the day being **viewed**. That is backfilling: somebody
+  filling in last Tuesday wants last Tuesday, and this is the behaviour that
+  already existed.
+- **"Logga i dag"** writes to **today**. That is somebody looking at yesterday
+  and eating the same thing again.
+
+**The labels carry the whole distinction**, because nothing else can. Two
+controls a few centimetres apart that both mean "log this again" are
+indistinguishable unless the label names the day, so one names it and the other
+does not need to: "Igen" is about the day already on screen.
+
+#### `dateSource` falls out of it rather than being set
+
+The copy passes the **device's own** day. `enqueue` compares the supplied date
+against the boundary the device would have computed and calls them equal
+`device`, different `chosen` (D61) — so writing today's date here produces
+`device` without this code mentioning `dateSource` at all, which is right,
+because it *is* a statement about a clock.
+
+#### Absent rather than disabled
+
+While viewing today the copy actions are not rendered. Copying today's lunch to
+today is an action with no effect, and a control that does nothing is worse than
+one that is not there: it invites a press and then explains itself.
+
+#### The whole day is sequential, and reports a partial result as one
+
+One write at a time rather than `Promise.all`. Each goes through the offline
+queue, and a burst of parallel IndexedDB transactions on a phone is how D118's
+stall was reached. If the fourth of six fails there is no undo and no
+pretending: the message says how many landed, and the rest are still on the day
+being viewed.
+
+#### The test is the pair, and it found a real defect
+
+Asserting only that the new action writes to today would pass on a build where
+"Igen" had quietly started doing the same — silently breaking backfilling, the
+older behaviour and the one nobody would think to re-check. So the test drives
+both, through the real date picker, and reads `localDate` off the request body.
+
+Writing it caught something the type checker could not: the `copyingDay` hook
+had landed **after** `if (me.isPending) return null`, so it ran on some renders
+and not others. React's "rendered more hooks than during the previous render"
+crashed the whole screen to a blank `<div>`, and every assertion failed on a
+missing element rather than on the cause. The lesson is the older one: a blank
+screen is a thrown render until proven otherwise.
