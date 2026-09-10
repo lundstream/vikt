@@ -56,22 +56,6 @@ jobs:
           --health-timeout 5s
           --health-retries 20
 
-      # The S3 destination's test endpoint (D133). Default settings on purpose:
-      # a suite that only passes against a server somebody loosened is the
-      # mistake this whole arrangement exists to correct.
-      minio:
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: viktaccess
-          MINIO_ROOT_PASSWORD: viktsecret123
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://127.0.0.1:9000/minio/health/live || exit 1"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 30
-
     env:
       # The harness swaps the database name for `vikt_test`, so this is the
       # credential source rather than the database actually used.
@@ -114,6 +98,34 @@ jobs:
       # ceasing to run — which is the exact shape of the bug this pass fixes.
       - name: Ensure pg_dump is present
         run: pg_dump --version
+
+      # The S3 destination's test endpoint (D133), with **default settings**: a
+      # suite that only passes against a server somebody loosened is the mistake
+      # this whole arrangement exists to correct.
+      #
+      # A step rather than a service container, because `minio/minio` needs the
+      # `server /data` argument and the `services:` block has nowhere to put a
+      # command. Bitnami's image exists to work around exactly that and has
+      # since withdrawn its `latest` tag, which is how this was found.
+      - name: Start MinIO
+        run: |
+          docker run -d --name vikt-minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=viktaccess \
+            -e MINIO_ROOT_PASSWORD=viktsecret123 \
+            minio/minio:latest server /data
+          # Waited for rather than slept past: a fixed sleep is a race that
+          # passes on a fast runner and fails on a slow one.
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9000/minio/health/live > /dev/null; then
+              echo "MinIO is ready after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MinIO did not become ready"
+          docker logs vikt-minio
+          exit 1
 
       - name: Test
         run: pnpm test
