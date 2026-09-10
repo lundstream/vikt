@@ -60,42 +60,73 @@ describe("y-axis ticks", () => {
   });
 });
 
-describe("the y-domain follows the trend, not the outliers", () => {
-  /**
-   * A calm trend with two wild readings. The trend is the hero (§5), so it has
-   * to fill the plot; the outliers are allowed to sit at or beyond the edges.
-   */
+/**
+ * The y-domain holds the readings, and the reason it did not used to.
+ *
+ * This block asserted the opposite until 10 September: the domain was built
+ * from the **trend alone**, so that a couple of wild readings could not squash
+ * the line into the middle quarter of the plot. The reasoning was right about
+ * the hero and wrong about the arithmetic.
+ *
+ * The trend is an exponential moving average, so it lags. On a real series it
+ * runs *through* the readings that produce it, and the most recent reading —
+ * the one somebody opens the app to see — is the one furthest from it. A
+ * morning weigh-in of 106,9 against a trend still at 108,4 fell outside a
+ * trend-only domain and was clipped: invisible rather than wrong, which is
+ * exactly why it survived a design pass. The chart looked fine and the missing
+ * point looked like a day nobody logged.
+ *
+ * The fixture below also changed, because the old one was not a weight series.
+ * It swung ±6 kg on consecutive days against a calm trend, which no body does:
+ * real daily noise is salt, hydration and glycogen, and it is about ±1 kg. A
+ * fixture built to justify clipping was proving that clipping worked.
+ *
+ * **What this costs.** A mistyped reading — 150 for 105 — now stretches the
+ * axis instead of being hidden. That is the better failure: the point is
+ * visible, and D56 put edit and delete on the row that shows it. A chart that
+ * quietly omits a value is a chart that cannot be corrected from.
+ */
+describe("the y-domain holds every reading", () => {
+  /** A real fortnight: a trend easing down, readings scattered ±1 kg around it. */
   const points: TrendPoint[] = [
-    point("2026-01-01", 90.0, 90),
-    point("2026-01-02", 89.8, 95.5), // a heavy meal and a late night
-    point("2026-01-03", 89.6, 89),
-    point("2026-01-04", 89.4, 84.0), // dehydrated
-    point("2026-01-05", 89.2, 89),
+    point("2026-01-01", 90.0, 90.6),
+    point("2026-01-02", 89.8, 88.9),
+    point("2026-01-03", 89.6, 90.3),
+    point("2026-01-04", 89.4, 88.5),
+    point("2026-01-05", 89.2, 88.3),
   ];
 
-  it("bounds the axis on the trend range plus padding", () => {
+  it("contains every raw reading, padded", () => {
     const [min, max] = yDomain(points);
-    // Trend spans 89.2..90.0. Padding is 25% of the spread, min 0.4.
-    expect(min).toBeGreaterThan(88.0);
-    expect(max).toBeLessThan(91.0);
+    for (const p of points) {
+      expect(p.raw!, `${p.raw} outside [${min}, ${max}]`).toBeGreaterThanOrEqual(min);
+      expect(p.raw!).toBeLessThanOrEqual(max);
+    }
+    expect(min).toBeLessThan(88.3);
+    expect(max).toBeGreaterThan(90.6);
   });
 
-  it("gives the trend most of the plot height", () => {
+  it("leaves the trend a readable share of the plot", () => {
     const [min, max] = yDomain(points);
     const trendSpan = 90.0 - 89.2;
-    expect(trendSpan / (max - min)).toBeGreaterThan(0.4);
+    expect(trendSpan / (max - min)).toBeGreaterThan(0.15);
   });
 
-  it("is not dragged out by the outlying readings", () => {
+  /**
+   * The padding is proportional to the **trend's** spread rather than the
+   * combined one, so a noisy morning widens the domain by its own distance and
+   * not by a quarter of itself again.
+   */
+  it("does not compound the padding on a noisy series", () => {
     const [min, max] = yDomain(points);
-    // A raw-driven domain would have run 84..95.5 and squashed the line.
-    expect(max - min).toBeLessThan(3);
+    expect(max - min).toBeLessThan(4);
   });
 
   it("still gives a flat series a band to sit in", () => {
     const flat = ["2026-01-01", "2026-01-02", "2026-01-03"].map((d) => point(d, 90));
     const [min, max] = yDomain(flat);
-    expect(max - min).toBeGreaterThanOrEqual(0.8);
+    // 0.3 of padding either side of a flat line, floating point included.
+    expect(max - min).toBeGreaterThan(0.55);
     expect(min).toBeLessThan(90);
     expect(max).toBeGreaterThan(90);
   });
@@ -118,10 +149,6 @@ describe("the y-domain follows the trend, not the outliers", () => {
   });
 });
 
-/**
- * Round ticks, added after the design pass shipped `85,6 / 87,5 / 89,4 / 91,3 /
- * 93,2` on the hero element: evenly spaced, all correct, and all meaningless.
- */
 describe("y ticks are round numbers", () => {
   it("marks the axis at halves and whole numbers", () => {
     // The exact domain that produced the broken axis.
@@ -176,12 +203,17 @@ describe("y ticks are round numbers", () => {
  * that cannot show it is a ruler with the small marks filed off.
  */
 describe("the one-kilo cap", () => {
-  it("uses whole kilos where two-kilo steps would have fitted", () => {
-    const uncapped = yTicks([85.5, 91.5], 6);
-    const capped = yTicks([85.5, 91.5], 6, 1);
-
-    expect(step(uncapped)).toBe(2);
-    expect(step(capped)).toBe(1);
+  /**
+   * Both land on whole kilos now, and that is the counting change rather than
+   * the cap. Choosing by an *estimate* of how many marks a step would place,
+   * `floor(range / step) + 1`, assumed the first mark sat on the domain
+   * minimum; it does not, so the estimate ran one high and a 6 kg window was
+   * handed two-kilo steps. Counting the marks that actually land gives six at
+   * 1 kg, which is inside the four-to-six band and finer.
+   */
+  it("uses whole kilos on a six-kilo window, capped or not", () => {
+    expect(step(yTicks([85.5, 91.5], 6))).toBe(1);
+    expect(step(yTicks([85.5, 91.5], 6, 1))).toBe(1);
   });
 
   it("keeps half-kilo steps on a narrow window, since the cap is a ceiling", () => {

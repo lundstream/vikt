@@ -463,12 +463,43 @@ export function yDomain(points: readonly TrendPoint[]): [number, number] {
   const trends = points.map((point) => point.trend).filter(Number.isFinite);
   if (trends.length === 0) return [0, 1];
 
-  const min = Math.min(...trends);
-  const max = Math.max(...trends);
+  /**
+   * Every raw reading in the window is inside the domain.
+   *
+   * This used to bound the axis by the **trend alone**, on the reasoning that
+   * the line is the hero and a couple of outlying readings should not squash
+   * it into the middle quarter of the plot. That reasoning was right about the
+   * hero and wrong about the arithmetic: the trend is an exponential moving
+   * average, so it lags, and on a real series it sits well inside the readings
+   * that produced it. A morning weigh-in of 106,9 against a trend still at
+   * 108,4 landed outside a domain built from the trend and was clipped —
+   * the most recent reading, the one a person opens the app to see, simply not
+   * drawn.
+   *
+   * Clipping made it invisible rather than wrong, which is why it survived: the
+   * chart looked fine, and the missing point looked like a day nobody logged.
+   *
+   * The line stays readable because the two series are not independent. The
+   * trend is drawn from these readings, so it runs through the middle of them
+   * by construction, and widening to hold them costs the line the noise band
+   * around it rather than half the plot.
+   */
+  const readings = points
+    .map((point) => point.raw)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
-  // A flat line still needs a band to sit in, or it lands on the axis.
-  const spread = max - min;
-  const padding = Math.max(spread * 0.25, 0.4);
+  const values = [...trends, ...readings];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  /**
+   * Padding proportional to the **trend's** spread, not the combined one, so a
+   * single noisy morning widens the domain by its own distance and not by a
+   * quarter of itself again. A flat line still needs a band to sit in, or it
+   * lands on the axis.
+   */
+  const trendSpread = Math.max(...trends) - Math.min(...trends);
+  const padding = Math.max(trendSpread * 0.2, (max - min) * 0.06, 0.3);
 
   return [round(min - padding), round(max + padding)];
 }
@@ -494,8 +525,16 @@ export function yTicks(
   count = 5,
   maxStep?: number,
 ): number[] {
-  return niceTicks(domain[0], domain[1], count, formatKg, maxStep);
+  /**
+   * `KG_QUANTUM` is what makes the marks evenly spaced *as printed*. The labels
+   * carry one decimal, so a step has to be a whole number of tenths — see
+   * `candidateSteps` in ticks.ts, which this axis is the reason for.
+   */
+  return niceTicks(domain[0], domain[1], count, formatKg, maxStep, KG_QUANTUM);
 }
+
+/** One decimal is the precision `formatKg` prints at, so 0.1 kg is the quantum. */
+const KG_QUANTUM = 0.1;
 
 /**
  * Above this span the one-kilo cap is dropped. Ten kilos at one mark each is
@@ -539,8 +578,16 @@ function TrendTooltip({
   return (
     <div className="rounded-lg border border-edge bg-card px-3 py-2 text-note shadow-lg">
       <p className="text-micro text-muted">{formatLongDay(point.localDate, LOCALE)}</p>
+      {/*
+        One decimal, like the headline trend weight and like the axis. The
+        tooltip carried two, so tapping the chart turned 86,9 into 86,93 and
+        invited a reader to believe the second digit. The trend is an average
+        over a fortnight of scale readings that are themselves ±0.1 at best;
+        the second decimal is arithmetic, not measurement, and §5's rule that
+        uncertainty is never dressed up applies to precision as much as colour.
+      */}
       <p className="num mt-1 text-metric-sm text-ink">
-        {t("chart.trendValue", { value: formatDecimal(point.trend, { decimals: 2 }) })}
+        {t("chart.trendValue", { value: formatDecimal(point.trend, { decimals: 1 }) })}
       </p>
       <p className="num text-muted">{readingLine}</p>
       {showWhtr && typeof point.whtr === "number" ? (
