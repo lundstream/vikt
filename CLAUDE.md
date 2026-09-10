@@ -579,6 +579,26 @@ A daily checklist the user writes themselves, and the first push notification th
 > **Reminders are Web Push**, which works on Android and on iOS **only once the app has been installed to the home screen** — that is a platform rule, not a bug, and it is the reason D116's install control exists at all. VAPID keys are configuration, per-device subscriptions are rows, and a subscription that the push service rejects with 404 or 410 is deleted rather than retried.
 >
 > **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. One time of day, in the user's timezone, off by default.
+
+#### The two reminders, and the foundation they pay for
+
+The habit checklist above is the second customer of this machinery, not the first. Two reminders ship with it, and they are the ones every account wants whether or not it ever writes a habit:
+
+> **"Väg dig", 07:00 by default.** **"Fyll i dagen", 22:00 by default.** Each has a configurable time and is **individually disableable** in Inställningar. Both are off until somebody turns them on: a notification nobody asked for is the fastest way to have notifications turned off for good.
+>
+> **Each is skipped when it has already happened.** The morning one does not fire if a weight is already logged for that day; the evening one does not fire if a daily log exists. Checked at send time, not at schedule time, because somebody who weighs themselves at 06:40 has answered the question and the reminder is then an interruption that makes the app look like it is not paying attention. This is also the difference between a reminder and an alarm, and it is the whole reason to prefer the first.
+>
+> **The foundation, built once for these two and reused by the checklist:**
+>
+> - **VAPID keys as configuration**, under `assertProdSecrets` like every other secret that must not be an example value. Push without them is not degraded, it is absent — the toggle does not appear.
+> - **A per-device subscription table.** One row per browser per account, not one per account: the same person has a phone and a laptop and they subscribe separately. **Edit and delete per D56**, which here means a device can be named and removed from any other device, because the commonest reason to want that is a phone somebody no longer has.
+> - **A scheduler firing in each user's timezone**, which is stored on the profile already. Not in UTC and not on the server's clock: 07:00 means seven in the morning where the person is, and that is a different instant for two accounts and a different instant for one account in March.
+> - **A service worker handler that opens the right screen on tap.** The morning reminder opens the weight sheet; the evening one opens Dagen. A notification that opens the dashboard and leaves somebody to navigate has spent its one interaction on nothing.
+> - **A rejected subscription is deleted, not retried.** 404 and 410 from the push service mean the browser threw it away, and a queue that retries them forever is a queue that grows forever.
+>
+> **Say where push works, next to the toggle.** It works in the browser on Android, and on iOS **only once the app has been installed to the home screen** — a platform rule, not a bug, and the reason D116's install control exists. Inställningar has to state this beside the switch rather than in a help page, because the person who needs it is the one about to turn on a reminder that will never arrive. Offer the install control there when the app is not installed.
+>
+> Nothing here is built in the pass that writes this down.
 >
 > **Some habits are health data.** "Ta tabletten" is a record of medication, which under the GDPR is the same special category as the weights already are (D107). The privacy page must say so when this ships: what a habit name can contain, that it is stored like everything else, that it is in the export, and that it is deleted with the account. This is not an afterthought at the end of the phase — the page changes in the same pass as the feature.
 >
@@ -629,6 +649,8 @@ Not phases. Each is a good idea with no deadline and no dependency on the others
 > **A plate photo into the decomposition path**, if the local model handles images. Phase 8's parsing already takes a sentence and returns a structure the backend re-prices; an image is the same contract with a different input. Strictly conditional on the model running on hardware the owner controls (D94): a photograph of somebody's dinner is not going to a cloud API, and if the local model cannot do it then this does not happen.
 >
 > **Desktop keyboard shortcuts for logging.** The fast path is measured on a phone and lives on a phone, but the app is used at a desk too, and a keystroke that opens the weight sheet with focus in the field is the desktop equivalent of the two taps. Small, self-contained, and worth nothing until somebody actually logs from a laptop often enough to be annoyed.
+>
+> **Bounce handling for outbound mail**, or at minimum forwarding the noreply mailbox somewhere a person reads. Today a message that hard-bounces is `sent` as far as this app is concerned: the queue's job ends when the relay accepts it, and the relay's rejection arrives later, by mail, to an address nobody opens. That is the same shape as D109's dead invite link — everything reports success and the recipient got nothing. The cheap version is a real forward on the noreply address and a line in `docs/backup.md`'s neighbourhood saying so; the real version reads bounces back into `outbound_email` and marks the row, which is worth doing before this app has more than a handful of accounts.
 
 ---
 
