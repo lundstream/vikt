@@ -102,73 +102,75 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   en egen färg. Att radera ett konto kräver att adressen skrivs in.
 - När du tittar på en tidigare dag i Mat kan du logga en rad, eller hela dagen, på
   dagens datum. "Igen" under Senast loggat fyller fortfarande i dagen du tittar på.
+- Tryck på en loggad rad i Mat för att se protein, kolhydrater, fett och fiber för
+  just den raden, hur mycket det var och varifrån siffrorna kommer. Ändra, ta bort
+  och "Logga i dag" ligger numera där, i den öppnade raden.
 
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. Five commits:
+between what is built and what is running. 9 commits:
 
 | | |
 |---|---|
+| `1b4806d` | A logged row opens onto its macros, amount and source |
+| `ea18cc5` | Copy a past day's food forward to today |
+| `443f3ac` | Restart dev when needed, and hand the deploy over in writing |
+| `200ae48` | Record what is on dev and not on main |
+| `0f823e0` | One primary, one secondary, and Honung for what costs something |
+| `b83a1d9` | Write the reminder design into Phase 11, and bounce handling into the backlog |
+| `e864f6a` | Say why a macro mean is withheld, and dismiss the search on a pick |
+| `25a173f` | The weight axis is a ruler again, and holds every reading |
 | `36d6f9a` | Work happens on dev; main receives merges only |
-| `25a173f` | The weight axis is a ruler again, and holds every reading (D122) |
-| `e864f6a` | Say why a macro mean is withheld, and dismiss the search on a pick (D122) |
-| `b83a1d9` | The reminder design into Phase 11, bounce handling into the backlog |
-| `0f823e0` | One primary, one secondary, and Honung for what costs something (D123) |
 
-CI green on `dev`:
-[34508734187](https://github.com/lundstream/vikt/actions/runs/34508734187).
-
-**Merging is a deploy.** `main` takes these through a pull request when the owner
-decides to update production, not when the suite goes green.
+**Merging is a deploy**, and "Inför nästa deploy" above is the handover. `main`
+takes these through a pull request when the owner decides to update production,
+not when the suite goes green.
 
 ### Before the next redeploy
 
-Unchanged from INFRA.md and still outstanding: `CONTACT_EMAIL`, `OPERATOR`,
-`REPO_URL` and `SUPPORT_URL` have to exist on the Portainer stack **before** the
-image that reads them ships (D121). The API refuses to boot in production with a
-landing page and no contact address, which is deliberate — a public privacy page
-naming nobody is not lawful to run.
+`tailwind.config.js` changed, adding the `on-reward` colour. Tailwind resolves
+its config at boot, so a development server that has been up since before that
+commit serves the old one and reports `text-on-reward` as a class that does not
+exist. §7 now carries the rule, including that `pkill -f vite` does nothing on
+Windows and the kill has to be by port.
 
-**`tailwind.config.js` changed** in `0f823e0`, adding the `on-reward` colour.
-Tailwind resolves its config at boot, so the development server needs a restart
-before that class exists; a green build proves nothing about a running dev
-server.
+## Still open from the briefs
 
-## Still open from the 10 September brief
+Finished on `dev`: the branching rule and this deploy list, both chart defects,
+the macro reason line, dismissing the food search on a pick, the button audit
+with the Honung tier and its guard, the Phase 11 reminder design, the
+bounce-handling backlog entry, the "med ett tryck" copy fix, copying a past day
+forward, and the expandable food rows.
 
-Started and finished: the branching rule, both chart defects, the macro reason
-line, dismissing the food search on a pick, the button audit with the Honung
-tier and its guard, the Phase 11 reminder design, the bounce-handling backlog
-entry, and the "med ett tryck" copy fix.
+**Not started.** Each is a numbered item of its own and none is half-built:
 
-**Not started**, and each is a pass of its own rather than a loose end:
-
-- **Copy a past day forward** (1d): a per-row "Logga i dag" and a whole-day
-  version, writing with today's `local_date` and `dateSource: "device"` per D61,
-  with Senast loggat keeping its backfill behaviour and the two labels made
-  obviously different.
-- **Expandable food rows** (2): macros, amount, source and estimate marker
-  inside the row, with edit, delete and the copy-forward action, one open at a
-  time.
-- **Framsteg** (3): the two forms into modals, existing milestones and savings
-  rules behind counted disclosures, the page leading with how it is going.
-- **`/kod` behind `REQUEST_ENABLED`** (6b), with the hero line replaced and
+- **Framsteg** (3): "Lägg till milstolpe" and "Ny sparregel" into modals,
+  existing milestones and savings rules behind counted disclosures, the page
+  leading with the header card, then the next milestone, then the pot.
+- **`/kod` behind `REQUEST_ENABLED`** (4), off by default, documented as a
+  deployment mode beside `LANDING_ENABLED`, with the hero line replaced and
   `/integritet` updated.
-- **Markdown in announcements** (6c), rendered sanitised in three places with a
-  preview in the editor.
-- **Mail to the admin on an access request** (6d), with an unread marker and a
+- **Markdown in announcements** (5): a small subset, sanitised, in the app, the
+  HTML mail and the plain-text part, with a preview in the editor.
+- **Mail to the admin on an access request** (6), with an unread marker and a
   per-admin opt-out.
-- **SMB backup** (6e), over the protocol from Node rather than a mount.
+- **Backup to SMB** (7), over the protocol from Node rather than a mount.
+
+**Verification not run** (8): the screenshot pass and the fast-path
+re-measurement belong after item 3, since Framsteg is one of the screens they
+cover. The expanded row and the copy actions do not touch the two-tap repeat
+path — that path is Senast loggat, which is unchanged — but that is reasoning,
+not a measurement, and the brief asks for a measurement.
 
 **Blocked, not skipped:** removing the probe request
-`human-check-probe@example.test` (6g) needs the production database, and the
+`human-check-probe@example.test` needs the production database, and the
 Portainer password was rotated after the deployment pass. It is under
 Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1229 tests**: 464 shared, 195 web, 570 api. Lint clean, all three packages
+**1239 tests**: 464 shared, 205 web, 570 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 Measurements, and the conditions they were taken under, are in
