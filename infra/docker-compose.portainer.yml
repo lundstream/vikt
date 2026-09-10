@@ -48,6 +48,7 @@ services:
       NODE_ENV: production
       APP_NAME: ${APP_NAME:-Vikt}
       LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      REQUEST_ENABLED: ${REQUEST_ENABLED:-false}
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
@@ -98,6 +99,7 @@ services:
       # so renaming the app needs no rebuild (D13).
       APP_NAME: ${APP_NAME:-Vikt}
       LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      REQUEST_ENABLED: ${REQUEST_ENABLED:-false}
       # Who runs this installation (D121). The GDPR controller is whoever
       # deploys Vikt, so these are settings and not constants in the source.
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}

@@ -143,10 +143,32 @@ Two routes, same three containers:
   stack environment variable, because that is the form a container-management UI
   gives you.
 
-`CONTACT_EMAIL` is required wherever `LANDING_ENABLED` is true: `/integritet`
-has to name somebody the reader can write to about their own data, and the API
-refuses to boot without it. Whoever deploys Vikt is the controller under the
-GDPR, not whoever wrote it, so that address cannot live in this repository.
+### Deployment modes
+
+Each is off by default, each is an environment variable, and none of them can be
+changed from the admin UI: a toggle in a web interface that exposes a public
+endpoint is an attack surface, and a self-hoster edits the file once.
+
+| Mode | On means | Off means |
+|---|---|---|
+| `LANDING_ENABLED` | The public landing page is served at `/`. | `/` redirects to `/app` and the landing bundle is never served. |
+| `REQUEST_ENABLED` | The request form is served at `/kod` and the endpoint it posts to is registered. | Both are 404: the path does not exist and neither does the route. |
+| `LLM_ENABLED` | The phase 8 surfaces exist. Needs `OLLAMA_URL`. | They are absent, not greyed out. |
+
+**`REQUEST_ENABLED` is separate from `LANDING_ENABLED` on purpose** (D127). A
+landing page is something to read. A request form takes a stranger's name and
+address, and every code you approve makes you responsible for that person's
+weight, meals and address, under your own name on `/integritet`. Those are two
+different decisions and the common answer is yes to the first and no to the
+second. Nothing links to `/kod` even when it is on: turning it on means handing
+the address to somebody, not publishing it. The form keeps its human check, its
+honeypot and its rate limit either way.
+
+`CONTACT_EMAIL` is required wherever either of those first two is true:
+`/integritet` has to name somebody the reader can write to about their own data,
+and the API refuses to boot without it. Whoever deploys Vikt is the controller
+under the GDPR, not whoever wrote it, so that address cannot live in this
+repository.
 
 `.github/workflows/release.yml` builds and pushes both images on every push to
 `main` that touches code.

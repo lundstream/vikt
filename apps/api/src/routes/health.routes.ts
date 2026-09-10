@@ -15,16 +15,18 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
             /**
              * Which optional modes this installation runs (D94).
              *
-             * On the health endpoint rather than behind auth, because the
-             * landing page needs to know whether to offer "be om en kod"
-             * before anyone has signed in, and because an operator checking a
-             * deployment should be able to see its shape with one curl.
+             * On the health endpoint rather than behind auth, because an
+             * operator checking a deployment should be able to see its shape
+             * with one curl, and because the modes decide which paths answer
+             * at all.
              *
              * It discloses nothing an anonymous visitor could not already
              * infer from which pages answer.
              */
             modes: z.object({
               landing: z.boolean(),
+              /** Whether `/kod` and the request endpoint exist (D127). */
+              request: z.boolean(),
               mail: z.boolean(),
               llm: z.boolean(),
             }),
@@ -40,6 +42,7 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
         db: "up" as const,
         modes: {
           landing: app.config.LANDING_ENABLED,
+          request: app.config.REQUEST_ENABLED,
           mail: app.mailer.enabled,
           llm: app.llm.enabled,
         },

@@ -138,13 +138,17 @@ export function assertProdSecrets(env: NodeJS.ProcessEnv = process.env): void {
    * legible: a container that will not start with a reason in its log beats a
    * page that renders an empty sentence and is read by nobody who can fix it.
    */
-  if (env.NODE_ENV === "production" && env.LANDING_ENABLED === "true") {
+  const publicFace =
+    env.LANDING_ENABLED === "true" || env.REQUEST_ENABLED === "true";
+
+  if (env.NODE_ENV === "production" && publicFace) {
     const contact = env.CONTACT_EMAIL?.trim() ?? "";
     if (contact === "") {
       problems.push(
-        "CONTACT_EMAIL is not set, and LANDING_ENABLED is true. /integritet has " +
-          "to name someone the reader can write to about their own data, and " +
-          "that person is whoever runs this installation",
+        "CONTACT_EMAIL is not set, and LANDING_ENABLED or REQUEST_ENABLED is " +
+          "true. /integritet has to name someone the reader can write to " +
+          "about their own data, and that person is whoever runs this " +
+          "installation",
       );
     }
   }
@@ -277,13 +281,32 @@ const envSchema = z.object({
    */
 
   /**
-   * Serve the landing page at `/` and accept invite requests.
+   * Serve the landing page at `/`.
    *
-   * Off means `/` redirects to `/app` and `POST /invite-requests` does not
-   * exist — a 404 rather than a disabled endpoint, because an endpoint that
-   * answers at all is one that can be probed and rate-limited around.
+   * Off means `/` redirects to `/app` and the landing bundle is never served:
+   * a private install has no public face rather than a public face nobody
+   * links to.
+   *
+   * It no longer carries the request form with it. See `REQUEST_ENABLED`
+   * (D127): the two are separate questions, and the answer to the second is
+   * no far more often than the answer to the first.
    */
   LANDING_ENABLED: booleanish.default("false"),
+
+  /**
+   * Accept requests for an invite code, at the unlinked path `/kod` (D127).
+   *
+   * Off means the page and the endpoint **do not exist** — 404, not a disabled
+   * form and not a 403. An endpoint that answers at all is one that can be
+   * probed and rate-limited around, and this one takes a name and an address
+   * from a stranger.
+   *
+   * Off by default and independent of `LANDING_ENABLED`, because a landing
+   * page is something to read and a request form is something that creates
+   * work and responsibility for whoever runs the installation. Most people who
+   * want the first do not want the second.
+   */
+  REQUEST_ENABLED: booleanish.default("false"),
 
   /**
    * Every phase 8 surface. Off means they are **absent**, not greyed out.
@@ -401,6 +424,7 @@ export function describeModes(env: Env, mailEnabled = false): string {
 
   return [
     on("landing", env.LANDING_ENABLED),
+    on("request", env.REQUEST_ENABLED),
     /**
      * Mail is no longer an environment question (D102). It is on when the
      * settings table holds a server whose password the app can actually read,

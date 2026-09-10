@@ -46,6 +46,7 @@ services:
       # needs it as well as the API: the API decides whether the endpoint
       # exists, nginx decides whether the page is served at all.
       LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      REQUEST_ENABLED: ${REQUEST_ENABLED:-false}
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/.env}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in infra/.env}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
@@ -100,6 +101,7 @@ services:
       # rebuild (DECISIONS.md D13).
       APP_NAME: ${APP_NAME:-Vikt}
       LANDING_ENABLED: ${LANDING_ENABLED:-false}
+      REQUEST_ENABLED: ${REQUEST_ENABLED:-false}
       # Who runs this installation (D121).
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       OPERATOR: ${OPERATOR:-}

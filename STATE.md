@@ -70,6 +70,7 @@ Cleared back to empty when a merge ships, not before.
 | `OPERATOR` | Vem som driver installationen, i sidfoten och på `/integritet`. | Nej, men sidan blir vagare utan. |
 | `REPO_URL` | Vart GitHub-länken pekar. | Nej, har ett förval. |
 | `SUPPORT_URL` | Länken "Bjud på en öl". Tom betyder att länken utgår helt. | Nej. |
+| `REQUEST_ENABLED` | Serverar formuläret för kodförfrågan på `/kod` och registrerar endpointen det skickar till. Av betyder 404 på båda (D127). | Nej, förvalet är `false`. |
 
 **Sätt dem innan avbilden som läser dem rullar ut.** En variabel den nuvarande
 avbilden inte känner till ignoreras, så det finns inget fönster där något går sönder
@@ -83,6 +84,9 @@ Inga. Senaste tillämpade är `0020_profile_theme`, och produktionen har alla 21
 ### Manuella steg på Portainer-värden
 
 - Sätt de fyra variablerna ovan i stacken `vikt` innan avbilden byts.
+- **`REQUEST_ENABLED` behöver inte sättas.** Utan den är formuläret borta, vilket är
+  det avsedda läget. Sätt den till `true` bara om du vill kunna skicka adressen
+  `/kod` till någon. Ingenting länkar dit.
 - Ta bort den kvarglömda förfrågan `human-check-probe@example.test` under
   Administration, Förfrågningar, Besvarade. Den blev kvar från verifieringen av
   människokontrollen och kan inte tas bort härifrån.
@@ -109,6 +113,10 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   milstolpar och sparregler är hopfällda med antal bredvid rubriken. Tryck för att
   fälla ut. "Lägg till milstolpe" och "Ny sparregel" öppnar ett formulär i ett eget
   fönster i stället för att stå framme hela tiden.
+- Formuläret för att be om en inbjudningskod ligger inte längre på startsidan. Det
+  har flyttat till en egen adress som inget länkar till, och den är avstängd om
+  inte den som driftar servern slår på den. Startsidan säger i stället att appen
+  kräver en inbjudan och att den som vill kan köra en egen kopia.
 
 ## On `dev`, not yet on `main`
 

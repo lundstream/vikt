@@ -4672,3 +4672,45 @@ two lists move when somebody moves them. The savings rules left the pot panel in
 the same change: they were hanging off the bottom of a chart, and the retroactive
 note (D54) belongs beside the rules it warns about rather than beside the
 balance.
+
+### D127 — Asking for a code is its own deployment mode, at its own path
+
+The request form sat in the landing page's last section, behind
+`LANDING_ENABLED`, and the hero carried a second button pointing at it. Turning
+on a page for people to read turned on a public write endpoint with it, and
+there was no way to have one without the other.
+
+**They are different decisions.** A landing page is something to read: it costs
+its owner nothing to serve, and it is the thing that makes an open-source
+project findable. A request form takes a stranger's name, address and a line of
+free text, and every code approved from it makes whoever runs the installation
+responsible for that person's weight, meals, measurements and address, under
+their own name on `/integritet`. That is a decision worth making one person at a
+time, and a form on a public page is the opposite of making it one person at a
+time.
+
+So `REQUEST_ENABLED`, off by default, independent of `LANDING_ENABLED`, and
+documented as a deployment mode beside it in `README.md` and `.env.example`.
+
+**Off means absent, at both locks.** nginx returns 404 for `/kod`, and the API
+does not register `POST /invite-requests` or its challenge endpoint. A route
+that answers 403 is still a route: still reachable, still something to probe and
+rate-limit around. `invite-request.test.ts` asserts the landing-on,
+request-off configuration specifically, because that is the one the separation
+was made for and the one that did not exist before.
+
+**On means everything that guarded it is still there.** The human check (D112),
+the honeypot, and the per-IP limits on both the challenge and the submission all
+moved with the form. Being unlinked is not a security property and is not
+treated as one: it is unlinked because it is not for browsing.
+
+**The hero says something true for every reader instead.** "Be om en kod" as a
+second button implied asking was a normal way in, and on most installations it
+pointed at a page that does not exist. What replaces it is a sentence, not a
+control, because there is no action here that is right for everybody: somebody
+with a code opens the app, somebody without one cannot get one here, and both
+can run their own copy. The link goes to the repository, which is the one offer
+this page can make to anybody who reads it.
+
+`/integritet` gained a paragraph saying the form may not exist at all, and that
+where it does not, no request is stored here in the first place.

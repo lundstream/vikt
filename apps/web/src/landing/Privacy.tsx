@@ -35,7 +35,7 @@ export function Privacy() {
   const operator = operatorName();
 
   return (
-    <PageShell title="Integritet" updated="6 september 2026">
+    <PageShell title="Integritet" updated="10 september 2026">
       <Section title="Vem som ansvarar">
         <P>
           Den här installationen drivs av {operator}.{" "}
@@ -61,9 +61,17 @@ export function Privacy() {
           några.
         </P>
         <P>
-          Sådant som hör till driften. Inloggningar med tidpunkt, kön av utgående mejl, och din förfrågan om en
-          inbjudningskod tills den är besvarad. Förfrågan innehåller namnet och adressen du
-          skrev och raden om varför, om du skrev en.
+          Sådant som hör till driften. Inloggningar med tidpunkt, kön av utgående mejl, och en
+          förfrågan om en inbjudningskod tills den är besvarad. Förfrågan
+          innehåller namnet och adressen som skrevs och raden om varför, om det
+          skrevs en.
+        </P>
+        <P>
+          Om den här installationen tar emot förfrågningar alls. Formuläret ligger
+          på en egen adress som inget länkar till, och den kan vara avstängd. Är den
+          avstängd finns varken sidan eller det den skickar till, och då lagras
+          ingen förfrågan här över huvud taget. Registrering sker med kod hur som
+          helst.
         </P>
         <P>
           Aviseringar. Vilka meddelanden i appen du har läst, och om du vill ha nyhetsmejl.
@@ -127,7 +135,7 @@ export function Privacy() {
           krypterade.
         </P>
         <P>
-          Nekas din förfrågan om kod raderas raden. Ingen kopia sparas, och inget mejl skickas. Det gäller namnet lika mycket som adressen.
+          Nekas en förfrågan om kod raderas raden. Ingen kopia sparas, och inget mejl skickas. Det gäller namnet lika mycket som adressen.
         </P>
       </Section>
 
