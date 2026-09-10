@@ -307,7 +307,7 @@ export function Backup() {
           does not hold a copy of every user's data in memory to hand it over.
         */}
         <a
-          className={`btn-secondary inline-flex w-auto px-6 ${
+          className={`btn inline-flex w-auto px-6 ${
             data?.downloadable ? "" : "pointer-events-none opacity-50"
           }`}
           href="/api/admin/backup/latest"
@@ -535,7 +535,7 @@ export function Backup() {
           <button
             type="button"
             data-testid="test-backup"
-            className="btn-secondary w-auto px-6"
+            className="btn w-auto px-6"
             disabled={test.isPending}
             onClick={() => test.mutate()}
           >

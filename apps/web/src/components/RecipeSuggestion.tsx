@@ -366,7 +366,7 @@ export function RecipeSuggestion({
             <button
               type="button"
               data-testid="log-recipe"
-              className="btn-secondary w-auto px-4"
+              className="btn w-auto px-4"
               onClick={() => void log()}
               disabled={confirm.isPending}
             >

@@ -865,7 +865,7 @@ function TodaySection({
         <button
           type="button"
           data-testid="copy-day-to-today"
-          className="btn-secondary mb-3 w-auto px-4"
+          className="btn-small mb-3"
           disabled={copyingDay}
           onClick={() => void onCopyDay(entries)}
         >
@@ -1159,7 +1159,7 @@ function EntryRow({
               <button
                 type="submit"
                 data-testid={`save-entry-${entry.id}`}
-                className="btn-secondary w-auto px-4"
+                className="btn w-auto px-4"
                 disabled={update.isPending}
               >
                 {t("profile.save")}
@@ -1535,7 +1535,7 @@ function TemplateRow({
           <button
             type="submit"
             data-testid={`save-template-${template.id}`}
-            className="btn-secondary w-auto px-4"
+            className="btn w-auto px-4"
             disabled={update.isPending}
           >
             {t("profile.save")}

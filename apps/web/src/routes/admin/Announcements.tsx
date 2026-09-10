@@ -282,7 +282,7 @@ export function Announcements() {
           {form.id ? (
             <button
               type="button"
-              className="btn-secondary w-auto px-6"
+              className="btn-link w-auto px-6"
               onClick={() => setForm(BLANK)}
             >
               {t("common.cancel")}

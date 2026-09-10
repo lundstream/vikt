@@ -5093,3 +5093,74 @@ verified.
 likely to throw outside a promise chain than a socket state machine. It costs
 one function call, it is the difference between a bad destination and a dead
 API, and the reason it exists is that nobody predicted the last one either.
+
+### D134 — Three button tiers, and the outline one is not among them
+
+D123 audited the buttons and found the app already consistent: 21 filled, 25
+outline, three exceptions. It was consistent, and it was consistently spending a
+whole visual tier on the wrong distinction.
+
+**The outline said "the other button".** `.btn-secondary` existed to make a
+second action quieter than the first — "lägg till pass" beside "spara dagen".
+But the reader does not need to be told which of two actions is more important,
+and the app was not saying anything reliable about it anyway: `.btn-secondary`
+was on saves, on cancels, on diagnostics probes and on a download link. A tier
+that means five things means none.
+
+**Worse, a cancel looked like a button.** "Avbryt" and "Spara" sat side by side,
+both button-shaped, distinguished only by position and fill. That is the wrong
+pair to make look similar: one writes and one leaves.
+
+#### The three that remain
+
+**A filled button for every action.** Snö on Natt in dark, Natt on Snö in light,
+which is what the profile has said since v1.0 and what `.btn` already was. Three
+parallel saves on Dagen are three filled buttons, and that says "these are three
+equal things" more honestly than an outline said "this one is lesser".
+
+**A text link for what is not an action.** Cancel, back, dismiss. The app
+already used this for "Tillbaka" and for "Ta bort" in a row, so `.btn-link` is
+the existing pattern given a name rather than a new invention. It reads as
+"this takes you out of here", which is what cancel is. Still 44 px tall: a link
+is a quieter target, not a smaller one.
+
+**Honung for an action with a cost**, unchanged from D123 and now written into
+the profile itself (v1.3, page 3: "sådant som kostar: belöningar och
+oåterkalleliga handlingar").
+
+**And a small filled variant for a row action.** "Köpte ändå" on a savings
+offset, "logga hela dagen i dag" on a past day. These write something, so they
+are buttons, not links; they sit inside a row, so they are small. The outline
+used to be how they were made to fit, which is how a fourth tier earns its
+keep and then spreads. `.btn-small` is `.btn` at the size a row can hold. Its
+pressed state stays Gran, because the profile is explicit that a chosen control
+is the logged colour: chosen *is* logged.
+
+#### What was converted
+
+28 call sites. 20 became filled buttons: the saves on Dagen, Mat and the macro
+form, the diagnostics probes, "lägg till milstolpe" and "ny sparregel", "skicka
+testmejl", "hämta senaste", "testa anslutningen", "logga receptet", "spara
+raderna", "se vad ändringen gör", "logga första vägningen", and the trigger that
+opens the account-deletion confirm. Six became text links, and all six are
+"Avbryt": the scanner, the confirm sheet, the account deletion, a savings rule,
+the announcement editor and the admin user deletion. Two became `.btn-small`:
+"logga hela dagen i dag" and "köpte ändå".
+
+#### The profile's page 6 is now behind the code
+
+Page 6 still reads "Sekundär är kantlinje i Dis". That sentence describes a tier
+that no longer exists. The rest of the paragraph is unchanged and still right:
+primary is Snö on Natt and Natt on Snö in light, a chosen scale button is Gran,
+high impact is Honung with Natt text in both themes, and an irreversible action
+is confirmed by typing. **The PDF is the owner's file and is not edited from
+here**, so the divergence is recorded rather than silently tolerated: when page
+6 is next revised, the secondary line becomes a text link for what is not an
+action, plus the small filled variant for a row action.
+
+`class-names.test.ts` holds the rule in two halves, because either alone is easy
+to work around. The class may not reappear in source or as a rule in the
+stylesheet, and no component may hand-roll the look out of `bg-transparent` plus
+a border on one element, which is how a removed tier usually comes back. Proved
+by reintroduction: putting `btn-secondary` back into `DayCard.tsx` fails the
+test and names the file.

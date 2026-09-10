@@ -144,7 +144,7 @@ export function MacroTargetForm({
         </p>
       ) : null}
 
-      <button className="btn-secondary" type="submit" disabled={update.isPending}>
+      <button className="btn" type="submit" disabled={update.isPending}>
         {update.isPending
           ? t("profile.saving")
           : saved

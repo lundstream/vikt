@@ -287,7 +287,7 @@ function DeleteSheet({
             >
               {t("admin.deleteConfirm")}
             </button>
-            <button type="button" className="btn-secondary w-auto px-6" onClick={onClose}>
+            <button type="button" className="btn-link w-auto px-6" onClick={onClose}>
               {t("common.cancel")}
             </button>
           </div>

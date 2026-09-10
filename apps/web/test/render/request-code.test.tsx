@@ -68,7 +68,8 @@ describe("the landing page", () => {
     expect(primary).toHaveLength(1);
     expect(primary[0]?.getAttribute("href")).toBe("/app");
 
-    expect(container.querySelectorAll("main .btn-secondary")).toHaveLength(0);
+    // No second button of any tier: the alternative is a sentence now (D134).
+    expect(container.querySelectorAll("main button, main a.btn, main a.btn-small")).toHaveLength(0);
   });
 });
 

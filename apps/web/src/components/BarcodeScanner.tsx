@@ -76,7 +76,7 @@ export function BarcodeScanner({
         */}
         <button
           type="button"
-          className="btn-secondary border-paper/40 text-paper hover:border-paper"
+          className="btn-link border-paper/40 text-paper hover:border-paper"
           onClick={onClose}
         >
           {t("quick.cancel")}

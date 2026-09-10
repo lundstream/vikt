@@ -51,7 +51,7 @@ export function DayCard({
             {t("day.nothingLogged")}
           </p>
           <div className="mt-4 flex justify-center">
-            <button type="button" className="btn-secondary" onClick={onLogFood}>
+            <button type="button" className="btn" onClick={onLogFood}>
               {t("day.logFirst")}
             </button>
           </div>

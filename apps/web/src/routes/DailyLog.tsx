@@ -473,13 +473,15 @@ export function DailyLog() {
         ) : null}
 
         {/*
-          `.btn-secondary`, like the other two saves on this screen.
+          Filled, like the other two saves on this screen (D134).
 
           Dagen is three parallel forms — the day's ratings, an activity, a
           measurement — each with its own submit, and none of them is the one
-          that matters. A filled button among outlines claims a precedence that
-          does not exist here, and the screen read as though "Spara dagen" also
-          saved the other two, which it does not.
+          that matters. That used to be said with an outline, on the reasoning
+          that a filled button among outlines would claim a precedence it does
+          not have. The outline tier is gone: three equal actions are three
+          equal buttons, which says the same thing without spending a visual
+          tier on it, and nothing here is a cancel.
         */}
         <button
           type="submit"
@@ -551,12 +553,18 @@ export function DailyLog() {
                   type="button"
                   data-testid={`offset-${rule.id}`}
                   aria-pressed={rule.offsetToday}
-                  className={[
-                    "rounded-md border px-3 py-2 text-micro transition-colors",
-                    rule.offsetToday
-                      ? "border-transparent bg-logged text-paper"
-                      : "border-edge text-muted",
-                  ].join(" ")}
+                  /**
+                   * A row action, so the small filled button (D134). It writes
+                   * something, which is what makes it a button rather than a
+                   * link, and it lives in a row, which is what makes it small.
+                   *
+                   * Pressed is Gran, and stays Gran: the profile is explicit
+                   * that a chosen control is the logged colour, because chosen
+                   * *is* logged. That is the one state that is not Snö on Natt.
+                   */
+                  className={`btn-small ${
+                    rule.offsetToday ? "bg-logged text-paper" : ""
+                  }`}
                   onClick={() =>
                     void (rule.offsetToday
                       ? removeOffset.mutateAsync({ ruleId: rule.id, localDate: today })
@@ -670,7 +678,7 @@ export function DailyLog() {
           <button
             type="submit"
             data-testid="add-activity"
-            className="btn-secondary mt-4"
+            className="btn mt-4"
             disabled={saveActivity.isPending}
           >
             {t("activity.add")}
@@ -752,7 +760,7 @@ export function DailyLog() {
             <button
               type="submit"
               data-testid="save-measurement"
-              className="btn-secondary mt-4"
+              className="btn mt-4"
               disabled={saveMeasurement.isPending}
             >
               {saveMeasurement.isPending ? t("daily.saving") : t("measure.save")}

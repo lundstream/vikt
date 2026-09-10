@@ -333,7 +333,7 @@ function MilestonesSection({
       <button
         type="button"
         data-testid="open-milestone-form"
-        className="btn-secondary mt-4"
+        className="btn mt-4"
         onClick={() => setAdding(true)}
       >
         {t("progress.addMilestone")}
@@ -383,7 +383,7 @@ function SavingsSection({ pot, today }: { pot: PotDto; today: string }) {
       <button
         type="button"
         data-testid="open-rule-form"
-        className="btn-secondary mt-4"
+        className="btn mt-4"
         onClick={() => setAdding(true)}
       >
         {t("pot.addRule")}
@@ -574,7 +574,7 @@ function MilestoneEditor({
           <button
             type="submit"
             data-testid={`save-milestone-${milestone.id}`}
-            className="btn-secondary"
+            className="btn"
             disabled={update.isPending || remove.isPending}
           >
             {t("progress.saveMilestone")}

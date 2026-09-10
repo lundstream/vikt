@@ -101,7 +101,7 @@ export function DeleteAccount() {
       <button
         type="button"
         data-testid="start-delete"
-        className="btn-secondary mt-4 w-auto px-6"
+        className="btn mt-4 w-auto px-6"
         onClick={() => void start()}
       >
         {t("account.deleteStart")}
@@ -191,7 +191,7 @@ export function DeleteAccount() {
               </button>
               <button
                 type="button"
-                className="btn-secondary w-auto px-6"
+                className="btn-link w-auto"
                 onClick={() => setPreview(null)}
               >
                 {t("common.cancel")}

@@ -221,7 +221,7 @@ function RuleRow({ rule, today }: { rule: SavingsRuleDto; today: string }) {
             <button
               type="submit"
               data-testid={`preview-rule-${rule.id}`}
-              className="btn-secondary"
+              className="btn"
               disabled={busy}
             >
               {t("pot.reviewChange")}
@@ -335,7 +335,7 @@ function ConsequenceNotice({
         <button
           type="button"
           data-testid="confirm-rule-change"
-          className="btn-secondary"
+          className="btn-link"
           onClick={onConfirm}
           disabled={busy}
         >

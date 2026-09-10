@@ -62,7 +62,7 @@ export function ConfirmSheet({
         <button
           type="button"
           data-testid={`${testId}-cancel`}
-          className="btn-secondary w-auto px-6"
+          className="btn-link w-auto px-6"
           onClick={onClose}
         >
           {t("quick.cancel")}

@@ -150,6 +150,9 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   hink, mapp, nyckel och hemlighet ställs in under Administration, Backup, och
   hemligheten lagras krypterat. Fungerar mot AWS, Backblaze, MinIO och de flesta
   NAS-lådors egen S3-tjänst.
+- Knapparna har tre former i stället för fyra. Allt som gör något är en fylld knapp,
+  allt som bara tar dig därifrån (Avbryt, Tillbaka) är en textlänk, och det som
+  kostar något är fortfarande Honung. Den tunna konturknappen är borta.
 
 ## On `dev`, not yet on `main`
 

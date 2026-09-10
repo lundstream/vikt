@@ -318,7 +318,7 @@ export function FoodTextEntry({
             <button
               type="button"
               data-testid="confirm-parsed"
-              className="btn-secondary w-auto px-4"
+              className="btn w-auto px-4"
               onClick={() => void save()}
               disabled={confirm.isPending || keep.size === 0}
             >

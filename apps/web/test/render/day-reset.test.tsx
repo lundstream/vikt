@@ -7,6 +7,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { addDays } from "shared";
+import { todayLocalDate } from "../../src/lib/dates.js";
 import { LogDateProvider } from "../../src/lib/log-date.js";
 import { DailyLog } from "../../src/routes/DailyLog.js";
 import { stubFetch, type StatefulRoute } from "./harness.js";
@@ -46,15 +47,20 @@ const ME = {
   },
 };
 
+/**
+ * Today **in the app's timezone**, not the runner's.
+ *
+ * This built the date from `new Date()`'s local parts, which is the machine's
+ * zone: the same as Europe/Stockholm on the workstation and two hours behind it
+ * on a UTC CI runner. Between 22:00 and midnight UTC the fixture keyed one day
+ * and the screen showed the next, and the test failed on a clock rather than on
+ * the code. `copy-forward` had the same bug in a different shape.
+ *
+ * The app's own helper against the zone the provider is given is the only
+ * version that cannot disagree with the component under test (§3, D39).
+ */
 function today(): string {
-  const d = new Date();
-  return (
-    d.getFullYear() +
-    "-" +
-    String(d.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(d.getDate()).padStart(2, "0")
-  );
+  return todayLocalDate("Europe/Stockholm");
 }
 
 /** A day with everything filled in. */

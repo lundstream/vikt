@@ -14,7 +14,8 @@ import config from "../tailwind.config.js";
  * Every class name the app uses must resolve to a real rule.
  *
  * This exists because `btn-primary` shipped twice. It is not a class: the
- * component layer defines `.btn` and `.btn-secondary`, and Tailwind generates
+ * component layer defines `.btn`, `.btn-small`, `.btn-link` and `.btn-impact`,
+ * and Tailwind generates
  * nothing for a name it does not recognise. The result is not an error, it is a
  * `<button>` with no padding — which is exactly the kind of defect that gets
  * through, because **tests assert values, not the path taken to produce them**.
@@ -184,12 +185,73 @@ describe("class names", () => {
    */
   it("would have caught btn-primary", async () => {
     const emitted = emittedClassNames(
-      await generatedCss(["btn", "btn-secondary", "btn-primary"]),
+      await generatedCss(["btn", "btn-small", "btn-primary"]),
     );
 
     expect(emitted.has("btn")).toBe(true);
-    expect(emitted.has("btn-secondary")).toBe(true);
+    expect(emitted.has("btn-small")).toBe(true);
     expect(emitted.has("btn-primary")).toBe(false);
+  }, 60_000);
+
+  /**
+   * The outline tier is gone and may not come back (D134).
+   *
+   * Three tiers remain: a filled button for an action, a text link for what is
+   * not an action, and Honung for an action with a cost. `.btn-secondary` was
+   * the fourth and it spent a whole visual tier on "the other button", a
+   * distinction the reader does not need and the app was never consistent
+   * about.
+   *
+   * Two halves, because either alone can be worked around. The **class** must
+   * not reappear, in source or in the stylesheet. And no component may
+   * hand-roll the look it had — a bordered, transparent, full-height control —
+   * out of raw utilities, which is how a removed tier usually returns.
+   */
+  it("has no outline button style, by name or by hand", () => {
+    const named = sourceFiles(SRC)
+      .map((file) => ({ file, source: readFileSync(file, "utf8") }))
+      .filter(({ source }) => /\bbtn-secondary\b/.test(source))
+      .map(({ file }) => path.relative(SRC, file));
+
+    expect(named).toEqual([]);
+
+    /**
+     * The stylesheet must not *define* it either. The rule, not the word: the
+     * comment that explains why the tier was removed names it, and a check
+     * that fails on its own explanation is a check nobody keeps.
+     */
+    const stylesheet = readFileSync(path.join(SRC, "styles/index.css"), "utf8");
+    expect(stylesheet).not.toMatch(/\.btn-secondary\s*\{/);
+
+    /**
+     * A hand-rolled outline: a border and a transparent background on the same
+     * element. `border-transparent` is not one, and neither is a bordered card
+     * or field — this looks for the pair on one `className`, which is what a
+     * button rebuilt from utilities has.
+     */
+    const handRolled: string[] = [];
+    for (const file of sourceFiles(SRC)) {
+      const source = readFileSync(file, "utf8");
+      for (const [index, line] of source.split("\n").entries()) {
+        if (!/className/.test(line) && !/^\s*"/.test(line)) continue;
+        if (!/\bbg-transparent\b/.test(line)) continue;
+        if (!/\bborder-(edge|muted|ink)\b/.test(line)) continue;
+        handRolled.push(`${path.relative(SRC, file)}:${index + 1}`);
+      }
+    }
+
+    expect(handRolled).toEqual([]);
+  });
+
+  /** And the three that remain all resolve, so none of them is a dead name. */
+  it("emits all three button tiers", async () => {
+    const emitted = emittedClassNames(
+      await generatedCss(["btn", "btn-small", "btn-link", "btn-impact"]),
+    );
+
+    for (const tier of ["btn", "btn-small", "btn-link", "btn-impact"]) {
+      expect(emitted.has(tier), `${tier} does not resolve`).toBe(true);
+    }
   }, 60_000);
 
   /**

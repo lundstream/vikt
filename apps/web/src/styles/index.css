@@ -245,15 +245,45 @@
   }
 
   /**
-   * The quieter sibling, for a second action on a screen that already has a
-   * primary one: "add an activity" beside "save the day". Same height, so the
-   * two line up and both clear a thumb.
+   * A small filled button, for an action inside a row (D134).
+   *
+   * Same colour and same shape as `.btn`, at the size a row can hold. "Köpte
+   * ändå" on a savings offset, "logga i dag" on a past entry: these are
+   * actions, they change data, and the outline style used to be how they were
+   * made quiet enough to sit in a list. Quiet is what a **link** is for; an
+   * action that writes something is filled, and if it needs to be smaller then
+   * it is smaller.
+   *
+   * `w-auto` rather than `w-full`, because a row action sits beside its row
+   * rather than under it.
    */
-  .btn-secondary {
-    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg border
-           border-edge bg-transparent px-4 py-2.5 text-body font-medium text-ink
-           transition-colors hover:border-muted
+  .btn-small {
+    @apply inline-flex min-h-9 w-auto items-center justify-center rounded-md bg-ink
+           px-3 py-1.5 text-micro font-medium text-paper transition-colors
            disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
+   * Not an action: cancel, back, dismiss (D134).
+   *
+   * The outline `.btn-secondary` is gone. It existed to make a second action
+   * quieter than the first, and it spent a whole visual tier on the distinction
+   * between "the button you probably want" and "the other button" — a
+   * distinction the reader does not need and the app was not consistent about.
+   * Worse, it looked like a button, so "avbryt" and "spara" were two equally
+   * button-shaped things and only their position said which was which.
+   *
+   * The replacement is what the app already used for "Tillbaka" and "Ta bort":
+   * a text link. It reads as "this takes you out of here" rather than "this
+   * does something", which is exactly what cancel is.
+   *
+   * Still 44 px tall. A link is not a smaller target, it is a quieter one, and
+   * a thumb needs the same room either way.
+   */
+  .btn-link {
+    @apply inline-flex min-h-11 w-auto items-center justify-center rounded-md px-2
+           text-body text-muted underline underline-offset-4 transition-colors
+           hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /**
