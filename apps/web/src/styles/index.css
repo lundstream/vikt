@@ -257,6 +257,40 @@
   }
 
   /**
+   * High impact: Honung with Natt text, in both themes (D123).
+   *
+   * ## Why the same colour as the pot
+   *
+   * The profile gives Honung to "belöning" — the pot, milestone markers, "ta
+   * ut" — and putting it on "radera kontot" looks at first like the palette
+   * colliding with itself. It is not a collision, and the amendment is worth
+   * stating: **Honung marks a thing that has a cost.** Taking money out of the
+   * pot spends something. So does deleting an account. The reward reading was
+   * the narrower one, and the two share a colour because they share the
+   * property that matters at the moment of pressing: this one is not free.
+   *
+   * That also keeps §5's rule intact. An accent still names an *area* rather
+   * than a feeling, and it is emphatically not a warning colour: there is no
+   * red here, nothing turns red on a bad day, and §3's "no failure state"
+   * holds. Honung on a delete is not the app being alarmed, it is the app
+   * saying what kind of action this is.
+   *
+   * ## Natt text in both themes
+   *
+   * The one place a colour pair does not flip with the theme. Honung is a mid
+   * tone: dark text on it clears AA in both themes, light text clears neither,
+   * so a pair that flipped would be unreadable in one of them. Stated here
+   * rather than discovered by a contrast audit later.
+   *
+   * `class-names.test.ts` holds the list of actions allowed to use this.
+   */
+  .btn-impact {
+    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg
+           bg-reward px-4 py-2.5 text-body font-medium text-on-reward transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
    * Checkboxes. `accent-color` is the only cross-browser way to theme a native
    * one, and without it Android draws the OS blue on both themes.
    */

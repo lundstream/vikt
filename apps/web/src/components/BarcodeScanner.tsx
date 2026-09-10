@@ -65,9 +65,18 @@ export function BarcodeScanner({
               ? t("food.cameraStarting")
               : ""}
         </p>
+        {/*
+          The secondary style with the two colours the surface demands, rather
+          than a button hand-rolled from scratch (D123). This bar is `bg-ink`
+          on purpose — a dark strip under a live viewfinder glares less and
+          reads better against it — so `border-edge text-ink` would be
+          dark-on-dark. Everything else about the button, the height that
+          clears a thumb, the radius, the focus ring and the disabled state,
+          comes from the shared class and stays in step with it.
+        */}
         <button
           type="button"
-          className="w-full rounded-md border border-paper/40 py-3 text-base text-paper"
+          className="btn-secondary border-paper/40 text-paper hover:border-paper"
           onClick={onClose}
         >
           {t("quick.cancel")}

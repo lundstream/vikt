@@ -66,6 +66,21 @@
   --ink: var(--sno);
   --muted: var(--sten);
 
+  /**
+   * Text that sits **on** a Honung surface, and the one pair in here that does
+   * not flip with the theme (D123).
+   *
+   * Honung is a mid tone in both themes — #A8761E light, #E2B25A dark — so
+   * dark text clears AA on both and light text clears neither. A pair that
+   * flipped with the theme would be unreadable in one of them, which is why
+   * this is a literal rather than `var(--natt)`: `--natt` *is* the page, and
+   * the page is light in light mode.
+   *
+   * Defined once, outside the `.dark` block, so nothing can flip it by
+   * accident.
+   */
+  --on-reward: #0f1418;
+
   /* The five areas. One colour, one meaning, everywhere in the app. */
   --trend: var(--lingon); /* the trend line and the wordmark. Nothing else. */
   --logged: var(--gran); /* logged, chosen, saved, streaks */

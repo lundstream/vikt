@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatLongDay } from "../../lib/dates.js";
 import { LOCALE, t } from "../../i18n/index.js";
 import { useMe } from "../../lib/session.js";
 import { Sheet } from "../../components/Sheet.js";
+import { ConfirmSheet } from "../../components/ConfirmSheet.js";
 import {
   deletionPreview,
   useAdminUsers,
@@ -38,6 +39,9 @@ export function Users() {
 
   /** The one-line outcome of the last action, said rather than merely done. */
   const [notice, setNotice] = useState<string | null>(null);
+
+  /** Switching an account off asks; switching it back on does not (D123). */
+  const [confirmDisable, setConfirmDisable] = useState<AdminUser | null>(null);
 
   async function startDelete(user: AdminUser) {
     setNotice(null);
@@ -112,7 +116,10 @@ export function Users() {
                   disabled={setDisabled.isPending}
                   onClick={() => {
                     setNotice(null);
-                    setDisabled.mutate({ id: user.id, disabled: user.disabledAt === null });
+                    // Enabling is not high impact; only switching an account off
+                    // is, and only that asks (D123).
+                    if (user.disabledAt === null) setConfirmDisable(user);
+                    else setDisabled.mutate({ id: user.id, disabled: false });
                   }}
                 >
                   {user.disabledAt ? t("admin.enable") : t("admin.disable")}
@@ -173,6 +180,20 @@ export function Users() {
           setNotice(t("admin.deleteDone", { email }));
         }}
       />
+      <ConfirmSheet
+        open={confirmDisable !== null}
+        onClose={() => setConfirmDisable(null)}
+        title={t("admin.disable")}
+        body={t("admin.disableConfirmBody", { email: confirmDisable?.email ?? "" })}
+        confirmLabel={t("admin.disable")}
+        busy={setDisabled.isPending}
+        testId="disable-user"
+        onConfirm={() => {
+          if (confirmDisable) setDisabled.mutate({ id: confirmDisable.id, disabled: true });
+          setConfirmDisable(null);
+        }}
+      />
+
     </section>
   );
 }
@@ -194,6 +215,16 @@ function DeleteSheet({
   onDeleted: (email: string) => void;
 }) {
   const remove = useDeleteUser();
+  const [typedEmail, setTypedEmail] = useState("");
+
+  /** Trimmed and case-insensitive, and cleared whenever the sheet changes target. */
+  const targetMatches =
+    pending !== null &&
+    typedEmail.trim().toLowerCase() === pending.preview.email.trim().toLowerCase();
+
+  useEffect(() => {
+    setTypedEmail("");
+  }, [pending?.user.id]);
 
   return (
     <Sheet
@@ -215,12 +246,38 @@ function DeleteSheet({
             <li>{t("admin.deletePhotos", { n: pending.preview.photos })}</li>
           </ul>
 
+          {/*
+            The target's address, typed out (D123).
+            
+            An admin deleting somebody else's account is the most consequential
+            control in this app: it destroys another person's data, and the
+            admin is not the one who will notice it missing. The preview above
+            already says how many rows, which guards against pressing it by
+            mistake; typing the address guards against pressing it on the wrong
+            row, which is the mistake a list of similar-looking accounts
+            actually invites.
+          */}
+          <label className="mt-6 block text-micro text-muted">
+            {t("admin.typeEmailToConfirm")}
+            <input
+              id="delete-user-email"
+              className="field mt-1 w-full"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder={pending.preview.email}
+              value={typedEmail}
+              onChange={(event) => setTypedEmail(event.target.value)}
+            />
+          </label>
+
           <div className="mt-6 flex gap-3">
             <button
               type="button"
               data-testid="confirm-delete-user"
-              className="btn w-auto px-6"
-              disabled={remove.isPending}
+              className="btn-impact w-auto px-6"
+              disabled={!targetMatches || remove.isPending}
               onClick={() =>
                 remove.mutate(
                   { id: pending.user.id },

@@ -62,6 +62,12 @@ export const sv = {
   "account.deleteDays": "{n} dagar",
   "account.deletePhotos": "{n} foton",
   "account.passwordToConfirm": "Ditt lösenord",
+  "account.typeEmailToConfirm": "Skriv din mejladress för att bekräfta",
+  "admin.revokeConfirmBody":
+    "Koden {code} slutar gälla direkt och går inte att använda för att registrera ett konto. Du kan skapa en ny när som helst.",
+  "admin.disableConfirmBody":
+    "{email} kan inte logga in förrän kontot slås på igen. Ingenting raderas, och alla sessioner avslutas.",
+  "admin.typeEmailToConfirm": "Skriv kontots mejladress för att bekräfta",
   "account.passwordWhy":
     "Lösenordet krävs, för en öppen session ska inte räcka för att radera ett år av loggning.",
   "account.deleteConfirm": "Radera för alltid",

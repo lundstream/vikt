@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatLongDay } from "../../lib/dates.js";
 import { LOCALE, t } from "../../i18n/index.js";
+import { ConfirmSheet } from "../../components/ConfirmSheet.js";
 import { useAdminInvites, useMintInvite, useRevokeInvite } from "./api.js";
 
 /**
@@ -19,6 +20,12 @@ export function Invites() {
   const invites = useAdminInvites();
   const mint = useMintInvite();
   const revoke = useRevokeInvite();
+
+  /**
+   * Revoking is reversible only by minting another code, which is one action
+   * away, so it gets the plain confirm rather than a typed one (D123).
+   */
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const [minted, setMinted] = useState<string | null>(null);
 
   if (invites.isLoading) {
@@ -97,7 +104,7 @@ export function Invites() {
                   disabled={revoke.isPending}
                   onClick={() => {
                     setMinted(null);
-                    revoke.mutate({ code: invite.code });
+                    setConfirmRevoke(invite.code);
                   }}
                 >
                   {t("admin.revoke")}
@@ -107,6 +114,20 @@ export function Invites() {
           ))}
         </ul>
       )}
+      <ConfirmSheet
+        open={confirmRevoke !== null}
+        onClose={() => setConfirmRevoke(null)}
+        title={t("admin.revoke")}
+        body={t("admin.revokeConfirmBody", { code: confirmRevoke ?? "" })}
+        confirmLabel={t("admin.revoke")}
+        busy={revoke.isPending}
+        testId="revoke-invite"
+        onConfirm={() => {
+          if (confirmRevoke !== null) revoke.mutate({ code: confirmRevoke });
+          setConfirmRevoke(null);
+        }}
+      />
+
     </section>
   );
 }

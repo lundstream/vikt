@@ -4388,3 +4388,150 @@ publish. The fast-path measurements it carried moved to `docs/measurements.md`,
 because a tap count is a fact about the program: the landing page quotes it and
 a test still pins the page to the file, so the claim cannot outlive the
 measurement.
+
+### D122 — Two chart defects, and saying why a number is missing
+
+#### A ruler whose marks are not evenly spaced
+
+The weight axis read `109,0 / 108,8 / 108,5 / 108,3 / 108,0`. The step was
+0.25 kg and the labels carry one decimal, so the printed gaps alternate 0,2 and
+0,3. Every label was correct and the ruler was wrong, which is the worse
+failure: nothing about it looks like a defect, and a reader measuring the
+distance between two marks is being told two different things alternately.
+
+**A step must be a whole multiple of the precision it is printed at.** That
+admits 0.1, 0.2, 0.5, 1, 2 and 5, and rejects 0.25. **2.5 survives**, because at
+one decimal `108,0 / 110,5 / 113,0` is exact and evenly spaced — the rule is
+about what prints evenly, not about which numbers look round.
+
+De-duplicating on the rendered label, which the axis already did, does not catch
+this. Those five labels are all different. They are simply not evenly spaced.
+
+**And the step is chosen by counting rather than estimating.**
+`floor(range / step) + 1` is how many marks a step *would* place if the first
+sat exactly on the domain minimum. It does not: it sits on the first multiple at
+or above it. The estimate therefore runs one high, and on a 3,1 kg window that
+decided between three marks and six.
+
+#### A domain that excluded the newest reading
+
+The y-domain was built from the **trend alone**, so that outlying readings could
+not squash the line into the middle quarter of the plot. Right about the hero,
+wrong about the arithmetic.
+
+The trend is an exponential moving average, so it **lags**. On a real series it
+runs through the middle of the readings that produced it, and the most recent
+reading — the one somebody opens the app to see — is the one furthest from it. A
+morning weigh-in of 106,9 against a trend still at 108,4 fell outside and was
+clipped. Clipped, not clamped, so it was **invisible rather than wrong**, which
+is why it survived a design pass: the chart looked fine and the missing point
+looked like a day nobody logged.
+
+The fixture defending the old behaviour swung ±6 kg between consecutive days,
+which no body does. Real daily noise is salt, hydration and glycogen, about
+±1 kg, and the trend is drawn from those readings, so widening to hold them
+costs the line its noise band rather than half the plot.
+
+**What this costs:** a mistyped reading now stretches the axis instead of being
+hidden. That is the better failure. The point becomes visible, and D56 put edit
+and delete on the row that shows it — a chart that quietly omits a value is a
+chart nobody can correct from.
+
+The tooltip also carried two decimals where the headline carries one. The trend
+averages scale readings that are ±0.1 at best; the second decimal is arithmetic,
+not measurement.
+
+#### "Inte än" is not a reason
+
+Fibre showed nothing while the other three macros rendered. Confirmed as D55's
+per-macro coverage gate working exactly as designed: crowdsourced food data
+omits fibre far more often than protein, so fewer than three days cleared 90 %
+and the mean was correctly withheld.
+
+Correctly withheld and wrongly explained. "Inte än" cannot distinguish **"you
+have logged nothing"** from **"what you logged does not carry this figure"**,
+and those ask different things of the reader — one is "log something", the other
+is "pick foods with fibre data, or accept that this number will not appear".
+
+`weeklyDaysLogged` carries the second number, and it counts **the day, not the
+macro**. Counting the macro was the first attempt and cannot work: a day of six
+entries that all omit fibre reports fibre coverage 0, which is the same value as
+a day nobody logged — the very distinction being drawn. The day's own `kcal`
+total is non-null exactly when something was logged.
+
+The reason line applies to **all four** macros. A rule that fires only for the
+case that prompted it is a rule nobody remembers when the next one goes quiet.
+
+### D123 — Honung marks a cost, and irreversible actions are typed
+
+#### The audit found one primary and one secondary already
+
+`.btn` is `bg-ink text-paper`, which is Snö on Natt in dark and Natt on Snö in
+light: the rule was already right. Across the app and the landing page, 21
+buttons use it, 25 use `.btn-secondary`, and **three** were neither:
+
+- **`QuickActions`** — Dis circle, Snö icon, Gran when pressed. The profile
+  names these separately on page 4; they are not buttons in this sense. Left.
+- **A row in `FoodLog`** that is a tap target rather than a button. Left.
+- **The scanner's cancel**, hand-rolled because its bar is `bg-ink` — a dark
+  strip under a live viewfinder glares less — so `border-edge text-ink` would be
+  dark on dark. Now `btn-secondary` with the two colours the surface demands
+  overridden, so height, radius, focus and disabled state come from the shared
+  class and stay in step with it.
+
+The landing page's Lingon primary is D99's stated exception and is unchanged.
+
+#### Honung, and why it is not a collision
+
+The profile gives Honung to *belöning*: the pot, milestone markers, "ta ut".
+Putting it on "radera kontot" looks like the palette colliding with itself.
+
+**Amended: Honung marks a thing that has a cost.** Taking money out of the pot
+spends something; so does deleting an account. The reward reading was the
+narrower one, and both share the property that matters at the moment of
+pressing: this one is not free.
+
+§5 holds. An accent still names an area rather than a feeling, and this is
+emphatically **not** a warning colour — nothing here is red, nothing turns red on
+a bad day, and §3's "no failure state" is intact. Honung on a delete is not the
+app being alarmed; it is the app saying what kind of action this is.
+
+**Natt text in both themes**, which is the one pair that does not flip. Honung is
+a mid tone in both (`#A8761E` light, `#E2B25A` dark): dark text clears AA on
+both, light text clears neither. A pair that flipped would be unreadable in one
+of them, so `--on-reward` is defined once outside the `.dark` block.
+
+#### Two tiers of confirmation
+
+**Irreversible — typing.** Deleting your own account types your address;
+deleting somebody else's, as an admin, types theirs. There is no undo, so the
+guard is deliberateness, and only typing proves somebody read the sheet rather
+than tapping through it. The admin case is the one that matters most: it
+destroys another person's data, and the admin is not the one who will notice it
+missing. The row preview guards against pressing it by accident; typing the
+address guards against pressing it on the **wrong row**, which is the mistake a
+list of similar accounts actually invites.
+
+Deleting your own account **keeps the password as well**. The two guard
+different things: the password authorises — without it somebody holding an
+unlocked phone could do it, and the address is on screen under Profil to read —
+while typing the address makes it deliberate.
+
+**Reversible — a plain confirm.** Disabling an account and revoking an unused
+invite both undo in one action. Asking somebody to type an address to do
+something they can undo in two seconds is theatre, and theatre teaches people to
+click past confirmations. `ConfirmSheet` is the shared mechanism; enabling an
+account back does not ask at all, because only switching it off has a cost.
+
+**Deleting a backup is on the list and does not exist.** There is no endpoint and
+no control. Listed anyway, so that when it is built the style is already
+permitted and this decision has already been taken.
+
+#### The guard
+
+`class-names.test.ts` holds the allow-list by **file**, not by test id: the guard
+reads source text, and a test id is a string in that same text, so matching on it
+would check that a file mentions a name it also defines. It checks two things —
+which files carry `btn-impact`, and which files open `ConfirmSheet`, since a
+shared component rendering the style for anyone would otherwise be a hole
+straight through the list.

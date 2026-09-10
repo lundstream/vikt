@@ -303,7 +303,7 @@ export function MailSettings() {
           <button
             type="submit"
             data-testid="save-mail-settings"
-            className="btn w-auto px-6"
+            className="btn-impact w-auto px-6"
             disabled={save.isPending}
           >
             {t("profile.save")}

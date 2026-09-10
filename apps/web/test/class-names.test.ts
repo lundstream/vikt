@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -259,4 +259,106 @@ describe("class names", () => {
     expect(emitted.has("bg-[var(--ink)]/70")).toBe(false);
     expect(emitted.has("bg-ink/70")).toBe(true);
   }, 60_000);
+});
+
+/**
+ * Honung is for actions that cost something, and for nothing else (D123).
+ *
+ * The profile gives Honung to "belöning" — the pot, milestone markers, "ta ut"
+ * — so putting it on "radera kontot" reads at first like the palette colliding
+ * with itself. The amendment: **Honung marks a thing that has a cost.** Taking
+ * money out of the pot spends something; so does deleting an account. The
+ * reward reading was the narrower one.
+ *
+ * That is a licence worth bounding. An accent that spreads is an accent that
+ * stops meaning anything, and this one is easy to reach for — it is the only
+ * style in the app that looks emphatic. So the list is written down here, and
+ * the file a button lives in has to be on it.
+ *
+ * The list is by **file** rather than by test id, because the guard reads
+ * source text and a test id is a string in that same text: matching on it would
+ * check that a file mentions a name it also defines. The file is the coarser
+ * check that actually holds — a new screen reaching for `.btn-impact` fails
+ * until somebody adds it here and, in adding it, decides whether it belongs.
+ */
+const IMPACT_ALLOWED = new Set([
+  /**
+   * The mechanism rather than a use of it: `ConfirmSheet` is the sanctioned way
+   * to confirm a reversible high-impact action, so it carries the style on
+   * behalf of its callers. Which callers those are is checked separately below
+   * — a component that renders the style for anyone would otherwise be a hole
+   * straight through this list.
+   */
+  "components/ConfirmSheet.tsx",
+  // Deleting your own account. Irreversible; typed confirmation (D123).
+  "components/DeleteAccount.tsx",
+  // Deleting or disabling another person's account, as an admin.
+  "routes/admin/Users.tsx",
+  // Changing the mail server: a wrong value stops every invite and reset
+  // silently, which is D109's failure shape.
+  "routes/admin/MailSettings.tsx",
+  // Revoking an invite. Reversible only by minting another.
+  "routes/admin/Invites.tsx",
+  // Deleting a backup. **No such control exists yet** — the endpoint is not
+  // built. Listed so that when it is, the style is already permitted and the
+  // decision has already been taken.
+  "routes/admin/Backup.tsx",
+]);
+
+describe("the high-impact style", () => {
+  it("appears only where an action costs something", () => {
+    const offenders: string[] = [];
+
+    for (const file of sourceFiles(SRC)) {
+      const rel = path.relative(SRC, file).replace(/\\/g, "/");
+      if (IMPACT_ALLOWED.has(rel)) continue;
+      if (/\bbtn-impact\b/.test(readFileSync(file, "utf8"))) offenders.push(rel);
+    }
+
+    expect(
+      offenders,
+      `btn-impact is for actions with a cost; these are not on the list: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  /**
+   * And the component that carries it for others is opened only by actions on
+   * the same list. Without this, `ConfirmSheet` would be a way to get Honung
+   * onto any screen without appearing in the check above.
+   */
+  it("is opened only by actions on the list", () => {
+    const offenders: string[] = [];
+
+    for (const file of sourceFiles(SRC)) {
+      const rel = path.relative(SRC, file).replace(/\\/g, "/");
+      if (IMPACT_ALLOWED.has(rel)) continue;
+      if (/\bConfirmSheet\b/.test(readFileSync(file, "utf8"))) offenders.push(rel);
+    }
+
+    expect(
+      offenders,
+      `ConfirmSheet confirms actions with a cost; these are not on the list: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  /** And it is actually in use, or the check above passes by being vacuous. */
+  it("is used by the actions that are on the list", () => {
+    const users = [...IMPACT_ALLOWED].filter((rel) => {
+      const full = path.join(SRC, rel);
+      return existsSync(full) && /\bbtn-impact\b/.test(readFileSync(full, "utf8"));
+    });
+
+    expect(users.length, "nothing uses btn-impact, so the guard proves nothing")
+      .toBeGreaterThanOrEqual(3);
+  });
+
+  /**
+   * Snö on Natt is the primary everywhere else, and Honung must not quietly
+   * become a second primary by being used for ordinary saves.
+   */
+  it("leaves the ordinary primary alone", () => {
+    const css = readFileSync(path.join(SRC, "styles/index.css"), "utf8");
+    expect(css).toMatch(/\.btn \{[\s\S]*?bg-ink[\s\S]*?text-paper/);
+    expect(css).toMatch(/\.btn-impact \{[\s\S]*?bg-reward[\s\S]*?text-on-reward/);
+  });
 });
