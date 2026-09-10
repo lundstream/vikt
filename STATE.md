@@ -54,6 +54,53 @@ Empty.
 - **Habits and reminders, MFA, and importing from other apps** — phases 11 to 13,
   written down in CLAUDE.md §6 and not started.
 
+## Inför nästa deploy
+
+**Every pass on `dev` appends to this list, and nothing merges to `main` until it has
+been read.** `main` is what production deploys from, so this is the handover: the four
+things that do not travel in a git diff and cannot be inferred from one.
+
+Cleared back to empty when a merge ships, not before.
+
+### Nya miljövariabler
+
+| Variabel | Vad den gör | Krävs? |
+|---|---|---|
+| `CONTACT_EMAIL` | Adressen `/integritet` namnger som personuppgiftsansvarig. Bygget lämnar `__CONTACT_EMAIL__` i `index.html` och `32-site-config.sh` fyller i den vid start (D121). | **Ja** när `LANDING_ENABLED=true`. API:t vägrar starta utan den i produktion. |
+| `OPERATOR` | Vem som driver installationen, i sidfoten och på `/integritet`. | Nej, men sidan blir vagare utan. |
+| `REPO_URL` | Vart GitHub-länken pekar. | Nej, har ett förval. |
+| `SUPPORT_URL` | Länken "Bjud på en öl". Tom betyder att länken utgår helt. | Nej. |
+
+**Sätt dem innan avbilden som läser dem rullar ut.** En variabel den nuvarande
+avbilden inte känner till ignoreras, så det finns inget fönster där något går sönder
+av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
+`__CONTACT_EMAIL__`.
+
+### Migrationer som kommer att köras
+
+Inga. Senaste tillämpade är `0020_profile_theme`, och produktionen har alla 21.
+
+### Manuella steg på Portainer-värden
+
+- Sätt de fyra variablerna ovan i stacken `vikt` innan avbilden byts.
+- Ta bort den kvarglömda förfrågan `human-check-probe@example.test` under
+  Administration, Förfrågningar, Besvarade. Den blev kvar från verifieringen av
+  människokontrollen och kan inte tas bort härifrån.
+
+### Till Nyheter
+
+En rad per synlig förändring, i appens register, färdig att klistra in:
+
+- Viktgrafens skala visar jämna steg igen, och alla vägningar får plats i bilden. Den
+  senaste vägningen kunde tidigare hamna utanför och ritades då inte alls.
+- Grafens ruta visar samma antal decimaler som siffran ovanför.
+- Saknas ett makrovärde står det numera varför: ingenting loggat, eller för få dagar
+  med uppgifter om just det makrot. Fibervärden saknas oftare än de andra i öppna
+  matdatabaser.
+- Att välja en träff i matsökningen stänger träfflistan.
+- Åtgärder som kostar något, som att radera ett konto eller ändra mejlservern, har fått
+  en egen färg. Att radera ett konto kräver att adressen skrivs in.
+
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference

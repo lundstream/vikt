@@ -674,6 +674,16 @@ a commit on `main` is a commit that the next redeploy ships.
   and it is invisible from inside either branch. D115's two navigation surfaces
   drifted for exactly that reason.
 
+- **Restart the development server when a change needs it.** Do not ask first and do
+  not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
+  dependencies at boot, and neither notices a file it read once. A green `pnpm build`
+  proves nothing about a server that has been up for a week.
+  - **Kill by port, never by name.** `pkill -f vite` silently does nothing on Windows,
+    so a "restart" leaves the old process serving the old transform and the next error
+    looks like a bug in the code that was just fixed. `Get-NetTCPConnection -LocalPort
+    5173 -State Listen` gives the PID.
+  - Clear `apps/web/node_modules/.vite` when a dependency or the Tailwind config
+    changed. The API's `tsx watch` picks up source edits on its own and rarely needs it.
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
