@@ -49,18 +49,19 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
               destinationPath: z.string(),
               scheduleMinute: z.number().int().nullable(),
               retainDays: z.number().int(),
-              smbHost: z.string(),
-              smbShare: z.string(),
-              smbDomain: z.string(),
-              smbUsername: z.string(),
+              s3Endpoint: z.string(),
+              s3Region: z.string(),
+              s3Bucket: z.string(),
+              s3PathStyle: z.boolean(),
+              s3AccessKeyId: z.string(),
               /**
-               * Whether a password is stored and readable, never the password
-               * (D130). The screen has to be able to say "a password is set"
-               * and "the stored one cannot be read with this key"; neither of
-               * those needs the value, and an endpoint that returned it would
-               * put it in every browser cache that touched this screen.
+               * Whether a secret key is stored and readable, never the secret
+               * (D133). The screen has to be able to say "a secret is set" and
+               * "the stored one cannot be read with this key"; neither of those
+               * needs the value, and an endpoint that returned it would put it
+               * in every browser cache that touched this screen.
                */
-              smbPasswordSet: z.boolean(),
+              s3SecretSet: z.boolean(),
             }),
             runs: z.array(runSchema),
             nextRunAt: z.string().nullable(),
@@ -96,17 +97,18 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
           /** Minutes past midnight, or null for no schedule. */
           scheduleMinute: z.number().int().min(0).max(1439).nullable(),
           retainDays: z.number().int().min(1).max(3650),
-          smbHost: z.string().trim().max(255).optional(),
-          smbShare: z.string().trim().max(255).optional(),
-          smbDomain: z.string().trim().max(255).optional(),
-          smbUsername: z.string().trim().max(255).optional(),
+          s3Endpoint: z.string().trim().max(500).optional(),
+          s3Region: z.string().trim().max(64).optional(),
+          s3Bucket: z.string().trim().max(255).optional(),
+          s3PathStyle: z.boolean().optional(),
+          s3AccessKeyId: z.string().trim().max(255).optional(),
           /**
-           * Absent leaves the stored password alone; an explicit empty string
-           * clears it (D130). The screen never receives the password, so it
+           * Absent leaves the stored secret alone; an explicit empty string
+           * clears it (D133). The screen never receives the secret, so it
            * cannot send it back, and reading an absent field as "clear it"
-           * would wipe the password every time somebody changed the schedule.
+           * would wipe the secret every time somebody changed the schedule.
            */
-          smbPassword: z.string().max(255).optional(),
+          s3SecretAccessKey: z.string().max(255).optional(),
         }),
         response: {
           200: z.object({ ok: z.literal(true) }),
@@ -126,8 +128,10 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
             result.reason === "no_secret_key"
               ? "SECRET_KEY is not set, so the share password cannot be stored encrypted. " +
                 "It is refused rather than saved in the clear or quietly dropped."
-              : "Only local and SMB destinations are implemented. S3 is named in the " +
-                "settings but not built, and this refuses rather than silently doing nothing.",
+              : "Only local and S3 destinations are implemented. Writing to a Windows " +
+                "share directly is not: both Node SMB clients speak NTLMv1, which " +
+                "current servers refuse. Mount the share on the host and choose a " +
+                "directory destination instead.",
         });
       }
       return { ok: true as const };

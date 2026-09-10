@@ -205,11 +205,36 @@ infra/restore-check.sh /var/backups/vikt/<file>    # safe on the live host
 ```
 
 The app also runs its own scheduled backup, configured under Administration,
-Backup. It writes either to a directory or straight to a Windows share over SMB,
-with the credentials stored encrypted under `SECRET_KEY`; a share needs no mount
-and no extra container capabilities, because mounting inside a container
-requires `CAP_SYS_ADMIN` and that is not a thing to grant for a backup (D130).
-The dump is encrypted before it leaves the process either way.
+Backup. It writes either to a **directory** or to an **S3-compatible bucket**
+— AWS, Backblaze B2, MinIO, or the S3 endpoint most NAS boxes now ship — with
+the access key and secret stored encrypted under `SECRET_KEY`. The dump is
+encrypted before it leaves the process either way, so what reaches the
+destination cannot be read without that key.
+
+**To back up to a Windows share, mount it on the host and use a directory
+destination.** Writing SMB directly is not supported: both Node SMB clients
+authenticate with NTLMv1, which current Samba and Windows refuse by default, and
+hand-writing NTLMv2 is authentication code whose errors are silent (D132, D133).
+Mounting inside the container is not the answer either, because `mount -t cifs`
+needs `CAP_SYS_ADMIN`, which is most of the way to root on the host.
+
+Mount it on the host, then bind-mount the directory into the API container:
+
+```sh
+# /etc/fstab on the Docker host
+//nas.local/backup  /mnt/vikt-backup  cifs  credentials=/root/.smb-vikt,uid=1000,gid=1000,_netdev  0  0
+```
+
+```yaml
+# infra/docker-compose.yml, the api service
+    volumes:
+      - /mnt/vikt-backup:/backups
+```
+
+Then set the destination to `/backups` under Administration, Backup, and press
+**Testa anslutningen**: it writes a small file and deletes it again, which is
+the only way to find out that the path is writable by the container's user
+before the first scheduled run.
 
 See [docs/backup.md](docs/backup.md) for where they go, how long they are kept,
 and the step-by-step restore. A backup that has never been restored is a hope.

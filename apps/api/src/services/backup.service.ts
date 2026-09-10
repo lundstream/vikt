@@ -4,6 +4,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
+import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { desc, eq } from "drizzle-orm";
 import type { Db } from "../db/index.js";
@@ -16,7 +17,15 @@ import {
   secretsAvailable,
   SECRET_USES,
 } from "../lib/secrets.js";
-import { connectSmb, explainSmbError, type SmbSession } from "../lib/backup-smb.js";
+import {
+  collect,
+  deleteObject,
+  explainS3Error,
+  listBackups,
+  putObject,
+  s3ClientFor,
+  type S3Target,
+} from "../lib/backup-s3.js";
 import { backupInFlight, backupSettled } from "../lib/backup-crash-guard.js";
 
 /**
@@ -37,19 +46,15 @@ import { backupInFlight, backupSettled } from "../lib/backup-crash-guard.js";
  * ## What this does and does not do
  *
  * It runs `pg_dump -Fc`, encrypts the stream, and writes it to the destination.
- * **Local and SMB are implemented; S3 is not.** S3 stays in the settings enum
- * because that is the column that would have to change, and the service refuses
- * it with a reason rather than pretending. See D103 for why that is a boundary
- * rather than an omission.
- *
- * The SMB destination speaks the protocol from Node rather than mounting the
- * share, because mounting inside a container needs `CAP_SYS_ADMIN` (D130). The
- * mounted path is still supported and is still the fallback: it is a `local`
- * destination pointed at a path the host happens to have mounted, and nothing
- * in `backup-smb.ts` is involved in it.
+ * **Local and S3 are implemented; SMB is refused** (D133). Both Node SMB
+ * clients speak NTLMv1, which current servers reject, and writing NTLMv2 by
+ * hand is authentication code whose errors are silent — D132 has the account.
+ * Somebody who wants a Windows share mounts it on the host and points a
+ * **directory** destination at the mount, which has always worked and involves
+ * nothing here.
  *
  * **Encryption happens before the destination sees anything**, which is what
- * makes writing over SMB acceptable at all: what crosses the network is
+ * makes any remote destination acceptable: what crosses the network is
  * ciphertext with a GCM tag, not a database.
  *
  * Restore is deliberately **not** here and never a button. It is a documented
@@ -68,24 +73,25 @@ export type BackupSettings = {
   destinationPath: string;
   scheduleMinute: number | null;
   retainDays: number;
-  smbHost: string;
-  smbShare: string;
-  smbDomain: string;
-  smbUsername: string;
+  s3Endpoint: string;
+  s3Region: string;
+  s3Bucket: string;
+  s3PathStyle: boolean;
+  s3AccessKeyId: string;
   /**
-   * Whether a password is stored and readable, never the password itself.
+   * Whether a secret key is stored and readable, never the secret itself.
    *
    * The same shape the mail settings use: an admin screen has to be able to say
-   * "a password is set" and "the stored password cannot be read with this key",
-   * and neither of those needs the value. Nothing in this API returns it.
+   * "a secret is set" and "the stored one cannot be read with this key", and
+   * neither of those needs the value. Nothing in this API returns it.
    */
-  smbPasswordSet: boolean;
+  s3SecretSet: boolean;
   updatedAt: string | null;
   updatedByEmail: string | null;
 };
 
 /** What is stored, encrypted as one value, in `credentials_encrypted`. */
-type SmbCredentials = { username: string; password: string };
+type S3Credentials = { accessKeyId: string; secretAccessKey: string };
 
 export type BackupRun = {
   id: string;
@@ -106,11 +112,12 @@ const DEFAULTS: BackupSettings = {
   destinationPath: "",
   scheduleMinute: null,
   retainDays: 30,
-  smbHost: "",
-  smbShare: "",
-  smbDomain: "",
-  smbUsername: "",
-  smbPasswordSet: false,
+  s3Endpoint: "",
+  s3Region: "",
+  s3Bucket: "",
+  s3PathStyle: true,
+  s3AccessKeyId: "",
+  s3SecretSet: false,
   updatedAt: null,
   updatedByEmail: null,
 };
@@ -124,21 +131,32 @@ const DEFAULTS: BackupSettings = {
  * connecting with an empty one and reporting a logon failure, which is the same
  * symptom with a much worse explanation.
  */
-function readSmbCredentials(
-  stored: string,
-  env: NodeJS.ProcessEnv,
-): SmbCredentials | null {
+function readS3Credentials(stored: string, env: NodeJS.ProcessEnv): S3Credentials | null {
   if (stored === "") return null;
   const plain = decryptSecret(stored, SECRET_USES.backupDestination, env);
   if (plain === null) return null;
 
   try {
-    const parsed = JSON.parse(plain) as Partial<SmbCredentials>;
-    if (typeof parsed.username !== "string" || typeof parsed.password !== "string") return null;
-    return { username: parsed.username, password: parsed.password };
+    const parsed = JSON.parse(plain) as Partial<S3Credentials>;
+    if (typeof parsed.accessKeyId !== "string" || typeof parsed.secretAccessKey !== "string") {
+      return null;
+    }
+    return { accessKeyId: parsed.accessKeyId, secretAccessKey: parsed.secretAccessKey };
   } catch {
     return null;
   }
+}
+
+/** The settings plus the decrypted credentials, which only this module sees. */
+function targetFrom(settings: BackupSettings, credentials: S3Credentials): S3Target {
+  return {
+    endpoint: settings.s3Endpoint,
+    region: settings.s3Region,
+    bucket: settings.s3Bucket,
+    prefix: settings.destinationPath,
+    forcePathStyle: settings.s3PathStyle,
+    ...credentials,
+  };
 }
 
 async function settingsRow(db: Db) {
@@ -156,18 +174,19 @@ export async function readBackupSettings(
 ): Promise<BackupSettings> {
   const row = await settingsRow(db);
   if (!row) return DEFAULTS;
-  const credentials = readSmbCredentials(row.credentialsEncrypted, processEnv);
+  const credentials = readS3Credentials(row.credentialsEncrypted, processEnv);
 
   return {
     destinationKind: row.destinationKind,
     destinationPath: row.destinationPath,
     scheduleMinute: row.scheduleMinute,
     retainDays: row.retainDays,
-    smbHost: row.smbHost,
-    smbShare: row.smbShare,
-    smbDomain: row.smbDomain,
-    smbUsername: credentials?.username ?? "",
-    smbPasswordSet: credentials !== null && credentials.password !== "",
+    s3Endpoint: row.s3Endpoint,
+    s3Region: row.s3Region,
+    s3Bucket: row.s3Bucket,
+    s3PathStyle: row.s3PathStyle,
+    s3AccessKeyId: credentials?.accessKeyId ?? "",
+    s3SecretSet: credentials !== null && credentials.secretAccessKey !== "",
     updatedAt: row.updatedAt.toISOString(),
     updatedByEmail: row.updatedByEmail,
   };
@@ -181,56 +200,68 @@ export async function writeBackupSettings(
     destinationPath: string;
     scheduleMinute: number | null;
     retainDays: number;
-    smbHost?: string;
-    smbShare?: string;
-    smbDomain?: string;
-    smbUsername?: string;
+    s3Endpoint?: string;
+    s3Region?: string;
+    s3Bucket?: string;
+    s3PathStyle?: boolean;
+    s3AccessKeyId?: string;
     /**
-     * Absent leaves the stored password alone (D130).
+     * Absent leaves the stored secret alone (D133).
      *
-     * The screen never receives the password, so it cannot send it back, and a
-     * form that submitted an empty field as "clear the password" would wipe it
+     * The screen never receives the secret, so it cannot send it back, and a
+     * form that submitted an empty field as "clear the secret" would wipe it
      * every time somebody changed the retention window. Sending an empty string
      * explicitly is how it is cleared, which the screen offers as its own
      * control.
      */
-    smbPassword?: string | null;
+    s3SecretAccessKey?: string | null;
   },
   processEnv: NodeJS.ProcessEnv = process.env,
 ): Promise<
   { ok: true } | { ok: false; reason: "unsupported_destination" | "no_secret_key" }
 > {
-  if (input.destinationKind === "s3") {
+  /**
+   * SMB is refused, and says why (D132, D133).
+   *
+   * It stays in the enum so the reason stays visible rather than the value
+   * quietly disappearing: both Node clients speak NTLMv1, current servers
+   * refuse it, and hand-writing NTLMv2 is authentication code whose errors do
+   * not announce themselves.
+   */
+  if (input.destinationKind === "smb") {
     return { ok: false, reason: "unsupported_destination" };
   }
 
-  const smb = input.destinationKind === "smb";
+  const s3 = input.destinationKind === "s3";
 
   /**
-   * A password can only be stored if there is a key to store it under.
+   * A secret can only be stored if there is a key to store it under.
    *
    * Refused rather than stored in the clear, and refused rather than dropped
-   * silently: a destination saved without its password is one that fails at
-   * three in the morning with a logon error, which is the worst time and the
+   * silently: a destination saved without its secret is one that fails at three
+   * in the morning with a signature error, which is the worst time and the
    * least informative message.
    */
-  if (smb && !secretsAvailable(processEnv)) {
+  if (s3 && !secretsAvailable(processEnv)) {
     return { ok: false, reason: "no_secret_key" };
   }
 
   const existing = await settingsRow(db);
-  const stored = existing ? readSmbCredentials(existing.credentialsEncrypted, processEnv) : null;
+  const stored = existing ? readS3Credentials(existing.credentialsEncrypted, processEnv) : null;
 
-  const password = input.smbPassword === undefined ? (stored?.password ?? "") : (input.smbPassword ?? "");
-  const username = input.smbUsername?.trim() ?? stored?.username ?? "";
+  const secretAccessKey =
+    input.s3SecretAccessKey === undefined
+      ? (stored?.secretAccessKey ?? "")
+      : (input.s3SecretAccessKey ?? "");
+  const accessKeyId = input.s3AccessKeyId?.trim() ?? stored?.accessKeyId ?? "";
 
-  const credentialsEncrypted = smb
+  const credentialsEncrypted = s3
     ? encryptSecret(
-        JSON.stringify({ username, password } satisfies SmbCredentials),
+        JSON.stringify({ accessKeyId, secretAccessKey } satisfies S3Credentials),
         SECRET_USES.backupDestination,
         processEnv,
       )
-    : // A local destination needs none, and keeping a share's password around
+    : // A local destination needs none, and keeping a bucket's secret around
       // after somebody switched away from it is storing a secret for no
       // purpose anybody could name.
       "";
@@ -240,9 +271,10 @@ export async function writeBackupSettings(
     destinationKind: input.destinationKind,
     destinationPath: input.destinationPath.trim(),
     credentialsEncrypted,
-    smbHost: smb ? (input.smbHost?.trim() ?? "") : "",
-    smbShare: smb ? (input.smbShare?.trim() ?? "") : "",
-    smbDomain: smb ? (input.smbDomain?.trim() ?? "") : "",
+    s3Endpoint: s3 ? (input.s3Endpoint?.trim() ?? "") : "",
+    s3Region: s3 ? (input.s3Region?.trim() ?? "") : "",
+    s3Bucket: s3 ? (input.s3Bucket?.trim() ?? "") : "",
+    s3PathStyle: s3 ? (input.s3PathStyle ?? true) : true,
     scheduleMinute: input.scheduleMinute,
     retainDays: input.retainDays,
     updatedAt: new Date(),
@@ -264,15 +296,17 @@ export async function writeBackupSettings(
      * username is, because an audit entry that does not say which account was
      * configured is an audit entry about nothing.
      */
-    subject: smb
-      ? `\\\\${values.smbHost}\\${values.smbShare}${
-          values.destinationPath === "" ? "" : `\\${values.destinationPath}`
-        }`
-      : values.destinationPath,
+    subject: describeDestination({
+      ...DEFAULTS,
+      destinationKind: values.destinationKind,
+      destinationPath: values.destinationPath,
+      s3Endpoint: values.s3Endpoint,
+      s3Bucket: values.s3Bucket,
+    }),
     detail: [
       values.destinationKind,
       values.scheduleMinute === null ? "no schedule" : `${values.scheduleMinute} min`,
-      ...(smb ? [`as ${username || "(no username)"}`] : []),
+      ...(s3 ? [`as ${accessKeyId || "(no access key)"}`] : []),
     ].join(", "),
   });
 
@@ -366,10 +400,13 @@ export async function runBackup(
     return outcome;
   };
 
-  if (settings.destinationKind === "s3") {
+  if (settings.destinationKind === "smb") {
     return finish({
       ok: false,
-      reason: 'destination "s3" is not implemented; local and smb are',
+      reason:
+        'destination "smb" is not available: both Node SMB clients speak NTLMv1, ' +
+        "which current servers refuse. Mount the share on the host and choose a " +
+        "directory destination instead.",
     });
   }
   if (!secretsAvailable(processEnv)) {
@@ -410,9 +447,10 @@ export async function runBackup(
  * an audit entry about nothing.
  */
 export function describeDestination(settings: BackupSettings): string {
-  if (settings.destinationKind === "smb") {
-    const folder = settings.destinationPath === "" ? "" : `\\${settings.destinationPath}`;
-    return `smb://${settings.smbHost}/${settings.smbShare}${folder}`;
+  if (settings.destinationKind === "s3") {
+    const host = settings.s3Endpoint.trim().replace(/^https?:\/\//, "") || "s3.amazonaws.com";
+    const prefix = settings.destinationPath === "" ? "" : `/${settings.destinationPath}`;
+    return `s3://${host}/${settings.s3Bucket}${prefix}`;
   }
   return settings.destinationPath || "(no destination configured)";
 }
@@ -437,36 +475,39 @@ async function writeBackup(
   fileName: string,
   processEnv: NodeJS.ProcessEnv,
 ): Promise<number> {
-  if (settings.destinationKind === "smb") {
+  if (settings.destinationKind === "s3") {
     const row = await settingsRow(db);
-    const credentials = readSmbCredentials(row?.credentialsEncrypted ?? "", processEnv);
+    const credentials = readS3Credentials(row?.credentialsEncrypted ?? "", processEnv);
     if (credentials === null) {
       throw new Error(
-        "The stored share password cannot be read. Either SECRET_KEY changed, or no " +
-          "password has been saved for this destination.",
+        "The stored secret key cannot be read. Either SECRET_KEY changed, or no " +
+          "secret has been saved for this destination.",
       );
     }
 
-    let session: SmbSession | null = null;
-    try {
-      session = await connectSmb({
-        host: settings.smbHost,
-        share: settings.smbShare,
-        domain: settings.smbDomain,
-        username: credentials.username,
-        password: credentials.password,
-        folder: settings.destinationPath,
-      });
+    const target = targetFrom(settings, credentials);
+    const client = s3ClientFor(target);
 
-      const out = await session.createWriteStream(fileName);
-      const bytes = await dumpEncrypted(env.DATABASE_URL, out, processEnv);
-      await pruneOverSmb(session, settings.retainDays);
+    try {
+      /**
+       * Buffered, not streamed. `PutObject` needs a length, and the alternative
+       * is a second dependency for the multipart uploader. `backup-s3.ts` says
+       * more about why that trade is the right way round for one dump.
+       */
+      const body = await collect(dumpStream(env.DATABASE_URL, processEnv));
+      const bytes = await putObject(client, target, fileName, body);
+      await pruneOnS3(client, target, settings.retainDays);
       return bytes;
     } catch (error) {
-      await session?.unlink(fileName).catch(() => {});
-      throw new Error(explainSmbError(error));
+      // A partial object is worse than none: it has a plausible name and
+      // cannot be restored. S3 has no partial PUT, but a failed prune or a
+      // half-written multipart would, so the delete is attempted regardless.
+      await deleteObject(client, target, fileName).catch(() => {});
+      throw new Error(explainS3Error(error));
     } finally {
-      session?.close();
+      // The SDK keeps sockets alive for reuse; a long-lived API that never
+      // destroys a client keeps one pool per backup.
+      client.destroy();
     }
   }
 
@@ -506,6 +547,27 @@ async function writeBackup(
  * than read back with `stat`, because a destination that cannot be stat'ed
  * afterwards is exactly the case this was extended for.
  */
+/**
+ * The same encrypted dump, as something to read from.
+ *
+ * The local destination writes to a file and wants a `Writable`; S3 wants
+ * bytes. Rather than two dump implementations, this hands `dumpEncrypted` a
+ * `PassThrough` and returns the reading end, so the header, the cipher, the
+ * `pg_dump` handling and the GCM tag are written once and used by both.
+ *
+ * A failure inside the dump destroys the stream with the error, so a caller
+ * reading it sees the real reason rather than a truncated body.
+ */
+function dumpStream(databaseUrl: string, processEnv: NodeJS.ProcessEnv): Readable {
+  const through = new PassThrough();
+
+  void dumpEncrypted(databaseUrl, through, processEnv).catch((error: unknown) => {
+    through.destroy(error instanceof Error ? error : new Error(String(error)));
+  });
+
+  return through;
+}
+
 async function dumpEncrypted(
   databaseUrl: string,
   out: NodeJS.WritableStream,
@@ -574,26 +636,36 @@ async function dumpEncrypted(
 }
 
 /**
- * Deletes backups on the share that are older than the retention window.
+ * Deletes objects older than the retention window.
  *
  * The local version's twin, and deliberately the same rule: by age rather than
  * by count, so a week the schedule did not run cannot silently shorten the
  * window that survives.
  *
- * A file whose modification time the share will not report is **left alone**.
- * Deleting on a guess is the one mistake here that cannot be undone, and a
- * destination filling up is a problem somebody can see and fix.
+ * **The newest is never deleted**, whatever its age. A retention window of one
+ * day and a backup that has not run for a week would otherwise leave the bucket
+ * empty, which is the one outcome a backup system must not produce on its own.
+ * That is why the list is sorted oldest first and the last entry is dropped
+ * from consideration before anything is removed.
  */
-async function pruneOverSmb(session: SmbSession, retainDays: number): Promise<void> {
+async function pruneOnS3(
+  client: ReturnType<typeof s3ClientFor>,
+  target: S3Target,
+  retainDays: number,
+): Promise<void> {
   if (retainDays <= 0) return;
   const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
 
-  for (const entry of await session.list()) {
-    if (!/^vikt-.*\.dump\.enc$/.test(entry)) continue;
-    const mtime = await session.mtimeOf(entry);
-    if (mtime !== null && mtime.getTime() < cutoff) {
-      await session.unlink(entry).catch(() => {});
-    }
+  const objects = await listBackups(client, target);
+  // Oldest first, so dropping the tail keeps the newest whatever its date.
+  const candidates = objects.slice(0, -1);
+
+  for (const object of candidates) {
+    // An object whose date the endpoint will not report is left alone:
+    // deleting on a guess is the one mistake here that cannot be undone.
+    if (object.lastModified === null) continue;
+    if (object.lastModified.getTime() >= cutoff) continue;
+    await deleteObject(client, target, object.name).catch(() => {});
   }
 }
 
@@ -635,57 +707,61 @@ export async function testBackupDestination(
     return outcome;
   };
 
-  if (settings.destinationKind === "s3") {
-    return record({ ok: false, reason: 'destination "s3" is not implemented' });
+  if (settings.destinationKind === "smb") {
+    return record({
+      ok: false,
+      reason:
+        "Writing to a Windows share directly is not available: both Node SMB " +
+        "clients speak NTLMv1, which current servers refuse. Mount the share on " +
+        "the host and choose a directory destination instead.",
+    });
   }
 
-  if (settings.destinationKind === "smb") {
+  if (settings.destinationKind === "s3") {
     const row = await settingsRow(db);
-    const credentials = readSmbCredentials(row?.credentialsEncrypted ?? "", processEnv);
+    const credentials = readS3Credentials(row?.credentialsEncrypted ?? "", processEnv);
     if (credentials === null) {
       return record({
         ok: false,
-        reason: "No share password is stored, or SECRET_KEY cannot read the one that is.",
+        reason: "No secret key is stored, or SECRET_KEY cannot read the one that is.",
       });
     }
 
+    if (settings.s3Bucket.trim() === "") {
+      return record({ ok: false, reason: "No bucket is configured." });
+    }
+
+    const target = targetFrom(settings, credentials);
+    const client = s3ClientFor(target);
+
     /**
      * The probe gets the same protection as a real run (D132). It is the button
-     * that took the API down, and it reaches exactly the same library path.
+     * that took the API down last time, and it reaches the same client path.
      *
-     * There is no `backup_runs` row for a test, so the guard is given the id of
-     * the row it would otherwise update as an empty string: it still logs, still
-     * keeps the process alive, and simply has no row to mark.
+     * There is no `backup_runs` row for a test, so the guard is given an empty
+     * id: it still logs, still keeps the process alive, and simply has no row
+     * to mark.
      */
     backupInFlight("", describeDestination(settings), db);
 
-    let session: SmbSession | null = null;
     try {
-      session = await connectSmb({
-        host: settings.smbHost,
-        share: settings.smbShare,
-        domain: settings.smbDomain,
-        username: credentials.username,
-        password: credentials.password,
-        folder: settings.destinationPath,
-      });
-
-      const out = await session.createWriteStream(name);
-      await new Promise<void>((resolve, reject) => {
-        out.on("error", reject);
-        out.end(payload, () => resolve());
-      });
-      await session.unlink(name);
-
+      /**
+       * Written **and** deleted, not just written. A key that can PUT and not
+       * DELETE leaves the bucket filling up forever once retention starts
+       * pruning, and that is exactly the permission mistake worth catching
+       * before the first scheduled run rather than a month later.
+       */
+      await putObject(client, target, name, payload);
+      await deleteObject(client, target, name);
       return record({ ok: true, wrote: name });
     } catch (error) {
-      // Best effort: if the write landed and the delete is what failed, the
-      // probe file must not be left behind on somebody's share.
-      await session?.unlink(name).catch(() => {});
-      return record({ ok: false, reason: explainSmbError(error) });
+      // If the PUT landed and the DELETE is what failed, the probe object must
+      // not be left behind in somebody's bucket.
+      await deleteObject(client, target, name).catch(() => {});
+      return record({ ok: false, reason: explainS3Error(error) });
     } finally {
-      session?.close();
       backupSettled();
+      client.destroy();
     }
   }
 

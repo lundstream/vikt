@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderRoute } from "./harness.js";
+import { todayLocalDate } from "../../src/lib/dates.js";
 import { FoodLog } from "../../src/routes/FoodLog.js";
 
 /**
@@ -24,7 +25,17 @@ import { FoodLog } from "../../src/routes/FoodLog.js";
  * the field D61 is about, and the screen never shows it.
  */
 
-const TODAY = new Date().toISOString().slice(0, 10);
+/**
+ * Today **in the harness's timezone**, not in UTC.
+ *
+ * This was `new Date().toISOString().slice(0, 10)`, which is the UTC day, while
+ * the app computes the day in the user's zone (§3, D39). Between midnight and
+ * 02:00 in Stockholm the two disagree and this file failed — a test that passed
+ * for twenty-two hours a day and was written at one of them. Using the app's
+ * own helper against the zone `renderRoute` provides is the only version that
+ * cannot drift from what the code under test does.
+ */
+const TODAY = todayLocalDate("Europe/Stockholm");
 const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 
 const ENTRY = {

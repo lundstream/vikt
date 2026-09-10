@@ -23,6 +23,12 @@ import {
  * is exactly what Node does when nothing catches one, rather than by actually
  * throwing from a socket — the real thing would take the test runner down with
  * it, which is the property being fixed.
+ *
+ * The destination is S3 now (D133) and its client is HTTP rather than a raw
+ * socket state machine, so this path is far less likely to throw where no
+ * `await` can see it. **The guard stays anyway.** It cost one function call, it
+ * is the difference between a bad destination and a dead API, and the reason it
+ * exists is that nobody predicted the last one either.
  */
 
 const ctx = useTestApp();
@@ -51,15 +57,20 @@ describe("when a destination throws outside any promise chain", () => {
 
     const [run] = await db
       .insert(backupRuns)
-      .values({ status: "running", startedByEmail: user.email, destination: "smb://nas/backup" })
+      .values({ status: "running", startedByEmail: user.email, destination: "s3://nas.local/backups" })
       .returning({ id: backupRuns.id });
 
     const remove = withGuard(app);
     try {
-      backupInFlight(run!.id, "smb://nas/backup", db);
+      backupInFlight(run!.id, "s3://nas.local/backups", db);
 
-      // What Node does when a socket callback throws and nothing catches it.
-      process.emit("uncaughtException", new Error("des-ecb is unsupported"));
+      /**
+       * What Node does when a client's callback throws and nothing catches it.
+       * Shaped like an SDK error, name and all, so the row records something a
+       * reader would recognise from a real failure.
+       */
+      const thrown = Object.assign(new Error("socket hang up"), { name: "TimeoutError" });
+      process.emit("uncaughtException", thrown);
 
       // The assertion that matters: we are still here to make it.
       expect(true).toBe(true);
@@ -69,7 +80,7 @@ describe("when a destination throws outside any promise chain", () => {
       const [row] = await db.select().from(backupRuns).where(eq(backupRuns.id, run!.id));
 
       expect(row!.status).toBe("failed");
-      expect(row!.error).toContain("des-ecb is unsupported");
+      expect(row!.error).toContain("socket hang up");
       expect(row!.finishedAt).not.toBeNull();
     } finally {
       remove();
@@ -85,8 +96,8 @@ describe("when a destination throws outside any promise chain", () => {
     const { db } = ctx();
 
     expect(currentBackup()).toBeNull();
-    backupInFlight("some-run", "smb://nas/backup", db);
-    expect(currentBackup()).toEqual({ runId: "some-run", destination: "smb://nas/backup" });
+    backupInFlight("some-run", "s3://nas.local/backups", db);
+    expect(currentBackup()).toEqual({ runId: "some-run", destination: "s3://nas.local/backups" });
 
     backupSettled();
     expect(currentBackup()).toBeNull();
@@ -120,7 +131,7 @@ describe("when a destination throws outside any promise chain", () => {
     const remove = withGuard(app);
 
     try {
-      backupInFlight("", "smb://nas/backup", db);
+      backupInFlight("", "s3://nas.local/backups", db);
       process.emit("uncaughtException", new Error("thrown from a socket callback"));
       await new Promise((resolve) => setTimeout(resolve, 150));
       expect(true).toBe(true);

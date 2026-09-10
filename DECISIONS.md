@@ -4817,6 +4817,13 @@ byte per row and removes that whole case.
 
 ### D130 — SMB is spoken, not mounted
 
+> **Superseded by D133.** The mechanism argument below is still right: mounting
+> a share inside a container needs `CAP_SYS_ADMIN` and that is not a thing to
+> grant for a backup. The protocol was wrong. Both Node SMB clients authenticate
+> with NTLMv1, which current servers refuse, and D132 records what that cost.
+> The destination is S3 now, and a Windows share is reached by mounting it **on
+> the host** and pointing a directory destination at the mount.
+
 D103 built the backup schedule with `local` as the only destination and `smb`
 and `s3` refused with a reason. SMB is the one people actually want: the point
 of a backup is that it survives the machine the database is on, and for a
@@ -5004,3 +5011,85 @@ decision to take quietly:
 
 Until that is settled the destination stays refused with a reason rather than
 half-working, which is the state D103 chose deliberately for exactly this case.
+
+### D133 — The remote destination is S3, and a share is mounted on the host
+
+D130 wanted a backup that survives the machine the database is on, and chose to
+speak SMB from Node rather than mount a share, because mounting inside a
+container needs `CAP_SYS_ADMIN`. That reasoning was right and is unchanged. The
+protocol was the mistake, and D132 records what it cost: a library that could
+not authenticate at all on Node 22, an admin button that exited the process, and
+eleven tests that never reached the code that broke.
+
+**Neither Node SMB client can authenticate to a current server.** Both speak
+NTLMv1 — `@marsaud/smb2` through OpenSSL's DES, which no longer exists, and
+`@awo00/smb2` through its own pure-JS copy. Samba has shipped `ntlm auth = no`
+by default since 4.5 and Windows has refused NTLMv1 for longer. Verified against
+a real Samba container: `STATUS_LOGON_FAILURE` with correct credentials, and a
+successful login only after setting `ntlm auth = yes`, `lanman auth = yes` and
+`server min protocol = NT1`. Nobody should run a NAS that way to receive
+backups, and a CI suite configured against one would go green while the owner's
+server kept refusing — the original mistake with more ceremony.
+
+**Writing NTLMv2 by hand was the rejected alternative.** It is well specified
+and roughly a hundred lines, and it is authentication code, where a subtle error
+does not announce itself. This project has one maintainer.
+
+**So: S3.** An HTTP request signed with a key the owner pastes in, reaching AWS,
+Backblaze B2, MinIO and the S3 endpoint most NAS boxes now ship. `s3` was
+already in the destination enum, refused with a reason since D103, which is
+exactly the boundary that decision existed to hold.
+
+**Somebody who wants a Windows share mounts it on the host** and points a
+directory destination at the mount. That has always worked, involves none of
+this code, and the README now carries the fstab line and the compose volume
+rather than leaving it as an idea.
+
+#### What is deliberate in the implementation
+
+**Path style is a setting, not a guess.** AWS addresses a bucket as
+`bucket.host/key` and everything self-hosted wants `host/bucket/key`. Getting it
+wrong fails in a way that reads like a wrong address rather than a wrong option,
+so it is a labelled checkbox that defaults to on, because self-hosted is what
+this project is for.
+
+**The dump is encrypted before it reaches the client**, which is D103's rule and
+is what makes any remote destination acceptable: what crosses the wire is
+ciphertext with a GCM tag. Server-side encryption is not requested and would add
+nothing to bytes that are already opaque.
+
+**The whole object is buffered.** `PutObject` needs a length, and the
+alternative is a second dependency for the multipart uploader. A database whose
+compressed dump does not fit in memory has outgrown a single-container
+deployment for several other reasons first. The local destination still streams
+to disk and does not go through this path.
+
+**Retention never deletes the newest.** By age as before, and the list is sorted
+oldest first with the last entry excluded before anything is removed. A window
+of one day and a schedule that has not run for a week would otherwise empty the
+bucket, which is the one outcome a backup system must not produce on its own.
+
+**The errors name the field.** The SDK says "the request signature we calculated
+does not match", which is accurate and tells somebody staring at six inputs
+nothing. `explainS3Error` maps the names MinIO actually returned during
+development to sentences that say which of them is wrong.
+
+#### The tests are the point of this decision
+
+`backup-s3-live.test.ts` runs against a **real MinIO with default settings**, as
+a service in CI and a container locally: put, list, get, delete, a wrong secret
+that produces a real `SignatureDoesNotMatch` from a real signature check, a
+wrong access key, a missing bucket, and an unreachable endpoint. Without
+`S3_TEST_ENDPOINT` they **skip loudly** rather than passing, because a suite
+that goes green when its subject is absent is worse than one that says it did
+not run. CI also asserts `pg_dump --version` before the suite, so the two
+full-run tests cannot quietly stop running if a runner image drops the client.
+
+That is the correction of the specific failure in D132: a destination is
+verified against something that can fail the way the real one does, or it is not
+verified.
+
+**The crash guard from D132 stays**, even though an HTTP client is far less
+likely to throw outside a promise chain than a socket state machine. It costs
+one function call, it is the difference between a bad destination and a dead
+API, and the reason it exists is that nobody predicted the last one either.

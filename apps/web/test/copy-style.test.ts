@@ -59,6 +59,11 @@ const ACRONYMS = new Set([
   "API",
   "SMB",
   "NFS",
+  // The backup destinations name these, and none has a lower-case form. "NAS"
+  // and "AWS" are what the boxes and the service call themselves; "MinIO" is
+  // mixed case already and is not matched by the rule.
+  "NAS",
+  "AWS",
   // File formats and a licence, named on the privacy and terms pages (D106).
   // "CSV" and "JSON" are how the export is labelled in the app itself, and a
   // page describing what you can take away should call it what the button does.

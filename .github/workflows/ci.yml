@@ -11,6 +11,13 @@
 # the cascades, and none of those exist in a fake. The harness creates and
 # migrates `vikt_test` itself, so nothing here needs to run migrations.
 #
+# MinIO is a service container for the same reason, and for a sharper one
+# (D133). The SMB destination it replaces shipped with eleven tests that all
+# connected to `127.0.0.1` and were refused at TCP, so not one of them ever
+# reached authentication: the path that broke in production was the path nothing
+# had run. MinIO signs requests the way S3 does, so a wrong secret here is a
+# real signature failure rather than a mock returning a string somebody typed.
+#
 # `pnpm --filter api contract:food` is deliberately absent. It hits the live
 # Open Food Facts and Livsmedelsverket APIs, and a build that fails because
 # somebody else's server is down is a build that teaches people to ignore red.
@@ -49,10 +56,33 @@ jobs:
           --health-timeout 5s
           --health-retries 20
 
+      # The S3 destination's test endpoint (D133). Default settings on purpose:
+      # a suite that only passes against a server somebody loosened is the
+      # mistake this whole arrangement exists to correct.
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: viktaccess
+          MINIO_ROOT_PASSWORD: viktsecret123
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://127.0.0.1:9000/minio/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+
     env:
       # The harness swaps the database name for `vikt_test`, so this is the
       # credential source rather than the database actually used.
       DATABASE_URL: postgres://vikt:vikt@127.0.0.1:5432/vikt
+
+      # Selects the live S3 tests (D133). Without it they skip, loudly, rather
+      # than passing while testing nothing. The bucket is created by the tests.
+      S3_TEST_ENDPOINT: http://127.0.0.1:9000
+      S3_TEST_ACCESS_KEY: viktaccess
+      S3_TEST_SECRET_KEY: viktsecret123
+      S3_TEST_BUCKET: vikt-test
 
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +107,13 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      # The S3 run tests shell out to `pg_dump`, and they skip when it is
+      # absent. Asserted here rather than assumed, so a runner image that drops
+      # the client turns into a loud failure instead of two tests quietly
+      # ceasing to run — which is the exact shape of the bug this pass fixes.
+      - name: Ensure pg_dump is present
+        run: pg_dump --version
 
       - name: Test
         run: pnpm test

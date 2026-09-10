@@ -162,6 +162,13 @@
       "when": 1788310170000,
       "tag": "0022_backup_smb",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788310180000,
+      "tag": "0023_backup_s3",
+      "breakpoints": true
     }
   ]
 }

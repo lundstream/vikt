@@ -89,17 +89,20 @@ describe("backup settings", () => {
   });
 
   /**
-   * The destination that is still named and not built. Refused with a reason,
-   * rather than accepted and silently doing nothing, which is the failure mode
-   * this whole pass exists to correct. SMB is implemented now (D130); S3 is
-   * still the boundary.
+   * The destination that is named and refused. S3 is implemented now (D133);
+   * SMB is the boundary, and it is refused with a reason rather than accepted
+   * and silently doing nothing.
+   *
+   * Its own `describe` below covers what the refusal says. This one holds the
+   * narrower property: nothing about a refused destination is written down, so
+   * a rejected save cannot leave half a configuration behind.
    */
-  it("refuses a destination it cannot actually write to", async () => {
+  it("writes nothing at all for a destination it refuses", async () => {
     const { db } = ctx();
     expect(
       await writeBackupSettings(db, await actor(), {
-        destinationKind: "s3",
-        destinationPath: "s3://nas/backups",
+        destinationKind: "smb",
+        destinationPath: "//nas/backups",
         scheduleMinute: null,
         retainDays: 30,
       }),
@@ -118,7 +121,16 @@ describe("backup settings", () => {
  * comes back out of the API, that saving other settings does not wipe it, and
  * that switching away from the share does not leave it lying about.
  */
-describe("an SMB destination", () => {
+/**
+ * The S3 destination's settings (D133).
+ *
+ * These are the parts that need no server: that the credentials round-trip
+ * through the encrypted column, that the secret never comes back out of the
+ * API, that saving other settings does not wipe it, and that switching away
+ * does not leave it lying about. What needs a server is in
+ * `backup-s3-live.test.ts`, which runs against a real MinIO.
+ */
+describe("an S3 destination", () => {
   const ctx = useTestApp();
 
   async function actorHere() {
@@ -128,39 +140,40 @@ describe("an SMB destination", () => {
     return { id: user.userId, email: user.email };
   }
 
-  const SMB = {
-    destinationKind: "smb" as const,
+  const S3 = {
+    destinationKind: "s3" as const,
     destinationPath: "vikt",
     scheduleMinute: 180,
     retainDays: 30,
-    smbHost: "nas.example.test",
-    smbShare: "backups",
-    smbDomain: "",
-    smbUsername: "vikt",
-    smbPassword: "hemligt",
+    s3Endpoint: "http://nas.example.test:9000",
+    s3Region: "us-east-1",
+    s3Bucket: "backups",
+    s3PathStyle: true,
+    s3AccessKeyId: "viktaccess",
+    s3SecretAccessKey: "hemligt",
   };
 
-  it("stores the host and share, and says a password is set", async () => {
+  it("stores the endpoint and bucket, and says a secret is set", async () => {
     const { db } = ctx();
-    expect(await writeBackupSettings(db, await actorHere(), SMB, KEY)).toEqual({ ok: true });
+    expect(await writeBackupSettings(db, await actorHere(), S3, KEY)).toEqual({ ok: true });
 
     const settings = await readBackupSettings(db, KEY);
-    expect(settings.destinationKind).toBe("smb");
-    expect(settings.smbHost).toBe("nas.example.test");
-    expect(settings.smbShare).toBe("backups");
-    expect(settings.smbUsername).toBe("vikt");
-    expect(settings.smbPasswordSet).toBe(true);
+    expect(settings.destinationKind).toBe("s3");
+    expect(settings.s3Endpoint).toBe("http://nas.example.test:9000");
+    expect(settings.s3Bucket).toBe("backups");
+    expect(settings.s3AccessKeyId).toBe("viktaccess");
+    expect(settings.s3PathStyle).toBe(true);
+    expect(settings.s3SecretSet).toBe(true);
 
-    // The password itself is not in the shape at all, so no screen and no
-    // endpoint can accidentally send it back.
-    expect(Object.keys(settings)).not.toContain("smbPassword");
+    // The secret is not in the shape at all, so no screen and no endpoint can
+    // accidentally send it back.
+    expect(Object.keys(settings)).not.toContain("s3SecretAccessKey");
     expect(JSON.stringify(settings)).not.toContain("hemligt");
   });
 
-  /** It is stored encrypted, not as text somebody with the row can read. */
-  it("does not keep the password in the clear", async () => {
+  it("does not keep the secret in the clear", async () => {
     const { db } = ctx();
-    await writeBackupSettings(db, await actorHere(), SMB, KEY);
+    await writeBackupSettings(db, await actorHere(), S3, KEY);
 
     const [row] = await db.select().from(backupSettings);
     expect(row!.credentialsEncrypted).not.toContain("hemligt");
@@ -168,45 +181,37 @@ describe("an SMB destination", () => {
   });
 
   /**
-   * An absent password leaves the stored one alone.
-   *
-   * The screen never receives the password, so it cannot send it back, and a
-   * form that read an empty field as "clear it" would wipe the password every
-   * time somebody changed the retention window.
+   * An absent secret leaves the stored one alone. The screen never receives
+   * it, so a form that read an empty field as "clear it" would wipe the secret
+   * every time somebody changed the retention window.
    */
-  it("keeps the password when other settings are saved", async () => {
+  it("keeps the secret when other settings are saved", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB, KEY);
+    await writeBackupSettings(db, who, S3, KEY);
 
-    const { smbPassword: _ignored, ...withoutPassword } = SMB;
-    await writeBackupSettings(db, who, { ...withoutPassword, retainDays: 7 }, KEY);
+    const { s3SecretAccessKey: _ignored, ...withoutSecret } = S3;
+    await writeBackupSettings(db, who, { ...withoutSecret, retainDays: 7 }, KEY);
 
     const settings = await readBackupSettings(db, KEY);
     expect(settings.retainDays).toBe(7);
-    expect(settings.smbPasswordSet).toBe(true);
+    expect(settings.s3SecretSet).toBe(true);
   });
 
-  /** And an explicit empty string is how it is cleared. */
-  it("clears the password when one is sent explicitly empty", async () => {
+  it("clears the secret when one is sent explicitly empty", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB, KEY);
-    await writeBackupSettings(db, who, { ...SMB, smbPassword: "" }, KEY);
+    await writeBackupSettings(db, who, S3, KEY);
+    await writeBackupSettings(db, who, { ...S3, s3SecretAccessKey: "" }, KEY);
 
-    expect((await readBackupSettings(db, KEY)).smbPasswordSet).toBe(false);
+    expect((await readBackupSettings(db, KEY)).s3SecretSet).toBe(false);
   });
 
-  /**
-   * Switching back to a local destination drops the credentials.
-   *
-   * Keeping a share's password after somebody stopped using that share is
-   * storing a secret for no purpose anybody could name.
-   */
-  it("forgets the credentials when the destination stops being a share", async () => {
+  /** Switching back to a directory drops the credentials. */
+  it("forgets the credentials when the destination stops being a bucket", async () => {
     const { db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, SMB, KEY);
+    await writeBackupSettings(db, who, S3, KEY);
 
     await writeBackupSettings(db, who, {
       destinationKind: "local",
@@ -217,43 +222,72 @@ describe("an SMB destination", () => {
 
     const [row] = await db.select().from(backupSettings);
     expect(row!.credentialsEncrypted).toBe("");
-    expect(row!.smbHost).toBe("");
-
-    const settings = await readBackupSettings(db, KEY);
-    expect(settings.smbPasswordSet).toBe(false);
+    expect(row!.s3Bucket).toBe("");
+    expect((await readBackupSettings(db, KEY)).s3SecretSet).toBe(false);
   });
 
-  /**
-   * A password cannot be stored where there is no key to store it under, and
-   * that is refused rather than silently dropped: a destination saved without
-   * its password is one that fails at three in the morning with a logon error.
-   */
-  it("refuses to save a share when SECRET_KEY is absent", async () => {
+  it("refuses to save a bucket when SECRET_KEY is absent", async () => {
     const { db } = ctx();
-    expect(await writeBackupSettings(db, await actorHere(), SMB, {})).toEqual({
+    expect(await writeBackupSettings(db, await actorHere(), S3, {})).toEqual({
       ok: false,
       reason: "no_secret_key",
     });
   });
+});
 
-  /**
-   * A run against a host that is not there fails with a row and a reason, and
-   * nothing about it is a crash. The reason names the SMB 2.0.2 limit, because
-   * a server that requires SMB 3 is the one refusal an operator cannot debug
-   * from a socket error.
-   */
-  it("records a failure rather than throwing when the share is unreachable", async () => {
+/**
+ * SMB is refused, and the refusal says what to do instead (D132, D133).
+ *
+ * It stays in the enum so the reason stays visible rather than the value
+ * quietly disappearing. Both Node clients speak NTLMv1, current servers refuse
+ * it, and writing NTLMv2 by hand is authentication code whose errors are
+ * silent.
+ */
+describe("the SMB destination", () => {
+  const ctx = useTestApp();
+
+  async function actorHere() {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, user.userId));
+    return { id: user.userId, email: user.email };
+  }
+
+  it("cannot be saved", async () => {
+    const { db } = ctx();
+    expect(
+      await writeBackupSettings(
+        db,
+        await actorHere(),
+        {
+          destinationKind: "smb",
+          destinationPath: "vikt",
+          scheduleMinute: null,
+          retainDays: 30,
+        },
+        KEY,
+      ),
+    ).toEqual({ ok: false, reason: "unsupported_destination" });
+
+    expect((await readBackupSettings(db, KEY)).destinationPath).toBe("");
+  });
+
+  /** And a row already set to it fails a run with the way round it. */
+  it("fails a run with a sentence naming the mounted path", async () => {
     const { app, db } = ctx();
     const who = await actorHere();
-    await writeBackupSettings(db, who, { ...SMB, smbHost: "127.0.0.1", smbShare: "nope" }, KEY);
+    await db.insert(backupSettings).values({
+      id: "singleton",
+      destinationKind: "smb",
+      destinationPath: "vikt",
+      retainDays: 30,
+      updatedByEmail: who.email,
+    });
 
     const outcome = await runBackup(db, app.config, who, KEY);
-
     expect(outcome.ok).toBe(false);
-    const [run] = await listBackupRuns(db, 1);
-    expect(run!.status).toBe("failed");
-    expect(run!.error).toBeTruthy();
-  }, 30_000);
+    if (!outcome.ok) expect(outcome.reason).toContain("Mount the share on the host");
+  });
 });
 
 describe("running a backup", () => {

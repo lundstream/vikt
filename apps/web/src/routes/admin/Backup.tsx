@@ -22,12 +22,13 @@ type Settings = {
   destinationPath: string;
   scheduleMinute: number | null;
   retainDays: number;
-  smbHost: string;
-  smbShare: string;
-  smbDomain: string;
-  smbUsername: string;
-  /** Whether one is stored, never the password itself (D130). */
-  smbPasswordSet: boolean;
+  s3Endpoint: string;
+  s3Region: string;
+  s3Bucket: string;
+  s3PathStyle: boolean;
+  s3AccessKeyId: string;
+  /** Whether one is stored, never the secret itself (D133). */
+  s3SecretSet: boolean;
   updatedAt: string | null;
   updatedByEmail: string | null;
 };
@@ -86,38 +87,40 @@ export function Backup() {
     retry: false,
   });
 
-  const [kind, setKind] = useState<"local" | "smb">("local");
+  const [kind, setKind] = useState<"local" | "s3">("local");
   const [path, setPath] = useState("");
   const [clock, setClock] = useState("");
   const [retain, setRetain] = useState("30");
-  const [host, setHost] = useState("");
-  const [share, setShare] = useState("");
-  const [domain, setDomain] = useState("");
-  const [username, setUsername] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [region, setRegion] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [pathStyle, setPathStyle] = useState(true);
+  const [accessKey, setAccessKey] = useState("");
   /**
-   * Empty means "leave the stored one alone" (D130).
+   * Empty means "leave the stored one alone" (D133).
    *
-   * The screen never receives the password, so there is nothing to prefill and
+   * The screen never receives the secret, so there is nothing to prefill and
    * nothing to send back unless somebody types a new one. Clearing it is its
    * own control below, because "clear" and "leave alone" are two intentions and
    * an empty box cannot be both.
    */
-  const [password, setPassword] = useState("");
-  const [clearPassword, setClearPassword] = useState(false);
+  const [secret, setSecret] = useState("");
+  const [clearSecret, setClearSecret] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loaded.data) return;
     const settings = loaded.data.settings;
-    setKind(settings.destinationKind === "smb" ? "smb" : "local");
+    setKind(settings.destinationKind === "s3" ? "s3" : "local");
     setPath(settings.destinationPath);
     setClock(toClock(settings.scheduleMinute));
     setRetain(String(settings.retainDays));
-    setHost(settings.smbHost);
-    setShare(settings.smbShare);
-    setDomain(settings.smbDomain);
-    setUsername(settings.smbUsername);
+    setEndpoint(settings.s3Endpoint);
+    setRegion(settings.s3Region);
+    setBucket(settings.s3Bucket);
+    setPathStyle(settings.s3PathStyle);
+    setAccessKey(settings.s3AccessKeyId);
   }, [loaded.data]);
 
   const save = useMutation({
@@ -131,14 +134,19 @@ export function Backup() {
           destinationPath: path,
           scheduleMinute: fromClock(clock),
           retainDays: Number(retain) || 30,
-          ...(kind === "smb"
+          ...(kind === "s3"
             ? {
-                smbHost: host,
-                smbShare: share,
-                smbDomain: domain,
-                smbUsername: username,
+                s3Endpoint: endpoint,
+                s3Region: region,
+                s3Bucket: bucket,
+                s3PathStyle: pathStyle,
+                s3AccessKeyId: accessKey,
                 // Absent leaves it alone; an explicit empty string clears it.
-                ...(clearPassword ? { smbPassword: "" } : password === "" ? {} : { smbPassword: password }),
+                ...(clearSecret
+                  ? { s3SecretAccessKey: "" }
+                  : secret === ""
+                    ? {}
+                    : { s3SecretAccessKey: secret }),
               }
             : {}),
         }),
@@ -152,8 +160,8 @@ export function Backup() {
     onSuccess: () => {
       setProblem(null);
       setNotice(t("backup.saved"));
-      setPassword("");
-      setClearPassword(false);
+      setSecret("");
+      setClearSecret(false);
       void queryClient.invalidateQueries({ queryKey: ["admin", "backup"] });
     },
     onError: (error: Error) => {
@@ -235,6 +243,17 @@ export function Backup() {
       {data && !data.secretKeyPresent ? (
         <p className="mb-4 max-w-prose text-note text-ink" data-testid="backup-no-key">
           {t("backup.noKey")}
+        </p>
+      ) : null}
+
+      {/*
+        A destination saved as a share before D133 removed it. The row can still
+        say `smb`, the runs will fail, and the screen has to say why and what to
+        do rather than showing a kind the selector below cannot even display.
+      */}
+      {data?.settings.destinationKind === "smb" ? (
+        <p className="mb-4 max-w-prose text-note text-ink" data-testid="backup-smb-gone">
+          {t("backup.smbGone")}
         </p>
       ) : null}
 
@@ -323,40 +342,52 @@ export function Backup() {
             data-testid="backup-kind"
             className="select mt-1 w-full"
             value={kind}
-            onChange={(event) => setKind(event.target.value as "local" | "smb")}
+            onChange={(event) => setKind(event.target.value as "local" | "s3")}
           >
             <option value="local">{t("backup.kindLocal")}</option>
-            <option value="smb">{t("backup.kindSmb")}</option>
+            <option value="s3">{t("backup.kindS3")}</option>
           </select>
         </label>
 
-        {kind === "smb" ? (
-          <div className="space-y-4" data-testid="backup-smb-fields">
+        {kind === "s3" ? (
+          <div className="space-y-4" data-testid="backup-s3-fields">
+            <label className="block text-micro text-muted">
+              {t("backup.s3Endpoint")}
+              <input
+                id="backup-s3-endpoint"
+                className="field mt-1 w-full"
+                placeholder="http://nas.local:9000"
+                value={endpoint}
+                onChange={(event) => setEndpoint(event.target.value)}
+              />
+            </label>
+            <p className="text-micro text-muted">{t("backup.s3EndpointHint")}</p>
+
             <div className="flex gap-4">
               <label className="block flex-1 text-micro text-muted">
-                {t("backup.smbHost")}
+                {t("backup.s3Bucket")}
                 <input
-                  id="backup-smb-host"
+                  id="backup-s3-bucket"
                   className="field mt-1 w-full"
-                  placeholder="nas.local"
-                  value={host}
-                  onChange={(event) => setHost(event.target.value)}
+                  placeholder="backups"
+                  value={bucket}
+                  onChange={(event) => setBucket(event.target.value)}
                 />
               </label>
               <label className="block flex-1 text-micro text-muted">
-                {t("backup.smbShare")}
+                {t("backup.s3Region")}
                 <input
-                  id="backup-smb-share"
+                  id="backup-s3-region"
                   className="field mt-1 w-full"
-                  placeholder="backup"
-                  value={share}
-                  onChange={(event) => setShare(event.target.value)}
+                  placeholder="us-east-1"
+                  value={region}
+                  onChange={(event) => setRegion(event.target.value)}
                 />
               </label>
             </div>
 
             <label className="block text-micro text-muted">
-              {t("backup.smbFolder")}
+              {t("backup.s3Prefix")}
               <input
                 id="backup-path"
                 className="field mt-1 w-full"
@@ -368,67 +399,71 @@ export function Backup() {
 
             <div className="flex gap-4">
               <label className="block flex-1 text-micro text-muted">
-                {t("backup.smbUser")}
+                {t("backup.s3Key")}
                 <input
-                  id="backup-smb-user"
+                  id="backup-s3-key"
                   className="field mt-1 w-full"
                   autoComplete="off"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
+                  value={accessKey}
+                  onChange={(event) => setAccessKey(event.target.value)}
                 />
               </label>
               <label className="block flex-1 text-micro text-muted">
-                {t("backup.smbDomain")}
+                {t("backup.s3Secret")}
                 <input
-                  id="backup-smb-domain"
+                  id="backup-s3-secret"
+                  data-testid="backup-s3-secret"
                   className="field mt-1 w-full"
-                  autoComplete="off"
-                  value={domain}
-                  onChange={(event) => setDomain(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  value={secret}
+                  disabled={clearSecret}
+                  onChange={(event) => setSecret(event.target.value)}
                 />
               </label>
             </div>
 
-            <label className="block text-micro text-muted">
-              {t("backup.smbPassword")}
-              <input
-                id="backup-smb-password"
-                data-testid="backup-smb-password"
-                className="field mt-1 w-full"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                disabled={clearPassword}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </label>
-
             {/*
-              The stored password is never sent to this screen, so there is
+              The stored secret is never sent to this screen, so there is
               nothing to prefill: an empty box means "leave it alone". Clearing
               it is a separate control, because "clear" and "leave alone" are
               two intentions and one empty field cannot express both.
             */}
-            {data?.settings.smbPasswordSet ? (
+            {data?.settings.s3SecretSet ? (
               <>
-                <p className="text-micro text-muted">{t("backup.smbPasswordSet")}</p>
+                <p className="text-micro text-muted">{t("backup.s3SecretSet")}</p>
                 <label className="flex items-center gap-2 text-micro text-muted">
                   <input
                     type="checkbox"
                     className="check"
-                    data-testid="backup-smb-clear"
-                    checked={clearPassword}
-                    onChange={(event) => setClearPassword(event.target.checked)}
+                    data-testid="backup-s3-clear"
+                    checked={clearSecret}
+                    onChange={(event) => setClearSecret(event.target.checked)}
                   />
-                  {t("backup.smbPasswordClear")}
+                  {t("backup.s3SecretClear")}
                 </label>
               </>
             ) : null}
 
-            <div className="space-y-1 text-micro text-muted">
-              <p>{t("backup.smbHelp")}</p>
-              <p>{t("backup.smbVersion")}</p>
-            </div>
+            {/*
+              Path style is a setting rather than a guess (D133). AWS wants the
+              bucket in the host name and everything self-hosted wants it in the
+              path, and getting it wrong fails in a way that reads like a wrong
+              address rather than a wrong option.
+            */}
+            <label className="flex items-center gap-2 text-micro text-muted">
+              <input
+                type="checkbox"
+                className="check"
+                data-testid="backup-s3-pathstyle"
+                checked={pathStyle}
+                onChange={(event) => setPathStyle(event.target.checked)}
+              />
+              {t("backup.s3PathStyle")}
+            </label>
+            <p className="text-micro text-muted">{t("backup.s3PathStyleHint")}</p>
+
+            <p className="text-micro text-muted">{t("backup.s3Help")}</p>
           </div>
         ) : (
           <>

@@ -66,33 +66,38 @@ A **directory** is any path the API container can write, and that includes a
 share the host already mounts. Point it somewhere that does not die with the
 machine the database is on.
 
-A **share** is spoken directly, over SMB, with the host, share name, folder,
-username and password set in the admin screen (D130). Nothing is mounted and
-the container needs no extra capabilities, which is the point: mounting inside
-a container requires `CAP_SYS_ADMIN`, and granting that so a backup can be
-written is a bad trade to make by accident.
+A **bucket** is any S3-compatible endpoint: AWS, Backblaze B2, MinIO, or the S3
+service most NAS boxes now ship. Set the address, bucket, folder, access key and
+secret under Administration, Backup (D133). Leave the address empty for AWS
+itself.
 
-The password is encrypted at rest under `SECRET_KEY`, the same way the SMTP
+**Path style is a checkbox and it matters.** AWS addresses a bucket as
+`bucket.host/key`; MinIO and most NAS endpoints want `host/bucket/key` and fail
+in a way that reads like a wrong address rather than a wrong option. It defaults
+to on, which is right for everything except AWS.
+
+The secret is encrypted at rest under `SECRET_KEY`, the same way the SMTP
 password is, and is never sent back to the browser. Saving other settings leaves
-it alone; clearing it is its own checkbox.
+it alone; clearing it is its own checkbox. The key needs `PutObject`,
+`ListBucket` and `DeleteObject` on the bucket — the last because retention
+prunes old backups, and a key that can write but not delete fills the bucket up
+forever.
 
-**Press "Testa anslutningen" after configuring one.** It writes a small file to
-the destination and deletes it again, which is the only way to find out that the
-host, share, folder, username and password are together a place this process can
-write. Each of them can be individually plausible and collectively wrong. The
-result goes in the admin log either way, so a pass dates the last time the
-destination was known to work.
-
-**The client speaks SMB 2.0.2.** Samba and every Windows since Vista accept it.
-A server hardened to require SMB 3 will refuse the connection, and the test
-button says so in as many words. The way round it is the directory option above:
-mount the share on the host and point a path at it.
+**Press "Testa anslutningen" after configuring one.** It writes a small object
+and deletes it again, which is the only way to find out that the address,
+bucket, folder, key and secret are together a place this process can write.
+Each of them can be individually plausible and collectively wrong, and the
+button names which one is wrong rather than repeating the SDK's message about
+signatures. The result goes in the admin log either way, so a pass dates the
+last time the destination was known to work.
 
 ### What is not implemented
 
-**S3.** It appears in the settings because that is the column that would have to
-change, and the app **refuses** it with a reason rather than accepting the
-setting and doing nothing.
+**Writing to a Windows share directly.** Both Node SMB clients authenticate with
+NTLMv1, which current Samba and Windows refuse by default, and hand-writing
+NTLMv2 is authentication code whose errors are silent. D132 and D133 have the
+account. Mount the share on the host and use a directory destination; the README
+has the fstab and compose lines.
 
 **Uploads are not in it.** The app's backup is the database. Photos live on disk
 outside it by D10, and Phase 7 has not shipped, so there is nothing there yet;

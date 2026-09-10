@@ -80,7 +80,14 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 ### Migrationer som kommer att köras
 
 `0022_backup_smb` lägger till `smb_host`, `smb_share` och `smb_domain` på
-`backup_settings`, alla med `DEFAULT ''`. Additiv som de andra.
+`backup_settings`, och `0023_backup_s3` tar bort dem igen och lägger till
+`s3_endpoint`, `s3_region`, `s3_bucket` och `s3_path_style`. Båda körs vid start.
+
+**Att 0023 tar bort kolumner är ett medvetet undantag** från regeln att
+migrationer bara lägger till. Det är ofarligt just här och bara här: 0022 har
+aldrig körts utanför utveckling, `main` har aldrig burit den, så ingen
+produktionsdatabas har kolumnerna och ingen har ett värde i dem. Produktionen
+lägger till tre kolumner och tar bort dem igen i samma uppstart.
 
 `0021_request_mail` lägger till kolumnen `request_mail` på `profiles`, med
 `DEFAULT true`. Den är additiv och körs av API-containerns entrypoint vid start,
@@ -90,10 +97,12 @@ kolumnen bryr sig inte om att den finns.
 ### Manuella steg på Portainer-värden
 
 - Sätt variablerna ovan i stacken `vikt` innan avbilden byts.
-- **Backupmålet behöver inget nytt på värden.** SMB talas direkt av API:t, så
-  containern behöver varken mount eller `SYS_ADMIN`. Vill du hellre montera
-  utdelningen på värden fungerar det som förut: välj "Katalog på maskinen" och peka
-  den på monteringen.
+- **Backupmålet är nu antingen en katalog eller en S3-hink.** Att skriva till en
+  Windows-utdelning direkt finns inte längre: biblioteken talar NTLMv1 som dagens
+  servrar nekar (D132, D133). Vill du använda NAS:en, montera utdelningen på värden
+  och bind-montera katalogen in i api-containern, se README. Vill du använda S3,
+  eller NAS:ens egen S3-tjänst, fyll i adress, hink, nyckel och hemlighet under
+  Administration, Backup och tryck "Testa anslutningen" innan du litar på schemat.
 - **`REQUEST_ENABLED` behöver inte sättas.** Utan den är formuläret borta, vilket är
   det avsedda läget. Sätt den till `true` bara om du vill kunna skicka adressen
   `/kod` till någon. Ingenting länkar dit.
@@ -137,6 +146,10 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   användarnamn och lösenord ställs in under Administration, Backup, och lösenordet
   lagras krypterat. Knappen "Testa anslutningen" skriver en liten fil och tar bort
   den igen, så att man ser att det fungerar innan nattens körning.
+- Backupen skrivs till en S3-hink i stället för till en Windows-utdelning. Adress,
+  hink, mapp, nyckel och hemlighet ställs in under Administration, Backup, och
+  hemligheten lagras krypterat. Fungerar mot AWS, Backblaze, MinIO och de flesta
+  NAS-lådors egen S3-tjänst.
 
 ## On `dev`, not yet on `main`
 
