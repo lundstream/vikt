@@ -634,6 +634,24 @@ Not phases. Each is a good idea with no deadline and no dependency on the others
 
 ## 7. Session conventions
 
+### Branching
+
+**Production deploys from `main`.** That is the whole reason for the rule below:
+a commit on `main` is a commit that the next redeploy ships.
+
+- **Never commit to `main` directly.** All work happens on `dev`.
+- `main` receives **merges only, through a pull request**, when the owner decides
+  to update production. Not when a pass finishes, not when CI goes green: when
+  somebody decides to deploy.
+- **CI runs on both branches**, so `dev` is never a place where the suite is
+  allowed to be red.
+- **Every pass ends with `dev` pushed and CI green.** A pass that ends with
+  unpushed work has put the record of it in one place that is not backed up.
+- **`STATE.md` names which commits on `dev` are not yet on `main`.** The gap
+  between the two is the difference between what is built and what is running,
+  and it is invisible from inside either branch. D115's two navigation surfaces
+  drifted for exactly that reason.
+
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
