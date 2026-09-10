@@ -804,6 +804,15 @@ function TodaySection({
 }) {
   const createTemplate = useCreateTemplate();
   const deleteEntry = useDeleteFoodEntry();
+
+  /**
+   * One row open at a time (D125).
+   *
+   * Held here rather than in each row, because "one at a time" is a fact about
+   * the list and a row cannot know what its neighbours are doing. Opening the
+   * second closes the first without either row being told.
+   */
+  const [openId, setOpenId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -870,6 +879,8 @@ function TodaySection({
             key={entry.id}
             entry={entry}
             onCopyToToday={onCopyToToday}
+            open={openId === entry.id}
+            onToggleOpen={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
             selectable={saving}
             selected={selected.has(entry.id)}
             onToggle={() =>
@@ -939,6 +950,8 @@ function EntryRow({
   onToggle,
   onDelete,
   onCopyToToday,
+  open,
+  onToggleOpen,
 }: {
   entry: FoodEntry;
   /** True while a meal is being assembled, when the row is a choice. */
@@ -948,6 +961,9 @@ function EntryRow({
   onDelete: () => Promise<unknown>;
   /** Present only on a past day. See `TodaySection` (D124). */
   onCopyToToday?: (entry: FoodEntry) => Promise<void>;
+  /** Whether this row is the open one. The list owns that (D125). */
+  open: boolean;
+  onToggleOpen: () => void;
 }) {
   const [copying, setCopying] = useState(false);
   const update = useUpdateFoodEntry();
@@ -971,6 +987,23 @@ function EntryRow({
     }
   }
 
+  /**
+   * An estimate, judged from `confidence` (D125).
+   *
+   * The entry carries no `isEstimate` of its own — that lives on the food item
+   * — but it does carry the confidence the figure was logged with, and the
+   * schema is explicit that anything below 1 marks a figure somebody estimated
+   * rather than looked up. Reading it here keeps one definition of "estimated"
+   * rather than inventing a second.
+   */
+  const estimated = entry.confidence < 1;
+
+  /** Where the numbers came from: a database row, or something typed. */
+  const source = entry.foodItemId === null ? t("food.sourceTyped") : t("food.sourceDatabase");
+
+  const macro = (grams: number | null) =>
+    grams === null ? t("stat.notYet") : `${formatDecimal(grams, { decimals: 0 })} g`;
+
   return (
     <li className="py-2.5">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-baseline gap-x-3">
@@ -987,78 +1020,153 @@ function EntryRow({
           <span />
         )}
 
-        <span className="min-w-0 truncate text-note text-ink">{entry.name}</span>
+        {/*
+          The name is the disclosure (D125). A whole row that expands would
+          fight the checkbox beside it while a meal is being assembled, so
+          while `selectable` the row keeps its one meaning and does not expand:
+          one tap, one thing, and the thing changes with the mode.
+        */}
+        {selectable ? (
+          <span className="min-w-0 truncate text-note text-ink">{entry.name}</span>
+        ) : (
+          <button
+            type="button"
+            data-testid={`expand-entry-${entry.id}`}
+            aria-expanded={open}
+            className="min-w-0 truncate text-left text-note text-ink"
+            onClick={onToggleOpen}
+          >
+            {entry.name}
+            {estimated ? <EstimateTag /> : null}
+          </button>
+        )}
 
         <span className="num shrink-0 whitespace-nowrap text-right text-micro text-muted">
           {formatDecimal(entry.grams, { decimals: 0 })} g · {formatKcal(entry.kcal)} kcal
         </span>
 
+        {/*
+          A chevron rather than the three controls that used to sit here. The
+          actions moved inside the disclosure, which is what stops a row of
+          four rows carrying twelve controls a thumb has to aim between.
+        */}
         <span className="flex shrink-0 items-center gap-1">
-          {/*
-            Only on a past day, and worded so it cannot be confused with "Igen"
-            under Senast loggat (D124). The two do the same thing to different
-            days: "Igen" logs to the day being viewed, which is backfilling;
-            this logs to today. Naming the day in the label is what makes that
-            legible, so neither is just "log this again".
-          */}
-          {onCopyToToday ? (
-            <button
-              type="button"
-              data-testid={`copy-entry-${entry.id}`}
-              className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
-              disabled={copying}
-              onClick={() => {
-                setCopying(true);
-                void onCopyToToday(entry).finally(() => setCopying(false));
-              }}
+          {selectable ? null : (
+            <span
+              aria-hidden="true"
+              className={`text-micro text-muted transition-transform ${open ? "rotate-180" : ""}`}
             >
-              {t("food.copyToToday")}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            data-testid={`edit-entry-${entry.id}`}
-            className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
-            onClick={() => setEditing((was) => !was)}
-          >
-            {editing ? t("common.cancel") : t("common.edit")}
-          </button>
-          {/* On the screen where the entry is displayed, not in a settings page. */}
-          <DeleteButton
-            testId={`delete-entry-${entry.id}`}
-            label={`${entry.name}, ${formatKcal(entry.kcal)} kcal`}
-            onDelete={onDelete}
-          />
+              ▾
+            </span>
+          )}
         </span>
       </div>
 
-      {editing ? (
-        <form onSubmit={submit} className="mt-2 flex items-start gap-2">
-          <div className="relative w-32">
-            <input
-              className="field num pr-8"
-              type="text"
-              inputMode="decimal"
-              aria-label={t("food.grams")}
-              value={grams}
-              onChange={(event) => setGrams(event.target.value)}
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-note text-muted"
+      {open && !selectable ? (
+        <div data-testid={`entry-detail-${entry.id}`} className="mt-3 pl-1">
+          {/*
+            What is in the entry, which the collapsed line cannot carry and
+            which the reader otherwise has to take on trust. A macro the entry
+            does not have says "Inte än" rather than 0: absent is not zero
+            (D44), and a fibre figure nobody recorded is not a fibre figure of
+            zero.
+          */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-micro text-muted sm:grid-cols-4">
+            <div>
+              <dt>{t("macro.protein")}</dt>
+              <dd className="num text-ink">{macro(entry.proteinG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.carbs")}</dt>
+              <dd className="num text-ink">{macro(entry.carbsG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.fat")}</dt>
+              <dd className="num text-ink">{macro(entry.fatG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.fiber")}</dt>
+              <dd className="num text-ink">{macro(entry.fiberG)}</dd>
+            </div>
+          </dl>
+
+          <p className="mt-2 text-micro text-muted">
+            {t("food.entryAmount", {
+              grams: formatDecimal(entry.grams, { decimals: 0 }),
+              kcal: formatKcal(entry.kcal),
+            })}
+            {" · "}
+            {source}
+            {entry.brand ? ` · ${entry.brand}` : ""}
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1">
+            {/*
+              The copy-forward action lives here too on a past day (D124), so
+              every action for this entry is in one place rather than split
+              between the line and the panel.
+            */}
+            {onCopyToToday ? (
+              <button
+                type="button"
+                data-testid={`copy-entry-${entry.id}`}
+                className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+                disabled={copying}
+                onClick={() => {
+                  setCopying(true);
+                  void onCopyToToday(entry).finally(() => setCopying(false));
+                }}
+              >
+                {t("food.copyToToday")}
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              data-testid={`edit-entry-${entry.id}`}
+              className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+              onClick={() => setEditing((was) => !was)}
             >
-              g
-            </span>
+              {editing ? t("common.cancel") : t("common.edit")}
+            </button>
+
+            {/* On the screen where the entry is displayed, not in a settings page. */}
+            <DeleteButton
+              testId={`delete-entry-${entry.id}`}
+              label={`${entry.name}, ${formatKcal(entry.kcal)} kcal`}
+              onDelete={onDelete}
+            />
           </div>
-          <button
-            type="submit"
-            data-testid={`save-entry-${entry.id}`}
-            className="btn-secondary w-auto px-4"
-            disabled={update.isPending}
-          >
-            {t("profile.save")}
-          </button>
-        </form>
+
+          {editing ? (
+            <form onSubmit={submit} className="mt-2 flex items-start gap-2">
+              <div className="relative w-32">
+                <input
+                  className="field num pr-8"
+                  type="text"
+                  inputMode="decimal"
+                  aria-label={t("food.grams")}
+                  value={grams}
+                  onChange={(event) => setGrams(event.target.value)}
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-note text-muted"
+                >
+                  g
+                </span>
+              </div>
+              <button
+                type="submit"
+                data-testid={`save-entry-${entry.id}`}
+                className="btn-secondary w-auto px-4"
+                disabled={update.isPending}
+              >
+                {t("profile.save")}
+              </button>
+            </form>
+          ) : null}
+        </div>
       ) : null}
 
       {error ? (

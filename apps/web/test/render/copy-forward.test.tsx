@@ -156,6 +156,8 @@ describe("logging a past day's food again", () => {
 
     await goToYesterday();
 
+    // The actions live inside the disclosure now (D125).
+    fireEvent.click(await screen.findByTestId(`expand-entry-${ENTRY.id}`));
     fireEvent.click(await screen.findByTestId(`copy-entry-${ENTRY.id}`));
 
     await waitFor(() => expect(posted.length).toBeGreaterThan(0));
@@ -205,6 +207,7 @@ describe("logging a past day's food again", () => {
     const posted: string[] = [];
     mount(posted);
 
+    fireEvent.click(await screen.findByTestId(`expand-entry-${ENTRY.id}`));
     await screen.findByTestId(`edit-entry-${ENTRY.id}`);
     expect(screen.queryByTestId(`copy-entry-${ENTRY.id}`)).toBeNull();
     expect(screen.queryByTestId("copy-day-to-today")).toBeNull();

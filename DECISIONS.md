@@ -4588,3 +4588,46 @@ and not others. React's "rendered more hooks than during the previous render"
 crashed the whole screen to a blank `<div>`, and every assertion failed on a
 missing element rather than on the cause. The lesson is the older one: a blank
 screen is a thrown render until proven otherwise.
+
+### D125 — A logged row opens onto what is in it
+
+The collapsed line carries a name, an amount and a calorie figure. Everything
+else about an entry — its four macros, whether the numbers came from a database
+or were typed, whether somebody estimated them — existed only in the database. A
+reader comparing a day against a macro target could not see which entry carried
+the fibre, or that one of them was a guess.
+
+Tapping the name opens the row onto all of it, and **one row is open at a time**.
+That state lives in the list rather than in each row, because "one at a time" is
+a fact about the list and a row cannot know what its neighbours are doing.
+
+#### The actions moved in with it
+
+Edit, delete and, on a past day, "Logga i dag" (D124) used to sit on the
+collapsed line. Three controls on each of four rows is twelve targets a thumb
+has to aim between on a 360 px screen, and eleven of them belong to entries
+nobody is looking at. Inside the disclosure they belong to the one row somebody
+chose to open. D56 is unaffected: edit and delete are still on the screen that
+displays the row, which is what that rule asks for.
+
+#### Two things stay on the collapsed line
+
+**The amount and the calories**, because they are what the line is for.
+
+**The estimate marker.** It changes how the number beside it should be read, so
+it cannot be behind a tap — a reader scanning a day has to be able to see which
+figures are guesses without opening each one. `confidence < 1` is the test, which
+is the schema's own definition rather than a second one invented here.
+
+#### While a meal is being assembled, the row does not expand
+
+The checkbox and the disclosure would be two meanings for one tap. In
+`selectable` mode the row keeps its single meaning — this is a thing you are
+choosing — and the name is plain text again. One tap, one thing, and which thing
+changes with the mode rather than with where in the row the thumb lands.
+
+#### A missing macro says "inte än", not zero
+
+D44's rule, in the smallest place it applies. A fibre figure nobody recorded is
+not a fibre figure of zero, and rendering it as `0 g` would put a fabricated
+number next to three real ones.

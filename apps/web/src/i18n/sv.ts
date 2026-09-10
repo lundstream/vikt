@@ -927,6 +927,9 @@ export const sv = {
     carry that difference on their own, because the two sit on the same screen
     (D124).
   */
+  "food.sourceTyped": "inskrivet",
+  "food.sourceDatabase": "ur matdatabasen",
+  "food.entryAmount": "{grams} g, {kcal} kcal",
   "food.copyToToday": "Logga i dag",
   "food.copyDayToToday": "Logga hela dagen i dag",
   "food.copyingDay": "Loggar…",

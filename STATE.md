@@ -100,6 +100,8 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - Att välja en träff i matsökningen stänger träfflistan.
 - Åtgärder som kostar något, som att radera ett konto eller ändra mejlservern, har fått
   en egen färg. Att radera ett konto kräver att adressen skrivs in.
+- När du tittar på en tidigare dag i Mat kan du logga en rad, eller hela dagen, på
+  dagens datum. "Igen" under Senast loggat fyller fortfarande i dagen du tittar på.
 
 ## On `dev`, not yet on `main`
 
