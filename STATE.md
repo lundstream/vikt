@@ -54,9 +54,72 @@ Empty.
 - **Habits and reminders, MFA, and importing from other apps** — phases 11 to 13,
   written down in CLAUDE.md §6 and not started.
 
+## On `dev`, not yet on `main`
+
+Production deploys from `main` (CLAUDE.md §7), so this list is the difference
+between what is built and what is running. Five commits:
+
+| | |
+|---|---|
+| `36d6f9a` | Work happens on dev; main receives merges only |
+| `25a173f` | The weight axis is a ruler again, and holds every reading (D122) |
+| `e864f6a` | Say why a macro mean is withheld, and dismiss the search on a pick (D122) |
+| `b83a1d9` | The reminder design into Phase 11, bounce handling into the backlog |
+| `0f823e0` | One primary, one secondary, and Honung for what costs something (D123) |
+
+CI green on `dev`:
+[34508734187](https://github.com/lundstream/vikt/actions/runs/34508734187).
+
+**Merging is a deploy.** `main` takes these through a pull request when the owner
+decides to update production, not when the suite goes green.
+
+### Before the next redeploy
+
+Unchanged from INFRA.md and still outstanding: `CONTACT_EMAIL`, `OPERATOR`,
+`REPO_URL` and `SUPPORT_URL` have to exist on the Portainer stack **before** the
+image that reads them ships (D121). The API refuses to boot in production with a
+landing page and no contact address, which is deliberate — a public privacy page
+naming nobody is not lawful to run.
+
+**`tailwind.config.js` changed** in `0f823e0`, adding the `on-reward` colour.
+Tailwind resolves its config at boot, so the development server needs a restart
+before that class exists; a green build proves nothing about a running dev
+server.
+
+## Still open from the 10 September brief
+
+Started and finished: the branching rule, both chart defects, the macro reason
+line, dismissing the food search on a pick, the button audit with the Honung
+tier and its guard, the Phase 11 reminder design, the bounce-handling backlog
+entry, and the "med ett tryck" copy fix.
+
+**Not started**, and each is a pass of its own rather than a loose end:
+
+- **Copy a past day forward** (1d): a per-row "Logga i dag" and a whole-day
+  version, writing with today's `local_date` and `dateSource: "device"` per D61,
+  with Senast loggat keeping its backfill behaviour and the two labels made
+  obviously different.
+- **Expandable food rows** (2): macros, amount, source and estimate marker
+  inside the row, with edit, delete and the copy-forward action, one open at a
+  time.
+- **Framsteg** (3): the two forms into modals, existing milestones and savings
+  rules behind counted disclosures, the page leading with how it is going.
+- **`/kod` behind `REQUEST_ENABLED`** (6b), with the hero line replaced and
+  `/integritet` updated.
+- **Markdown in announcements** (6c), rendered sanitised in three places with a
+  preview in the editor.
+- **Mail to the admin on an access request** (6d), with an unread marker and a
+  per-admin opt-out.
+- **SMB backup** (6e), over the protocol from Node rather than a mount.
+
+**Blocked, not skipped:** removing the probe request
+`human-check-probe@example.test` (6g) needs the production database, and the
+Portainer password was rotated after the deployment pass. It is under
+Administration, Förfrågningar, Besvarade, "Ta bort".
+
 ## Verified
 
-**1215 tests**: 464 shared, 184 web, 567 api. Lint clean, all three packages
+**1229 tests**: 464 shared, 195 web, 570 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 Measurements, and the conditions they were taken under, are in
