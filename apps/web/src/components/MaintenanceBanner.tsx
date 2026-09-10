@@ -1,4 +1,5 @@
 import { announcementBody, useAnnouncements, useMarkSeen } from "../lib/announcements.js";
+import { AnnouncementLine } from "./Announcement.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -29,9 +30,17 @@ export function MaintenanceBanner() {
       role="status"
     >
       <div className="flex items-baseline justify-between gap-4">
+        {/*
+          One line, formatted but not laid out (D128). A maintenance notice is
+          a sentence beside a dismiss button; an announcement with a heading and
+          a list in it wanted the news page, and a banner that grows to fill the
+          top of every screen is worse than one that says less than it could.
+        */}
         <p className="text-note text-ink">
           <strong className="font-semibold">{banner.title}</strong>{" "}
-          <span className="text-muted">{announcementBody(banner)}</span>
+          <span className="text-muted">
+            <AnnouncementLine markdown={announcementBody(banner)} />
+          </span>
         </p>
 
         <button

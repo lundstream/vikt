@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { sv } from "../src/i18n/sv.js";
+import { markdownToHtml, markdownToText } from "shared";
 import { allJsxStrings, dashPlaceholders, landingStrings } from "./jsx-copy.js";
 
 const LANDING_FILE = path.resolve(import.meta.dirname, "../src/landing/Landing.tsx");
@@ -321,5 +322,56 @@ describe("copy written inline, in components", () => {
 
     // And an ordinary hyphen is not a finding.
     expect(/[–—]/.test("Mifflin-St Jeor")).toBe(false);
+  });
+});
+
+/**
+ * The same guards, over a rendered announcement (D128).
+ *
+ * An announcement body is written at runtime, so no test can check what an
+ * admin will type. What it can check is that **the renderer does not introduce
+ * a violation the author did not write**, which is a real failure mode: a
+ * formatter with smart typography turns two hyphens into an en dash in every
+ * announcement, and a heading style with `text-transform` shouts one that was
+ * typed in sentence case.
+ *
+ * These run the file's own `shoutedWords` and dash rule, not copies of them, so
+ * the two cannot drift.
+ */
+describe("a rendered announcement", () => {
+  const STYLE = {
+    body: "margin:0",
+    heading: "font-weight:700",
+    link: "color:#B0203C",
+    list: "padding-left:20px",
+  };
+
+  const SOURCE = [
+    "## Vad som är nytt",
+    "",
+    "Ett streck -- och en mening till.",
+    "",
+    "- ett med **fetstil**",
+    "- två med [en länk](https://example.test)",
+  ].join("\n");
+
+  /** Text nodes only: the HTML's own attributes are not copy. */
+  const words = (html: string) => html.replace(/<[^>]*>/g, " ");
+
+  it("gains no en dash or em dash from either renderer", () => {
+    // The same rule the dictionary is held to, twenty lines up.
+    expect(markdownToText(SOURCE)).not.toMatch(/[–—]/);
+    expect(words(markdownToHtml(SOURCE, STYLE))).not.toMatch(/[–—]/);
+  });
+
+  it("shouts nothing that was written in sentence case", () => {
+    expect(shoutedWords(markdownToText(SOURCE))).toEqual([]);
+    expect(shoutedWords(words(markdownToHtml(SOURCE, STYLE)))).toEqual([]);
+  });
+
+  /** And the heading is still the words that were typed, in that case. */
+  it("keeps a heading's own case", () => {
+    expect(markdownToText(SOURCE)).toContain("Vad som är nytt");
+    expect(markdownToHtml(SOURCE, STYLE)).toContain(">Vad som är nytt</h2>");
   });
 });

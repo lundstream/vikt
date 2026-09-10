@@ -416,6 +416,10 @@ export const sv = {
   "admin.announceBody": "Text",
   "admin.announceBodyHint":
     "Lämna tomt för underhåll, så skrivs texten ut från tiderna i läsarens egen tidszon.",
+  "admin.announceFormatHint":
+    "Du kan använda ## rubrik, ### underrubrik, **fet**, punktlistor med -, numrerade listor och [länktext](adress). Annan formatering skrivs ut som den står.",
+  "admin.announcePreview": "Så här ser den ut",
+  "admin.announcePreviewEmpty": "Skriv något i rutan ovanför så visas det här.",
   "admin.announceFrom": "Från",
   "admin.announceTo": "Till",
   "admin.announceLead": "Visa banner i förväg (minuter)",

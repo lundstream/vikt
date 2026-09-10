@@ -117,6 +117,9 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   har flyttat till en egen adress som inget länkar till, och den är avstängd om
   inte den som driftar servern slår på den. Startsidan säger i stället att appen
   kräver en inbjudan och att den som vill kan köra en egen kopia.
+- Nyheter kan nu innehålla rubriker, fetstil, punktlistor, numrerade listor och
+  länkar. Det gäller både i appen och i mejlet. Den som skriver ett meddelande ser
+  hur det kommer att se ut innan det sparas.
 
 ## On `dev`, not yet on `main`
 

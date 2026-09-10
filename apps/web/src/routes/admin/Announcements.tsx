@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LOCALE, t } from "../../i18n/index.js";
+import { AnnouncementBody } from "../../components/Announcement.js";
 
 /**
  * Writing announcements (D108).
@@ -217,6 +218,35 @@ export function Announcements() {
         {form.kind === "maintenance" ? (
           <p className="text-micro text-muted">{t("admin.announceBodyHint")}</p>
         ) : null}
+
+        {/*
+          What the subset is, next to the box it applies to (D128). A formatting
+          syntax nobody is told about is a formatting syntax nobody uses, and
+          the alternative to saying it here is a person discovering that their
+          asterisks came out as asterisks after the mail went to everybody.
+        */}
+        <p className="text-micro text-muted">{t("admin.announceFormatHint")}</p>
+
+        {/*
+          The preview, rendered by the same component the news page uses.
+
+          Not an approximation of it: an announcement is written once and read
+          by everybody, and it is mailed once and cannot be recalled. The one
+          thing that makes that safe is seeing the actual rendering before
+          pressing save, which means the preview has to be the renderer rather
+          than something that looks like it.
+        */}
+        <section className="rounded-card border border-edge bg-card p-4">
+          <h3 className="text-micro text-muted">{t("admin.announcePreview")}</h3>
+          {form.title.trim() === "" && form.body.trim() === "" ? (
+            <p className="mt-2 text-micro text-muted">{t("admin.announcePreviewEmpty")}</p>
+          ) : (
+            <div data-testid="announce-preview" className="mt-2">
+              <p className="text-body text-ink">{form.title}</p>
+              <AnnouncementBody markdown={form.body} baseLevel={3} className="mt-1" />
+            </div>
+          )}
+        </section>
 
         <label className="flex items-center gap-2 text-micro text-muted">
           <input

@@ -127,8 +127,23 @@ function block(text: string): string {
 }
 
 export function wrap(text: string): string {
-  const body = text.trim().split(/\n{2,}/).map(block).join("\n");
+  return shell(text.trim().split(/\n{2,}/).map(block).join("\n"));
+}
 
+/**
+ * The chrome, around block HTML somebody else rendered (D128).
+ *
+ * `wrap` used to be the only way in, which meant the only thing a mail could
+ * contain was paragraphs of escaped text. Announcements carry a small Markdown
+ * subset now, and its renderer produces headings and lists that `block` cannot.
+ * Splitting the chrome from the paragraph-maker is what lets both use the same
+ * frame, wordmark and footer.
+ *
+ * **The caller owns the escaping.** Everything here is literal, so anything
+ * passed in is markup by definition. There are exactly two callers: `wrap`,
+ * which escapes, and the announcement renderer, which escapes.
+ */
+export function shell(body: string): string {
   return [
     // The outer table is the background. Outlook ignores a background colour on
     // a div and honours one on a table cell, which is the whole reason for it.
@@ -159,7 +174,23 @@ export function wrap(text: string): string {
   ].join("");
 }
 
-function escapeHtml(value: string): string {
+/**
+ * The inline styles the Markdown renderer needs, in the mail's palette.
+ *
+ * Here rather than in `shared`, because the palette belongs to the templates
+ * and the parser has no business knowing what Lingon is. The heading is a
+ * weight and a colour rather than a size: a mail read at 15 px does not have
+ * room for a type scale, and the profile's own rule is that emphasis is one
+ * step, not three.
+ */
+export const ANNOUNCEMENT_STYLE = {
+  body: `margin:0 0 18px;color:${SKYMNING};word-break:break-word`,
+  heading: `margin:20px 0 8px;font-family:${FONT_DISPLAY};font-size:16px;font-weight:700;color:${SKYMNING}`,
+  link: `color:${LINGON};text-decoration:underline`,
+  list: `margin:0 0 18px;padding-left:20px;color:${SKYMNING}`,
+} as const;
+
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

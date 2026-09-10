@@ -4714,3 +4714,57 @@ this page can make to anybody who reads it.
 
 `/integritet` gained a paragraph saying the form may not exist at all, and that
 where it does not, no request is stored here in the first place.
+
+### D128 — Announcements take a small Markdown subset, parsed rather than sanitised
+
+An announcement body was one string of plain text, dropped into a `<p>` in the
+app and into `wrap()` for the mail. That is right for "we are restarting on
+Tuesday" and useless for a release note, which wants a heading, a list of what
+changed, and a link to the screen it changed.
+
+**The subset is paragraphs, two heading levels, bold, bullet and numbered lists,
+and links.** Not italics: at 12 px in a mail client it is indistinguishable from
+bold, and §5 already rules that a second emphasis is a second voice arguing with
+the first. Not images, because D88 says no mail from here carries one. Not
+tables, not code, not nested lists. The stopping point is what a release note
+needs and nothing past it.
+
+**Parsed to a tree, not sanitised into one.** The obvious build is a Markdown
+library plus a sanitiser plus `dangerouslySetInnerHTML`, and that puts a
+sanitiser between an admin's textarea and script running in every reader's
+browser. Instead `packages/shared/src/markdown.ts` parses to a tree of three
+block types and three inline types, and each of the three surfaces walks it:
+React elements in the app, an HTML string for the mail, plain text for the
+mail's text part. **There is no markup to strip, because the tree cannot carry
+any.** Raw HTML in the source renders as the characters somebody typed, in all
+three, by construction rather than by configuration.
+
+The one place a string does become markup is the mail's HTML renderer, which
+escapes every value including the href, and refuses every scheme but `http`,
+`https`, `mailto` and a same-site path. An unsafe scheme keeps its label and
+loses its link, which is the right failure: `javascript:` and `data:` are the
+two that turn a link into an attack, and a reader who sees the words has lost
+nothing they could safely have had.
+
+**Heading levels are a parameter, not a constant.** The subset's two levels are
+"first" and "second", and each renderer places them: under the news list's `h2`
+they are `h3` and `h4`, in the admin preview they are one lower again. A body
+that hard-codes `h2` puts a hole in the outline of whichever page it lands on.
+
+**The banner gets one line.** `AnnouncementLine` renders the first block and
+stops. A maintenance notice is a sentence beside a dismiss button, and a banner
+that grew to hold a heading and a list would push the app down the screen on
+every route.
+
+**The editor previews with the renderer, not with an approximation of it.** An
+announcement is written once, read by everybody, and mailed once with no recall.
+The thing that makes that safe is seeing the actual rendering before pressing
+save, so the preview is the same component the news page uses.
+
+**The copy guards run over the rendered output.** No test can check what an
+admin will type, but it can check that the renderer introduces nothing: a
+formatter with smart typography would put an en dash into every announcement,
+and a heading style with `text-transform` would shout one written in sentence
+case. `copy-style.test.ts` runs its own dash rule and its own `shoutedWords`
+over both string renderers, and the render test asserts no `uppercase` class
+reaches the DOM.

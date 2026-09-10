@@ -3,6 +3,7 @@ export * from "./numbers.js";
 export * from "./food.js";
 export * from "./portions.js";
 export * from "./guardrails.js";
+export * from "./markdown.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/plan.js";
 export * from "./schemas/log.js";
