@@ -1,3 +1,4 @@
+import { createCipheriv } from "node:crypto";
 import { promisify } from "node:util";
 import type { Writable } from "node:stream";
 import SMB2 from "@marsaud/smb2";
@@ -76,6 +77,43 @@ function joinSmb(folder: string, name: string): string {
   return clean === "" ? name : `${clean}\\${name}`;
 }
 
+/**
+ * Whether this runtime can compute an NTLM LM hash (D132).
+ *
+ * `@marsaud/smb2` authenticates through the `ntlm` package, whose LM hash is
+ * built with **DES**, and OpenSSL 3 removed DES from its default provider. On
+ * Node 22 `createCipheriv("des-ecb", ...)` throws `ERR_OSSL_EVP_UNSUPPORTED`,
+ * and the library throws it from inside a socket callback — outside any promise
+ * chain, so no `try/catch` around `connectSmb` can catch it and **the process
+ * dies**. An admin pressing "test connection" took the whole API down.
+ *
+ * So the capability is checked before the library is touched at all. A refusal
+ * with a sentence somebody can act on beats a server that stops answering, and
+ * checking is one cheap call.
+ *
+ * Memoised because the answer cannot change while the process lives.
+ */
+let desUsable: boolean | null = null;
+
+function canDoNtlm(): boolean {
+  if (desUsable === null) {
+    try {
+      createCipheriv("des-ecb", Buffer.alloc(8), null);
+      desUsable = true;
+    } catch {
+      desUsable = false;
+    }
+  }
+  return desUsable;
+}
+
+/** Said in one place, because two callers need to say the same thing. */
+export const NTLM_UNAVAILABLE =
+  "This Node runtime cannot speak NTLM: its OpenSSL has no DES, which the SMB " +
+  "client needs to authenticate. Writing to a share directly is unavailable " +
+  "here. Mount the share on the host and choose a directory destination " +
+  "instead, which needs no credentials from this app.";
+
 export async function connectSmb(target: SmbTarget): Promise<SmbSession> {
   const host = target.host.trim().replace(/^\\+/, "");
   const share = target.share.trim().replace(/^[\\/]+|[\\/]+$/g, "");
@@ -83,6 +121,12 @@ export async function connectSmb(target: SmbTarget): Promise<SmbSession> {
   if (host === "" || share === "") {
     throw new Error("An SMB destination needs both a host and a share name.");
   }
+
+  /**
+   * Checked here rather than at the call sites, because this is the only door
+   * into the library and a check that can be forgotten is a check that will be.
+   */
+  if (!canDoNtlm()) throw new Error(NTLM_UNAVAILABLE);
 
   const client = new SMB2({
     share: `\\\\${host}\\${share}`,

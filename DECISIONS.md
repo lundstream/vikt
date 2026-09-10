@@ -4931,3 +4931,76 @@ about dev servers and evidently needs saying about everything else too.
 Left as it was found: the SPA fallback still answers unknown paths under `/`
 with the landing page, where nginx would 404. That is a divergence worth
 knowing about and it is not what this pass was for.
+
+### D132 — Both Node SMB clients speak NTLMv1, and no destination may crash the API
+
+D130 chose to speak SMB from Node rather than mount a share, to avoid granting
+`CAP_SYS_ADMIN` to a container. The mechanism was right. The library was not,
+and the second library is not either, and that is worth writing down before
+anybody tries a third.
+
+#### What went wrong, in the order it was found
+
+**`@marsaud/smb2` cannot authenticate on Node 22 at all.** It builds an NTLM LM
+hash with `createCipheriv("des-ecb", ...)`, and OpenSSL 3 moved DES out of the
+default provider. Every environment this project runs in — the workstation, CI,
+the API image — is Node 22, so the feature never worked anywhere.
+
+**It took the API down when tried.** The throw came from inside a socket `data`
+handler, which is outside every promise chain, so the `try/catch` around the
+connect never saw it. An admin pressing "test connection" exited the process.
+
+**Eleven tests covered the share destination and none reached authentication.**
+They all connected to `127.0.0.1`, which refuses at TCP. The path that broke was
+the path no test had ever run. This is the same failure as D98's lint claim and
+D95's eight "screens": a thing verified against a case that cannot fail the way
+the real one does.
+
+**`@awo00/smb2` fixes the crash and not the feature.** It carries its own
+pure-JS DES (`des.js`), so nothing asks OpenSSL for a cipher it does not have.
+Verified against a real Samba container: it reaches NTLMSSP type 3 and gets a
+proper SMB response instead of dying. But it implements **NTLMv1 only** — LM and
+NT hashes, three DES blocks against the server nonce, no HMAC-MD5 and no v2 blob
+anywhere in the package. Samba has shipped `ntlm auth = no` by default since
+4.5, and Windows has refused NTLMv1 by default for longer. Against a
+default-configured server it returns `STATUS_LOGON_FAILURE` with correct
+credentials.
+
+It authenticated only after the test server was set to `ntlm auth = yes`,
+`lanman auth = yes` and `server min protocol = NT1`. **That is the finding.** A
+CI suite against a Samba configured that way would go green while the owner's
+NAS kept refusing — the original mistake, rebuilt with more ceremony.
+
+#### What was done, and what is left open
+
+**The crash is fixed independently of the library**, because it has to be: an
+SMB client is a socket state machine that calls back from a `data` handler, and
+*any* such client can throw where no `await` can catch it. Swapping libraries
+changes which line throws, not whether an uncaught throw is possible.
+
+`backup-crash-guard.ts` installs one `uncaughtException` handler that is
+deliberately narrow. While a backup or a probe is in flight it logs with the
+destination, marks the `backup_runs` row failed so the admin screen shows what
+happened rather than a run that started and never finished, and keeps serving.
+With nothing in flight it restores Node's behaviour and exits, because
+swallowing an arbitrary throw turns every future bug into a silent one. A
+blanket handler would have been easier and much worse.
+
+The DES pre-check stays as a belt: a runtime missing a cipher the chosen client
+needs is refused with a sentence naming the mounted-path way round, rather than
+attempting a connection that will kill the process.
+
+**What is not decided** is how the feature actually works, and it is not a
+decision to take quietly:
+
+- **implement NTLMv2** over `@awo00/smb2`, whose NTLM module is isolated enough
+  to replace. It is well specified (MS-NLMP) and roughly a hundred lines, and it
+  is authentication code, which is the category where a subtle error is silent;
+- **drop direct SMB** and keep the mounted path, which already works and is what
+  the README documents as the fallback. Honest, small, and gives up what D130
+  was for;
+- **something else** — an S3-compatible endpoint that most NAS boxes now speak,
+  which needs no NTLM at all.
+
+Until that is settled the destination stays refused with a reason rather than
+half-working, which is the state D103 chose deliberately for exactly this case.

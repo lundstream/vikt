@@ -149,6 +149,13 @@ export default tseslint.config(
              * answer to that is everybody's.
              */
             "testBackupDestination",
+            /**
+             * Formats the one destination this installation has, for a log line
+             * and an audit row (D132). Pure: it takes settings and returns a
+             * string, touches no row, and there is no user whose destination it
+             * could be, because there is one per installation.
+             */
+            "describeDestination",
 
             /**
              * Announcements are per installation (D108): one notice, everybody

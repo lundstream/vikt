@@ -3,6 +3,7 @@ import { assertProdSecrets, describeModes, loadEnv } from "./env.js";
 import { buildApp } from "./app.js";
 import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
+import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
 /**
@@ -41,6 +42,16 @@ if (imported === "imported") {
 
 /** Reads the settings and builds the transport, once, before anything sends. */
 await app.mailer.refresh();
+
+/**
+ * A backup destination must never take the API down (D132).
+ *
+ * Installed before the scheduler, because the scheduler is one of the two
+ * things that can reach a socket client that throws outside a promise chain.
+ * The other is the admin's "test connection" button, which is how this was
+ * found: it exited the process.
+ */
+installBackupCrashGuard(app);
 
 /**
  * The backup schedule (D103), which D96 wrote as a cron line and nobody ever

@@ -17,6 +17,7 @@ import {
   SECRET_USES,
 } from "../lib/secrets.js";
 import { connectSmb, explainSmbError, type SmbSession } from "../lib/backup-smb.js";
+import { backupInFlight, backupSettled } from "../lib/backup-crash-guard.js";
 
 /**
  * Backups, run by the app and recorded (D103).
@@ -381,12 +382,39 @@ export async function runBackup(
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const fileName = `vikt-${stamp}.dump.enc`;
 
+  /**
+   * The window in which an uncaught throw belongs to this run (D132).
+   *
+   * A socket client can throw from a `data` handler, which is outside every
+   * promise chain and therefore outside the `catch` below. Naming the run here
+   * lets the process-level guard mark this row failed and keep serving instead
+   * of the process exiting with nothing written down.
+   */
+  backupInFlight(run!.id, describeDestination(settings), db);
+
   try {
     const bytes = await writeBackup(db, settings, env, fileName, processEnv);
     return finish({ ok: true, fileName, bytes });
   } catch (error) {
     return finish({ ok: false, reason: (error as Error).message.slice(0, 500) });
+  } finally {
+    backupSettled();
   }
+}
+
+/**
+ * Where the backup goes, in one short string, for a log line and an audit row.
+ *
+ * Never the password, and never anything derived from it. The username is
+ * included because an audit entry that does not say which account was used is
+ * an audit entry about nothing.
+ */
+export function describeDestination(settings: BackupSettings): string {
+  if (settings.destinationKind === "smb") {
+    const folder = settings.destinationPath === "" ? "" : `\\${settings.destinationPath}`;
+    return `smb://${settings.smbHost}/${settings.smbShare}${folder}`;
+  }
+  return settings.destinationPath || "(no destination configured)";
 }
 
 /**
@@ -621,6 +649,16 @@ export async function testBackupDestination(
       });
     }
 
+    /**
+     * The probe gets the same protection as a real run (D132). It is the button
+     * that took the API down, and it reaches exactly the same library path.
+     *
+     * There is no `backup_runs` row for a test, so the guard is given the id of
+     * the row it would otherwise update as an empty string: it still logs, still
+     * keeps the process alive, and simply has no row to mark.
+     */
+    backupInFlight("", describeDestination(settings), db);
+
     let session: SmbSession | null = null;
     try {
       session = await connectSmb({
@@ -647,6 +685,7 @@ export async function testBackupDestination(
       return record({ ok: false, reason: explainSmbError(error) });
     } finally {
       session?.close();
+      backupSettled();
     }
   }
 
