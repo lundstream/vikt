@@ -448,7 +448,7 @@ export function Diagnostics() {
         </button>
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-edge px-4 text-note text-ink"
+          className="btn w-auto px-4"
           data-testid="check-save-path"
           onClick={() => void checkSavePath()}
         >

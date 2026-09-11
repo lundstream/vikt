@@ -970,6 +970,7 @@ export const sv = {
   "food.itemOne": "1 rad",
   "food.itemMany": "{count} rader",
   "food.find": "Hitta mat",
+  "food.ways": "Sätt att lägga till mat",
   "food.searchPlaceholder": "Sök på namn",
   "food.searchAction": "Sök",
   "food.today": "I dag",
@@ -1194,7 +1195,6 @@ export const sv = {
     when to reach for it, which the old label never did.
   */
   "estimate.open": "Skriv in själv",
-  "estimate.openHint": "När maten inte finns i databasen",
   "food.favourites": "Sparade favoriter",
   "food.star": "Spara som favorit",
   "food.unstar": "Ta bort favorit",

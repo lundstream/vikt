@@ -67,6 +67,54 @@ export const barcodeIcon = (
   </>
 );
 
+/**
+ * The three ways into the food screen's other surfaces (D135).
+ *
+ * Drawn to the profile's line set: no fill, `currentColor`, 1.75 stroke, round
+ * caps and joins, on the same 24-unit grid as the three above. They are read at
+ * 24 px inside a 56 px circle, so each one is carried by its **silhouette**
+ * rather than by detail. Held to the same test as `mealIcon`: cover the label
+ * and the three still have to be tellable apart.
+ */
+
+/** A pen, nib down, with the stroke it has just drawn. "Skriv in själv". */
+export const penIcon = (
+  <>
+    <path d="M15.5 4.5l4 4L9 19l-5 1 1-5Z" {...stroke} />
+    <path d="M13.5 6.5l4 4" {...stroke} />
+  </>
+);
+
+/**
+ * A speech bubble with its tail, for "skriv vad du åt".
+ *
+ * Deliberately not three dots inside it: at 24 px the dots close up into a
+ * smudge, and the empty bubble reads as "say something" more plainly than a
+ * bubble that appears to be already talking.
+ */
+export const speechIcon = (
+  <>
+    <path
+      d="M20 5.5H4a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 4 15.5h2v4l4.5-4H20a1.5 1.5 0 0 0 1.5-1.5V7A1.5 1.5 0 0 0 20 5.5Z"
+      {...stroke}
+    />
+  </>
+);
+
+/**
+ * A pot with two handles and a lid, for "vad kan jag laga".
+ *
+ * Wider than it is tall, which is what separates it from `mealIcon`'s bowl at a
+ * glance: the bowl is a shallow arc with steam, this is a rectangle with a rim.
+ */
+export const potIcon = (
+  <>
+    <path d="M4.5 9.5h15v6.5a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3Z" {...stroke} />
+    <path d="M2.5 11.5h2M19.5 11.5h2" {...stroke} />
+    <path d="M8 6.5h8" {...stroke} />
+  </>
+);
+
 /** A bowl with steam. Distinct in silhouette from both of the others. */
 const mealIcon = (
   <>

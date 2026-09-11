@@ -191,7 +191,7 @@ export function FoodTextEntry({
         <button
           type="submit"
           data-testid="parse-food"
-          className="shrink-0 rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+          className="btn w-auto  disabled:opacity-50"
           disabled={text.trim().length < 2 || parse.isPending}
         >
           {parse.isPending ? t("llm.reading") : t("llm.read")}

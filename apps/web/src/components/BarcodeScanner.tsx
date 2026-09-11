@@ -76,7 +76,13 @@ export function BarcodeScanner({
         */}
         <button
           type="button"
-          className="btn-link border-paper/40 text-paper hover:border-paper"
+          /**
+           * The surface under this is a live viewfinder, so the link takes the
+           * page's light text rather than the app's muted one. No border: a
+           * `.btn-link` has none, and the override was left behind when this
+           * stopped being an outline (D135).
+           */
+          className="btn-link text-paper hover:text-paper/80"
           onClick={onClose}
         >
           {t("quick.cancel")}

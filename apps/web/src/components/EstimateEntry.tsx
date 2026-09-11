@@ -164,7 +164,7 @@ export function EstimateEntry({
           <button
             type="button"
             data-testid="ask-model"
-            className="min-h-11 w-full rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+            className="btn  disabled:opacity-50"
             onClick={() => void askModel()}
             disabled={name.trim().length < 3 || estimate.isPending}
           >

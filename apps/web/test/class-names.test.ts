@@ -224,19 +224,63 @@ describe("class names", () => {
     expect(stylesheet).not.toMatch(/\.btn-secondary\s*\{/);
 
     /**
-     * A hand-rolled outline: a border and a transparent background on the same
-     * element. `border-transparent` is not one, and neither is a bordered card
-     * or field — this looks for the pair on one `className`, which is what a
-     * button rebuilt from utilities has.
+     * A hand-rolled outline, which is the third way one gets built (D135).
+     *
+     * The first version of this check looked for `bg-transparent` **and** a
+     * border on one line, because that is what `.btn-secondary` expanded to. It
+     * caught nothing, because nobody writes `bg-transparent`: a border with no
+     * background at all is transparent already. Twelve controls were built that
+     * way — "Skriv in själv", "Skriv vad du åt" and "Vad kan jag laga?" among
+     * them — and the guard walked straight past every one.
+     *
+     * So the rule is the absence, not a token: **an all-sides border with no
+     * background on a control is an outline**, whatever else is on it.
+     *
+     * Three things are deliberately not caught:
+     *
+     *  - **directional borders**. `border-b` on a row is a divider, and a
+     *    divider is not a button's outline;
+     *  - **a choice in a set**. A control carrying `aria-pressed`, `aria-checked`
+     *    or `role="radio"`/`"tab"` is expressing which one is chosen, which the
+     *    profile keeps bordered on purpose (page 6, "vald skalknapp är Gran").
+     *    `.chip` is the named form of that shape; a set that declares its state
+     *    is a set, and one that does not is a button pretending;
+     *  - **borders that live in a component class**. `.chip` and the quick
+     *    action's circle carry theirs in `index.css`, where the shape is
+     *    defined once and can be read.
      */
+    const controls = /<(?:button|a|Link)\b[^>]*?>/gs;
+    const className = /className=(?:"([^"]*)"|\{`([^`]*)`\}|\{\[([^\]]*)\])/s;
+
     const handRolled: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const source = readFileSync(file, "utf8");
-      for (const [index, line] of source.split("\n").entries()) {
-        if (!/className/.test(line) && !/^\s*"/.test(line)) continue;
-        if (!/\bbg-transparent\b/.test(line)) continue;
-        if (!/\bborder-(edge|muted|ink)\b/.test(line)) continue;
-        handRolled.push(`${path.relative(SRC, file)}:${index + 1}`);
+      for (const match of source.matchAll(controls)) {
+        const tag = match[0];
+        const found = className.exec(tag);
+        if (!found) continue;
+
+        const classes = (found[1] ?? found[2] ?? found[3] ?? "").replace(/\s+/g, " ");
+
+        /**
+         * An all-sides border **width**, which is what draws an outline.
+         *
+         * `border-edge` alone is a colour and paints nothing; `border-b
+         * border-edge` is a divider on a row. Only a width with no side draws
+         * all four, so that is what this looks for.
+         *
+         * Written as an explicit space-delimited match rather than
+         * `\bborder\b`, because a word boundary sits inside `border-b` too and
+         * the first version of this line flagged every divider in the app.
+         */
+        const bordered = /(^|\s)border(-[0-8])?(\s|$)/.test(classes);
+        if (!bordered) continue;
+
+        if (/\bbg-\S+/.test(classes)) continue;
+        if (/aria-(pressed|checked)/.test(tag) || /role="(radio|tab)"/.test(tag)) continue;
+
+        const line = source.slice(0, match.index).split("\n").length;
+        handRolled.push(`${path.relative(SRC, file)}:${line}  ${classes.slice(0, 50)}`);
       }
     }
 

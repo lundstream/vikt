@@ -153,6 +153,9 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - Knapparna har tre former i stället för fyra. Allt som gör något är en fylld knapp,
   allt som bara tar dig därifrån (Avbryt, Tillbaka) är en textlänk, och det som
   kostar något är fortfarande Honung. Den tunna konturknappen är borta.
+- På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
+  rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
+  sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
 
 ## On `dev`, not yet on `main`
 

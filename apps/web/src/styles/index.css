@@ -264,6 +264,24 @@
   }
 
   /**
+   * One option in a set: a portion unit, a scale step (D135).
+   *
+   * Not a button in the sense the three tiers mean. The profile keeps this
+   * shape deliberately — "vald skalknapp är Gran, eftersom valt betyder
+   * loggat" (page 6) — and it is bordered rather than filled because a row of
+   * five filled blocks would shout five times where one choice is being made.
+   *
+   * `aria-pressed` carries the state, so the colour is never the only thing
+   * saying which is chosen (§5).
+   */
+  .chip {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border
+           border-edge px-3 text-note text-muted transition-colors
+           hover:border-muted aria-pressed:border-transparent
+           aria-pressed:bg-logged aria-pressed:text-paper;
+  }
+
+  /**
    * Not an action: cancel, back, dismiss (D134).
    *
    * The outline `.btn-secondary` is gone. It existed to make a second action

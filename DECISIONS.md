@@ -5147,16 +5147,19 @@ opens the account-deletion confirm. Six became text links, and all six are
 the announcement editor and the admin user deletion. Two became `.btn-small`:
 "logga hela dagen i dag" and "köpte ändå".
 
-#### The profile's page 6 is now behind the code
+#### The profile's page 6 — resolved
 
-Page 6 still reads "Sekundär är kantlinje i Dis". That sentence describes a tier
-that no longer exists. The rest of the paragraph is unchanged and still right:
-primary is Snö on Natt and Natt on Snö in light, a chosen scale button is Gran,
-high impact is Honung with Natt text in both themes, and an irreversible action
-is confirmed by typing. **The PDF is the owner's file and is not edited from
-here**, so the divergence is recorded rather than silently tolerated: when page
-6 is next revised, the secondary line becomes a text link for what is not an
-action, plus the small filled variant for a row action.
+> **Closed by v1.4.** Page 6 now reads "Tre nivåer, inga konturer" and states
+> the rule this decision arrived at, in the profile's own words: actions are
+> filled, Snö on Natt and Natt on Snö in light; what is not an action — avbryt,
+> tillbaka, dölj — is a text link; what costs is Honung with Natt text in both
+> themes, and the irreversible is confirmed by typing; a chosen scale button is
+> Gran; and "radåtgärder som 'Köpte ändå' är samma fyllda stil i mindre
+> storlek". The code and the specification agree, and this decision needs no
+> further reading.
+
+For the fourth shape the profile keeps beside these three — the quick action —
+see D135.
 
 `class-names.test.ts` holds the rule in two halves, because either alone is easy
 to work around. The class may not reappear in source or as a rule in the
@@ -5164,3 +5167,71 @@ stylesheet, and no component may hand-roll the look out of `bg-transparent` plus
 a border on one element, which is how a removed tier usually comes back. Proved
 by reintroduction: putting `btn-secondary` back into `DayCard.tsx` fails the
 test and names the file.
+
+### D135 — An entry point is a quick action, not a button
+
+Three controls on the food screen were still outlines after D134 removed the
+tier: "Skriv in själv", "Skriv vad du åt" and "Vad kan jag laga?". Two questions
+follow from that, and the second matters more than the first.
+
+#### Why the guard walked past them
+
+`.btn-secondary` expanded to a border **and** `bg-transparent`, so the guard
+looked for that pair. Nobody writes `bg-transparent`: a border with no
+background is transparent already. These were
+`min-h-11 w-full rounded-lg border border-edge px-4 text-note text-ink` — the
+same look, built from utilities, with no token the guard was watching for.
+
+It was not three. It was **twelve**, across seven files: the search submit, the
+portion chips, "spara portionen", "fråga modellen", "läs", "lägg till" in the
+pantry, "föreslå", a diagnostics probe, and a border left on the scanner's
+cancel after it became a link.
+
+So the rule is now the **absence**, not a token: an all-sides border width with
+no background on a control is an outline, whatever else is on it. Three things
+are deliberately not caught, and each is a shape the profile keeps: a
+directional border is a divider; a control carrying `aria-pressed`,
+`aria-checked` or `role="radio"` is a choice in a set, which page 6 keeps
+bordered on purpose; and a border that lives in a component class is defined
+once where it can be read.
+
+The first version of that rule flagged every divider in the app, because a word
+boundary sits inside `border-b` as well as after `border`. It matches a
+space-delimited width now. Proved by reintroduction: putting the exact
+twelve-class string back into `DayCard.tsx` fails the test and names the file.
+
+#### Why they are not filled either
+
+Filling them would have been the obvious reading of D134 and it would have been
+wrong. **They are doors, not actions.** Each one opens a sheet; none of them
+writes anything. Scanning was already the fourth door and was already drawn
+correctly — a Dis circle with a Snö icon — which is the tell that the other
+three were the odd ones out.
+
+So the rule has three tiers **and one shape beside them**: an entry point to
+another surface is a quick action, exactly as the profile's Snabbåtgärder
+section already specifies. Filled for what does something, a link for what
+leaves, Honung for what costs, and a labelled circle for what opens a door.
+
+The four now sit in one row: scan, estimate, describe, recipe. The two
+model-backed ones are absent rather than disabled when the box is off, which is
+§6's rule for the whole phase 8 surface. `gap-x-4` is what lets four 64 px items
+fit the 320 px a 360 px screen leaves, and the row wraps rather than overflows.
+
+**The scan control left the search row to join them.** It had been unlabelled
+beside the field because a label made it taller than the input and nothing
+shared a centre line. That was the right fix for the wrong arrangement:
+scanning is not part of searching. In a row of peers it takes its label back.
+
+`estimate.openHint` — "När maten inte finns i databasen" — went with the button
+it sat under. A row of four labelled circles has no room for a footnote on one
+of them, and the sheet says it at more length on arrival.
+
+#### The icons
+
+A pen, a speech bubble and a pot, drawn to the profile's line set on the same
+24-unit grid as the three that existed: no fill, `currentColor`, 1.75 stroke,
+round caps. Each is carried by its silhouette, because they are read at 24 px:
+the bubble is empty rather than holding three dots that close into a smudge at
+that size, and the pot is wider than it is tall so it cannot be confused with
+the bowl that means "logga mat" on the dashboard.

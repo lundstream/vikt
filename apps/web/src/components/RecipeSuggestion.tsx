@@ -209,7 +209,7 @@ export function RecipeSuggestion({
         <button
           type="submit"
           data-testid="generate-recipe"
-          className="shrink-0 rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+          className="btn w-auto  disabled:opacity-50"
           disabled={have.trim().length < 2 || generate.isPending}
         >
           {generate.isPending ? t("recipe.thinking") : t("recipe.generate")}

@@ -40,7 +40,14 @@ import { FoodTextEntry } from "../components/FoodTextEntry.js";
 import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
-import { ActionButton, barcodeIcon } from "../components/QuickActions.js";
+import {
+  ActionButton,
+  barcodeIcon,
+  penIcon,
+  potIcon,
+  speechIcon,
+  type QuickAction,
+} from "../components/QuickActions.js";
 import {
   type TranslationKey, LOCALE, t } from "../i18n/index.js";
 
@@ -141,6 +148,50 @@ export function FoodLog() {
   const [query, setQuery] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [pending, setPending] = useState<FoodItem | null>(null);
+
+  /**
+   * The ways into this screen's other surfaces (D135).
+   *
+   * Built here rather than inline so the conditional membership is one list
+   * somebody can read: scanning and typing an estimate need nothing, the two
+   * model-backed ones need a model that answers. `llm.data?.reachable` is the
+   * same check the sheets themselves use, so a box that goes away mid-session
+   * takes its doors with it rather than leaving two that open onto an error.
+   */
+  const waysIn: QuickAction[] = [
+    {
+      key: "scan",
+      label: "action.scan",
+      icon: barcodeIcon,
+      onClick: () => setScannerOpen(true),
+      testId: "scan",
+    },
+    {
+      key: "estimate",
+      label: "estimate.open",
+      icon: penIcon,
+      onClick: () => setTool("estimate"),
+      testId: "open-estimate",
+    },
+    ...(llm.data?.reachable
+      ? ([
+          {
+            key: "text",
+            label: "llm.title",
+            icon: speechIcon,
+            onClick: () => setTool("text"),
+            testId: "open-text-entry",
+          },
+          {
+            key: "recipe",
+            label: "recipe.title",
+            icon: potIcon,
+            onClick: () => setTool("recipe"),
+            testId: "open-recipe",
+          },
+        ] satisfies QuickAction[])
+      : []),
+  ];
 
   /** True while a whole day is being copied forward (D124). */
   const [copyingDay, setCopyingDay] = useState(false);
@@ -425,42 +476,29 @@ export function FoodLog() {
         ) : null}
 
         {/*
-          Scan and search first, because they are the everyday path for
-          something that is not already in the lists below, and because the pair
-          is one line.
+          Search first, because typing a name is the everyday path for something
+          that is not already in the lists below.
 
-          Three earlier changes stand. The scan control has **no label**: it sat
-          under the circle and pushed the control taller than the field beside
-          it, so nothing shared a centre line and the two halves of one action
-          read as two blocks. The **heading is gone** with it, since "Hitta mat"
-          above a scanner and a box labelled "Sök på namn" restated the two
-          controls under it. And they are **centred against each other** rather
-          than top-aligned, which is what makes them one row.
+          **The scan control moved out of this row** (D135). It used to sit
+          beside the field, unlabelled, because a label underneath made it
+          taller than the input and nothing shared a centre line. That was the
+          right fix for the wrong arrangement: scanning is not part of
+          searching, it is one of four ways into this screen, and the other
+          three were sitting further down pretending to be buttons. They are one
+          row of quick actions now, directly below.
+
+          The heading stays gone: a box labelled "Sök på namn" does not need
+          "Hitta mat" above it.
         */}
-        <section aria-label={t("food.find")} className="mb-8">
-          <div className="flex items-center gap-3">
-            <ActionButton
-              action={{
-                key: "scan",
-                label: "action.scan",
-                icon: barcodeIcon,
-                onClick: () => setScannerOpen(true),
-                testId: "scan",
-              }}
-              labelled={false}
-            />
-
-            <div className="min-w-0 flex-1">
-              <SearchBox
-                query={query}
-                onQuery={(value) => {
-                  setQuery(value);
-                  setSearchEnabled(false);
-                }}
-                onSubmit={() => setSearchEnabled(true)}
-              />
-            </div>
-          </div>
+        <section aria-label={t("food.find")} className="mb-6">
+          <SearchBox
+            query={query}
+            onQuery={(value) => {
+              setQuery(value);
+              setSearchEnabled(false);
+            }}
+            onSubmit={() => setSearchEnabled(true)}
+          />
 
           {search.data?.notice ? (
             <p role="status" className="mt-2 text-micro text-muted">
@@ -491,6 +529,35 @@ export function FoodLog() {
             </ul>
           ) : null}
         </section>
+
+        {/*
+          The four ways into this screen, in one row (D135).
+
+          Scanning, typing an estimate, describing a meal and asking for a
+          recipe are all **doors to another surface**, not actions. Three of
+          them were full-width outlined buttons stacked down the page, which
+          said "press me" three times for things that only open a sheet, and
+          the fourth was a circle beside the search box. They are one shape now,
+          the one the profile already gives this job: a Dis circle, a Snö icon
+          and a label underneath (page 6, Snabbåtgärder).
+
+          The row carries two, three or four items. The two model-backed ones
+          are absent rather than disabled when the box is off, which is the same
+          rule as everywhere else: an absent feature leaves no trace. `gap-x-4`
+          at 360 px is what lets four 64 px items and their gaps fit inside the
+          320 px the padding leaves, and it wraps rather than overflowing if a
+          translation makes a label taller.
+        */}
+        <nav aria-label={t("food.ways")} className="mb-8">
+          <ul className="flex flex-wrap items-start justify-center gap-x-4 gap-y-4 sm:gap-x-8">
+            {waysIn.map((action) => (
+              <li key={action.key}>
+                <ActionButton action={action} />
+              </li>
+            ))}
+          </ul>
+        </nav>
+
 
         {/*
           The two fast paths, **not folded**.
@@ -612,42 +679,6 @@ export function FoodLog() {
           which is the same rule as before: no error banner, no disabled
           control, no trace.
         */}
-        {/*
-          Typing an estimate needs no model, so that control is always here; the
-          two model-backed tools are not rendered at all when the box is off.
-        */}
-        <div className="mb-8">
-          <button
-            type="button"
-            data-testid="open-estimate"
-            className="min-h-11 w-full rounded-lg border border-edge px-4 text-note text-ink"
-            onClick={() => setTool("estimate")}
-          >
-            {t("estimate.open")}
-          </button>
-          <p className="mt-1 text-center text-micro text-muted">{t("estimate.openHint")}</p>
-        </div>
-
-        {llm.data?.reachable ? (
-          <div className="mb-8 flex flex-wrap gap-3">
-            <button
-              type="button"
-              data-testid="open-text-entry"
-              className="min-h-11 flex-1 rounded-lg border border-edge px-4 text-note text-ink"
-              onClick={() => setTool("text")}
-            >
-              {t("llm.title")}
-            </button>
-            <button
-              type="button"
-              data-testid="open-recipe"
-              className="min-h-11 flex-1 rounded-lg border border-edge px-4 text-note text-ink"
-              onClick={() => setTool("recipe")}
-            >
-              {t("recipe.title")}
-            </button>
-          </div>
-        ) : null}
 
         {todayEntries.data && todayEntries.data.length > 0 ? (
           <TodaySection
@@ -761,7 +792,7 @@ function SearchBox({
       <button
         type="submit"
         data-testid="search-submit"
-        className="rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+        className="btn w-auto disabled:opacity-50"
         // Search runs on submit, never on keystrokes: the upstream budget is
         // ten searches a minute for the whole server (D30).
         disabled={query.trim().length < MIN_SEARCH_LENGTH}
@@ -1350,7 +1381,13 @@ function PortionSheet({
                   key={unit.unit}
                   type="button"
                   data-testid={`unit-${unit.unit}`}
-                  className="min-h-11 rounded-lg border border-edge px-3 text-note text-ink"
+                  /**
+                   * A choice in a set, not a button (D135). It says which
+                   * portion is currently in the grams field, so the colour is
+                   * never the only thing carrying that.
+                   */
+                  aria-pressed={grams === formatDecimal(unit.grams, { decimals: 0 })}
+                  className="chip"
                   onClick={() => setGrams(formatDecimal(unit.grams, { decimals: 0 }))}
                 >
                   {t("portion.oneIs", {
@@ -1394,7 +1431,7 @@ function PortionSheet({
               <button
                 type="button"
                 data-testid="save-portion"
-                className="min-h-11 shrink-0 rounded-lg border border-edge px-3 text-note text-ink disabled:opacity-50"
+                className="btn w-auto shrink-0 px-3"
                 disabled={unitName.trim().length === 0 || savePortion.isPending}
                 onClick={() => {
                   const parsed = readRequiredNumber(grams);
