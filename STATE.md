@@ -231,11 +231,14 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 30 commits, plus the one this
+between what is built and what is running. 33 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `a511cb9` | Coach chat, phase 8b |
+| `da310ea` | Pin every third-party image by digest |
+| `feba0d0` | Record the weekend pass: what CI ran and where MinIO lives now |
 | `efe56a1` | Pull MinIO from quay.io, since Docker Hub now refuses it |
 | `8528155` | The habit checklist, the second half of Phase 11 |
 | `5964645` | Each reminder gets a weekday time and a weekend one |
@@ -335,7 +338,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 **1423 tests**: 494 shared, 261 web, 668 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 656 with none skipped**, which is the number that
+**In CI the api suite runs 677 with none skipped**, which is the number that
 matters: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
 say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
