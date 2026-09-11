@@ -1,5 +1,7 @@
 # Build context is the repo root.
-FROM node:22-bookworm-slim AS base
+# Pinned by digest (D138). The tag still reads as the version it is; the
+# digest is what actually gets pulled, here and on the build runner.
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /app

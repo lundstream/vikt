@@ -370,12 +370,19 @@ suite.
 
 ### Before the next CI run
 
-**MinIO comes from quay.io now.** `minio/minio` on Docker Hub answers "pull
-access denied" as of 2026-09-11, and Bitnami's image withdrew its `latest` tag
-before that. The S3 tests depend on the image existing, so if that step fails
-again the first thing to check is whether the registry, not the code, moved.
+**MinIO comes from quay.io now**, pinned by digest like everything else (D138).
+`minio/minio` on Docker Hub answers "pull access denied" as of 2026-09-11, and
+Bitnami's image withdrew its `latest` tag before that. If that step fails again,
+check whether the registry moved before reading the diff.
 
 ## Known gotchas carried into this project
+
+**A Docker Hub tag is not a stable reference.** It is a name the publisher can
+repoint or withdraw, and this project lost two images to that in one week, both
+surfacing as a red build on a branch that had touched no infrastructure. Every
+third-party image here is pinned by digest (D138), and a digest changes only in
+a commit that says so, after the new image has been pulled and started locally.
+`docker buildx imagetools inspect <image>:<tag>` prints the index digest to pin.
 
 The long list lives at the bottom of `DECISIONS.md` where each one has its
 reasoning. The three that catch people most often:

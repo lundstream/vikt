@@ -5514,3 +5514,52 @@ the day's own pass went from 5 taps to 8 with three habits ticked, and the time
 did not move (161 ms against 160 ms, three runs each, with a spread wider than
 the difference). Each tick is its own write and does not block the save, which
 is why adding three of them to the path costs three taps and nothing else.
+
+---
+
+### D138 — Images are pinned by digest, because a tag is somebody else's name
+
+Two images under one CI step disappeared in a week. Bitnami withdrew the
+`latest` tag its whole image existed to provide, and then `minio/minio` on
+Docker Hub began answering `pull access denied` with the repository reported as
+not existing. Both arrived as a failed build on a branch that had changed no
+infrastructure at all, which is the expensive part: the first thing anyone does
+with a red build is look at their own diff.
+
+So every image this repository pulls is pinned by digest: Postgres in the three
+compose files and the CI service, the Node and nginx bases in the two
+Dockerfiles, and MinIO in the workflow. The tag is kept beside the digest
+because it is what a person reads, but the digest is what is fetched.
+
+**Index digests, not platform ones.** `docker buildx imagetools inspect` reports
+the digest of the manifest list, so the pin still resolves per architecture: the
+same reference works on the amd64 runner and on an arm64 workstation. A platform
+digest would have quietly broken one of them.
+
+**Verified by pulling and building, not by pushing and watching.** Each pinned
+reference was resolved with `imagetools inspect`, and both Dockerfiles were
+built locally on the pinned bases before the change was committed. The whole
+point of the change is that CI should stop being where infrastructure problems
+are discovered.
+
+#### What is deliberately not pinned
+
+**The two images this repo publishes.** `ghcr.io/lundstream/vikt-api` and
+`-web` are built by the release workflow here, and the moving tag **is** the
+deploy mechanism: the stack pulls `:latest` when the owner decides to update
+production (§7). Pinning them by digest would mean editing the stack file as
+part of every release, which is not supply-chain safety, it is a worse deploy
+procedure. They are also the two images whose provenance is not in question.
+
+**GitHub Actions**, referenced as `actions/checkout@v4` and the like. The same
+property — a major-version tag the author can move — and a different failure
+mode: a step changes behaviour rather than an image vanishing, and the authors
+are the platform's own. Named here so that it is a decision somebody can
+revisit rather than something nobody noticed.
+
+#### The rule that comes with it
+
+An image changes when somebody changes the digest, in a commit that says so,
+having pulled and started the new one first. That is written into §7 next to the
+migration rule, because both are "this cannot be changed casually" rules and
+both were learned the same way.

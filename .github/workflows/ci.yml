@@ -41,7 +41,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # Pinned by digest, not by tag (D138). A tag is a name somebody else
+        # can repoint, and this file lost two images to that in one week.
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
         env:
           POSTGRES_USER: vikt
           POSTGRES_PASSWORD: vikt
@@ -120,7 +122,7 @@ jobs:
             -p 9000:9000 \
             -e MINIO_ROOT_USER=viktaccess \
             -e MINIO_ROOT_PASSWORD=viktsecret123 \
-            quay.io/minio/minio:latest server /data
+            quay.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e server /data
           # Waited for rather than slept past: a fixed sleep is a race that
           # passes on a fast runner and fails on a slow one.
           for attempt in $(seq 1 30); do

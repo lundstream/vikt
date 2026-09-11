@@ -691,5 +691,24 @@ a commit on `main` is a commit that the next redeploy ships.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
 - Migrations are additive and checked in. Never edit an applied migration.
+- **Every third-party image is pinned by digest, and an image changes only when
+  somebody changes the digest.** `postgres:16-alpine@sha256:...` in the compose
+  files and the CI service, the same for the Node and nginx bases in
+  `infra/*.Dockerfile` and for MinIO in the workflow. A tag is a name somebody
+  else controls: `bitnami/minio` withdrew its `latest`, `minio/minio` on Docker
+  Hub started refusing to be pulled at all, and both arrived as a red build on a
+  branch that had not touched infrastructure. A digest cannot be repointed.
+  - **Changing one is a commit that says so**, with the new digest read from
+    `docker buildx imagetools inspect <image>:<tag>` and the image pulled and
+    started before the change is pushed, not after.
+  - The two **own** images are the exception: `ghcr.io/lundstream/vikt-api` and
+    `-web` are published by this repo's own release workflow and the moving tag
+    is how a deploy happens. Pinning those would mean editing the stack file to
+    release, which is the deploy procedure and not supply-chain safety.
+  - GitHub Actions are referenced by major-version tag, which has the same
+    property and is not fixed here. Named so it is a decision rather than an
+    oversight: those tags are moved by the action authors on their own
+    repositories and the failure mode is a step changing behaviour, not an image
+    disappearing from under a build.
 - **Harness scripts clean up after themselves.** Every script that drives a browser deletes its profile directory on exit, and every script that writes screenshots keeps only the last three sets, pruning older ones as it starts. The scratchpad reached 5.4 GB of abandoned Edge profiles because forty scripts each made one and none removed it; a stale profile is also a stale service worker waiting to mislead the next verification pass. `scratchpad/harness.mjs` does both in one call.
 - Before implementing a phase, re-read section 3 and section 4. The math and the isolation rules are where this project can quietly go wrong.
