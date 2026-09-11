@@ -192,11 +192,12 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 27 commits, plus the one this
+between what is built and what is running. 28 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `5964645` | Each reminder gets a weekday time and a weekend one |
 | `2900709` | Reminders: the push foundation and the two that pay for it |
 | `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
 | `8fbe283` | Record the pass: S3, three button tiers, and what CI now proves |
@@ -293,7 +294,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 **1359 tests**: 485 shared, 246 web, 628 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 609 with none skipped**, which is the number that
+**In CI the api suite runs 637 with none skipped**, which is the number that
 matters: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
 say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
