@@ -63,6 +63,17 @@ export default tseslint.config(
              * suggest the answer could differ per account.
              */
             "habitIdOf",
+            /**
+             * Builds the sentence shown when the coach's own guardrail refuses
+             * a reply (D139). Pure text assembly from values the caller already
+             * holds: no row, no database, nothing to scope.
+             */
+            "refusalMessage",
+            /**
+             * The Monday on or before a date. Calendar arithmetic on a string;
+             * whose date it is, is the caller's question.
+             */
+            "weekStartOf",
 
             /**
              * Pure functions of their arguments. Neither touches the database,

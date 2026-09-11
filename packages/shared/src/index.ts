@@ -18,4 +18,5 @@ export * from "./schemas/food.js";
 export * from "./schemas/llm.js";
 export * from "./schemas/portions.js";
 export * from "./schemas/habits.js";
+export * from "./schemas/coach.js";
 export * from "./calc/index.js";

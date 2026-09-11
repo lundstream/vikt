@@ -20,6 +20,11 @@ function stubLlm(replies: ChatResult[]): LlmClient {
     // Successive calls get successive replies; the last one repeats, so a test
     // that only cares about one answer does not have to count attempts.
     chat: async () => replies[Math.min(call++, replies.length - 1)]!,
+    chatStream: async (_options, onDelta) => {
+      const result = replies[Math.min(call++, replies.length - 1)]!;
+      if (result.ok) onDelta(result.content);
+      return result;
+    },
     reachable: async () => true,
   };
 }

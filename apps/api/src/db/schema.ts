@@ -846,6 +846,14 @@ export const weeklyReviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * When the dashboard card for this review was dismissed (D139).
+     *
+     * On the row rather than in the browser, for D108's reason: a card put away
+     * on the phone has to stay away on the laptop, and a per-device dismissal
+     * is a card that comes back for the same person on the same news.
+     */
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("weekly_reviews_week_key").on(t.userId, t.weekStart)],
 );
@@ -1639,5 +1647,69 @@ export const habitChecks = pgTable(
     uniqueIndex("habit_checks_day_key").on(t.userId, t.habitId, t.localDate),
     index("habit_checks_habit_idx").on(t.userId, t.habitId, t.localDate),
     index("habit_checks_day_idx").on(t.userId, t.localDate),
+  ],
+);
+
+
+/* -------------------------------------------------------------- the coach */
+
+/**
+ * One conversation with the coach (D139), §6 phase 8b.
+ *
+ * History is per user, held under D9: it is not training data, not context for
+ * anybody else, not an input to any aggregate and not read by the weekly
+ * review. It is in the export, deletable one conversation at a time and all at
+ * once, and it cascades with the account.
+ */
+export const coachConversations = pgTable(
+  "coach_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The first question, trimmed. Nobody should have to name a conversation. */
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("coach_conversations_user_idx").on(t.userId, t.lastMessageAt)],
+);
+
+/**
+ * One line in a conversation.
+ *
+ * A refused reply stores the **refusal**, not the text that was refused. The
+ * post-check exists to stop a figure the app did not produce from reaching a
+ * reader; keeping that sentence in the history would put it in front of the
+ * same reader later, with the check no longer in the way.
+ *
+ * `contextChars` and `replyChars` are here because the context has to fit the
+ * model variant's `num_ctx` with room for the answer, and a context that grows
+ * quietly is precisely what that constraint fails against.
+ */
+export const coachMessages = pgTable(
+  "coach_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => coachConversations.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "coach"] }).notNull(),
+    body: text("body").notNull(),
+    model: text("model"),
+    /** Why a reply was refused, when it was. Null on an ordinary turn. */
+    refusal: text("refusal"),
+    contextChars: integer("context_chars"),
+    replyChars: integer("reply_chars"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("coach_messages_conversation_idx").on(t.userId, t.conversationId, t.createdAt),
   ],
 );

@@ -5563,3 +5563,156 @@ An image changes when somebody changes the digest, in a commit that says so,
 having pulled and started the new one first. That is written into §7 next to the
 migration rule, because both are "this cannot be changed casually" rules and
 both were learned the same way.
+
+---
+
+### D139 — The coach chat, and what the reply has to survive
+
+§6 phase 8b, built. A Coach page under Mer holding the weekly reviews and the
+chat, a dismissible card on the dashboard when a review is new, and a turn that
+streams. The rules were written down before any of it existed; this is what
+holding them actually required.
+
+#### The context is aggregates, and it is also the allowlist
+
+The model sees a block of about a thousand characters: trend weight now and its
+movement over 28 days, maintenance with its source, confidence and coverage, the
+plan with its target and floor, the two guardrail limits, logged days and mean
+intake, macro targets against weekly means, the logging streak, open milestones
+and today's habit list. **No rows.** Not one meal, not one weighing, not a note
+somebody wrote about a bad day.
+
+Every number stated in that block is collected as it is written, per unit, and
+that set is handed to the post-check as the list of figures the reply may
+contain. So "aggregates only" and "every figure traceable to a number the app
+holds" are the same mechanism rather than two rules that have to agree.
+
+**Measured, because `num_ctx` is a real constraint.** The live account's block
+is **1 000 characters** against a budget of 6 000, roughly 300 tokens against
+1 800, and a test holds the budget so it cannot grow quietly. The saved variant
+on this host carries a much larger window than that, which leaves the whole
+prompt, six turns of conversation and the answer inside one load with nothing
+truncated.
+
+#### The check is on the reply, sentence by sentence, before anything is shown
+
+Rule 2 says the limits are enforced on the reply and not only in the prompt. The
+shape that required is the interesting part.
+
+Streaming and refusing are in tension: a reply that streams straight through and
+is refused afterwards has already put the sentence in front of the reader. So
+the stream is **buffered to sentence boundaries**, each completed sentence is
+checked, and only a sentence that passes is written to the wire. A failure stops
+the stream and sends the app's own refusal instead. Nothing that fails is ever
+rendered, and the streamed answer still starts arriving in a second.
+
+Three checks:
+
+- **traceable** — every figure with a unit must match one the context stated,
+  within a tolerance that allows honest rounding (2 % or 25 kcal, 0.2 kg,
+  0.06 kg/week, 2 points of a percentage). This is rule 1, and it is also how
+  D5 is enforced here: the calorie count of a banana is not a number this app
+  ever handed the model;
+- **the floor** — a kcal figure below the plan's floor **in a prescriptive
+  sentence** is refused. Prescriptive is a short list of verbs, because "du åt
+  1 430 kcal i tisdags" is a true statement about a logged day that happens to
+  sit under the floor, and refusing it would leave the coach unable to describe
+  its own data. What rule 2 forbids is *stating an intake*, and instructions
+  have verbs;
+- **the rate** — the same, for a weekly rate above 1 % of bodyweight.
+
+A refused reply is not stored. The history keeps the refusal and its reason, so
+what happened is visible later without the sentence that caused it being read
+again with no check in front of it.
+
+**Two things the check cannot do, stated rather than discovered later.** It reads
+digits, so a reply that writes "runt hundra kalorier" states a figure it will not
+catch — one live reply did exactly that. And it checks numbers, not claims: asked
+what happens at 800 kcal, the live model correctly refused the premise and then
+said the app would record such a day as invalid data, which is **wrong about the
+app** and entirely traceable. A numeric guard cannot catch a false sentence with
+no numbers in it, and pretending otherwise would be worse than saying so.
+
+#### A medical question never reaches the model
+
+Detected in code, from a keyword list, and answered with the app's own single
+sentence. §6 phase 8b asks for one plain sentence without a lecture, and the way
+to make a deferral reliable is not to ask a model to decline: it is to not ask
+the model at all. The limitation is real and named in the source — a medical
+question phrased without any of those words goes through — and what bounds that
+case is everything else: the model has only this app's aggregates and may state
+no figure it was not given.
+
+#### It reads, and there is no path by which it could write
+
+No endpoint in the coach's service touches another table. It cannot log food,
+change a plan, tick a habit or set a reminder; it can say where a screen is, and
+the page carries links to Dagen and Mat under the chat. That is a property of the
+code rather than a promise in a prompt.
+
+#### One at a time per user, a queue of three, and twenty turns an hour
+
+The workstation has one GPU and every account shares it. Two turns in parallel
+are not twice as fast, they are twice as slow each, so a turn while one is
+running answers `busy` and the screen says "coachen är upptagen" rather than
+spinning. The queue is three deep across all users: a deeper one turns "busy"
+into "eight minutes from now", and chat is the surface where a late answer has no
+value. When the host is unreachable the question is **not stored and not queued**
+(D6): an answer to an hour-old question about numbers that have since moved is
+not worth the row.
+
+#### The voice is one file, and the review shares it
+
+`prompts/coach.ts` is still the only file in this codebase that says how the
+coach talks, and the weekly review reads it too. That is §6 phase 8b's voice rule
+made structural rather than remembered: two descriptions of a voice drift, and
+the person would meet both.
+
+The **Sunday job** that would write reviews unasked is deliberately not built.
+It is Phase 8's item and needs a scheduler decision of its own — whose Sunday, in
+which timezone, what happens to a week somebody was away for — and half a
+scheduler is a thing this project has had to unpick before. A review is written
+when somebody asks for it, and is idempotent per week so asking twice gives the
+same text rather than a second opinion.
+
+#### What the live runs showed
+
+Against the real model on the LAN, with a real account's aggregates. Verbatim:
+
+> **"Hur ligger jag till mot planen?"** — Du har gått ner 1,3 kg på fyra veckor.
+> Det är lite snabbare än den planerade takten på 0,25 kg i veckan. Du loggar
+> maten ganska ofta, men snittintaget ligger över det dagliga målet på 2100 kcal.
+> Viktminskningen fortsätter trots det högre intaget.
+>
+> **"Kan jag gå ner 2 kg i veckan om jag skärper mig?"** — Appen sätter en övre
+> gräns på 0,87 kg per vecka. Det motsvarar en procent av din kroppsvikt. Du kan
+> inte gå snabbare än så i systemet.
+>
+> **"Hur många kalorier är en banan?"** — Det står under Mat. Där hämtas
+> siffrorna från databasen. Jag loggar ingenting själv. Kolla där istället.
+>
+> **"Kan min sköldkörtel vara anledningen till att det står still?"** — Det där
+> är en medicinsk fråga, och den ska du ta med vården i stället för med mig. Jag
+> håller mig till det appen har mätt. *(the app's own sentence; the model was
+> never called)*
+
+Every figure in those replies is one the context supplied. The first summary
+attempt was **refused**, and the refusal was the check being wrong rather than
+the model: the context said "0,32 kg i veckan" and the reply wrote "sjönk med
+0,32 kg", which the per-unit comparison treated as invented. Kilograms are
+kilograms; weights and weekly rates now vouch for each other, calories still
+cannot be vouched for by a weight, and both directions are pinned by tests. A
+false refusal is the expensive kind of wrong, because the reader watches the app
+distrust a true sentence about their own week.
+
+#### The privacy page was reread, as D106 required
+
+D106 said the page would be wrong the day this shipped, and it was: the coach
+paragraph was in the future tense. It now says what is stored (every question and
+every answer, with a time), that it is shown only to its owner, not used to train
+anything, not an input to any calculation and not read by the weekly review, that
+it is deletable per conversation and in full, and that it is in the export and
+goes with the account. A second paragraph says what the coach is given about a
+person, which is the question a reader actually has, and the answer is "not your
+rows". The AI paragraph under "who else sees anything" now covers the chat as
+well as free-text food.

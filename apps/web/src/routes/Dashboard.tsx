@@ -17,6 +17,7 @@ import { RangeSelector, rangeDays, type RangeKey } from "../components/RangeSele
 import { InsightsPanel } from "../components/InsightsPanel.js";
 import { DayCard } from "../components/DayCard.js";
 import { WelcomeCard } from "../components/WelcomeCard.js";
+import { ReviewCard } from "../components/ReviewCard.js";
 import { Disclosure } from "../components/Disclosure.js";
 import { QuickActions, quickActions } from "../components/QuickActions.js";
 import { DeleteButton } from "../components/DeleteButton.js";
@@ -259,6 +260,13 @@ export function Dashboard() {
           the first thing on a new account and nothing above it would be true
           yet, and gone by itself once its three suggestions are done.
         */}
+        {/*
+          The week's review, once, when there is a new one (D139). Above the
+          trend figure like the welcome card, and gone as soon as it is put
+          away: it is news, not furniture.
+        */}
+        <ReviewCard />
+
         <WelcomeCard
           hasWeight={readings.length > 0}
           hasHeight={profile?.heightCm != null}

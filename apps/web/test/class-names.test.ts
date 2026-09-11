@@ -416,6 +416,13 @@ const IMPACT_ALLOWED = new Set([
    * same class as revoking an invite or deleting a backup.
    */
   "components/HabitEditor.tsx",
+  /**
+   * Deleting every conversation with the coach (D139). Irreversible, and the
+   * thing being destroyed is a record of what somebody asked about their own
+   * body, which is the same class as deleting an account's data rather than
+   * the same class as tidying a list.
+   */
+  "routes/Coach.tsx",
 ]);
 
 describe("the high-impact style", () => {

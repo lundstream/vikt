@@ -98,8 +98,18 @@ export function Privacy() {
           så vad påminnelsen säger går inte att läsa där.
         </P>
         <P>
-          Om coachen slås på. Då sparas också dina samtal med den, per konto. Den funktionen finns inte
-          än, och den här sidan skrivs om när den kommer.
+          Dina samtal med coachen, om AI-lagret är på. Varje fråga du ställer och varje svar sparas på ditt konto, med
+          tidpunkt. De visas bara för dig, de används inte för att träna någon modell,
+          de är inte underlag till någon uträkning i appen och de läses inte av
+          veckosammanfattningen. Du kan ta bort ett samtal i taget eller allihop på en
+          gång, under Coach, och de följer med i exporten.
+        </P>
+        <P>
+          Vad coachen får se om dig. Inte dina rader. Den får en sammanställning av sådant appen redan räknat
+          fram: trendvikt, underhållsnivå, planens mål och spärrar, hur många dagar du
+          loggat, makromål mot veckosnitt, aktiva milstolpar, streck och vad som står
+          på vanelistan. Ingen enskild måltid, ingen enskild vägning och ingen
+          anteckning skickas dit.
         </P>
       </Section>
 
@@ -134,7 +144,8 @@ export function Privacy() {
         </P>
         <P>
           Slår du på AI-lagret kör det där du pekar det. Det är avstängt som standard, och när det är på går texten till den
-          maskin du själv anger, inte till någon molntjänst.
+          maskin du själv anger, inte till någon molntjänst. Det gäller både maten du
+          skriver in i fritext och frågorna du ställer till coachen.
         </P>
         <P>
           Kontrollen på formuläret är ingen tredje part. Den ber din webbläsare räkna ut ett tal, och svaret

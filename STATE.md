@@ -43,6 +43,10 @@ when it will be down, and its mail goes out.
   weekend one, in the account's own timezone, skipped when the thing has already
   been done and never sent twice for a day (D136). Absent entirely without VAPID
   keys.
+- **A coach page under Mer** (D139): the weekly review and a chat that answers
+  from the account's own aggregates, streamed, with every figure in the reply
+  checked against the numbers the app actually holds before it reaches the
+  screen. Absent entirely when the LLM layer is off.
 - **A habit checklist on Dagen** (D137): the user's own words, an optional icon from
   a closed set, an order, one tap to tick and one to untick, a streak per habit, and
   an optional reminder per habit in the same two-time shape. Removing a habit keeps
@@ -59,9 +63,11 @@ Empty.
 - **Group features** (§6 phase 9) and **device integrations** (§6 phase 10).
 - **SMB and S3 backup destinations**, named in the settings and refused with a
   reason.
-- **The coach chat** (§6 phase 8b): the Coach page, the weekly review card, the
-  guardrail post-check and the history. Phase 11 is now complete on both halves
-  (D136, D137).
+- **The Sunday job** that would write weekly reviews without being asked (§6
+  phase 8). The review itself is built and is written on request (D139); what is
+  missing is the schedule, which needs its own decision about whose Sunday it is.
+- **Photos** are still the oldest unbuilt item (§6 phase 7), with the self-service
+  deletion hook that waits on them.
 - **MFA and importing from other apps** — phases 12 and 13, written down in
   CLAUDE.md §6 and not started.
 
@@ -95,6 +101,10 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
+
+`0027_coach` lägger till tabellerna `coach_conversations` och `coach_messages`,
+samt kolumnen `dismissed_at` på `weekly_reviews`. Additiv. Samtalen kaskaderar
+med kontot.
 
 `0026_habits` lägger till tabellerna `habits` och `habit_checks`. Vanorna är
 användarens egna ord, en rad per vana och dag, och båda tabellerna kaskaderar med
@@ -190,6 +200,18 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
+- Under Mer finns Coach: en sida där Bengt sammanfattar veckan och svarar på frågor
+  om hur det går. Han utgår bara från dina egna siffror, hittar aldrig på några nya
+  och ändrar ingenting: loggar och planer sköter du själv. Svaret skrivs ut medan
+  det blir till.
+- Är veckans sammanfattning ny visas den överst på Översikt, en gång, med "Läs hela"
+  till Coach. Trycker du "Tack, läst" försvinner den på alla dina enheter.
+- Samtalen sparas på ditt konto, visas bara för dig och används inte till något
+  annat. Du kan ta bort ett samtal i taget eller allihop, och de följer med i
+  exporten.
+- Frågor om medicin, sjukdom och graviditet svarar han inte på, utan hänvisar till
+  vården i en mening.
+- Hela Coach finns bara om AI-lagret är påslaget på den här installationen.
 - Dagen har en egen checklista. Skriv in det du vill göra varje dag, med eller utan
   ikon, och bocka av med ett tryck. Ett tryck till tar bort bocken. Under varje vana
   står hur många dagar i rad du har den, och en dag du inte fyllde i listan alls
@@ -310,7 +332,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1395 tests**: 494 shared, 254 web, 647 api. Lint clean, all three packages
+**1423 tests**: 494 shared, 261 web, 668 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 656 with none skipped**, which is the number that
@@ -346,6 +368,15 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- Coach at 360 px and at 1280 px, against the **real model on the LAN**: the
+  week's summary written from the account's own aggregates, four questions asked
+  and answered, and the medical one answered by the app without the model being
+  called. Every figure in every reply was one the context supplied. Two defects
+  were found by looking at the screen rather than by a test: the conversation
+  list reported zero messages for every row (a correlated subquery that counted
+  nothing), and a sentence with two links in it had a space before each comma;
+- Översikt at 360 px and at 1280 px with the review card above the trend figure,
+  clamped to three lines, with "Läs hela" and "Tack, läst" and no accent colour;
 - Dagen at 360 px and at 1280 px with a checklist of three, written through the
   screen rather than seeded: one habit added from the empty state's suggestions and
   two typed into the editor, one of them with an icon. All three ticked, one

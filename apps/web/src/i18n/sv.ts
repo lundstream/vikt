@@ -401,6 +401,48 @@ export const sv = {
   "announce.defaultBody":
     "Vikt är nere för underhåll {weekday} {date} kl {from} till {to}. Du kan logga som vanligt under tiden, det sparas på telefonen och skickas när appen är tillbaka.",
 
+  /* ---------------------------------------------------------------- coachen */
+
+  "coach.title": "Coach",
+  "coach.name": "Bengt",
+  "coach.what":
+    "Bengt svarar på frågor om hur det går, utifrån dina egna siffror. Han räknar inte fram några nya, och han ändrar ingenting.",
+  "coach.reviewTitle": "Veckans sammanfattning",
+  "coach.writeReview": "Skriv veckans",
+  "coach.writing": "Skriver…",
+  "coach.noReviews": "Ingen sammanfattning än. Be om veckans, så skriver han en.",
+  "coach.reviewRefused":
+    "Sammanfattningen innehöll en siffra som inte kommer ur dina uppgifter, så den sparades inte.",
+  "coach.weekOf": "Veckan från {date}",
+  "coach.readAll": "Läs hela",
+  "coach.dismiss": "Tack, läst",
+  "coach.chatTitle": "Fråga Bengt",
+  "coach.empty":
+    "Fråga något om hur det går. Till exempel hur veckan sett ut, eller varför underhållsnivån rört sig.",
+  "coach.ask": "Din fråga",
+  "coach.placeholder": "Hur har veckan sett ut?",
+  "coach.send": "Fråga",
+  "coach.thinking": "Tänker…",
+  "coach.you": "Du",
+  "coach.newConversation": "Nytt samtal",
+  "coach.refusedNote": "Svaret stoppades av appens spärrar, och det du ser är appens egen text.",
+  "coach.busy": "Coachen är upptagen just nu. Försök igen om en stund.",
+  "coach.unreachable":
+    "Coachen går inte att nå just nu. Den kör på en dator hemma som inte alltid är igång, och frågan sparas inte.",
+  "coach.limited": "Du har frågat många gånger den här timmen. Prova igen om en stund.",
+  "coach.readsOnly":
+    "Bengt kan bara läsa. Han loggar ingenting och ändrar ingen plan: det gör du själv under",
+  "coach.historyTitle": "Tidigare samtal",
+  "coach.historyWhat":
+    "Samtalen sparas på ditt konto, visas bara för dig och används inte till något annat. De följer med i exporten och försvinner med kontot.",
+  "coach.noHistory": "Inga samtal än.",
+  "coach.turns": "{count} rader, senast {date}",
+  "coach.forget": "Ta bort",
+  "coach.forgetAll": "Ta bort alla samtal",
+  "coach.forgetAllTitle": "Ta bort alla samtal?",
+  "coach.forgetAllBody":
+    "Allt du har frågat och allt Bengt har svarat försvinner. Det går inte att ångra.",
+
   /* ---------------------------------------------------------------- vanor */
 
   "habit.title": "Vanor",

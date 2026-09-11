@@ -4,6 +4,7 @@ import { SyncIndicator } from "./SyncIndicator.js";
 import { Sheet } from "./Sheet.js";
 import { useLogout, useMe } from "../lib/session.js";
 import { useAnnouncements } from "../lib/announcements.js";
+import { useLlmHealth } from "../lib/food.js";
 import { MaintenanceBanner } from "./MaintenanceBanner.js";
 import { useServiceWorker } from "../lib/update.js";
 import { t, type TranslationKey } from "../i18n/index.js";
@@ -48,6 +49,14 @@ type Destination = {
   inBar?: boolean;
   /** Drawn for admins only (D100). The server decides everything else. */
   adminOnly?: boolean;
+  /**
+   * Drawn only where the LLM layer is configured (D139, D94).
+   *
+   * Absent rather than disabled, and the same rule the server follows: with
+   * the flag off the routes do not exist, so a link to one would be a link
+   * to a 404 wearing a label.
+   */
+  llmOnly?: boolean;
 };
 
 const stroke = {
@@ -123,6 +132,22 @@ const DESTINATIONS: Destination[] = [
       <>
         <path d="M4 4v16h16" {...stroke} />
         <path d="M8 16v-4M12 16v-7M16 16v-2M20 16v-5" {...stroke} />
+      </>
+    ),
+  },
+  {
+    /**
+     * The coach is a place, not an icon (§6 phase 8b). It sits in the list
+     * with everything else, reached the same way, and it is not in the bar:
+     * four is what a thumb can hit across 360 px.
+     */
+    to: "/coach",
+    label: "coach.title",
+    llmOnly: true,
+    icon: (
+      <>
+        <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H9.5L5.5 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z" {...stroke} />
+        <path d="M8 10.5h8M8 13h5" {...stroke} />
       </>
     ),
   },
@@ -213,8 +238,11 @@ const SIGN_OUT_ICON = (
  * Exported so the navigation test can assert the two surfaces cover the same
  * set without reaching into a module-private constant.
  */
-export function destinationsFor(isAdmin: boolean): Destination[] {
-  return DESTINATIONS.filter((destination) => !destination.adminOnly || isAdmin);
+export function destinationsFor(isAdmin: boolean, llm = true): Destination[] {
+  return DESTINATIONS.filter(
+    (destination) =>
+      (!destination.adminOnly || isAdmin) && (!destination.llmOnly || llm),
+  );
 }
 
 /** The four in the bar, and everything that overflows into Mer. */
@@ -319,6 +347,8 @@ function DestinationRow({
 function Sidebar() {
   const { pathname } = useLocation();
   const me = useMe();
+  /** Whether this installation has the LLM layer at all (D94, D139). */
+  const llm = useLlmHealth();
   const signOut = useLogout();
   const unread = useAnnouncements().data?.unread ?? 0;
   /** Requests waiting for an answer, zero for anyone who is not an admin (D129). */
@@ -346,7 +376,7 @@ function Sidebar() {
         place.
       */}
       <ul className="space-y-1">
-        {destinationsFor(me.data?.isAdmin ?? false).map((destination) => (
+        {destinationsFor(me.data?.isAdmin ?? false, llm.data?.configured === true).map((destination) => (
           <li key={destination.to} className="relative">
             <DestinationRow
               destination={destination}
@@ -548,7 +578,8 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { pathname } = useLocation();
   const pending = me.data?.pendingRequests ?? 0;
 
-  const links = destinationsFor(me.data?.isAdmin ?? false).filter(
+  const llm = useLlmHealth();
+  const links = destinationsFor(me.data?.isAdmin ?? false, llm.data?.configured === true).filter(
     (destination) => !inBar(destination),
   );
 

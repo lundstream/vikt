@@ -1,4 +1,8 @@
 import type {
+  CoachConversation,
+  CoachConversationList,
+  CoachReview,
+  CoachReviewList,
   CreateHabit,
   Habit,
   HabitList,
@@ -353,6 +357,31 @@ export const api = {
 
   /** Everything logged for one day, so the daily screen opens filled in. */
   dayLog: (localDate: string) => request<DayLog>(`/day?localDate=${localDate}`),
+
+  /* -------------------------------------------------------------- coach */
+
+  coachConversations: () => request<CoachConversationList>("/coach/conversations"),
+
+  coachConversation: (id: string) => request<CoachConversation>(`/coach/conversations/${id}`),
+
+  removeConversation: (id: string) =>
+    request<void>(`/coach/conversations/${id}`, { method: "DELETE" }),
+
+  removeAllConversations: () =>
+    request<{ removed: number }>("/coach/conversations", { method: "DELETE" }),
+
+  coachReviews: () => request<CoachReviewList>("/coach/reviews"),
+
+  coachCurrentReview: () => request<{ review: CoachReview | null }>("/coach/review/current"),
+
+  writeReview: (asOf: string) =>
+    request<{ status: string; review: CoachReview | null }>("/coach/reviews", {
+      method: "POST",
+      body: JSON.stringify({ asOf }),
+    }),
+
+  dismissReview: (id: string) =>
+    request<{ ok: true }>(`/coach/reviews/${id}/dismiss`, { method: "POST" }),
 
   /* ------------------------------------------------------------- habits */
 
