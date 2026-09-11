@@ -403,7 +403,7 @@ export const sv = {
 
   "push.title": "Påminnelser",
   "push.what":
-    "Två påminnelser, var och en med egen tid och egen på- och avknapp. Båda är avstängda tills du slår på dem.",
+    "Två påminnelser, var och en med en tid för vardagar och en för helgen. Varje tid har en egen på- och avknapp, och alla är avstängda tills du slår på dem.",
   "push.where":
     "Push fungerar i webbläsaren på Android. På iPhone och iPad fungerar det bara när appen är installerad på hemskärmen.",
   "push.unsupported": "Den här webbläsaren kan inte ta emot push. Påminnelserna går inte att slå på här.",
@@ -414,7 +414,10 @@ export const sv = {
   "push.allow": "Tillåt notiser",
   "push.weighLabel": "Påminn mig att väga mig",
   "push.dayLabel": "Påminn mig att fylla i dagen",
-  "push.time": "Tid",
+  "push.weekdays": "Vardagar",
+  "push.weekend": "Helg",
+  "push.timeWeekdays": "Tid på vardagar",
+  "push.timeWeekend": "Tid på helgen",
   "push.test": "Skicka en testnotis",
   "push.testing": "Skickar…",
   "push.testSent": "Skickad till {count} enhet. Kommer den inte fram är det enheten som blockerar den.",

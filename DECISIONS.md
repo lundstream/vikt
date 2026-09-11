@@ -5337,6 +5337,46 @@ send impossible — the second claim loses — so what two schedulers would cost
 doubled work rather than doubled notifications. That is the honest limit, and it
 is why this is not a reason to add a lock today.
 
+#### Weekdays and weekends are two settings, not one
+
+Amended after the first half shipped. One time per reminder was wrong in the
+ordinary case: somebody who weighs themselves at 07:00 on the way to work does
+not want the phone at 07:00 on a Sunday, and the only thing the app could offer
+was turning the reminder off on Friday and remembering to turn it back on. So
+each reminder carries a weekday pair and a weekend pair, each with its own
+switch, and **off at the weekend is a setting** rather than the absence of one.
+
+Additive, not a rename. The four existing columns keep their names and are now
+the weekday pair, which is already correct for every row ever written, and
+`0025_reminder_weekend` seeds the weekend columns **from them**. A default of
+"off at 07:00" would have quietly turned the weekend off for everybody who had
+already set this up, and a setting that changes itself during a deploy is worse
+than a missing feature.
+
+**The weekend is the user's, like the time is.** `isWeekend` takes the local
+date string that `toLocalDate` has already produced rather than an instant and
+a timezone, so there is one timezone conversion per profile per sweep and
+nothing that can disagree with it. Friday 23:30 on a server in London is
+Saturday 01:30 in Stockholm: that account gets its Saturday time, and an account
+in Los Angeles having the same instant as Friday afternoon gets its weekday one.
+Both directions are tested, and so is the mirror image where the switches are
+swapped and neither account is due, because a test that reads the wrong pair for
+both of them would otherwise pass.
+
+Saturday and Sunday, not a configurable weekend. Somewhere the week ends on a
+Thursday, and the day that becomes worth building is the day somebody asks.
+
+The skip rule and the never-twice rule are untouched. Both key on the local
+date, which is where the weekend came from in the first place, so a Saturday
+reminder is claimed under the Saturday the user was having.
+
+In Inställningar the two sit side by side under each reminder with the day
+labels above them, in a `fieldset` whose legend is the reminder's own name:
+without it "Vardagar" is a checkbox that could belong to either reminder for
+anybody not looking at the screen. Side by side rather than stacked so the two
+times can be compared at a glance, and they fit at 360 px because a clock is
+four characters wide.
+
 #### The service worker is joined, not replaced
 
 Two handlers, imported into the generated worker rather than taking it over.

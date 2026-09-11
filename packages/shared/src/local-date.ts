@@ -45,3 +45,23 @@ export function localMinuteOfDay(date: Date, timezone: string): number {
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
   return hour * 60 + minute;
 }
+
+/**
+ * Whether a local date is a Saturday or a Sunday (D136, amended).
+ *
+ * Takes the **date string**, not an instant and a timezone, and that is the
+ * whole point: `toLocalDate` has already done the timezone work, and the
+ * weekday follows from the calendar date it produced. Asking `Intl` a second
+ * time would be a second chance to disagree with the first.
+ *
+ * Parsed at UTC midnight because the string is a calendar date with no zone of
+ * its own. `2026-09-12` is a Saturday for everybody who is having that date,
+ * whatever instant it is elsewhere — which is exactly the question being asked.
+ *
+ * Saturday and Sunday, not a configurable weekend. Somewhere the week ends on a
+ * Thursday, and the day that becomes worth building is the day somebody asks.
+ */
+export function isWeekend(localDate: string): boolean {
+  const day = new Date(`${localDate}T00:00:00Z`).getUTCDay();
+  return day === 0 || day === 6;
+}

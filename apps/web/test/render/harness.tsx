@@ -112,12 +112,12 @@ export function stubFetch(
       // test mutates in `post`, so holding the wrapper object would let the
       // response reflect writes that happened after the request was made.
       /**
-       * A write is a POST **or a PUT**. The admin screens save with PUT, and a
-       * stub that only recognised POST answered those from `get()` and dropped
-       * the body on the floor, so a test asserting what a form sends passed
-       * while asserting nothing.
+       * A write is a POST, a PUT **or a PATCH**. The admin screens save with
+       * PUT and the profile saves with PATCH, and a stub that only recognised
+       * POST answered those from `get()` and dropped the body on the floor, so
+       * a test asserting what a form sends passed while asserting nothing.
        */
-      const writing = method === "POST" || method === "PUT";
+      const writing = method === "POST" || method === "PUT" || method === "PATCH";
       const snapshot = writing ? null : JSON.parse(JSON.stringify(route.get(url) ?? null));
 
       if (route.delayMs) {

@@ -61,11 +61,19 @@ export type AuthedUser = {
     newsMail: boolean;
     /** Whether an admin is mailed about a new invite request (D129). */
     requestMail: boolean;
-    /** The two reminders (D136), and their times as local minutes. */
+    /**
+     * The two reminders (D136), and their times as local minutes. Two pairs
+     * each: the plain names are the weekday times, `Weekend` is Saturday and
+     * Sunday.
+     */
     remindWeigh: boolean;
     remindWeighMinute: number;
     remindDay: boolean;
     remindDayMinute: number;
+    remindWeighWeekend: boolean;
+    remindWeighWeekendMinute: number;
+    remindDayWeekend: boolean;
+    remindDayWeekendMinute: number;
     /** Which theme to use: system, dark or light (D117). */
     theme: Theme;
     lastDrinkOn: string | null;
@@ -240,6 +248,10 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
       remindWeighMinute: profile.remindWeighMinute,
       remindDay: profile.remindDay,
       remindDayMinute: profile.remindDayMinute,
+      remindWeighWeekend: profile.remindWeighWeekend,
+      remindWeighWeekendMinute: profile.remindWeighWeekendMinute,
+      remindDayWeekend: profile.remindDayWeekend,
+      remindDayWeekendMinute: profile.remindDayWeekendMinute,
       theme: themeSchema.catch("system").parse(profile.theme),
       lastDrinkOn: profile.lastDrinkOn,
       /**

@@ -157,6 +157,15 @@ export const meResponseSchema = z.object({
     remindDay: z.boolean().default(false),
     remindDayMinute: z.number().int().min(0).max(1439).default(1320),
     /**
+     * The same two for Saturday and Sunday. The pair above is the weekday one.
+     * Defaulted like the rest, so an identity cached before this existed parses
+     * and the screen simply shows the fallback until the next `/me`.
+     */
+    remindWeighWeekend: z.boolean().default(false),
+    remindWeighWeekendMinute: z.number().int().min(0).max(1439).default(420),
+    remindDayWeekend: z.boolean().default(false),
+    remindDayWeekendMinute: z.number().int().min(0).max(1439).default(1320),
+    /**
      * Which theme to use (D117). Defaulted so an identity cached by an older
      * build still parses and the app still opens offline.
      */
@@ -225,11 +234,19 @@ export const updateProfileSchema = z
     newsMail: z.boolean(),
     /** Whether an admin is mailed about a new invite request (D129). Opt-out. */
     requestMail: z.boolean(),
-    /** The two reminders and their times (D136). Minutes past local midnight. */
+    /**
+     * The two reminders (D136). Minutes past local midnight, and two pairs
+     * each: the plain names are Monday to Friday, the `Weekend` ones are
+     * Saturday and Sunday.
+     */
     remindWeigh: z.boolean(),
     remindWeighMinute: z.number().int().min(0).max(1439),
     remindDay: z.boolean(),
     remindDayMinute: z.number().int().min(0).max(1439),
+    remindWeighWeekend: z.boolean(),
+    remindWeighWeekendMinute: z.number().int().min(0).max(1439),
+    remindDayWeekend: z.boolean(),
+    remindDayWeekendMinute: z.number().int().min(0).max(1439),
     /** Which theme to use: system, dark or light (D117). */
     theme: themeSchema,
     /**

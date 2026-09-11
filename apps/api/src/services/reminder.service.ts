@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { localMinuteOfDay, REMINDER_TEXT, REMINDER_URL, toLocalDate } from "shared";
+import { isWeekend, localMinuteOfDay, REMINDER_TEXT, REMINDER_URL, toLocalDate } from "shared";
 import type { Db } from "../db/index.js";
 import { dailyLog, profiles, pushSubscriptions, reminderSends, users } from "../db/schema.js";
 import { findWeightForDay } from "../repositories/weight.repo.js";
@@ -12,6 +12,11 @@ import { pushEnabled, sendPush, type PushPayload } from "../lib/push.js";
  * "Väg dig" in the morning and "Fyll i dagen" in the evening, each with its own
  * time and its own switch, both off until somebody turns them on.
  *
+ * Each has **two** of those: one pair for Monday to Friday and one for Saturday
+ * and Sunday, so the morning reminder can be 07:00 on a Tuesday and 09:00 on a
+ * Sunday, or off on a Sunday while staying on for the week. Which pair applies
+ * follows from the date the person is having, below.
+ *
  * ## Four rules, and each one is a decision
  *
  * **The time is the user's, not the server's.** 07:00 means seven in the
@@ -20,6 +25,12 @@ import { pushEnabled, sendPush, type PushPayload } from "../lib/push.js";
  * profile what time it is *there* rather than comparing against a UTC hour.
  * `toLocalDate` is the app's own helper (§3, D39); the machine clock is never
  * consulted for a day boundary.
+ *
+ * **The weekend is the user's too.** Friday 23:30 on a server in London is
+ * already Saturday in Stockholm, and that account gets its Saturday time, not
+ * Friday's. The day is read off the local date `toLocalDate` already produced,
+ * so there is one timezone conversion per profile per tick and nothing that can
+ * disagree with it.
  *
  * **Skipped when it has already happened.** The morning one does not fire if a
  * weight is already logged for that local date; the evening one does not fire
@@ -139,6 +150,10 @@ export async function dueNow(db: Db, now: Date): Promise<DueReminder[]> {
       remindWeighMinute: profiles.remindWeighMinute,
       remindDay: profiles.remindDay,
       remindDayMinute: profiles.remindDayMinute,
+      remindWeighWeekend: profiles.remindWeighWeekend,
+      remindWeighWeekendMinute: profiles.remindWeighWeekendMinute,
+      remindDayWeekend: profiles.remindDayWeekend,
+      remindDayWeekendMinute: profiles.remindDayWeekendMinute,
     })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))
@@ -147,7 +162,14 @@ export async function dueNow(db: Db, now: Date): Promise<DueReminder[]> {
   const due: DueReminder[] = [];
 
   for (const row of rows) {
-    if (!row.remindWeigh && !row.remindDay) continue;
+    /**
+     * Cheap exit for the common case of an account that has never turned any of
+     * this on. All four switches, because being on only at the weekend is a
+     * setting somebody will have.
+     */
+    if (!row.remindWeigh && !row.remindDay && !row.remindWeighWeekend && !row.remindDayWeekend) {
+      continue;
+    }
 
     /**
      * An invalid timezone on a profile must not take the whole run down with
@@ -163,10 +185,24 @@ export async function dueNow(db: Db, now: Date): Promise<DueReminder[]> {
       continue;
     }
 
-    if (row.remindWeigh && insideWindow(minuteNow, row.remindWeighMinute)) {
+    /**
+     * Read from the local date rather than from `now`, so the weekend follows
+     * the person. The two pairs never combine: a Saturday consults only the
+     * weekend switch, and a weekday only the other one.
+     */
+    const weekend = isWeekend(localDate);
+
+    const weigh = weekend
+      ? { on: row.remindWeighWeekend, minute: row.remindWeighWeekendMinute }
+      : { on: row.remindWeigh, minute: row.remindWeighMinute };
+    const day = weekend
+      ? { on: row.remindDayWeekend, minute: row.remindDayWeekendMinute }
+      : { on: row.remindDay, minute: row.remindDayMinute };
+
+    if (weigh.on && insideWindow(minuteNow, weigh.minute)) {
       due.push({ userId: row.userId, kind: "weigh", localDate });
     }
-    if (row.remindDay && insideWindow(minuteNow, row.remindDayMinute)) {
+    if (day.on && insideWindow(minuteNow, day.minute)) {
       due.push({ userId: row.userId, kind: "day", localDate });
     }
   }

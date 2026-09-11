@@ -578,7 +578,9 @@ A daily checklist the user writes themselves, and the first push notification th
 >
 > **Reminders are Web Push**, which works on Android and on iOS **only once the app has been installed to the home screen** — that is a platform rule, not a bug, and it is the reason D116's install control exists at all. VAPID keys are configuration, per-device subscriptions are rows, and a subscription that the push service rejects with 404 or 410 is deleted rather than retried.
 >
-> **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. One time of day, in the user's timezone, off by default.
+> **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. Two times of day, in the user's timezone, off by default: see the two-time shape below.
+>
+> **A reminder for the checklist, if it gets one, inherits the shape.** A weekday pair and a weekend pair, each with its own switch, the same field names and the same helper, and no second notion of what a weekend is. A habit reminder that invented its own single time would be the one setting on the screen that behaves differently from the two beside it, and somebody would have to find out by being woken on a Sunday.
 
 #### The two reminders, and the foundation they pay for
 
@@ -593,6 +595,7 @@ The habit checklist above is the second customer of this machinery, not the firs
 > - **VAPID keys as configuration**, under `assertProdSecrets` like every other secret that must not be an example value. Push without them is not degraded, it is absent — the toggle does not appear.
 > - **A per-device subscription table.** One row per browser per account, not one per account: the same person has a phone and a laptop and they subscribe separately. **Edit and delete per D56**, which here means a device can be named and removed from any other device, because the commonest reason to want that is a phone somebody no longer has.
 > - **A scheduler firing in each user's timezone**, which is stored on the profile already. Not in UTC and not on the server's clock: 07:00 means seven in the morning where the person is, and that is a different instant for two accounts and a different instant for one account in March.
+> - **Two times per reminder, `vardagar` and `helg`, each with its own switch.** Saturday is not Tuesday, and the alternative was turning the reminder off on Friday and remembering to turn it back on. Which days are the weekend follows from the date the user is having, never the server's: `isWeekend(toLocalDate(now, tz))`, one helper in `shared`, and Friday 23:30 in London is already Saturday in Stockholm. Every reminder built after this uses these two pairs rather than a third arrangement.
 > - **A service worker handler that opens the right screen on tap.** The morning reminder opens the weight sheet; the evening one opens Dagen. A notification that opens the dashboard and leaves somebody to navigate has spent its one interaction on nothing.
 > - **A rejected subscription is deleted, not retried.** 404 and 410 from the push service mean the browser threw it away, and a queue that retries them forever is a queue that grows forever.
 >

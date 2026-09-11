@@ -176,6 +176,13 @@
       "when": 1788310190000,
       "tag": "0024_push",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788310200000,
+      "tag": "0025_reminder_weekend",
+      "breakpoints": true
     }
   ]
 }

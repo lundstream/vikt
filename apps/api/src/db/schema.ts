@@ -245,6 +245,27 @@ export const profiles = pgTable("profiles", {
   remindDay: boolean("remind_day").notNull().default(false),
   remindDayMinute: integer("remind_day_minute").notNull().default(1320),
   /**
+   * The same two reminders again, for Saturday and Sunday (D136, amended).
+   *
+   * Each reminder has two independent pairs, so the morning one can be 07:00 on
+   * a Tuesday and 09:00 on a Sunday, or off on a Sunday entirely. Off on the
+   * weekend is a setting somebody will want on purpose and is not the same as
+   * having the reminder off.
+   *
+   * The columns above keep their names and are now the **weekday** pair, which
+   * is why this is additive: every existing row was already correct for Monday
+   * to Friday, and `0025_reminder_weekend` seeded these from them so an account
+   * that had 07:00 every day still has 07:00 every day.
+   *
+   * Which days are the weekend is decided from the date the user is having, not
+   * the server's. `isWeekend(toLocalDate(now, timezone))` in shared, one place,
+   * and `reminder.service.ts` is the only caller.
+   */
+  remindWeighWeekend: boolean("remind_weigh_weekend").notNull().default(false),
+  remindWeighWeekendMinute: integer("remind_weigh_weekend_minute").notNull().default(420),
+  remindDayWeekend: boolean("remind_day_weekend").notNull().default(false),
+  remindDayWeekendMinute: integer("remind_day_weekend_minute").notNull().default(1320),
+  /**
    * Which theme to use: `system`, `dark` or `light` (D117).
    *
    * On the account rather than in `localStorage`, because it is a preference

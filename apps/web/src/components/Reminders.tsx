@@ -6,6 +6,19 @@ import { t } from "../i18n/index.js";
 /**
  * The two reminders, and the permission they need (D136).
  *
+ * ## Why each reminder has two times
+ *
+ * Because Saturday is not Tuesday. Somebody who weighs themselves at 07:00 on
+ * the way to work does not want the phone at 07:00 on a Sunday, and the answer
+ * before this was to turn the reminder off on Friday and remember to turn it
+ * back on. So each reminder carries a weekday pair and a weekend pair, each
+ * with its own switch, and off at the weekend is a setting rather than the
+ * absence of one.
+ *
+ * Side by side under the reminder rather than stacked, so the two times can be
+ * compared at a glance, and they still fit at 360 px because a clock is four
+ * characters wide.
+ *
  * ## Why the permission state is spelled out
  *
  * Three states and three different things to do about them, and a toggle alone
@@ -261,27 +274,20 @@ export function Reminders() {
         </p>
       )}
 
-      {/* The two reminders. Each has its own switch and its own time. */}
+      {/* The two reminders, each with a weekday time and a weekend one. */}
       {profile ? (
-        <div className="mt-6 space-y-5">
-          {(
-            [
-              ["weigh", "remindWeigh", "remindWeighMinute", profile.remindWeigh, profile.remindWeighMinute],
-              ["day", "remindDay", "remindDayMinute", profile.remindDay, profile.remindDayMinute],
-            ] as const
-          ).map(([kind, onKey, minuteKey, on, minute]) => (
-            <div key={kind}>
-              <label className="flex items-start gap-3 text-body text-ink">
-                <input
-                  type="checkbox"
-                  className="check mt-1"
-                  data-testid={`remind-${kind}`}
-                  checked={on}
-                  disabled={saveProfile.isPending}
-                  onChange={(event) => saveProfile.mutate({ [onKey]: event.target.checked })}
-                />
+        <div className="mt-6 space-y-6">
+          {(["weigh", "day"] as const).map((kind) => (
+            /*
+              A fieldset because the four controls under one reminder are one
+              group, and the reminder's own name has to be what names them.
+              Without it "Vardagar" is a checkbox that could belong to either
+              reminder, for anybody not looking at the screen.
+            */
+            <fieldset key={kind}>
+              <legend className="text-body text-ink">
                 {t(kind === "weigh" ? "push.weighLabel" : "push.dayLabel")}
-              </label>
+              </legend>
 
               {/*
                 What the notification will actually say, before it is turned
@@ -297,23 +303,68 @@ export function Reminders() {
                 })}
               </p>
 
-              <label className="mt-2 block max-w-[10rem] text-micro text-muted">
-                {t("push.time")}
-                <input
-                  className="field num mt-1 w-full"
-                  data-testid={`remind-${kind}-time`}
-                  defaultValue={toClock(minute)}
-                  onBlur={(event) => {
-                    const parsed = fromClock(event.target.value);
-                    if (parsed !== null && parsed !== minute) {
-                      saveProfile.mutate({ [minuteKey]: parsed });
-                    } else {
-                      event.target.value = toClock(minute);
-                    }
-                  }}
-                />
-              </label>
-            </div>
+              {/*
+                The two days side by side. `-weekend` is the only difference in
+                the test ids, so the weekday control keeps the name it had.
+              */}
+              <div className="mt-3 grid max-w-xs grid-cols-2 gap-4">
+                {(
+                  [
+                    {
+                      part: "",
+                      dayLabel: t("push.weekdays"),
+                      timeLabel: t("push.timeWeekdays"),
+                      onKey: kind === "weigh" ? "remindWeigh" : "remindDay",
+                      minuteKey: kind === "weigh" ? "remindWeighMinute" : "remindDayMinute",
+                      on: kind === "weigh" ? profile.remindWeigh : profile.remindDay,
+                      minute:
+                        kind === "weigh" ? profile.remindWeighMinute : profile.remindDayMinute,
+                    },
+                    {
+                      part: "-weekend",
+                      dayLabel: t("push.weekend"),
+                      timeLabel: t("push.timeWeekend"),
+                      onKey: kind === "weigh" ? "remindWeighWeekend" : "remindDayWeekend",
+                      minuteKey:
+                        kind === "weigh" ? "remindWeighWeekendMinute" : "remindDayWeekendMinute",
+                      on: kind === "weigh" ? profile.remindWeighWeekend : profile.remindDayWeekend,
+                      minute:
+                        kind === "weigh"
+                          ? profile.remindWeighWeekendMinute
+                          : profile.remindDayWeekendMinute,
+                    },
+                  ] as const
+                ).map(({ part, dayLabel, timeLabel, onKey, minuteKey, on, minute }) => (
+                  <div key={part}>
+                    <label className="flex items-center gap-2 text-note text-ink">
+                      <input
+                        type="checkbox"
+                        className="check"
+                        data-testid={`remind-${kind}${part}`}
+                        checked={on}
+                        disabled={saveProfile.isPending}
+                        onChange={(event) => saveProfile.mutate({ [onKey]: event.target.checked })}
+                      />
+                      {dayLabel}
+                    </label>
+                    <input
+                      className="field num mt-1.5 w-full"
+                      data-testid={`remind-${kind}${part}-time`}
+                      aria-label={timeLabel}
+                      defaultValue={toClock(minute)}
+                      onBlur={(event) => {
+                        const parsed = fromClock(event.target.value);
+                        if (parsed !== null && parsed !== minute) {
+                          saveProfile.mutate({ [minuteKey]: parsed });
+                        } else {
+                          event.target.value = toClock(minute);
+                        }
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </fieldset>
           ))}
         </div>
       ) : null}

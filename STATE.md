@@ -39,6 +39,10 @@ when it will be down, and its mail goes out.
   by an admin, with every action written to an audit log (D95, D100).
 - **The theme is a choice** of system, dark or light, stored per account (D117),
   and the app offers to install itself where the platform allows (D116).
+- **Two reminders arrive as push notifications**, each with a weekday time and a
+  weekend one, in the account's own timezone, skipped when the thing has already
+  been done and never sent twice for a day (D136). Absent entirely without VAPID
+  keys.
 
 ### API without a screen
 
@@ -51,8 +55,10 @@ Empty.
 - **Group features** (§6 phase 9) and **device integrations** (§6 phase 10).
 - **SMB and S3 backup destinations**, named in the settings and refused with a
   reason.
-- **Habits and reminders, MFA, and importing from other apps** — phases 11 to 13,
-  written down in CLAUDE.md §6 and not started.
+- **The habit checklist** (§6 phase 11). The other half of that phase, the two
+  reminders and the push foundation under them, is built (D136).
+- **MFA and importing from other apps** — phases 12 and 13, written down in
+  CLAUDE.md §6 and not started.
 
 ## Inför nästa deploy
 
@@ -84,6 +90,12 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
+
+`0025_reminder_weekend` lägger till fyra kolumner till på `profiles`: en egen
+på-knapp och en egen tid för helgen, per påminnelse. De fyra som redan fanns behåller
+sina namn och är nu vardagstiderna. Migrationen kopierar vardagsvärdena till
+helgkolumnerna, så ett konto som hade 07:00 alla dagar har kvar 07:00 alla dagar
+tills någon ändrar det. Additiv.
 
 `0022_backup_smb` lägger till `smb_host`, `smb_share` och `smb_domain` på
 `backup_settings`, och `0023_backup_s3` tar bort dem igen och lägger till
@@ -170,19 +182,22 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
 - Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig
-  och en på kvällen om att fylla i dagen. Var och en har egen tid och egen knapp, och
-  båda är avstängda tills du slår på dem. Morgonens hoppas över om du redan vägt dig,
+  och en på kvällen om att fylla i dagen. Var och en har en tid för vardagar och en för
+  helgen, med var sin knapp, så morgonpåminnelsen kan vara 07:00 i veckan och 09:00 på
+  lördag och söndag, eller avstängd då. Alla fyra är avstängda tills du slår på dem.
+  Vilka dagar som är helg räknas i din egen tidszon. Morgonens hoppas över om du redan vägt dig,
   kvällens om dagen redan är ifylld. Push fungerar i webbläsaren på Android och på
   iPhone bara när appen är installerad på hemskärmen, vilket står bredvid knappen.
 
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 26 commits, plus the one this
+between what is built and what is running. 27 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `2900709` | Reminders: the push foundation and the two that pay for it |
 | `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
 | `8fbe283` | Record the pass: S3, three button tiers, and what CI now proves |
 | `7c3d682` | Give the S3 run tests a database pg_dump can reach |
@@ -275,7 +290,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1338 tests**: 478 shared, 239 web, 621 api. Lint clean, all three packages
+**1359 tests**: 485 shared, 246 web, 628 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 609 with none skipped**, which is the number that
@@ -310,7 +325,14 @@ build served by `vite preview`:
 - Nyheter with a formatted post: two heading levels, bold, a bullet list and a
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
-  shown and the test-connection button beside Spara.
+  shown and the test-connection button beside Spara;
+- Inställningar at 360 px with the two reminders: each one shows a weekday time
+  and a weekend time side by side under its name, with the day labels above them.
+  Driven through the controls rather than seeded — 07:00 typed into the weigh
+  reminder's weekday field and 09:30 into its weekend field, 21:00 into the
+  evening one's weekday field, and the evening weekend switch left off — and
+  `GET /api/me` then reported exactly those four values in their own columns, with
+  the screen showing them again after a reload. No horizontal overflow.
 
 No horizontal overflow on any of the eighteen shots, and nothing blank.
 

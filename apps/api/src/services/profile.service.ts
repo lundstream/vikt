@@ -66,6 +66,18 @@ export async function editProfile(
       : {}),
     ...(input.remindDay !== undefined ? { remindDay: input.remindDay } : {}),
     ...(input.remindDayMinute !== undefined ? { remindDayMinute: input.remindDayMinute } : {}),
+    ...(input.remindWeighWeekend !== undefined
+      ? { remindWeighWeekend: input.remindWeighWeekend }
+      : {}),
+    ...(input.remindWeighWeekendMinute !== undefined
+      ? { remindWeighWeekendMinute: input.remindWeighWeekendMinute }
+      : {}),
+    ...(input.remindDayWeekend !== undefined
+      ? { remindDayWeekend: input.remindDayWeekend }
+      : {}),
+    ...(input.remindDayWeekendMinute !== undefined
+      ? { remindDayWeekendMinute: input.remindDayWeekendMinute }
+      : {}),
     ...(input.theme !== undefined ? { theme: input.theme } : {}),
     ...(input.soberAssumeUnloggedDry !== undefined
       ? { soberAssumeUnloggedDry: input.soberAssumeUnloggedDry }

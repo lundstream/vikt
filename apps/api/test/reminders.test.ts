@@ -176,6 +176,241 @@ describe("who is due", () => {
   });
 });
 
+/**
+ * Weekday times and weekend times (D136, amended).
+ *
+ * Every instant here is a Wednesday, a Friday or a Saturday on purpose, and the
+ * dates are named in comments, because a test that silently lands on the wrong
+ * day of the week would pass for the wrong reason.
+ */
+describe("the weekend", () => {
+  const ctx = useTestApp(KEYED);
+
+  async function withProfile(patch: Record<string, unknown>) {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(profiles).set(patch).where(eq(profiles.userId, user.userId));
+    return user;
+  }
+
+  /** A Saturday consults the weekend pair and not the weekday one. */
+  it("uses the weekend time on a Saturday", async () => {
+    const { db } = ctx();
+    await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: true,
+      remindWeighMinute: 420, // 07:00 on a weekday
+      remindWeighWeekend: true,
+      remindWeighWeekendMinute: 540, // 09:00 at the weekend
+    });
+
+    // 2026-07-04 is a Saturday. 05:00 UTC is 07:00 in Stockholm: the weekday
+    // time, which must not fire, because it is not a weekday.
+    expect(await dueNow(db, new Date("2026-07-04T05:00:00.000Z"))).toEqual([]);
+
+    // 07:00 UTC is 09:00 there, which is the weekend time.
+    const due = await dueNow(db, new Date("2026-07-04T07:00:00.000Z"));
+    expect(due).toEqual([{ userId: due[0]?.userId, kind: "weigh", localDate: "2026-07-04" }]);
+  });
+
+  /** And Sunday is the weekend too, which is worth one assertion of its own. */
+  it("uses the weekend time on a Sunday", async () => {
+    const { db } = ctx();
+    await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: true,
+      remindWeighMinute: 420,
+      remindWeighWeekend: true,
+      remindWeighWeekendMinute: 540,
+    });
+
+    // 2026-07-05, a Sunday, at 09:00 in Stockholm.
+    const due = await dueNow(db, new Date("2026-07-05T07:00:00.000Z"));
+    expect(due.map((entry) => entry.localDate)).toEqual(["2026-07-05"]);
+  });
+
+  /**
+   * Off at the weekend is a setting, not the absence of one.
+   *
+   * The reminder stays on for the working week; Saturday simply produces
+   * nothing, which is the arrangement somebody sets up on purpose.
+   */
+  it("is silent at the weekend when only the weekday switch is on", async () => {
+    const { db } = ctx();
+    await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: true,
+      remindWeighMinute: 420,
+      remindWeighWeekend: false,
+      remindWeighWeekendMinute: 420,
+    });
+
+    // Saturday at 07:00 local: nothing.
+    expect(await dueNow(db, new Date("2026-07-04T05:00:00.000Z"))).toEqual([]);
+
+    // The following Monday at 07:00 local: there it is.
+    const monday = await dueNow(db, new Date("2026-07-06T05:00:00.000Z"));
+    expect(monday.map((entry) => entry.localDate)).toEqual(["2026-07-06"]);
+  });
+
+  /** The reverse: on at the weekend and off during the week. */
+  it("is silent on a weekday when only the weekend switch is on", async () => {
+    const { db } = ctx();
+    await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: false,
+      remindWeighMinute: 420,
+      remindWeighWeekend: true,
+      remindWeighWeekendMinute: 420,
+    });
+
+    // Wednesday: nothing. Saturday, same local time: due.
+    expect(await dueNow(db, new Date("2026-07-01T05:00:00.000Z"))).toEqual([]);
+    expect(await dueNow(db, new Date("2026-07-04T05:00:00.000Z"))).toHaveLength(1);
+  });
+
+  /**
+   * The case the whole thing turns on: **Friday 23:30 on the server is already
+   * Saturday in Stockholm**, and that account gets its Saturday time.
+   *
+   * The same instant is still Friday afternoon in Los Angeles, and that account
+   * gets its weekday time. One instant, two answers, and neither of them is the
+   * server's day of the week.
+   */
+  it("follows the user's day of the week, not the server's", async () => {
+    const { db } = ctx();
+
+    // Friday 2026-07-03 at 23:30 UTC. Saturday 01:30 in Stockholm, Friday
+    // 16:30 in Los Angeles.
+    const now = new Date("2026-07-03T23:30:00.000Z");
+
+    const stockholm = await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: false, // off on weekdays
+      remindWeighMinute: 90,
+      remindWeighWeekend: true, // on at the weekend, 01:30
+      remindWeighWeekendMinute: 90,
+    });
+
+    const losAngeles = await withProfile({
+      timezone: "America/Los_Angeles",
+      remindWeigh: true, // on on weekdays, 16:30
+      remindWeighMinute: 990,
+      remindWeighWeekend: false, // off at the weekend
+      remindWeighWeekendMinute: 990,
+    });
+
+    const due = await dueNow(db, now);
+
+    expect(
+      due.find((entry) => entry.userId === stockholm.userId),
+      "Stockholm is having Saturday and its weekend reminder is on",
+    ).toEqual({ userId: stockholm.userId, kind: "weigh", localDate: "2026-07-04" });
+
+    expect(
+      due.find((entry) => entry.userId === losAngeles.userId),
+      "Los Angeles is still having Friday and its weekday reminder is on",
+    ).toEqual({ userId: losAngeles.userId, kind: "weigh", localDate: "2026-07-03" });
+  });
+
+  /**
+   * The mirror image, so the test above cannot pass by reading the wrong pair
+   * for both of them: swap the switches and neither account is due.
+   */
+  it("does not fire the wrong pair for either of them", async () => {
+    const { db } = ctx();
+
+    const now = new Date("2026-07-03T23:30:00.000Z");
+
+    await withProfile({
+      timezone: "Europe/Stockholm",
+      remindWeigh: true, // weekday only, but it is Saturday there
+      remindWeighMinute: 90,
+      remindWeighWeekend: false,
+      remindWeighWeekendMinute: 90,
+    });
+    await withProfile({
+      timezone: "America/Los_Angeles",
+      remindWeigh: false,
+      remindWeighMinute: 990,
+      remindWeighWeekend: true, // weekend only, but it is Friday there
+      remindWeighWeekendMinute: 990,
+    });
+
+    expect(await dueNow(db, now)).toEqual([]);
+  });
+
+  /**
+   * The skip rule and the never-twice rule are unchanged: they key on the local
+   * date, and the local date is where the weekend came from in the first place.
+   */
+  it("still skips what is already done, and still sends once, at the weekend", async () => {
+    const { app, db } = ctx();
+    const user = await withProfile({
+      timezone: "Europe/Stockholm",
+      remindDay: false,
+      remindDayWeekend: true,
+      remindDayWeekendMinute: 1320, // 22:00 on a Saturday
+    });
+
+    await db.insert(pushSubscriptions).values({
+      userId: user.userId,
+      endpoint: `https://push.example.test/${user.userId}`,
+      p256dh: "key",
+      auth: "auth",
+    });
+
+    // Saturday 2026-07-04 at 22:00 in Stockholm.
+    const now = new Date("2026-07-04T20:00:00.000Z");
+
+    const first = recordingSend();
+    expect((await runReminders(db, app.config, now, first.send)).sent).toBe(1);
+    expect(first.calls).toHaveLength(1);
+
+    // A second sweep inside the same window sends nothing more.
+    const second = recordingSend();
+    const again = await runReminders(db, app.config, now, second.send);
+    expect(second.calls).toEqual([]);
+    expect(again.sent).toBe(0);
+
+    // And the claim is filed under the Saturday the user was having.
+    const [claim] = await db
+      .select()
+      .from(reminderSends)
+      .where(eq(reminderSends.userId, user.userId));
+    expect(claim?.localDate).toBe("2026-07-04");
+  });
+
+  /** A day already filled in is not reminded about, whatever day it is. */
+  it("skips the weekend reminder when the day is already filled in", async () => {
+    const { app, db } = ctx();
+    const user = await withProfile({
+      timezone: "Europe/Stockholm",
+      remindDay: false,
+      remindDayWeekend: true,
+      remindDayWeekendMinute: 1320,
+    });
+
+    await db.insert(dailyLog).values({
+      userId: user.userId,
+      clientUuid: "33333333-3333-3333-3333-333333333333",
+      localDate: "2026-07-04",
+      loggedAt: new Date("2026-07-04T19:30:00.000Z"),
+    });
+
+    const recorder = recordingSend();
+    const result = await runReminders(
+      db,
+      app.config,
+      new Date("2026-07-04T20:00:00.000Z"),
+      recorder.send,
+    );
+
+    expect(recorder.calls).toEqual([]);
+    expect(result.skipped).toBe(1);
+  });
+});
+
 describe("the skip rules", () => {
   const ctx = useTestApp(KEYED);
 
