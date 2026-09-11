@@ -103,17 +103,24 @@ jobs:
       # suite that only passes against a server somebody loosened is the mistake
       # this whole arrangement exists to correct.
       #
-      # A step rather than a service container, because `minio/minio` needs the
+      # A step rather than a service container, because the image needs the
       # `server /data` argument and the `services:` block has nowhere to put a
       # command. Bitnami's image exists to work around exactly that and has
       # since withdrawn its `latest` tag, which is how this was found.
+      #
+      # **From quay.io, not Docker Hub.** `minio/minio` on Docker Hub started
+      # answering `pull access denied` with the repository reported as not
+      # existing, which is the second image under this one step to disappear.
+      # quay.io is MinIO's own registry and the one its documentation points at,
+      # and the tag there was pulled, run and health-checked before this was
+      # changed rather than after.
       - name: Start MinIO
         run: |
           docker run -d --name vikt-minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=viktaccess \
             -e MINIO_ROOT_PASSWORD=viktsecret123 \
-            minio/minio:latest server /data
+            quay.io/minio/minio:latest server /data
           # Waited for rather than slept past: a fixed sleep is a race that
           # passes on a fast runner and fails on a slow one.
           for attempt in $(seq 1 30); do
