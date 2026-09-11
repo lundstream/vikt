@@ -21,11 +21,14 @@ import { users } from "../db/schema.js";
 import { createLlmClient } from "../llm/client.js";
 import { buildCoachFacts, CONTEXT_CHAR_BUDGET } from "../llm/coach-context.js";
 import { checkSentence, sentencesOf } from "../llm/coach-guard.js";
-import { COACH_PERSONA, NO_PRESCRIPTION } from "../llm/prompts/coach.js";
+import { buildCoachPrompt } from "../llm/prompts/coach.js";
+import { coachToneSchema } from "shared";
 
 const question = process.argv[2] ?? "Hur har veckan sett ut?";
 const email = process.argv[3] ?? "test@example.test";
 const asOf = process.argv[4] ?? new Date().toISOString().slice(0, 10);
+/** Which voice to probe (D140). Defaults to the account's own setting. */
+const toneArgument = process.argv[5];
 
 const env = loadEnv();
 const { db, client } = createDb(env.DATABASE_URL);
@@ -47,24 +50,15 @@ console.log(`figures kg/vecka: ${facts.figures.kgPerWeek.join(", ")}`);
 console.log(`figures procent: ${facts.figures.percent.join(", ")}`);
 console.log(`floor: ${facts.guardrails.intakeFloorKcal}, max rate: ${facts.guardrails.maxRateKgWeek}`);
 
+const tone = coachToneSchema.catch("torr").parse(toneArgument ?? user.id);
+console.log(`tone: ${tone}`);
+
 const llm = createLlmClient(env);
 
 const result = await llm.chat({
   model: env.OLLAMA_MODEL_LARGE,
   messages: [
-    {
-      role: "system",
-      content: [
-        COACH_PERSONA,
-        NO_PRESCRIPTION,
-        "Du svarar bara utifrån siffrorna nedan och utifrån NNR. Du hittar aldrig på ett tal. " +
-          "Om någon frågar hur mycket kalorier eller makron en maträtt har, svarar du att det står under Mat, " +
-          "där siffrorna kommer från databasen. Du loggar ingenting och ändrar ingenting: du kan bara berätta " +
-          "var i appen något görs.",
-        "Det här är vad appen vet om personen just nu:",
-        facts.text,
-      ].join("\n\n"),
-    },
+    { role: "system", content: buildCoachPrompt(tone, facts.text) },
     { role: "user", content: question },
   ],
   timeoutMs: env.OLLAMA_JOB_TIMEOUT_MS,

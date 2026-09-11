@@ -4,7 +4,7 @@ import { auth, createUser, localDate, logWeight } from "./factories.js";
 import { useTestApp } from "./harness.js";
 import { coachMessages } from "../src/db/schema.js";
 import type { ChatResult, LlmClient } from "../src/llm/client.js";
-import { checkReply, isMedicalQuestion } from "../src/llm/coach-guard.js";
+import { checkReply, isMedicalQuestion, withQuestionFigures } from "../src/llm/coach-guard.js";
 import type { CoachFacts } from "../src/llm/coach-context.js";
 
 /**
@@ -152,6 +152,25 @@ describe("what the coach may say", () => {
     expect(checkReply("Du åt 84 kcal.", FACTS)).toMatchObject({
       ok: false,
       reason: "untraceable",
+    });
+  });
+
+  /**
+   * Found live: the neutral tone answered "systemet genererar ingen plan
+   * baserad på 800 kcal" and was refused for a figure the **person** had just
+   * typed. Repeating somebody's own number is the opposite of inventing one.
+   */
+  it("lets the reply repeat a figure from the question", () => {
+    const asked = withQuestionFigures(FACTS, "Vad händer om jag äter 800 kcal om dagen?");
+    expect(checkReply("Systemet sätter ingen plan på 800 kcal.", asked).ok).toBe(true);
+  });
+
+  /** And that concession does not reopen the floor. */
+  it("still refuses to recommend the figure the question named", () => {
+    const asked = withQuestionFigures(FACTS, "Vad händer om jag äter 800 kcal om dagen?");
+    expect(checkReply("Sikta på 800 kcal om dagen.", asked)).toMatchObject({
+      ok: false,
+      reason: "floor",
     });
   });
 

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { RegisterRequest, LoginRequest, Theme } from "shared";
 import { themeSchema } from "shared";
 import { toNumber, toNumberOrNull } from "shared";
+import { coachToneSchema } from "shared";
 import type { Db } from "../db/index.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { hashToken, newSessionToken } from "../auth/tokens.js";
@@ -70,6 +71,8 @@ export type AuthedUser = {
     remindWeighMinute: number;
     remindDay: boolean;
     remindDayMinute: number;
+    /** Which voice the coach uses (D140). */
+    coachTone: "torr" | "peppig" | "saklig";
     remindWeighWeekend: boolean;
     remindWeighWeekendMinute: number;
     remindDayWeekend: boolean;
@@ -248,6 +251,7 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
       remindWeighMinute: profile.remindWeighMinute,
       remindDay: profile.remindDay,
       remindDayMinute: profile.remindDayMinute,
+      coachTone: coachToneSchema.catch("torr").parse(profile.coachTone),
       remindWeighWeekend: profile.remindWeighWeekend,
       remindWeighWeekendMinute: profile.remindWeighWeekendMinute,
       remindDayWeekend: profile.remindDayWeekend,

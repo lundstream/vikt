@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { COACH_QUESTION_MAX, type CoachEvent } from "shared";
 import { t } from "../i18n/index.js";
 import { useLlmHealth } from "../lib/food.js";
+import { useMe } from "../lib/session.js";
 import { useLogDate } from "../lib/log-date.js";
 import {
   askCoach,
@@ -14,6 +15,7 @@ import {
   useWriteReview,
 } from "../lib/coach.js";
 import { ConfirmSheet } from "../components/ConfirmSheet.js";
+import { CoachTone } from "../components/CoachTone.js";
 
 /**
  * The Coach page (D139), §6 phase 8b.
@@ -39,6 +41,7 @@ type Line = { role: "user" | "coach"; body: string; refusal?: string | null };
 
 export function Coach() {
   const health = useLlmHealth();
+  const me = useMe();
   const { today } = useLogDate();
   const navigate = useNavigate();
 
@@ -145,10 +148,18 @@ export function Coach() {
 
   const newest = reviews.data?.[0] ?? null;
 
+  /**
+   * Who is speaking. The neutral tone has no name on purpose: a voice with
+   * no character has nobody to be named after, and calling it Bengt anyway
+   * would be the persona the person switched off.
+   */
+  const speaker =
+    me.data?.profile.coachTone === "saklig" ? t("coach.nameNeutral") : t("coach.name");
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 sm:px-6">
       <h1 className="text-lg text-ink">{t("coach.title")}</h1>
-      <p className="mt-1 max-w-prose text-note text-muted">{t("coach.what")}</p>
+      <p className="mt-1 max-w-prose text-note text-muted">{t("coach.what", { name: speaker })}</p>
 
       {/* The host being off is ordinary, and it is said once, with nothing else. */}
       {health.data && !health.data.reachable ? (
@@ -156,6 +167,21 @@ export function Coach() {
           {t("coach.unreachable")}
         </p>
       ) : null}
+
+      {/*
+        The two limits the checking cannot cover (D139, D140).
+
+        In Sten, under the description, where somebody reads it before asking
+        rather than after being told something wrong. The numbers are checked;
+        the sentences around them are not, and the screens are where the figures
+        somebody acts on actually live.
+      */}
+      <p className="mt-2 max-w-prose text-micro text-muted" data-testid="coach-limits">
+        {t("coach.limits")}
+      </p>
+
+      {/* Which voice, for both the summary and the chat (D140). */}
+      <CoachTone />
 
       {/* ------------------------------------------------------- the review */}
 
@@ -197,7 +223,7 @@ export function Coach() {
 
       <section className="mt-10" data-testid="coach-chat">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-base text-ink">{t("coach.chatTitle")}</h2>
+          <h2 className="text-base text-ink">{t("coach.chatTitle", { name: speaker })}</h2>
           {lines.length > 0 ? (
             <button
               type="button"
@@ -224,7 +250,7 @@ export function Coach() {
                 data-testid={line.role === "user" ? "coach-you" : "coach-said"}
               >
                 <p className="text-micro text-muted">
-                  {line.role === "user" ? t("coach.you") : t("coach.name")}
+                  {line.role === "user" ? t("coach.you") : speaker}
                 </p>
                 <p className="mt-1 whitespace-pre-line text-body text-ink">
                   {line.body === "" ? t("coach.thinking") : line.body}
@@ -280,7 +306,7 @@ export function Coach() {
           and full stop on the rendered page.
         */}
         <p className="mt-4 max-w-prose text-micro text-muted">
-          {t("coach.readsOnly")}{" "}
+          {t("coach.readsOnly", { name: speaker })}{" "}
           <Link className="btn-link" to="/dag">{t("nav.daily")}</Link>
           {" och "}
           <Link className="btn-link" to="/food">{t("nav.food")}</Link>.

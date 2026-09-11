@@ -161,6 +161,8 @@ export const meResponseSchema = z.object({
      * Defaulted like the rest, so an identity cached before this existed parses
      * and the screen simply shows the fallback until the next `/me`.
      */
+    /** Which voice the coach uses (D140). Defaulted for an older identity. */
+    coachTone: z.enum(["torr", "peppig", "saklig"]).default("torr"),
     remindWeighWeekend: z.boolean().default(false),
     remindWeighWeekendMinute: z.number().int().min(0).max(1439).default(420),
     remindDayWeekend: z.boolean().default(false),
@@ -243,6 +245,8 @@ export const updateProfileSchema = z
     remindWeighMinute: z.number().int().min(0).max(1439),
     remindDay: z.boolean(),
     remindDayMinute: z.number().int().min(0).max(1439),
+    /** Which voice the coach uses (D140). */
+    coachTone: z.enum(["torr", "peppig", "saklig"]),
     remindWeighWeekend: z.boolean(),
     remindWeighWeekendMinute: z.number().int().min(0).max(1439),
     remindDayWeekend: z.boolean(),

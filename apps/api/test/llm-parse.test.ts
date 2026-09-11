@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readParsedFood, PARSE_SYSTEM_PROMPT } from "../src/llm/parse-food.js";
 import { describeBudget, readGeneratedRecipe, RECIPE_SYSTEM_PROMPT } from "../src/llm/recipe.js";
-import { COACH_PERSONA, NO_PRESCRIPTION } from "../src/llm/prompts/coach.js";
+import { COACH_RULES, TONE_BLOCKS } from "../src/llm/prompts/coach.js";
 import { isPlausibleMatch } from "../src/services/llm.service.js";
 
 /**
@@ -143,17 +143,28 @@ describe("the prompts keep their prohibitions", () => {
     expect(PARSE_SYSTEM_PROMPT).toContain('"confidence"');
   });
 
-  /** §3: there is no failure state in this UI, and the coach is where one would appear. */
-  it("forbids the coach from guilt and cheerleading", () => {
-    expect(COACH_PERSONA).toMatch(/Aldrig skuld/);
-    expect(COACH_PERSONA).toMatch(/Aldrig peppig/);
-    expect(COACH_PERSONA).toMatch(/misslyckats/);
+  /**
+   * §3: there is no failure state in this UI, and the coach is where one would
+   * appear. The prohibition moved into the shared rules when the tones arrived
+   * (D140), which is the point of having a shared block: a warmer voice cannot
+   * opt out of it.
+   */
+  it("forbids the coach from guilt, whatever the tone", () => {
+    expect(COACH_RULES).toMatch(/Aldrig skuld/);
+    expect(COACH_RULES).toMatch(/misslyckats/);
   });
 
   /** §6: it comments on patterns, it never sets targets or prescribes intake. */
   it("forbids the coach from prescribing", () => {
-    expect(NO_PRESCRIPTION).toMatch(/aldrig mål/);
-    expect(NO_PRESCRIPTION).toMatch(/kaloriintag/);
+    expect(COACH_RULES).toMatch(/aldrig mål/);
+    expect(COACH_RULES).toMatch(/kaloriintag/);
+  });
+
+  /** And no tone block quietly grants back what the rules forbid. */
+  it("keeps the tones to tone", () => {
+    for (const [tone, block] of Object.entries(TONE_BLOCKS)) {
+      expect(block, tone).not.toMatch(/kcal|kalori|mål|takt/i);
+    }
   });
 });
 

@@ -5716,3 +5716,149 @@ goes with the account. A second paragraph says what the coach is given about a
 person, which is the question a reader actually has, and the answer is "not your
 rows". The AI paragraph under "who else sees anything" now covers the chat as
 well as free-text food.
+
+---
+
+### D140 — Three tones, one set of rules, and a fact sheet
+
+The coach had one voice. It now has three, chosen on the Coach page and applied
+to the chat and the weekly review alike, because they are one voice from one
+prompt and a person who picks a tone picks it for both.
+
+- **Torr**, the original and the default: short, understated, funnier when
+  things go well than when they do not.
+- **Peppig**: warmer where warmth is honest. Glad on the way up, and **exactly
+  as restrained** when a week has gone badly. That asymmetry is the whole design
+  of this profile; a uniformly upbeat coach at somebody having a hard month is
+  the failure state §3 forbids, wearing a friendlier hat.
+- **Saklig**: no persona at all, and no name. The numbers, what they mean,
+  nothing else.
+
+#### What was rejected, and why it is not a matter of taste
+
+Strict, roasting and guilt-based tones were considered and are **ruled out by
+the rules rather than by preference**. §3 says this UI has no failure state, and
+the Phase 8 entry says the coach is "never nagging, never guilt". A tone whose
+point is disapproval cannot be built out of those; it would have to be an
+exception to them.
+
+**The set is closed.** Adding a fourth means amending this decision *and* the
+Phase 8 entry, which is the cost that keeps somebody from adding "sträng" on a
+quiet afternoon.
+
+#### The prompt splits where the risk is
+
+`prompts/coach.ts` is still the only file that says anything about how the coach
+sounds, and it now has two parts:
+
+- `COACH_RULES`, shared and handed to every profile **verbatim**. No invented
+  numbers, no pricing a food, no prescribing, no guilt, no medical advice, no
+  writing anything. A test asserts that every assembled prompt contains it
+  exactly, and a second asserts that no tone block mentions calories, targets or
+  rates — a tone may not quietly grant back what the rules forbid.
+- `TONE_BLOCKS`, one per profile, and the only thing that varies.
+
+#### A fact sheet, because the third finding in D139 was not about numbers
+
+D139 recorded that the guard checks figures and not claims: asked what happens at
+800 kcal, the model refused the premise correctly and then said the app would
+record such a day as invalid data. Every figure in that reply was traceable, so
+there was nothing for a numeric check to catch.
+
+The answer is to give the model less to invent. `APP_FACTS` is ten lines about
+what the app actually does: what is logged, that **no day is ever invalid**, how
+the trend and maintenance figures are produced, that estimates are marked, where
+the guardrails sit, that food figures come from the database, that streaks count
+logging rather than compliance, that the coach sees only aggregates and can
+write nothing. It travels on every turn in every tone.
+
+It worked. Asked the same question afterwards, in all three tones, none repeated
+the falsehood, and the neutral one stated the truth outright: "Om du loggar ett
+intag på 800 kcal sparas det, men appen kommer inte att justera din plan nedåt
+till den nivån."
+
+#### Live, one turn per tone
+
+Same account, same question, same model. Verbatim:
+
+> **Torr** — Trendvikten ligger nu på 86,9 kg efter att ha sjunkit 1,2 kg under
+> de senaste fyra veckorna. Det motsvarar ett snitt på 0,30 kg i veckan. Du har
+> vägt dig 15 gånger och loggat matintaget under 21 av dagarna.
+>
+> **Peppig** — Det ser riktigt bra ut med den nedgående trenden just nu.
+> Trendvikten har minskat 1,2 kg på de senaste 28 dagarna, vilket motsvarar
+> 0,30 kg i veckan. Det är roligt att se att du håller god fart mot målet på
+> 83,5 kg.
+>
+> **Saklig** — Trendvikten har minskat med 0,30 kg denna vecka och ligger nu på
+> 86,9 kg. Det motsvarar en total nedgång på 1,2 kg under de senaste 28 dagarna
+> baserat på 15 vägningar. Det loggade genomsnittliga intaget har varit
+> 2249 kcal per dag på de dagar då mat registrerats.
+
+**Every sentence of all three passed the guard**, and the guardrail battery was
+run once per tone against a stubbed model as well, so the refusal, the deferral
+and the storage are known not to depend on which voice is in force. The one
+profile that tripped a guard live was **Saklig**, once, and it was the check
+being wrong rather than the tone: it repeated the **question's own** 800 kcal
+back, and a figure the person just typed is the opposite of an invented one.
+Question figures now count as traceable. The floor and rate checks do not
+consult that allowlist at all, so "sikta på 800 kcal" is still refused whoever
+said 800 first, and both directions are tested.
+
+Peppig did not trip a guard in any live run, which is the thing to keep watching:
+it is the profile with the most room to reach for a number.
+
+#### The nameless tone has no name
+
+Saklig drops "Bengt" from the page as well as from the prompt. The heading, the
+speaker label and the line about what the coach cannot do all take the name as a
+parameter, and with no persona the name is "Coachen". Leaving the character's
+name on a voice somebody switched off would be the persona surviving the setting
+that removes it.
+
+---
+
+### D141 — The Sunday job, and the week that is not worth summarising
+
+The weekly review was written on request only, and D139 named the missing piece
+as Phase 8's with the reason: a scheduler needs decisions, not a cron line. Here
+they are.
+
+**Sunday at 20:00, in the user's own timezone.** On the reminder scheduler's
+machinery (D136): a minute tick that asks each profile what time it is *there*.
+A cron expression would have to name one timezone, and a timezone is the one
+value that cannot be a single thing in this app. Sunday evening because the week
+is over and the next one has not started, and because a summary that arrives
+Monday morning is a thing to read on the way to work rather than a full stop.
+
+The same 30-minute window the reminders use, so a sweep that runs a few minutes
+late still writes. Tested with a user whose Sunday 20:00 **is Monday for the
+server**: Los Angeles at 03:00 UTC, where `getUTCDay()` says Monday and the
+person is still having Sunday evening.
+
+**At least four logged days, or nothing is written.** Below that there is no week
+to describe. A summary built from one weighing is padding, and the model's
+natural way of filling it is a sentence about how little was logged — which is
+the failure state §3 forbids, arriving through the back door in a friendly voice.
+So the honest output for a quiet week is **nothing at all**: no review, no card,
+and no comment about the absence. A week somebody was away simply does not
+produce one.
+
+Four of seven is a judgement, and it is written down here so that changing it is
+a decision rather than a tweak. "Logged" means the same thing it means for the
+streak: a weight, a daily row, or food.
+
+**Idempotent per user and week**, by the unique index on `(user_id, week_start)`
+that already existed. The sweep checks for an existing row before spending a
+generation, so a second pass inside the same window costs one query rather than
+one GPU minute. The on-request path and the sweep meet at the same index: asking
+on Sunday afternoon and the sweep arriving at eight cannot produce two.
+
+**One instance**, like the mail drainer (D104) and the reminders (D136). Two
+schedulers cannot write two reviews — the index forbids it — so what they would
+cost is a wasted generation, not a duplicate. That is the honest limit and the
+reason this is still not worth a lock.
+
+The dashboard card is unchanged: it appears when a review exists and has not been
+dismissed, and the dismissal is on the row so that putting it away on the phone
+puts it away on the laptop (D139, D108).

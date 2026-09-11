@@ -66,6 +66,7 @@ export async function editProfile(
       : {}),
     ...(input.remindDay !== undefined ? { remindDay: input.remindDay } : {}),
     ...(input.remindDayMinute !== undefined ? { remindDayMinute: input.remindDayMinute } : {}),
+    ...(input.coachTone !== undefined ? { coachTone: input.coachTone } : {}),
     ...(input.remindWeighWeekend !== undefined
       ? { remindWeighWeekend: input.remindWeighWeekend }
       : {}),

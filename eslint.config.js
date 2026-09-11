@@ -74,6 +74,13 @@ export default tseslint.config(
              * whose date it is, is the caller's question.
              */
             "weekStartOf",
+            /**
+             * The Sunday sweep (D141), which is the same shape as `runReminders`
+             * beside it: it runs for **every** account and finds whose local
+             * clock has just passed Sunday at eight. Its per-user work is
+             * scoped; the sweep itself has no one user to belong to.
+             */
+            "runWeeklyReviews",
 
             /**
              * Pure functions of their arguments. Neither touches the database,

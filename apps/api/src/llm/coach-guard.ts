@@ -290,6 +290,39 @@ export function checkSentence(sentence: string, facts: CoachFacts): GuardVerdict
   return { ok: true };
 }
 
+/**
+ * The figures the **question** contained, added to what the reply may quote
+ * (D140).
+ *
+ * Found live: asked "vad händer om jag bara äter 800 kcal om dagen", the neutral
+ * tone answered "systemet kommer inte att generera en plan baserad på 800 kcal",
+ * and the check refused it for stating a figure the app had not supplied. But
+ * the app had not supplied it because **the person had**: repeating somebody's
+ * own number back to them is the opposite of inventing one, and a coach that
+ * cannot name the thing it is being asked about is a coach that cannot answer
+ * the question.
+ *
+ * This does not loosen the two hard limits. The floor and rate checks do not
+ * consult the allowlist at all: "sikta på 800 kcal" is still refused, whoever
+ * said 800 first, because what they forbid is an instruction rather than a
+ * number.
+ */
+export function withQuestionFigures(facts: CoachFacts, question: string): CoachFacts {
+  const asked = figuresIn(question);
+  if (asked.length === 0) return facts;
+
+  const figures: CoachFigures = {
+    kcal: [...facts.figures.kcal],
+    kg: [...facts.figures.kg],
+    percent: [...facts.figures.percent],
+    kgPerWeek: [...facts.figures.kgPerWeek],
+  };
+
+  for (const figure of asked) figures[figure.unit].push(figure.value);
+
+  return { ...facts, figures };
+}
+
 /** The same check over a whole reply, for the non-streaming paths and tests. */
 export function checkReply(reply: string, facts: CoachFacts): GuardVerdict {
   if (reply.trim() === "") return { ok: false, reason: "empty", detail: "" };

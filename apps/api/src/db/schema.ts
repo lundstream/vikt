@@ -261,6 +261,14 @@ export const profiles = pgTable("profiles", {
    * the server's. `isWeekend(toLocalDate(now, timezone))` in shared, one place,
    * and `reminder.service.ts` is the only caller.
    */
+  /**
+   * Which voice the coach speaks in (D140): `torr`, `peppig` or `saklig`.
+   *
+   * On the profile rather than in the browser, because the weekly review is
+   * written by a scheduler with no browser to ask, and because a tone chosen
+   * on the phone is meant on the laptop.
+   */
+  coachTone: text("coach_tone").notNull().default("torr"),
   remindWeighWeekend: boolean("remind_weigh_weekend").notNull().default(false),
   remindWeighWeekendMinute: integer("remind_weigh_weekend_minute").notNull().default(420),
   remindDayWeekend: boolean("remind_day_weekend").notNull().default(false),

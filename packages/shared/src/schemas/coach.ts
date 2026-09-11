@@ -2,6 +2,19 @@ import { z } from "zod";
 import { localDateSchema } from "./log.js";
 
 /**
+ * The three tones (D140).
+ *
+ * A closed set, in `shared` because the server picks a prompt with it and the
+ * settings control offers exactly these three. Strict, roasting and
+ * guilt-based tones are ruled out by §3 and by the Phase 8 entry, not by
+ * taste, and adding a fourth means amending both documents.
+ */
+export const COACH_TONES = ["torr", "peppig", "saklig"] as const;
+export type CoachTone = (typeof COACH_TONES)[number];
+export const coachToneSchema = z.enum(COACH_TONES);
+
+
+/**
  * The coach over the wire (D139), §6 phase 8b.
  *
  * The turn itself is **not** a JSON response: it is Server-Sent Events, one

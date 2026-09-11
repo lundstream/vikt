@@ -7,6 +7,7 @@ import { renderRoute } from "./harness.js";
 import { Coach } from "../../src/routes/Coach.js";
 import { ReviewCard } from "../../src/components/ReviewCard.js";
 import { destinationsFor } from "../../src/components/AppShell.js";
+import { CoachTone } from "../../src/components/CoachTone.js";
 
 /**
  * The coach's surfaces (D139), §6 phase 8b.
@@ -192,5 +193,153 @@ describe("the navigation entry", () => {
     expect(without).not.toContain("/coach");
     // And nothing else moved.
     expect(without.length).toBe(withLlm.length - 1);
+  });
+});
+
+describe("the tone", () => {
+  afterEach(cleanup);
+
+  /**
+   * A whole identity, not a fragment.
+   *
+   * `api.me()` parses the response, so a partial profile fails the schema, the
+   * query has no data, and the component falls back to the default tone — which
+   * looked exactly like the component ignoring the setting.
+   */
+  function identity(coachTone: string) {
+    return {
+      id: "00000000-0000-0000-0000-000000000001",
+      email: "someone@example.test",
+      displayName: "Someone",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      isAdmin: false,
+      profile: {
+        heightCm: 180,
+        birthDate: null,
+        sex: "unspecified",
+        timezone: "Europe/Stockholm",
+        locale: "sv-SE",
+        activityFactor: 1.35,
+        addExerciseToTarget: false,
+        soberAssumeUnloggedDry: false,
+        newsMail: true,
+        theme: "system",
+        lastDrinkOn: null,
+        coachTone,
+        macroOverrides: { proteinG: null, carbsG: null, fatG: null, fiberG: null },
+      },
+    };
+  }
+
+  function mountTone(current: string) {
+    const patches: Record<string, unknown>[] = [];
+
+    renderRoute(<CoachTone />, {
+      responses: [{ match: "/api/me", body: identity(current) }],
+      stateful: [
+        {
+          match: "/api/me/profile",
+          get: () => ({}),
+          post: (body) => patches.push(body as Record<string, unknown>),
+          wrote: { profile: { coachTone: "peppig" } },
+        },
+      ],
+    });
+
+    return { patches };
+  }
+
+  it("offers exactly the three, with the chosen one marked", async () => {
+    mountTone("torr");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("coach-tone-torr").getAttribute("aria-pressed")).toBe("true"),
+    );
+    expect(screen.getByTestId("coach-tone-peppig").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("coach-tone-saklig")).toBeTruthy();
+    // Three and no more: the set is closed by decision (D140).
+    expect(document.querySelectorAll('[data-testid^="coach-tone-"]')).toHaveLength(4);
+  });
+
+  it("saves the choice to the profile", async () => {
+    const { patches } = mountTone("torr");
+
+    fireEvent.click(await screen.findByTestId("coach-tone-peppig"));
+
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toEqual({ coachTone: "peppig" });
+  });
+
+  it("describes the one that is chosen, not all three", async () => {
+    mountTone("saklig");
+
+    /**
+     * Waited for rather than read once: the row renders on the first paint with
+     * the default, and the chosen tone arrives with the identity a moment
+     * later. Reading it immediately asserted the placeholder.
+     */
+    await waitFor(() =>
+      expect(screen.getByTestId("coach-tone-what").textContent).toContain("Ingen personlighet"),
+    );
+    expect(screen.getByTestId("coach-tone-what").textContent).not.toContain("underdriven");
+    expect(screen.getByTestId("coach-tone-saklig").getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("the neutral tone", () => {
+  afterEach(cleanup);
+
+  /**
+   * Saklig has no persona, so it has no name either: calling it Bengt anyway
+   * would be exactly the character somebody switched off.
+   */
+  it("drops the persona's name from the page", async () => {
+    renderRoute(<Coach />, {
+      responses: [
+        {
+          match: "/api/llm/health",
+          body: { configured: true, reachable: true, models: { small: "s", large: "l" } },
+        },
+        { match: "/api/coach/conversations", body: { conversations: [] } },
+        { match: "/api/coach/reviews", body: { reviews: [] } },
+        {
+          match: "/api/me",
+          body: {
+            id: "00000000-0000-0000-0000-000000000001",
+            email: "someone@example.test",
+            displayName: "Someone",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            isAdmin: false,
+            profile: {
+              heightCm: 180, birthDate: null, sex: "unspecified",
+              timezone: "Europe/Stockholm", locale: "sv-SE", activityFactor: 1.35,
+              addExerciseToTarget: false, soberAssumeUnloggedDry: false, newsMail: true,
+              theme: "system", lastDrinkOn: null, coachTone: "saklig",
+              macroOverrides: { proteinG: null, carbsG: null, fatG: null, fiberG: null },
+            },
+          },
+        },
+      ],
+    });
+
+    await waitFor(() => expect(screen.getByText(/Fråga Coachen/)).toBeTruthy());
+    expect(screen.queryByText(/Fråga Bengt/)).toBeNull();
+  });
+});
+
+describe("what the coach cannot promise", () => {
+  afterEach(cleanup);
+
+  /**
+   * D139 found two limits a numeric check cannot cover, and D140 put them on
+   * the screen rather than only in a decision file nobody reading the app will
+   * open.
+   */
+  it("says that the words are not checked even though the numbers are", async () => {
+    mountCoach(sse([]));
+
+    const line = await screen.findByTestId("coach-limits");
+    expect(line.textContent).toContain("kan ha fel");
+    expect(line.textContent).toContain("andra skärmarna");
   });
 });

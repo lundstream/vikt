@@ -47,6 +47,12 @@ when it will be down, and its mail goes out.
   from the account's own aggregates, streamed, with every figure in the reply
   checked against the numbers the app actually holds before it reaches the
   screen. Absent entirely when the LLM layer is off.
+- **Three tones for it** (D140), chosen on the same page and applied to the chat
+  and the review alike: torr, peppig and saklig. Every tone gets the same rules
+  block verbatim and the same ten-line fact sheet about what the app does.
+- **The review writes itself on Sunday evening** (D141), at 20:00 in the
+  account's own timezone, and only for a week carrying at least four logged
+  days.
 - **A habit checklist on Dagen** (D137): the user's own words, an optional icon from
   a closed set, an order, one tap to tick and one to untick, a streak per habit, and
   an optional reminder per habit in the same two-time shape. Removing a habit keeps
@@ -63,9 +69,6 @@ Empty.
 - **Group features** (§6 phase 9) and **device integrations** (§6 phase 10).
 - **SMB and S3 backup destinations**, named in the settings and refused with a
   reason.
-- **The Sunday job** that would write weekly reviews without being asked (§6
-  phase 8). The review itself is built and is written on request (D139); what is
-  missing is the schedule, which needs its own decision about whose Sunday it is.
 - **Photos** are still the oldest unbuilt item (§6 phase 7), with the self-service
   deletion hook that waits on them.
 - **MFA and importing from other apps** — phases 12 and 13, written down in
@@ -101,6 +104,9 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
+
+`0028_coach_tone` lägger till kolumnen `coach_tone` på `profiles`, med `torr` som
+standard. Additiv, och standardvärdet är den röst som redan fanns.
 
 `0027_coach` lägger till tabellerna `coach_conversations` och `coach_messages`,
 samt kolumnen `dismissed_at` på `weekly_reviews`. Additiv. Samtalen kaskaderar
@@ -200,6 +206,12 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
+- Coachen har tre tonlägen som du väljer under Coach: Torr, Peppig och Saklig.
+  Valet gäller både veckans sammanfattning och chatten. Saklig har ingen
+  personlighet alls och heter då bara Coachen.
+- Veckans sammanfattning skrivs numera av sig själv på söndagskvällen, klockan
+  20:00 i din egen tidszon. Har veckan färre än fyra loggade dagar skrivs ingen
+  alls, och då dyker inget kort upp på Översikt heller.
 - Under Mer finns Coach: en sida där Bengt sammanfattar veckan och svarar på frågor
   om hur det går. Han utgår bara från dina egna siffror, hittar aldrig på några nya
   och ändrar ingenting: loggar och planer sköter du själv. Svaret skrivs ut medan
@@ -335,7 +347,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1423 tests**: 494 shared, 261 web, 668 api. Lint clean, all three packages
+**1458 tests**: 494 shared, 265 web, 699 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 677 with none skipped**, which is the number that
@@ -371,6 +383,12 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- Coach at 360 px and at 1280 px with the tone selector, against the **real model
+  on the LAN**: one turn per tone, every sentence of all three passing the guard,
+  and the 800 kcal question asked again in each tone. None of them repeated the
+  false claim about the app that D139 recorded, which is what the fact sheet was
+  for. One live refusal, in the neutral tone, was the check being wrong rather
+  than the model: it quoted the question's own figure back;
 - Coach at 360 px and at 1280 px, against the **real model on the LAN**: the
   week's summary written from the account's own aggregates, four questions asked
   and answered, and the medical one answered by the app without the model being

@@ -468,6 +468,10 @@ The workstation on the LAN, wherever `OLLAMA_URL` points, is not always on, so t
 > 3. Weekly review: a Sunday job that feeds the week's aggregates (not raw rows) to the larger model and stores a short written summary. It comments on patterns, it never sets targets or prescribes intake.
 >
 > 4. Coach persona: a named character with a consistent dry voice that delivers the weekly review and milestone messages. Personality lives in one prompt file, easy to rewrite. Never nagging, never guilt, funnier when things are going well than when they are not.
+>
+> **Amended when built (D140): three tones, not one.** Torr (this voice, the default), Peppig (warmer when things go well, equally restrained when they do not) and Saklig (no persona at all). The prompt file splits into rules that every tone gets verbatim and a tone block that is the only thing which varies. **The set is closed**: strict, roasting and guilt-based tones are ruled out by §3 and by this entry rather than by taste, and adding a fourth means amending D140 and this paragraph together.
+>
+> **The Sunday job (D141)**: the review is written at 20:00 on the user's own Sunday, on the reminder scheduler's machinery, and only for a week with at least four logged days. A quieter week produces no review, no card and no sentence about the absence.
 
 ---
 

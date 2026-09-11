@@ -2,14 +2,20 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
-import { coachConversations, coachMessages, weeklyReviews } from "../db/schema.js";
-import { COACH_NAME, COACH_PERSONA, NO_PRESCRIPTION } from "../llm/prompts/coach.js";
+import { coachToneSchema, type CoachTone } from "shared";
+import { coachConversations, coachMessages, profiles, weeklyReviews } from "../db/schema.js";
+import { buildCoachPrompt, COACH_NAME } from "../llm/prompts/coach.js";
 import {
   buildCoachFacts,
   CONTEXT_TURNS,
   type CoachFacts,
 } from "../llm/coach-context.js";
-import { checkSentence, isMedicalQuestion, sentencesOf } from "../llm/coach-guard.js";
+import {
+  checkSentence,
+  isMedicalQuestion,
+  sentencesOf,
+  withQuestionFigures,
+} from "../llm/coach-guard.js";
 import { RateLimiter } from "../lib/rate-limit.js";
 
 /**
@@ -106,18 +112,14 @@ export function refusalMessage(reason: string, facts: CoachFacts): string {
   }
 }
 
-/** The persona, the rules and the numbers, assembled per turn. */
-function systemPrompt(facts: CoachFacts): string {
-  return [
-    COACH_PERSONA,
-    NO_PRESCRIPTION,
-    `Du svarar bara utifrån siffrorna nedan och utifrån NNR. Du hittar aldrig på ett tal. ` +
-      `Om någon frågar hur mycket kalorier eller makron en maträtt har, svarar du att det står under Mat, ` +
-      `där siffrorna kommer från databasen. Du loggar ingenting och ändrar ingenting: du kan bara berätta ` +
-      `var i appen något görs.`,
-    "Det här är vad appen vet om personen just nu:",
-    facts.text,
-  ].join("\n\n");
+/**
+ * The chosen tone, the unchanging rules, the fact sheet and the numbers.
+ *
+ * Assembled in `prompts/coach.ts` (D140), which is still the only file that
+ * says anything at all about how the coach sounds.
+ */
+function systemPrompt(tone: CoachTone, facts: CoachFacts): string {
+  return buildCoachPrompt(tone, facts.text);
 }
 
 async function loadTurns(userId: string, db: Db, conversationId: string) {
@@ -228,11 +230,22 @@ export async function* askCoach(
     return;
   }
 
-  const facts = await buildCoachFacts(userId, db, env, input.asOf);
-  const history = await loadTurns(userId, db, conversationId);
+  /**
+   * The figures the question itself carried count as traceable (D140):
+   * repeating somebody's own number back to them is not inventing one, and
+   * the floor and rate checks are unaffected either way.
+   */
+  const facts = withQuestionFigures(
+    await buildCoachFacts(userId, db, env, input.asOf),
+    input.question,
+  );
+  const [history, tone] = await Promise.all([
+    loadTurns(userId, db, conversationId),
+    coachToneFor(userId, db),
+  ]);
 
   const messages = [
-    { role: "system" as const, content: systemPrompt(facts) },
+    { role: "system" as const, content: systemPrompt(tone, facts) },
     ...history
       .filter((row) => row.refusal === null || row.role === "user")
       .slice(-(CONTEXT_TURNS * 2))
@@ -392,6 +405,17 @@ export async function* askCoach(
     inFlight.delete(userId);
     queued -= 1;
   }
+}
+
+/** Which voice this account has chosen, falling back to the original one. */
+export async function coachToneFor(userId: string, db: Db): Promise<CoachTone> {
+  const [row] = await db
+    .select({ tone: profiles.coachTone })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+
+  return coachToneSchema.catch("torr").parse(row?.tone);
 }
 
 async function touch(userId: string, db: Db, conversationId: string): Promise<void> {

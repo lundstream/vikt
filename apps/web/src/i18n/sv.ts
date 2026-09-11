@@ -406,7 +406,7 @@ export const sv = {
   "coach.title": "Coach",
   "coach.name": "Bengt",
   "coach.what":
-    "Bengt svarar på frågor om hur det går, utifrån dina egna siffror. Han räknar inte fram några nya, och han ändrar ingenting.",
+    "{name} svarar på frågor om hur det går, utifrån dina egna siffror. Inga nya siffror räknas fram, och ingenting ändras.",
   "coach.reviewTitle": "Veckans sammanfattning",
   "coach.writeReview": "Skriv veckans",
   "coach.writing": "Skriver…",
@@ -416,7 +416,18 @@ export const sv = {
   "coach.weekOf": "Veckan från {date}",
   "coach.readAll": "Läs hela",
   "coach.dismiss": "Tack, läst",
-  "coach.chatTitle": "Fråga Bengt",
+  "coach.nameNeutral": "Coachen",
+  "coach.limits":
+    "Siffrorna i svaren kontrolleras mot dina egna uppgifter, men orden runt dem gör det inte: coachen kan ha fel om hur appen fungerar. Det som står på de andra skärmarna är det som gäller.",
+  "coach.toneTitle": "Tonläge",
+  "coach.toneTorr": "Torr",
+  "coach.tonePeppig": "Peppig",
+  "coach.toneSaklig": "Saklig",
+  "coach.toneTorrWhat": "Kort och underdriven, och roligare när det går bra än när det går trögt.",
+  "coach.tonePeppigWhat": "Varmare och gladare när det går bra, lika lugn när det går trögt.",
+  "coach.toneSakligWhat": "Ingen personlighet alls. Siffrorna och vad de betyder.",
+  "coach.toneBoth": "Gäller både sammanfattningen och chatten.",
+  "coach.chatTitle": "Fråga {name}",
   "coach.empty":
     "Fråga något om hur det går. Till exempel hur veckan sett ut, eller varför underhållsnivån rört sig.",
   "coach.ask": "Din fråga",
@@ -431,7 +442,7 @@ export const sv = {
     "Coachen går inte att nå just nu. Den kör på en dator hemma som inte alltid är igång, och frågan sparas inte.",
   "coach.limited": "Du har frågat många gånger den här timmen. Prova igen om en stund.",
   "coach.readsOnly":
-    "Bengt kan bara läsa. Han loggar ingenting och ändrar ingen plan: det gör du själv under",
+    "{name} kan bara läsa. Ingenting loggas och ingen plan ändras: det gör du själv under",
   "coach.historyTitle": "Tidigare samtal",
   "coach.historyWhat":
     "Samtalen sparas på ditt konto, visas bara för dig och används inte till något annat. De följer med i exporten och försvinner med kontot.",

@@ -4,6 +4,7 @@ import { buildApp } from "./app.js";
 import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
 import { startReminderScheduler } from "./lib/reminder-scheduler.js";
+import { startReviewScheduler } from "./lib/review-scheduler.js";
 import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
@@ -67,6 +68,7 @@ startBackupScheduler(app);
  * `reminder_sends` means they still could not send twice.
  */
 startReminderScheduler(app);
+startReviewScheduler(app);
 
 /**
  * The mail drainer (D104), which D88 made a separate process and nothing ever
