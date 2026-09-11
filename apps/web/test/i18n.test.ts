@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { LOCALE, t, translationKeys } from "../src/i18n/index.js";
+import { REMINDER_TEXT } from "shared";
 import { sv } from "../src/i18n/sv.js";
 
 /**
@@ -182,5 +183,21 @@ describe("translation coverage", () => {
     const forbidden = /\b(misslyckad|misslyckats|du missade|fel på dig|bruten)\b/i;
     const offenders = Object.entries(sv).filter(([, value]) => forbidden.test(value));
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * The notification copy has one owner (D136).
+ *
+ * The server builds the payload and the settings screen previews it, so the
+ * words live in `shared`. The dictionary keeps its own entries because that is
+ * where the copy guards look — a string that arrives on a lock screen is
+ * interface copy that happens to be displayed somewhere else — and this is what
+ * stops the two from drifting apart.
+ */
+describe("the reminder notifications", () => {
+  it("say the same thing in the dictionary as on the wire", () => {
+    expect(sv["push.notifyWeigh"]).toBe(REMINDER_TEXT.weigh);
+    expect(sv["push.notifyDay"]).toBe(REMINDER_TEXT.day);
   });
 });

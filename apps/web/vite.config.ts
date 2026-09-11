@@ -318,6 +318,20 @@ export default defineConfig(({ command }) => ({
       injectRegister: null,
       includeAssets: ["icon.svg", "icon-maskable.svg"],
       workbox: {
+        /**
+         * The push handlers, joined to the generated worker (D136).
+         *
+         * `importScripts` rather than switching the whole build to
+         * `injectManifest`: the worker is workbox's, the handlers are two
+         * events, and owning the entire file to add them would mean owning the
+         * precache manifest and the navigation fallback as well.
+         *
+         * The path is absolute because the worker is served from `/sw.js` at
+         * the root while its scope is `/app/`, so a relative import would
+         * resolve against the wrong directory.
+         */
+        importScripts: ["/app/push-sw.js"],
+
         // The app shell. Everything else is data and goes through the queue.
         // woff2 included: the fonts are local now, and an offline app that
         // falls back to a system sans is the thing this phase exists to stop.

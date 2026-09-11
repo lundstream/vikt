@@ -228,6 +228,22 @@ export const profiles = pgTable("profiles", {
    * default costs one boolean per row and removes that whole case.
    */
   requestMail: boolean("request_mail").notNull().default(true),
+
+  /**
+   * The two reminders (D136), off until somebody turns them on.
+   *
+   * A notification nobody asked for is the fastest way to have notifications
+   * turned off for good, so the default is the one where nothing arrives.
+   *
+   * The times are **minutes past midnight in this user's own timezone**, the
+   * same shape the backup schedule uses. 07:00 is 420 and 22:00 is 1320. Never
+   * a UTC hour: seven in the morning is a different instant for two accounts,
+   * and a different instant for one account in March.
+   */
+  remindWeigh: boolean("remind_weigh").notNull().default(false),
+  remindWeighMinute: integer("remind_weigh_minute").notNull().default(420),
+  remindDay: boolean("remind_day").notNull().default(false),
+  remindDayMinute: integer("remind_day_minute").notNull().default(1320),
   /**
    * Which theme to use: `system`, `dark` or `light` (D117).
    *
@@ -1432,4 +1448,77 @@ export const announcementSeen = pgTable(
     uniqueIndex("announcement_seen_key").on(t.announcementId, t.userId),
     index("announcement_seen_user_idx").on(t.userId),
   ],
+);
+
+/**
+ * One push subscription per browser per account (D136).
+ *
+ * Per device rather than per account, because the same person has a phone and
+ * a laptop and they subscribe separately. `endpoint` is the push service's URL
+ * for that device and is unique table-wide: re-subscribing the same browser
+ * updates the row rather than making a second one, which is what stops a
+ * reinstalled app from collecting duplicates that all fire at once.
+ *
+ * Cascades with the account (D107). A subscription is a way to reach a person,
+ * so it goes when they do.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /** Opaque to this app: stored, and handed back to the push library. */
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+
+    /**
+     * What the browser calls itself, so somebody with three devices can tell
+     * which row is the phone they no longer have. Editable and removable from
+     * any other device, per D56.
+     */
+    label: text("label").notNull().default(""),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Touched when a push service accepts a notification for this device, so a
+     * row nothing has reached for months is visible as one.
+     */
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    endpointKey: uniqueIndex("push_subscriptions_endpoint_key").on(t.endpoint),
+    userIdx: index("push_subscriptions_user_idx").on(t.userId),
+  }),
+);
+
+/**
+ * What has already been sent, so a reminder is never sent twice for one day
+ * (D136).
+ *
+ * The unique index on `(user_id, kind, local_date)` **is** the guard, rather
+ * than a check in code: a retry, a second process, or a clock that steps
+ * backwards all converge on one row. Inserting is how a send claims the day,
+ * and a conflict means somebody else already has it.
+ *
+ * `local_date` is the user's own day (§3), never derived from a UTC timestamp.
+ */
+export const reminderSends = pgTable(
+  "reminder_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `weigh` or `day`. */
+    kind: text("kind", { enum: ["weigh", "day"] }).notNull(),
+    localDate: date("local_date").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    once: uniqueIndex("reminder_sends_key").on(t.userId, t.kind, t.localDate),
+  }),
 );

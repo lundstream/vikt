@@ -169,6 +169,13 @@
       "when": 1788310180000,
       "tag": "0023_backup_s3",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788310190000,
+      "tag": "0024_push",
+      "breakpoints": true
     }
   ]
 }

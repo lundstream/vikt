@@ -148,6 +148,15 @@ export const meResponseSchema = z.object({
      */
     requestMail: z.boolean().default(true),
     /**
+     * The two reminders (D136), off until turned on, with their times as
+     * minutes past midnight in this profile's own timezone. Defaulted so an
+     * identity cached by an older build still parses.
+     */
+    remindWeigh: z.boolean().default(false),
+    remindWeighMinute: z.number().int().min(0).max(1439).default(420),
+    remindDay: z.boolean().default(false),
+    remindDayMinute: z.number().int().min(0).max(1439).default(1320),
+    /**
      * Which theme to use (D117). Defaulted so an identity cached by an older
      * build still parses and the app still opens offline.
      */
@@ -216,6 +225,11 @@ export const updateProfileSchema = z
     newsMail: z.boolean(),
     /** Whether an admin is mailed about a new invite request (D129). Opt-out. */
     requestMail: z.boolean(),
+    /** The two reminders and their times (D136). Minutes past local midnight. */
+    remindWeigh: z.boolean(),
+    remindWeighMinute: z.number().int().min(0).max(1439),
+    remindDay: z.boolean(),
+    remindDayMinute: z.number().int().min(0).max(1439),
     /** Which theme to use: system, dark or light (D117). */
     theme: themeSchema,
     /**

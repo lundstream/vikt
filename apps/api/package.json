@@ -18,6 +18,7 @@
     "contract:food": "tsx src/scripts/contract-check.ts",
     "import:livsmedelsverket": "tsx src/scripts/import-livsmedelsverket.ts",
     "admin": "tsx src/scripts/make-admin.ts",
+    "vapid": "tsx src/scripts/vapid.ts",
     "mail:worker": "tsx src/scripts/mail-worker.ts",
     "mail:samples": "tsx src/scripts/send-samples.ts"
   },
@@ -35,11 +36,13 @@
     "nodemailer": "^10.0.0",
     "postgres": "^3.4.5",
     "shared": "workspace:*",
+    "web-push": "^3.6.7",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/nodemailer": "^8.0.1",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.30.1",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",

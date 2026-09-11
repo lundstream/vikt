@@ -12,6 +12,7 @@ import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NewsMailToggle, RequestMailToggle } from "../components/NewsMailToggle.js";
+import { Reminders } from "../components/Reminders.js";
 import { InstallApp } from "../components/InstallApp.js";
 import { ThemeChoice } from "../components/ThemeChoice.js";
 
@@ -189,8 +190,20 @@ export function Settings() {
       <NewsMailToggle />
       <RequestMailToggle />
 
+
+
       {/* The look of the app, per account rather than per device (D117). */}
       <ThemeChoice />
+
+      {/*
+        The two reminders (D136), directly above the install control.
+
+        §6 wants the line about iOS beside the switch, and the control that
+        answers it one section away rather than inside this one: Inställningar
+        already has an install control, and two copies of it on one screen is
+        worse than either placement.
+      */}
+      <Reminders />
 
       {/*
         Installing (D116). Above the offline explainer on purpose: the two are

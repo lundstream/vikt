@@ -60,6 +60,12 @@ export async function editProfile(
       : {}),
     ...(input.newsMail !== undefined ? { newsMail: input.newsMail } : {}),
     ...(input.requestMail !== undefined ? { requestMail: input.requestMail } : {}),
+    ...(input.remindWeigh !== undefined ? { remindWeigh: input.remindWeigh } : {}),
+    ...(input.remindWeighMinute !== undefined
+      ? { remindWeighMinute: input.remindWeighMinute }
+      : {}),
+    ...(input.remindDay !== undefined ? { remindDay: input.remindDay } : {}),
+    ...(input.remindDayMinute !== undefined ? { remindDayMinute: input.remindDayMinute } : {}),
     ...(input.theme !== undefined ? { theme: input.theme } : {}),
     ...(input.soberAssumeUnloggedDry !== undefined
       ? { soberAssumeUnloggedDry: input.soberAssumeUnloggedDry }

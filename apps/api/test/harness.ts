@@ -50,6 +50,13 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     // exercises the degraded path a fresh self-hosted install actually has.
     LANDING_ENABLED: false,
     REQUEST_ENABLED: false,
+    /**
+     * Push off by default, like every other mode: a test that forgets to turn
+     * it on exercises the absent path a fresh install actually has (D136).
+     */
+    VAPID_PUBLIC_KEY: "",
+    VAPID_PRIVATE_KEY: "",
+    VAPID_SUBJECT: "",
     // The drainer is not started in tests: a background timer writing to a
     // rolled-back transaction is a race with no upside (D104).
     MAIL_WORKER_IN_PROCESS: false,

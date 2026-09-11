@@ -35,7 +35,7 @@ export function Privacy() {
   const operator = operatorName();
 
   return (
-    <PageShell title="Integritet" updated="10 september 2026">
+    <PageShell title="Integritet" updated="11 september 2026">
       <Section title="Vem som ansvarar">
         <P>
           Den här installationen drivs av {operator}.{" "}
@@ -77,6 +77,18 @@ export function Privacy() {
           Aviseringar. Vilka meddelanden i appen du har läst, och om du vill ha nyhetsmejl.
           Underhållsmeddelanden får du oavsett, eftersom de handlar om tjänsten du
           använder.
+        </P>
+        <P>
+          Påminnelser, om du slår på dem. Då sparas en prenumeration per enhet: adressen
+          till din webbläsares push-tjänst och två nycklar som notisen krypteras med. Du
+          ser dina enheter under Inställningar och kan ta bort vilken som helst därifrån,
+          även en telefon du inte har kvar.
+        </P>
+        <P>
+          Vad push-tjänsten ser. Notisen går via din webbläsares egen tjänst, alltså
+          Google för Chrome och Apple för Safari. Den ser att ett meddelande skickades till
+          din enhet och när. Innehållet är krypterat till nycklar bara din webbläsare har,
+          så vad påminnelsen säger går inte att läsa där.
         </P>
         <P>
           Om coachen slås på. Då sparas också dina samtal med den, per konto. Den funktionen finns inte

@@ -86,6 +86,20 @@ export default tseslint.config(
              * every route that acts on what it counts.
              */
             "countPendingInviteRequests",
+            /**
+             * The reminder scheduler (D136). It runs on a timer with no session
+             * and its whole job is to sweep **every** profile: a `userId` first
+             * parameter would be a lie about what it does. The per-user reads
+             * it makes — `alreadyDone`, `claimDay` — take one and are absent
+             * from this list for that reason.
+             *
+             * `insideWindow` and `payloadFor` are pure: a number and a string,
+             * no row of any kind.
+             */
+            "insideWindow",
+            "payloadFor",
+            "dueNow",
+            "runReminders",
 
             /**
              * Password reset is pre-session by definition: the caller has lost
@@ -298,6 +312,21 @@ export default tseslint.config(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+
+  /**
+   * The hand-written half of the service worker (D136).
+   *
+   * It runs in a worker, where `self` is the global scope and there is no
+   * `window`. Declared here rather than with a file-level eslint comment,
+   * because the scope is a property of where the file runs rather than an
+   * exception somebody decided to make.
+   */
+  {
+    files: ["apps/web/public/app/push-sw.js"],
+    languageOptions: {
+      globals: { self: "readonly", clients: "readonly", registration: "readonly" },
     },
   },
 

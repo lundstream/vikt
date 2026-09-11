@@ -3,6 +3,7 @@ import { assertProdSecrets, describeModes, loadEnv } from "./env.js";
 import { buildApp } from "./app.js";
 import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
+import { startReminderScheduler } from "./lib/reminder-scheduler.js";
 import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
@@ -58,6 +59,14 @@ installBackupCrashGuard(app);
  * installed. In the process, so it starts when the process does.
  */
 startBackupScheduler(app);
+
+/**
+ * The reminder tick (D136), which does not start without VAPID keys and says
+ * so once when it does not. Same single-instance limit as the mail drainer:
+ * two API processes would sweep twice, though the unique index on
+ * `reminder_sends` means they still could not send twice.
+ */
+startReminderScheduler(app);
 
 /**
  * The mail drainer (D104), which D88 made a separate process and nothing ever

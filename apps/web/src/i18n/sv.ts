@@ -401,6 +401,32 @@ export const sv = {
   "announce.defaultBody":
     "Vikt är nere för underhåll {weekday} {date} kl {from} till {to}. Du kan logga som vanligt under tiden, det sparas på telefonen och skickas när appen är tillbaka.",
 
+  "push.title": "Påminnelser",
+  "push.what":
+    "Två påminnelser, var och en med egen tid och egen på- och avknapp. Båda är avstängda tills du slår på dem.",
+  "push.where":
+    "Push fungerar i webbläsaren på Android. På iPhone och iPad fungerar det bara när appen är installerad på hemskärmen.",
+  "push.unsupported": "Den här webbläsaren kan inte ta emot push. Påminnelserna går inte att slå på här.",
+  "push.notAsked": "Webbläsaren har inte frågat än. Tryck nedan, så frågar den.",
+  "push.denied":
+    "Du har nekat notiser för den här sidan, och webbläsaren frågar inte igen. Slå på notiser för sidan i webbläsarens inställningar, så fungerar knapparna här.",
+  "push.granted": "Den här enheten är ansluten och kan ta emot påminnelser.",
+  "push.allow": "Tillåt notiser",
+  "push.weighLabel": "Påminn mig att väga mig",
+  "push.dayLabel": "Påminn mig att fylla i dagen",
+  "push.time": "Tid",
+  "push.test": "Skicka en testnotis",
+  "push.testing": "Skickar…",
+  "push.testSent": "Skickad till {count} enhet. Kommer den inte fram är det enheten som blockerar den.",
+  "push.testNone": "Ingen enhet tog emot den. Anslut den här enheten först.",
+  "push.testFailed": "Det gick inte att skicka just nu.",
+  "push.forget": "Ta bort",
+  "push.thisDevice": "den här enheten",
+  "push.unnamedDevice": "Enhet utan namn",
+  "push.lastSeen": "Senast nådd {date}",
+  "push.preview": "Notisen säger: {text}",
+  "push.notifyWeigh": "Dags att väga dig",
+  "push.notifyDay": "Dags att fylla i dagen",
   "settings.requestMail": "Mejla mig när någon ber om en kod",
   "settings.requestMailHint":
     "Gäller bara dig som administrerar. Förfrågan hamnar i listan under Administration oavsett, och pricken vid Administration visas också oavsett. Det här handlar bara om mejlet.",

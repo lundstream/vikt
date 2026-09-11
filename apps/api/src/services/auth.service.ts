@@ -61,6 +61,11 @@ export type AuthedUser = {
     newsMail: boolean;
     /** Whether an admin is mailed about a new invite request (D129). */
     requestMail: boolean;
+    /** The two reminders (D136), and their times as local minutes. */
+    remindWeigh: boolean;
+    remindWeighMinute: number;
+    remindDay: boolean;
+    remindDayMinute: number;
     /** Which theme to use: system, dark or light (D117). */
     theme: Theme;
     lastDrinkOn: string | null;
@@ -231,6 +236,10 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
       soberAssumeUnloggedDry: profile.soberAssumeUnloggedDry,
       newsMail: profile.newsMail,
       requestMail: profile.requestMail,
+      remindWeigh: profile.remindWeigh,
+      remindWeighMinute: profile.remindWeighMinute,
+      remindDay: profile.remindDay,
+      remindDayMinute: profile.remindDayMinute,
       theme: themeSchema.catch("system").parse(profile.theme),
       lastDrinkOn: profile.lastDrinkOn,
       /**

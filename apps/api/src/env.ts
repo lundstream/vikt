@@ -169,6 +169,41 @@ export function assertProdSecrets(env: NodeJS.ProcessEnv = process.env): void {
         "Generate one with `openssl rand -hex 32`",
     );
   }
+  /**
+   * VAPID, when push is configured at all (D136).
+   *
+   * Half-configured is the case worth refusing. A public key with no private
+   * key produces subscriptions the server can never send to: the browser says
+   * yes, the row is stored, the person waits for a reminder that has no way to
+   * arrive, and nothing anywhere reports an error. That is worse than push
+   * being off, because off is visible.
+   */
+  const vapidPublic = env.VAPID_PUBLIC_KEY?.trim() ?? "";
+  const vapidPrivate = env.VAPID_PRIVATE_KEY?.trim() ?? "";
+  const vapidSubject = env.VAPID_SUBJECT?.trim() ?? "";
+
+  if (vapidPublic !== "" || vapidPrivate !== "") {
+    if (vapidPublic === "" || vapidPrivate === "") {
+      problems.push(
+        "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY go together: one without the " +
+          "other accepts subscriptions it can never send to. Generate a pair " +
+          "with `pnpm --filter api vapid`, or unset both to turn push off",
+      );
+    }
+    if (vapidSubject === "") {
+      problems.push(
+        "VAPID_SUBJECT is not set. It is the mailto: or URL a push service " +
+          "contacts about this server, it is required by the spec, and some " +
+          "services refuse a subscription without it",
+      );
+    } else if (!/^(mailto:|https?:\/\/)/.test(vapidSubject)) {
+      problems.push(
+        `VAPID_SUBJECT is "${vapidSubject}". It has to be a mailto: address or ` +
+          "an https URL",
+      );
+    }
+  }
+
   if (secretKeyFile && secretKey) {
     problems.push(
       "SECRET_KEY and SECRET_KEY_FILE are both set. The file wins, so the variable is " +
@@ -316,6 +351,25 @@ const envSchema = z.object({
    * that does not mention them.
    */
   LLM_ENABLED: booleanish.default("false"),
+
+  /* ------------------------------------------------------------ web push */
+  /**
+   * VAPID, which is what lets this server identify itself to a push service
+   * (D136). Both empty means push is **absent**, not degraded: the toggles do
+   * not appear, the subscribe endpoint is not registered, and nothing in the
+   * interface mentions a feature that cannot work.
+   *
+   * The private key is a secret and is checked by `assertProdSecrets` like the
+   * others. The public key is not — it is handed to every browser that
+   * subscribes, which is its whole job.
+   *
+   * `VAPID_SUBJECT` is the `mailto:` or URL a push service contacts if this
+   * server misbehaves. The RFC requires one; it is not optional in practice,
+   * because some services refuse a subscription without it.
+   */
+  VAPID_PUBLIC_KEY: z.string().trim().default(""),
+  VAPID_PRIVATE_KEY: z.string().trim().default(""),
+  VAPID_SUBJECT: z.string().trim().default(""),
 
   /* -------------------------------------------------------- outbound mail */
   /**

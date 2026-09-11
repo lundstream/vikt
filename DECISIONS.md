@@ -5235,3 +5235,111 @@ round caps. Each is carried by its silhouette, because they are read at 24 px:
 the bubble is empty rather than holding three dots that close into a smudge at
 that size, and the pot is wider than it is tall so it cannot be confused with
 the bowl that means "logga mat" on the dashboard.
+
+### D136 — The two reminders, and the foundation they pay for
+
+The first notification this app has ever sent. Phase 11 specified it; this is
+what was built, and the parts worth arguing about.
+
+#### Push is absent without keys, not degraded
+
+No VAPID pair means the scheduler does not start, the subscribe endpoint is not
+registered, and the settings section is not drawn. The same rule as the LLM
+surfaces and the landing page: an unavailable feature leaves no trace rather
+than a disabled control that invites a support question. `assertProdSecrets`
+refuses a **half** configuration — a public key with no private key accepts
+subscriptions it can never send to, and the failure is invisible: the browser
+says yes, the row is stored, and the person waits for a reminder with no way to
+arrive.
+
+#### Four rules, and each one is a way this could be quietly wrong
+
+**The time is the user's.** 07:00 means seven in the morning where the person
+is, which is a different instant for two accounts and a different instant for
+one account in March. The sweep asks each profile what time it is *there*.
+
+That forced a decision about where the day boundary lives. §3 gives it to the
+client, and that is still right for logging — but the scheduler cannot ask a
+sleeping client what day it is. So `toLocalDate` moved into `shared`, where both
+sides use one implementation. The two policies differ and both are deliberate:
+the client falls back to the device's zone on an unknown timezone, because an
+unknown zone must not stop somebody logging; the server does **not**, because
+its own zone is not the user's and quietly substituting UTC would file a
+reminder under the wrong day and look like it worked. It skips the profile.
+
+**Skipped when it has already happened**, checked at send time rather than when
+the window opened. Somebody who weighs themselves at 06:40 has answered the
+question, and a reminder then is the app admitting it was not paying attention.
+That is also the difference between a reminder and an alarm.
+
+**Never twice for one day.** The unique index on `(user_id, kind, local_date)`
+is the guard, not a check in code: a retry, a second process or a clock stepping
+backwards all converge on one row. The insert **is** the claim, and it happens
+before the send, so a crash between them costs one reminder rather than
+producing two. A skipped day is claimed as well, so it is not reconsidered every
+minute for the rest of the window.
+
+**Late is worse than never.** A device offline at 07:00 does not get "dags att
+väga dig" at 11:00; by then it is not a reminder, it is an interruption about
+something the morning has settled. The window is 30 minutes, and the push TTL
+says the same thing to the push service for the case where the device comes back
+after the send.
+
+#### A subscription is per device, and rejected means deleted
+
+One row per browser per account: the same person has a phone and a laptop.
+`endpoint` is unique table-wide, so re-subscribing the same browser updates the
+row rather than adding a second that fires alongside the first — and the
+conflict updates `user_id` too, because a shared computer produces the same
+endpoint for a different person and the row has to follow.
+
+404, 410 **and 403** delete the row on the first failure. The first two mean the
+browser threw the subscription away; 403 means the VAPID key no longer matches
+the one it was created with, which happens when somebody regenerates the pair.
+All three are equally dead, and a queue that retries them forever is a queue that
+grows forever. Anything else is transient and the row stays.
+
+Removable from **any** device (D56), because the commonest reason to want that is
+a phone somebody no longer has, and a control that only worked on the device
+being removed would be useless in exactly that case.
+
+#### The settings screen says what it cannot do
+
+Three permission states and three different things to do about them, and a
+toggle expresses none of them. **Denied** is the one that matters: the browser
+will not ask again, the switch would appear to work, and the only way out is
+site settings the app cannot open. So it is said in words.
+
+The platform line sits beside the switch rather than in a help page, because the
+person who needs it is the one about to turn on a reminder that will never
+arrive: push works in the browser on Android and on iOS only once the app is
+installed. The install control is offered there.
+
+And there is a test button, so the first test of the whole arrangement is not
+tomorrow's reminder failing to appear. "Wait until seven and see" is not a
+diagnostic.
+
+#### The copy has one owner
+
+"Dags att väga dig" and "Dags att fylla i dagen". No dashes, no exclamation
+marks, and nothing about what was missed — §3 rules out a failure state, and
+"du har inte vägt dig idag" is a telling-off. The words live in `shared` because
+the server sends them and the settings screen previews them, and two copies of a
+user-visible string is how one of them becomes the old one. The dictionary keeps
+its own entries so the copy guards cover them, and `i18n.test.ts` asserts the two
+agree.
+
+#### One instance, stated plainly
+
+Two API processes would run two sweeps. The mail drainer has the same property
+(D104). Reminders are gentler about it, because the unique index makes a double
+send impossible — the second claim loses — so what two schedulers would cost is
+doubled work rather than doubled notifications. That is the honest limit, and it
+is why this is not a reason to add a lock today.
+
+#### The service worker is joined, not replaced
+
+Two handlers, imported into the generated worker rather than taking it over.
+`injectManifest` would mean owning the precache manifest and the navigation
+fallback to add two event listeners. A tap focuses an app that is already open
+and navigates it, rather than opening a second copy beside it.

@@ -70,6 +70,9 @@ Cleared back to empty when a merge ships, not before.
 | `OPERATOR` | Vem som driver installationen, i sidfoten och på `/integritet`. | Nej, men sidan blir vagare utan. |
 | `REPO_URL` | Vart GitHub-länken pekar. | Nej, har ett förval. |
 | `SUPPORT_URL` | Länken "Bjud på en öl". Tom betyder att länken utgår helt. | Nej. |
+| `VAPID_PUBLIC_KEY` | Publik nyckel för push. Lämnas den tom finns påminnelserna inte alls: inget schemaläggs, ingen endpoint registreras och avsnittet i Inställningar ritas inte (D136). | Nej, men utan den finns inga påminnelser. |
+| `VAPID_PRIVATE_KEY` | Privat nyckel för push. Hemlig som `SECRET_KEY`. API:t vägrar starta om bara den ena av nycklarna är satt. | Bara om push ska vara på. |
+| `VAPID_SUBJECT` | `mailto:`-adress eller URL som push-tjänsten kontaktar om servern missköter sig. Krävs av specen. | Ja, om nycklarna är satta. |
 | `REQUEST_ENABLED` | Serverar formuläret för kodförfrågan på `/kod` och registrerar endpointen det skickar till. Av betyder 404 på båda (D127). | Nej, förvalet är `false`. |
 
 **Sätt dem innan avbilden som läser dem rullar ut.** En variabel den nuvarande
@@ -78,6 +81,9 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 `__CONTACT_EMAIL__`.
 
 ### Migrationer som kommer att köras
+
+`0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
+fyra kolumner på `profiles` för de två påminnelserna. Additiv.
 
 `0022_backup_smb` lägger till `smb_host`, `smb_share` och `smb_domain` på
 `backup_settings`, och `0023_backup_s3` tar bort dem igen och lägger till
@@ -97,6 +103,13 @@ kolumnen bryr sig inte om att den finns.
 ### Manuella steg på Portainer-värden
 
 - Sätt variablerna ovan i stacken `vikt` innan avbilden byts.
+- **Generera VAPID-nycklar en gång per installation** med `pnpm --filter api vapid`
+  och lägg dem i stackens miljö. Byts paret senare slutar alla befintliga
+  prenumerationer fungera, tyst, så gör det en gång. Utan nycklar finns
+  påminnelserna inte, och det är ett giltigt läge.
+- **Påminnelserna kräver en enda API-instans**, precis som mejlkön (D104). Två
+  processer sveper två gånger. Dubbla notiser går inte att få, det förhindrar
+  unikindexet, men arbetet görs två gånger.
 - **Backupmålet är nu antingen en katalog eller en S3-hink.** Att skriva till en
   Windows-utdelning direkt finns inte längre: biblioteken talar NTLMv1 som dagens
   servrar nekar (D132, D133). Vill du använda NAS:en, montera utdelningen på värden
@@ -156,14 +169,22 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
+- Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig
+  och en på kvällen om att fylla i dagen. Var och en har egen tid och egen knapp, och
+  båda är avstängda tills du slår på dem. Morgonens hoppas över om du redan vägt dig,
+  kvällens om dagen redan är ifylld. Push fungerar i webbläsaren på Android och på
+  iPhone bara när appen är installerad på hemskärmen, vilket står bredvid knappen.
 
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 24 commits:
+between what is built and what is running. 26 commits, plus the one this
+pass is about to add:
 
 | | |
 |---|---|
+| `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
+| `8fbe283` | Record the pass: S3, three button tiers, and what CI now proves |
 | `7c3d682` | Give the S3 run tests a database pg_dump can reach |
 | `ca8c17d` | Three button tiers, and the outline one is not among them |
 | `e791bca` | Start MinIO as a step, not a service container |
@@ -231,14 +252,30 @@ response, because the app-name substitution shortens the body and the
 `Content-Length` sirv had already sent was too large; pages sat at
 `readyState: "loading"` forever.
 
-**Blocked, not skipped:** removing the probe request
+**Waiting on the owner, for the phone half of the reminders (D136):**
+
+The desktop round trip is done and recorded above. What cannot be done from
+here is the device that matters:
+
+1. Install the app on the phone from the home screen. On iOS a reminder cannot
+   arrive at all until it is installed; on Android the browser is enough.
+2. Open Inställningar, Påminnelser, and allow notifications.
+3. Press "Skicka en testnotis" and confirm it arrives on the phone.
+4. Leave "Påminn mig att väga mig" on overnight and confirm the 07:00 one
+   arrives the next morning, before weighing in, and that it does **not** arrive
+   on a morning where the weight was already logged.
+
+**Report the device and the Chrome version** with the result, so this section
+can record what it was verified on rather than that it was verified.
+
+**Blocked, not skipped:****Blocked, not skipped:** removing the probe request
 `human-check-probe@example.test` needs the production database, and the
 Portainer password was rotated after the deployment pass. It is under
 Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1321 tests**: 478 shared, 234 web, 609 api. Lint clean, all three packages
+**1338 tests**: 478 shared, 239 web, 621 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 609 with none skipped**, which is the number that
@@ -246,6 +283,18 @@ matters: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
 say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
 of which have caught tests that passed only on this workstation.
+
+**Push, verified end to end on the desktop.** Edge 152 headless against the
+production build: the browser subscribed to a real push service
+(`wns2-db5p.notify.windows.com` — Edge uses WNS where Chrome uses FCM), the
+server signed the message with its VAPID key, and the notification arrived with
+the right title, body and tag. `POST /api/push/test` reported
+`{"devices":1,"sent":1,"removed":0}` and the service worker's own handler showed
+it. The scheduler was also run against the development database: at 07:00
+Stockholm it finds the account, and at 08:00 it finds nobody, which is the
+late-is-worse-than-never rule outside a test harness.
+
+**Still open, and only the owner can close it** (see the section below).
 
 **Exercised through the interface**, at 360 px and at 1280 px, on the production
 build served by `vite preview`:
