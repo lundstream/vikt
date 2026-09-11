@@ -33,6 +33,7 @@ export const ENDPOINTS: Record<MutationKind, string> = {
   measurement: "/measurement",
   activity: "/activity",
   "savings-offset": "/savings/offsets",
+  "habit-check": "/habit-check",
 };
 
 /**

@@ -17,6 +17,7 @@ import { ScaleInput } from "../components/ScaleInput.js";
 import { Field, fieldAria, fieldErrorsFrom, type FieldErrors } from "../components/Field.js";
 import { DeleteButton } from "../components/DeleteButton.js";
 import { DateSelector } from "../components/DateSelector.js";
+import { HabitChecklist } from "../components/HabitChecklist.js";
 import {
   useDayLog,
   useDeleteActivity,
@@ -525,6 +526,20 @@ export function DailyLog() {
           </p>
         ) : null}
       </form>
+
+      {/* ------------------------------------------------------- vanor */}
+
+      {/*
+        The checklist (D137), beside the daily log rather than on a screen of
+        its own: it is part of "what happened today", which is what this screen
+        already is, and a separate page would make a habit a thing you go and do
+        rather than a thing you tick while you are here anyway.
+
+        Above the savings offsets and below the day's own form, because the
+        ratings are what most days are opened for and a list of five rows must
+        not push them down the screen.
+      */}
+      <HabitChecklist habits={day.data?.habits ?? []} localDate={today} />
 
       {/* ----------------------------------------------------- savings */}
 

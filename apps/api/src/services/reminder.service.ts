@@ -1,7 +1,16 @@
 import { and, eq, sql } from "drizzle-orm";
-import { isWeekend, localMinuteOfDay, REMINDER_TEXT, REMINDER_URL, toLocalDate } from "shared";
+import {
+  habitReminderBody,
+  HABIT_REMINDER_URL,
+  isWeekend,
+  localMinuteOfDay,
+  REMINDER_TEXT,
+  REMINDER_URL,
+  toLocalDate,
+} from "shared";
 import type { Db } from "../db/index.js";
-import { dailyLog, profiles, pushSubscriptions, reminderSends, users } from "../db/schema.js";
+import { dailyLog, habits, profiles, pushSubscriptions, reminderSends, users } from "../db/schema.js";
+import { isHabitCheckedOn } from "../repositories/habit.repo.js";
 import { findWeightForDay } from "../repositories/weight.repo.js";
 import type { Env } from "../env.js";
 import { pushEnabled, sendPush, type PushPayload } from "../lib/push.js";
@@ -51,7 +60,20 @@ import { pushEnabled, sendPush, type PushPayload } from "../lib/push.js";
  * already sent.
  */
 
-export type ReminderKind = "weigh" | "day";
+/**
+ * Which reminder this is.
+ *
+ * A habit's reminder carries the habit's id **in the kind** (D137), which is
+ * what lets the existing unique index on `(user_id, kind, local_date)` be the
+ * never-twice guard for it too: two habits are two kinds, so neither can claim
+ * the other's day, and no column had to be added to make room.
+ */
+export type ReminderKind = "weigh" | "day" | `habit:${string}`;
+
+/** The habit id a kind names, or null when it names one of the fixed two. */
+export function habitIdOf(kind: ReminderKind): string | null {
+  return kind.startsWith("habit:") ? kind.slice("habit:".length) : null;
+}
 
 /** How long after the chosen minute a reminder may still be sent. */
 export const SEND_WINDOW_MINUTES = 30;
@@ -91,6 +113,16 @@ export async function alreadyDone(
     return (await findWeightForDay(userId, db, localDate)) !== null;
   }
 
+  /**
+   * A habit already ticked today is the same case as a weight already logged:
+   * the question has been answered, and asking again is the app failing to
+   * notice. Unticked is **not** done, which is the difference between a
+   * reminder and a report.
+   */
+  const habitId = habitIdOf(kind);
+  if (habitId !== null) return isHabitCheckedOn(userId, db, habitId, localDate);
+
+
   const [row] = await db
     .select({ id: dailyLog.id })
     .from(dailyLog)
@@ -121,17 +153,43 @@ export async function claimDay(
   return claimed.length > 0;
 }
 
-/** The copy, in the app's register: no dashes, no exclamation, no guilt. */
-export function payloadFor(kind: ReminderKind): PushPayload {
+/**
+ * The copy, in the app's register: no dashes, no exclamation, no guilt.
+ *
+ * A habit's body is the habit's own name, which is why this takes one: the
+ * words are the user's, and the app supplies only "Kom ihåg".
+ */
+export function payloadFor(kind: ReminderKind, habitName?: string): PushPayload {
+  const habitId = habitIdOf(kind);
+  if (habitId !== null) {
+    return {
+      title: "Vikt",
+      body: habitReminderBody(habitName ?? ""),
+      url: HABIT_REMINDER_URL,
+      /**
+       * Tagged per habit, so two habits due at eight o'clock are two
+       * notifications rather than one replacing the other on the lock screen.
+       */
+      tag: `vikt-habit-${habitId}`,
+    };
+  }
+
+  const fixed = kind as "weigh" | "day";
   return {
     title: "Vikt",
-    body: REMINDER_TEXT[kind],
-    url: REMINDER_URL[kind],
-    tag: `vikt-${kind}`,
+    body: REMINDER_TEXT[fixed],
+    url: REMINDER_URL[fixed],
+    tag: `vikt-${fixed}`,
   };
 }
 
-export type DueReminder = { userId: string; kind: ReminderKind; localDate: string };
+export type DueReminder = {
+  userId: string;
+  kind: ReminderKind;
+  localDate: string;
+  /** The habit's name, carried so the send does not need a second query. */
+  habitName?: string;
+};
 
 /**
  * Everybody who should be reminded right now.
@@ -207,6 +265,70 @@ export async function dueNow(db: Db, now: Date): Promise<DueReminder[]> {
     }
   }
 
+  due.push(...(await habitsDueNow(db, now)));
+
+  return due;
+}
+
+/**
+ * The habits whose own reminder is due (D137).
+ *
+ * A separate query rather than a third pair of columns on the profile, because
+ * a habit reminder belongs to the habit: deleting the habit takes it with it,
+ * and an account with no habits reads no rows here at all.
+ *
+ * The timezone still comes from the profile, and the weekday-or-weekend choice
+ * is made exactly as it is above, from the date the user is having.
+ */
+async function habitsDueNow(db: Db, now: Date): Promise<DueReminder[]> {
+  const rows = await db
+    .select({
+      userId: habits.userId,
+      habitId: habits.id,
+      name: habits.name,
+      timezone: profiles.timezone,
+      remind: habits.remind,
+      remindMinute: habits.remindMinute,
+      remindWeekend: habits.remindWeekend,
+      remindWeekendMinute: habits.remindWeekendMinute,
+    })
+    .from(habits)
+    .innerJoin(profiles, eq(profiles.userId, habits.userId))
+    .innerJoin(users, eq(users.id, habits.userId))
+    .where(
+      and(
+        sql`${users.disabledAt} is null`,
+        sql`${habits.archivedAt} is null`,
+        sql`(${habits.remind} or ${habits.remindWeekend})`,
+      ),
+    );
+
+  const due: DueReminder[] = [];
+
+  for (const row of rows) {
+    let minuteNow: number;
+    let localDate: string;
+    try {
+      minuteNow = localMinuteOfDay(now, row.timezone);
+      localDate = toLocalDate(now, row.timezone);
+    } catch {
+      continue;
+    }
+
+    const pair = isWeekend(localDate)
+      ? { on: row.remindWeekend, minute: row.remindWeekendMinute }
+      : { on: row.remind, minute: row.remindMinute };
+
+    if (pair.on && insideWindow(minuteNow, pair.minute)) {
+      due.push({
+        userId: row.userId,
+        kind: `habit:${row.habitId}`,
+        localDate,
+        habitName: row.name,
+      });
+    }
+  }
+
   return due;
 }
 
@@ -255,7 +377,7 @@ export async function runReminders(
       .from(pushSubscriptions)
       .where(eq(pushSubscriptions.userId, reminder.userId));
 
-    const payload = payloadFor(reminder.kind);
+    const payload = payloadFor(reminder.kind, reminder.habitName);
 
     for (const device of devices) {
       const outcome = await send(

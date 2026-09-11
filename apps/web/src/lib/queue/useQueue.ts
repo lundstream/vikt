@@ -1,3 +1,4 @@
+import { HABIT_KEY } from "../habits.js";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -102,6 +103,12 @@ const AFFECTED: Record<MutationKind, readonly (readonly string[])[]> = {
   measurement: [MEASUREMENT_KEY, DAY_KEY, INSIGHTS_KEY, CORRELATION_KEY],
   activity: [ACTIVITY_KEY, DAY_KEY, CORRELATION_KEY],
   "savings-offset": [PROGRESS_KEY, POT_KEY, DAY_KEY],
+  /**
+   * A tick moves the checklist on Dagen and the streak beside it, both of which
+   * arrive with `GET /api/day`. It moves nothing else: a habit is not an
+   * intake, not a measurement and not an input to any number on the dashboard.
+   */
+  "habit-check": [HABIT_KEY, DAY_KEY],
 };
 
 /** How often the queue is retried while something is waiting. */

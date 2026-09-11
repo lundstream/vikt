@@ -22,3 +22,20 @@ export const REMINDER_URL = {
   weigh: "/app/?logga",
   day: "/app/dag",
 } as const;
+
+/**
+ * What a habit's reminder says (D137).
+ *
+ * The habit's own name, because the habit's own name is the whole content: the
+ * app has nothing to add to "D-vitamin" that is not padding, and a lock screen
+ * is the one surface where every extra word costs something.
+ *
+ * "Kom ihåg" rather than "Du har inte" — §3 has no failure state, and a
+ * notification is the worst possible place to invent one.
+ */
+export function habitReminderBody(name: string): string {
+  return `Kom ihåg: ${name}`;
+}
+
+/** A habit reminder lands on Dagen, where the checklist is. */
+export const HABIT_REMINDER_URL = "/app/dag";

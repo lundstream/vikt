@@ -5383,3 +5383,134 @@ Two handlers, imported into the generated worker rather than taking it over.
 `injectManifest` would mean owning the precache manifest and the navigation
 fallback to add two event listeners. A tap focuses an app that is already open
 and navigates it, rather than opening a second copy beside it.
+
+---
+
+### D137 — The habit checklist, and the three kinds of day
+
+The second half of Phase 11, on the foundation the two reminders paid for. A
+daily checklist the user writes themselves: the first table in this schema whose
+**content** is the user's own words rather than something the app named.
+
+#### A habit is a name, an icon and a place in the order
+
+The phase entry said "a name and nothing else: no category, no icon picker, no
+target value". Two thirds of that stands. No target and no unit, because a habit
+with a number attached is a measurement and the daily log already holds
+measurements; the moment "två liter vatten" becomes a field with 2 in it, it
+needs a unit, a history and a chart, and it has stopped being a checkbox.
+
+The icon was reconsidered and added, from a **closed set of ten** drawn to the
+profile's line stroke. The argument for none was that a picker is a decision
+nobody asked for; the argument that won is that a checklist is read in one
+glance while doing something else, and a row found by its shape is found faster
+than a row read as words. Closed rather than open because an open set is an
+upload endpoint with a moderation question attached, and because ten line icons
+keep the list looking like this app. The set lives in `shared` and the server
+validates against it: an icon the API accepts and the client cannot draw is a
+blank square on somebody's list.
+
+The order is the user's, moved one place at a time with two buttons rather than
+dragged. A drag handle at 360 px inside a scrolling page is a fight, and this
+list is five rows long.
+
+#### Ticking, unticking, and why unticking writes a row
+
+One tap ticks, one untick. The whole row is the target, not a checkbox beside a
+label, because 44 px is what a thumb actually hits.
+
+**Unticking writes `checked: false` rather than deleting the row**, and that is
+the decision the rest of this entry rests on. A day somebody answered and did
+not do this is a different fact from a day nobody answered at all, and only a
+row can tell them apart. Delete-on-untick would merge the two, and the streak
+would then have to choose between calling every absent day a miss (a month away
+reads as a month of failure) or calling it nothing (a month away reads as an
+unbroken chain, which is D35's "pays out for silence" in a new costume).
+
+#### Three kinds of day, which is the whole streak
+
+- **ticked** — counted;
+- **missed** — the checklist was answered that day and this habit was not
+  ticked. One per rolling seven does not break the chain, which is §4.6's grace
+  rule, applied here for the reason it exists there: a single missed morning is
+  not a lapse, and rendering it as one is the failure state this product does
+  not have;
+- **unknown** — nothing was answered that day. Not a miss. It does not spend the
+  grace day, and the count does not claim it: the walk stops there and the
+  screen says "räknat sedan" the day it actually starts from.
+
+"Answered" spans **every** habit rather than this one, deliberately. Ticking two
+of three on a Tuesday means the person was there and made a judgement about the
+third, so the third's Tuesday is a miss. Narrower than "any log entry at all",
+because weighing yourself says nothing about whether you took the vitamin.
+
+**One rule, not two.** D35 has a permissive mode because a savings rule can be
+keyed on the sober counter, so the number on screen and the number in the ledger
+have to be able to mean the same thing for an occasional logger. Nothing is
+keyed on a habit streak, so a second mode here could only let the number
+overstate itself. The rule in force is stated under the list, once, the way the
+sober counter states its basis.
+
+The number is quiet: "4 dagar i rad" under the name when there is a chain, and
+nothing at all when there is not. No flame, no badge, no colour that appears
+only on a bad day. A ticked row is Gran, which is what Gran already means
+("logged, chosen"), and nothing new enters the palette.
+
+#### Deleting says which of two things it is about to do
+
+A habit that leaves the list has history behind it, so there are two different
+requests hiding behind one word:
+
+- **keep the history** sets `archived_at`. The habit leaves the checklist, the
+  ticks stay, and the row survives **because the ticks name it** — a tick whose
+  habit was deleted outright is a date with nothing attached, and the export
+  would have to invent a word for it;
+- **remove everything** is a real delete, and the checks go by cascade.
+
+Both are offered and neither is defaulted, because the difference is not
+recoverable. The gentler one is the sheet's own confirm; the irreversible one is
+the Honung button beside it, which is the same class as revoking an invite.
+
+#### The reminder is the existing one, with the habit's id in the kind
+
+No new machinery. A habit's reminder is `remind` / `remind_minute` and a weekend
+pair, exactly D136's shape, and the sweep chooses between them with the same
+`isWeekend(toLocalDate(now, tz))`. What is new is the claim key: the kind is
+`habit:<id>`, which makes the existing unique index on
+`(user_id, kind, local_date)` the never-twice guard for habits too. Two habits
+at eight o'clock are two kinds, so neither can claim the other's day, and no
+column had to be added to `reminder_sends` to make room.
+
+The cost of putting an id in a string is that nothing cascades to it, so a hard
+delete sweeps its own claims. That is three lines in one place, against a
+migration that would have had to drop and recreate a unique index on a table
+that is already in production.
+
+The skip rule is the same rule: a habit already ticked today is a question
+already answered. Unticked is **not** done, and the reminder still goes, which
+is the difference between a reminder and a report.
+
+#### A habit name is health data
+
+"Ta tabletten" is a medication schedule, which under the GDPR is the same
+special category as the weights (D107). So: scoped by `user_id` in every query
+and tested for it, never in a group view (D9), in the export, and deleted with
+the account. `/integritet` says all of that in the same pass as the feature,
+which is what the phase entry asked for and what D111 means by the page being
+part of the work rather than after it.
+
+#### Nothing is seeded
+
+An empty checklist says what it is for in one line and offers three common ones
+to add with a tap: vatten, vitaminer, stretching. They are **suggestions, not
+rows**. A list somebody did not write is a list they have to prune before it
+means anything, and the first thing a seeded checklist teaches is that the ticks
+are not really theirs.
+
+#### What this costs on Dagen
+
+Measured, on the production build under the same conditions as the fast path:
+the day's own pass went from 5 taps to 8 with three habits ticked, and the time
+did not move (161 ms against 160 ms, three runs each, with a spread wider than
+the difference). Each tick is its own write and does not block the save, which
+is why adding three of them to the path costs three taps and nothing else.

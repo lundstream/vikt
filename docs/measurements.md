@@ -41,6 +41,26 @@ an unchanged path is the machine and the run, not an improvement to claim.
 
 ---
 
+## The day's own pass
+
+Same conditions as the fast path: production build, 360x740, 4x CPU throttling,
+~80 ms latency on 1.6 Mbps. Measured when the habit checklist landed (D137),
+three runs each, median reported.
+
+| | taps | in-app |
+|---|---|---|
+| four ratings, then save | 5 | **161 ms** |
+| four ratings, three habits ticked, then save | 8 | **160 ms** |
+
+No figure existed for this path before, so the comparison is the two rows above:
+the same screen on the same build, with and without the ticks. Three habits cost
+**three taps and no measurable time**. Each tick is its own write and does not
+block the save, and the spread across runs (146 to 169 ms) is wider than the
+difference between the rows, so the right reading is "unchanged" rather than
+"faster".
+
+---
+
 ## The human check
 
 ALTCHA proof of work (D112), solved in the browser. Measured with the real

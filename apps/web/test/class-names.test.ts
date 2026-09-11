@@ -409,6 +409,13 @@ const IMPACT_ALLOWED = new Set([
   // built. Listed so that when it is, the style is already permitted and the
   // decision has already been taken.
   "routes/admin/Backup.tsx",
+  /**
+   * Removing a habit **with its history** (D137). The gentler option beside it
+   * archives and keeps the ticks, and that one is an ordinary action; this one
+   * deletes a run of days somebody built up and cannot be undone, which is the
+   * same class as revoking an invite or deleting a backup.
+   */
+  "components/HabitEditor.tsx",
 ]);
 
 describe("the high-impact style", () => {

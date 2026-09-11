@@ -56,6 +56,13 @@ export default tseslint.config(
              * a signature.
              */
             "llmHealth",
+            /**
+             * Splits a habit id out of a reminder kind string (D137). Pure
+             * string work on a value the caller already holds: it reads no row,
+             * touches no database and has no user to scope to. Scoping it would
+             * suggest the answer could differ per account.
+             */
+            "habitIdOf",
 
             /**
              * Pure functions of their arguments. Neither touches the database,

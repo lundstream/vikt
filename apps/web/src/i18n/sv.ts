@@ -401,6 +401,52 @@ export const sv = {
   "announce.defaultBody":
     "Vikt är nere för underhåll {weekday} {date} kl {from} till {to}. Du kan logga som vanligt under tiden, det sparas på telefonen och skickas när appen är tillbaka.",
 
+  /* ---------------------------------------------------------------- vanor */
+
+  "habit.title": "Vanor",
+  "habit.empty":
+    "En egen checklista. Skriv det du vill göra varje dag, och bocka av när det är gjort.",
+  "habit.examplesLead": "Tre vanliga, om du vill börja där:",
+  "habit.exampleWater": "Två liter vatten",
+  "habit.exampleVitamins": "Vitaminer",
+  "habit.exampleStretch": "Stretching",
+  "habit.add": "Lägg till vana",
+  "habit.edit": "Ändra listan",
+  "habit.editTitle": "Ändra listan",
+  "habit.name": "Namn",
+  "habit.namePlaceholder": "D-vitamin",
+  "habit.icon": "Ikon",
+  "habit.iconNone": "Ingen",
+  "habit.icon.droppe": "Droppe",
+  "habit.icon.tablett": "Tablett",
+  "habit.icon.stretch": "Stretching",
+  "habit.icon.promenad": "Promenad",
+  "habit.icon.somn": "Sömn",
+  "habit.icon.bok": "Bok",
+  "habit.icon.tand": "Tandborste",
+  "habit.icon.sol": "Dagsljus",
+  "habit.icon.andning": "Andning",
+  "habit.icon.penna": "Penna",
+  "habit.change": "Ändra",
+  "habit.moveUp": "Flytta upp",
+  "habit.moveDown": "Flytta ner",
+  "habit.remove": "Ta bort",
+  "habit.removeTitle": "Ta bort {name}?",
+  "habit.removeKeepBody":
+    "Vanan försvinner från listan. Dagarna du redan bockat av finns kvar, och de följer med i exporten.",
+  "habit.removeAllBody":
+    "Vill du bli av med historiken också, ta bort allt. Det går inte att ångra.",
+  "habit.removeKeep": "Ta bort, behåll historiken",
+  "habit.removeAll": "Ta bort allt",
+  "habit.reminder": "Påminnelse",
+  "habit.reminderWhat":
+    "En notis med vanans namn. Den hoppas över om du redan bockat av den den dagen.",
+  "habit.streakDays": "{days} dagar i rad",
+  "habit.streakOne": "1 dag i rad",
+  "habit.rule":
+    "Dagar i rad räknas från de dagar du fyllt i listan. En dag du inte var här alls är okänd, inte missad, och räkningen börjar då om från senaste dagen du fyllde i.",
+  "habit.saveFailed": "Det gick inte att spara just nu.",
+
   "push.title": "Påminnelser",
   "push.what":
     "Två påminnelser, var och en med en tid för vardagar och en för helgen. Varje tid har en egen på- och avknapp, och alla är avstängda tills du slår på dem.",
@@ -430,6 +476,7 @@ export const sv = {
   "push.preview": "Notisen säger: {text}",
   "push.notifyWeigh": "Dags att väga dig",
   "push.notifyDay": "Dags att fylla i dagen",
+  "push.notifyHabit": "Kom ihåg: {name}",
   "settings.requestMail": "Mejla mig när någon ber om en kod",
   "settings.requestMailHint":
     "Gäller bara dig som administrerar. Förfrågan hamnar i listan under Administration oavsett, och pricken vid Administration visas också oavsett. Det här handlar bara om mejlet.",

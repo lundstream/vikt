@@ -36,6 +36,7 @@ import {
 } from "../repositories/daily.repo.js";
 import { getWeightRows } from "./series.service.js";
 import { notFound } from "../lib/errors.js";
+import { getHabitsForDay } from "./habit.service.js";
 import { detectMilestones, getOffsetsForDay, getRulesForDay } from "./progress.service.js";
 
 /**
@@ -268,7 +269,7 @@ export async function removeActivity(userId: string, db: Db, id: string): Promis
  * means retyping what is already there, or losing it.
  */
 export async function getDayLog(userId: string, db: Db, localDate: string): Promise<DayLog> {
-  const [daily, measurement, activities, weights, savingsRules, offsets] =
+  const [daily, measurement, activities, weights, savingsRules, offsets, habits] =
     await Promise.all([
       findDailyForDay(userId, db, localDate),
       findMeasurementForDay(userId, db, localDate),
@@ -276,6 +277,7 @@ export async function getDayLog(userId: string, db: Db, localDate: string): Prom
       getWeightRows(userId, db, { from: localDate, to: localDate }),
       getRulesForDay(userId, db, localDate),
       getOffsetsForDay(userId, db, localDate),
+      getHabitsForDay(userId, db, localDate),
     ]);
 
   const weight = weights.at(-1);
@@ -287,6 +289,13 @@ export async function getDayLog(userId: string, db: Db, localDate: string): Prom
     measurement: measurement ? toMeasurement(measurement) : null,
     activities: activities.map(toActivity),
     weightKg: weight ? toNumber(weight.weightKg) : null,
+    /**
+     * The checklist rides along with the day (D137), for the same reason the
+     * savings rules do: it is part of what happened today, and a second request
+     * is a second thing that can be slow or absent while the screen is already
+     * on the phone.
+     */
+    habits,
     /**
      * The savings rules that accrued today, each flagged with whether an offset
      * has already been filed (D37). They ride along with the day rather than

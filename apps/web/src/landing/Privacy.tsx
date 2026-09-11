@@ -79,6 +79,13 @@ export function Privacy() {
           använder.
         </P>
         <P>
+          Dina vanor, om du skriver några. Checklistan på Dagen är dina egna ord, och de kan
+          beskriva hälsa: "ta tabletten" är ett läkemedelsschema. De lagras som allt annat
+          här, de visas aldrig för någon annan och de följer med i exporten. Du kan ta bort
+          en vana och behålla dagarna du bockat av, eller ta bort båda, och allt försvinner
+          om du raderar kontot.
+        </P>
+        <P>
           Påminnelser, om du slår på dem. Då sparas en prenumeration per enhet: adressen
           till din webbläsares push-tjänst och två nycklar som notisen krypteras med. Du
           ser dina enheter under Inställningar och kan ta bort vilken som helst därifrån,
@@ -109,7 +116,7 @@ export function Privacy() {
         </P>
         <P>
           Ingen profilering, ingen försäljning, ingen annonsering. Din data jämförs aldrig med någon annans. Gruppfunktioner visar bara om
-          någon har loggat, aldrig vad.
+          någon har loggat, aldrig vad, och aldrig vilka vanor du har på din lista.
         </P>
       </Section>
 

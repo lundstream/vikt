@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { LOCALE, t, translationKeys } from "../src/i18n/index.js";
-import { REMINDER_TEXT } from "shared";
+import { habitReminderBody, REMINDER_TEXT } from "shared";
 import { sv } from "../src/i18n/sv.js";
 
 /**
@@ -91,6 +91,10 @@ const COMPUTED_PREFIXES = [
   // `t(`admin.mail.${row.status}`)` in the admin view, over the queue's status
   // column (D88).
   "admin.mail.",
+  // `t(`habit.icon.${key}`)` over the closed icon set in `packages/shared`
+  // (D137). The labels are what a screen reader reads for a round icon button,
+  // so a missing one is audible rather than invisible.
+  "habit.icon.",
 ];
 
 describe("the translation layer", () => {
@@ -199,5 +203,15 @@ describe("the reminder notifications", () => {
   it("say the same thing in the dictionary as on the wire", () => {
     expect(sv["push.notifyWeigh"]).toBe(REMINDER_TEXT.weigh);
     expect(sv["push.notifyDay"]).toBe(REMINDER_TEXT.day);
+  });
+
+  /**
+   * A habit's notification is its own name with two words in front of it, and
+   * those two words are copy like any other (D137). Compared through the
+   * placeholder, because the name comes from the user and the register can only
+   * hold the part the app wrote.
+   */
+  it("say the same thing for a habit", () => {
+    expect(sv["push.notifyHabit"]).toBe(habitReminderBody("{name}"));
   });
 });

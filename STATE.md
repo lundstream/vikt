@@ -43,6 +43,10 @@ when it will be down, and its mail goes out.
   weekend one, in the account's own timezone, skipped when the thing has already
   been done and never sent twice for a day (D136). Absent entirely without VAPID
   keys.
+- **A habit checklist on Dagen** (D137): the user's own words, an optional icon from
+  a closed set, an order, one tap to tick and one to untick, a streak per habit, and
+  an optional reminder per habit in the same two-time shape. Removing a habit keeps
+  its history unless the history is removed on purpose.
 
 ### API without a screen
 
@@ -55,8 +59,9 @@ Empty.
 - **Group features** (§6 phase 9) and **device integrations** (§6 phase 10).
 - **SMB and S3 backup destinations**, named in the settings and refused with a
   reason.
-- **The habit checklist** (§6 phase 11). The other half of that phase, the two
-  reminders and the push foundation under them, is built (D136).
+- **The coach chat** (§6 phase 8b): the Coach page, the weekly review card, the
+  guardrail post-check and the history. Phase 11 is now complete on both halves
+  (D136, D137).
 - **MFA and importing from other apps** — phases 12 and 13, written down in
   CLAUDE.md §6 and not started.
 
@@ -90,6 +95,10 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
+
+`0026_habits` lägger till tabellerna `habits` och `habit_checks`. Vanorna är
+användarens egna ord, en rad per vana och dag, och båda tabellerna kaskaderar med
+kontot. Additiv.
 
 `0025_reminder_weekend` lägger till fyra kolumner till på `profiles`: en egen
 på-knapp och en egen tid för helgen, per påminnelse. De fyra som redan fanns behåller
@@ -181,6 +190,14 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
+- Dagen har en egen checklista. Skriv in det du vill göra varje dag, med eller utan
+  ikon, och bocka av med ett tryck. Ett tryck till tar bort bocken. Under varje vana
+  står hur många dagar i rad du har den, och en dag du inte fyllde i listan alls
+  räknas som okänd i stället för som missad.
+- Varje vana kan ha en egen påminnelse, med samma tider för vardag och helg som de
+  andra påminnelserna. Den hoppas över om du redan bockat av vanan den dagen.
+- Tar du bort en vana får du välja: behåll dagarna du redan bockat av, eller ta bort
+  dem också. Vad som händer står innan du bekräftar.
 - Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig
   och en på kvällen om att fylla i dagen. Var och en har en tid för vardagar och en för
   helgen, med var sin knapp, så morgonpåminnelsen kan vara 07:00 i veckan och 09:00 på
@@ -291,7 +308,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1359 tests**: 485 shared, 246 web, 628 api. Lint clean, all three packages
+**1395 tests**: 494 shared, 254 web, 647 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 637 with none skipped**, which is the number that
@@ -327,6 +344,13 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- Dagen at 360 px and at 1280 px with a checklist of three, written through the
+  screen rather than seeded: one habit added from the empty state's suggestions and
+  two typed into the editor, one of them with an icon. All three ticked, one
+  unticked and ticked again, and `GET /api/day` then reported the unticked one as
+  `checked: false, answered: true` — a day answered rather than a day nobody was
+  there for, which is what the streak reads differently. Streaks and ticks survived
+  a reload. No horizontal overflow;
 - Inställningar at 360 px with the two reminders: each one shows a weekday time
   and a weekend time side by side under its name, with the day labels above them.
   Driven through the controls rather than seeded — 07:00 typed into the weigh

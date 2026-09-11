@@ -1534,12 +1534,110 @@ export const reminderSends = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** `weigh` or `day`. */
-    kind: text("kind", { enum: ["weigh", "day"] }).notNull(),
+    /**
+     * `weigh`, `day`, or `habit:<habit id>` (D137).
+     *
+     * A habit's reminder puts the habit's id **in the kind** rather than in a
+     * column of its own, and that is what makes the existing unique index the
+     * guard for it too: two habits reminded on the same day are two different
+     * kinds, so neither can claim the other's row, and nothing about
+     * `(user_id, kind, local_date)` had to change to make room.
+     */
+    kind: text("kind").notNull(),
     localDate: date("local_date").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     once: uniqueIndex("reminder_sends_key").on(t.userId, t.kind, t.localDate),
   }),
+);
+
+
+/* ------------------------------------------------------------- habits */
+
+/**
+ * A habit: the user's own words, ticked once a day (D137).
+ *
+ * The first table in this schema whose **content** is written by the user
+ * rather than chosen from something the app named. "D-vitamin", "stretcha
+ * rygg", "ta tabletten" — that last one is a medication schedule, which is the
+ * same special category as the weights (D107), so a habit name is health data
+ * and is handled like one: never in a group view (D9), in the export, and
+ * deleted with the account.
+ *
+ * No target value and no unit. A habit with a number attached is a
+ * measurement, and the daily log already holds measurements.
+ */
+export const habits = pgTable(
+  "habits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /**
+     * A key into the app's closed line icon set, or null.
+     *
+     * Closed because an open one is an upload endpoint, and because the set is
+     * drawn to the profile's stroke so a checklist keeps looking like this app.
+     */
+    icon: text("icon"),
+    sortOrder: integer("sort_order").notNull().default(0),
+
+    /**
+     * The habit's own reminder, in the two-time shape D136 settled: a weekday
+     * pair and a weekend pair, each with its own switch. 08:00 by default,
+     * which is a guess about vitamins rather than a claim about anything.
+     */
+    remind: boolean("remind").notNull().default(false),
+    remindMinute: integer("remind_minute").notNull().default(480),
+    remindWeekend: boolean("remind_weekend").notNull().default(false),
+    remindWeekendMinute: integer("remind_weekend_minute").notNull().default(480),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Set when the habit is taken off the checklist with its history kept.
+     *
+     * A timestamp nothing cascades to (§3), not a boolean and not a deletion:
+     * the checks that already exist name this row, so something has to keep
+     * saying what the habit was called.
+     */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("habits_user_idx").on(t.userId, t.sortOrder)],
+);
+
+/**
+ * One row per habit per day, ticked or deliberately not (D137).
+ *
+ * `checked: false` is a row that says "asked today, did not do it", and it is
+ * not the same as no row at all. The streak needs the difference: a day nobody
+ * answered is **unknown** and stops the count, a day answered with no tick is a
+ * **miss** and spends the grace day (D35's shape, and §4.6's grace rule).
+ *
+ * `client_uuid` and a client-computed `local_date` like every other log row, so
+ * the offline queue replays a tick made in a shop basement safely.
+ */
+export const habitChecks = pgTable(
+  "habit_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    habitId: uuid("habit_id")
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    clientUuid: uuid("client_uuid").notNull(),
+    localDate: date("local_date").notNull(),
+    checked: boolean("checked").notNull().default(true),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("habit_checks_client_key").on(t.userId, t.clientUuid),
+    uniqueIndex("habit_checks_day_key").on(t.userId, t.habitId, t.localDate),
+    index("habit_checks_habit_idx").on(t.userId, t.habitId, t.localDate),
+    index("habit_checks_day_idx").on(t.userId, t.localDate),
+  ],
 );

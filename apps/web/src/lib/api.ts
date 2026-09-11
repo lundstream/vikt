@@ -1,4 +1,8 @@
 import type {
+  CreateHabit,
+  Habit,
+  HabitList,
+  UpdateHabit,
   CreateMilestone,
   UpdateMilestone,
   CreateOffset,
@@ -349,6 +353,26 @@ export const api = {
 
   /** Everything logged for one day, so the daily screen opens filled in. */
   dayLog: (localDate: string) => request<DayLog>(`/day?localDate=${localDate}`),
+
+  /* ------------------------------------------------------------- habits */
+
+  listHabits: () => request<HabitList>("/habits"),
+
+  createHabit: (input: CreateHabit) =>
+    request<Habit>("/habits", { method: "POST", body: JSON.stringify(input) }),
+
+  updateHabit: (id: string, patch: UpdateHabit) =>
+    request<Habit>(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  reorderHabits: (ids: readonly string[]) =>
+    request<HabitList>("/habits/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
+
+  /**
+   * `history` is in the query string rather than the body because a DELETE with
+   * a body is a thing proxies drop. `keep` archives, `remove` takes the ticks.
+   */
+  removeHabit: (id: string, history: "keep" | "remove") =>
+    request<void>(`/habits/${id}?history=${history}`, { method: "DELETE" }),
 
   listActivities: (range: DateRangeQuery = {}) =>
     request<ActivityList>(`/activity${queryString(range)}`),

@@ -75,7 +75,8 @@ export type MutationKind =
   | "daily"
   | "measurement"
   | "activity"
-  | "savings-offset";
+  | "savings-offset"
+  | "habit-check";
 
 /**
  * `pending` is waiting to be sent, `failed` has been refused and needs a
