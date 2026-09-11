@@ -209,11 +209,13 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 28 commits, plus the one this
+between what is built and what is running. 30 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `efe56a1` | Pull MinIO from quay.io, since Docker Hub now refuses it |
+| `8528155` | The habit checklist, the second half of Phase 11 |
 | `5964645` | Each reminder gets a weekday time and a weekend one |
 | `2900709` | Reminders: the push foundation and the two that pay for it |
 | `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
@@ -311,7 +313,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 **1395 tests**: 494 shared, 254 web, 647 api. Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 637 with none skipped**, which is the number that
+**In CI the api suite runs 656 with none skipped**, which is the number that
 matters: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
 say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
@@ -365,6 +367,13 @@ Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file
 by a test, so a fast path that changes without the page changing fails the
 suite.
+
+### Before the next CI run
+
+**MinIO comes from quay.io now.** `minio/minio` on Docker Hub answers "pull
+access denied" as of 2026-09-11, and Bitnami's image withdrew its `latest` tag
+before that. The S3 tests depend on the image existing, so if that step fails
+again the first thing to check is whether the registry, not the code, moved.
 
 ## Known gotchas carried into this project
 
