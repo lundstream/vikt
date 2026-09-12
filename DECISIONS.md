@@ -7044,3 +7044,58 @@ Exercised at 360 px and desktop against the development API: the footer renders
 `Version dev · 107321a` with all five links resolving, and `/integritet` reads
 "Källkoden är öppen och finns att hämta … Koden till den här installationen
 finns på github.com/lundstream/vikt."
+
+### D152 — One scrim, and the sheet has no edge of its own
+
+*2026-09-13.*
+
+Four components each carried their own backdrop: `bg-ink/40` on three sheets,
+`bg-ink/70` on the celebration. Four places for a number to drift, and one of
+them had already been wrong — the celebration once shipped a **fully transparent
+backdrop** because `bg-[var(--ink)]/70` emitted no rule at all, and nothing said
+so until somebody looked at it.
+
+`.scrim` is one class: the colour, the blur, and what happens when somebody has
+asked for less transparency. Position stays with the component, because whether
+it is `absolute` inside a fixed wrapper or `fixed` itself is layout, and mixing
+the two in the class means one of them quietly loses to a utility.
+
+#### The scrim is the dark Natt in both themes
+
+`--natt` is **re-pointed** in the light theme: there it is Papper, the page
+colour. A scrim built from `var(--natt)` would therefore have brightened a light
+page instead of dimming it, which is the sort of thing that looks like a
+rendering fault and is actually a token doing what it was told.
+
+So `--scrim` is written out as the dark Natt in both blocks, and only the alpha
+differs: **0.72 dark, 0.45 light**. Lighter on a light theme because the page
+underneath is already bright and the sheet on top of it is not; higher on a dark
+one because the sheet and the page are closer together there and the scrim has
+to do more to say which is in front. The blur is **10 px in both**, because the
+blur is what separates the layers and the tint is what dims them.
+
+`prefers-reduced-transparency` drops the blur entirely and raises the opacity to
+0.88 and 0.78. Entirely rather than reduced: a small blur is the same effect
+asking to be noticed less, and somebody who has asked for less translucency has
+asked for the separation to come from somewhere else.
+
+#### The Is line was a focus ring on the dialog
+
+`Sheet` focused the panel itself, a `tabindex="-1"` container. Chromium matches
+`:focus-visible` on a programmatically focused element with a negative tabindex,
+and in the dark theme this app's focus ring is `--data`, which is Is. So an
+Is-coloured line appeared around the whole sheet — correct CSS applied to the
+wrong element, on a screen where Is means *a raw reading*.
+
+Focus goes to the **first field** now. That is also where somebody is going
+anyway: every sheet in this app opens onto a form. The container keeps its
+`tabIndex` as the fallback for a sheet with nothing focusable in it, which is
+what keeps focus inside the dialog either way, and it can no longer draw a ring.
+
+The panel's `border-edge` is gone with it. A sheet is Skymning standing on a
+dimmed, blurred page; the scrim is the separation, and a hairline on top of that
+is a second answer to a question already answered.
+
+Shot in both themes at 360 px and desktop. Dark: scrim
+`rgba(15, 20, 24, 0.72)`, `blur(10px)`, focus on `#ms-label`, no border and no
+ring on the panel. Light: the same with `0.45`.

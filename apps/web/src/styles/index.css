@@ -375,6 +375,42 @@
   }
 
   /**
+   * The dimmed page behind every sheet and dialog (D152).
+   *
+   * One class, no per-component values. Four components each carried their own
+   * `bg-ink/40` or `bg-ink/70`, which is four places for a number to drift and
+   * four chances for one of them to be wrong — and one of them **was**: the
+   * celebration dialog once shipped a fully transparent backdrop because
+   * `bg-[var(--ink)]/70` emitted no rule at all, and nothing said so.
+   *
+   * `--scrim` is the dark Natt in both themes. Dimming means darkening, and a
+   * light-theme scrim built from the re-pointed `--natt` would have brightened
+   * the page.
+   */
+  .scrim {
+    /* Paint only. Whether it is `absolute` inside a fixed wrapper or `fixed`
+       itself is layout and belongs to the component; mixing the two here means
+       one of them silently loses to a utility. */
+    @apply inset-0;
+    background-color: var(--scrim);
+    -webkit-backdrop-filter: blur(var(--scrim-blur));
+    backdrop-filter: blur(var(--scrim-blur));
+  }
+
+  /**
+   * Somebody who has asked for less transparency gets the separation from
+   * opacity alone (§5's quality floor). The blur goes entirely rather than
+   * being reduced: a small blur is the same effect asking to be noticed less.
+   */
+  @media (prefers-reduced-transparency: reduce) {
+    .scrim {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background-color: var(--scrim-flat);
+    }
+  }
+
+  /**
    * Status tags (profile, page 6).
    *
    * Only one of them has a colour. Logged is Gran; everything uncertain is Sten

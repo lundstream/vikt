@@ -51,6 +51,32 @@
   --sten: #5c6b72; /* darkened from #6B7B82 to hold 4.5:1 on Papper */
   --sno: #16232b; /* the text colour; on light it is the dark one */
 
+  /**
+   * The dimmed page behind a sheet (D152).
+   *
+   * **Always the dark Natt**, in both themes, and that is why it is written out
+   * rather than pointed at `--natt`: the palette name is re-pointed in the light
+   * theme, so `var(--natt)` there is Papper and a scrim built from it would
+   * brighten the page instead of dimming it. Dimming means darkening in both
+   * themes; only how much differs.
+   *
+   * Lighter in the light theme because the page underneath is already bright
+   * and the sheet on top of it is not: 45% is enough to push the page back
+   * without turning a daylight screen into a night one.
+   */
+  --scrim: rgb(15 20 24 / 0.45);
+  /** Same in both themes. The blur is what separates the layers, not the tint. */
+  --scrim-blur: 10px;
+  /**
+   * What the scrim does when the blur is gone.
+   *
+   * `prefers-reduced-transparency` is a request from somebody who finds
+   * translucency hard to read, so the blur goes and the opacity carries the
+   * separation alone. It has to be higher, or the page behind reads through a
+   * layer that is now doing half the work it was.
+   */
+  --scrim-flat: rgb(15 20 24 / 0.78);
+
   --lingon: #b0203c;
   --gran: #3d5943;
   --is: #5c8a96;
@@ -116,6 +142,11 @@
 .dark {
   --natt: #0f1418;
   --skymning: #16232b;
+
+  /* Higher on a dark page: the sheet and the page are closer together here, so
+     the scrim has to do more to say which one is in front (D152). */
+  --scrim: rgb(15 20 24 / 0.72);
+  --scrim-flat: rgb(15 20 24 / 0.88);
   --dis: #1e2d36;
   --sten: #6b7b82;
   --sno: #edf1f2;

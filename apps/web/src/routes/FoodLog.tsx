@@ -1356,7 +1356,7 @@ function PortionSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-ink/40" aria-label={t("quick.cancel")} onClick={onClose} />
+      <button type="button" className="scrim absolute" aria-label={t("quick.cancel")} onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
