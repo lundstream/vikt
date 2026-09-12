@@ -525,7 +525,10 @@ build served by `vite preview`:
   `GET /api/me` then reported exactly those four values in their own columns, with
   the screen showing them again after a reload. No horizontal overflow.
 
-No horizontal overflow on any of the eighteen shots, and nothing blank.
+`shoot2.mjs` was then run across every screen at both widths: twenty screens,
+forty shots, **no horizontal overflow on any of them and nothing blank**. The
+photo sheet was shot separately, because it needs a real photograph and a real
+model and neither belongs in a screenshot sweep.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file
