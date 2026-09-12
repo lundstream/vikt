@@ -48,6 +48,12 @@ when it will be down, and its mail goes out.
   tell an edit arriving late from two devices disagreeing about a day. A real
   conflict now offers two equal answers, keep the saved one or use the waiting
   one, in the conflict list and on the queued row alike.
+- **One scrim behind every sheet** (D152). Natt at high opacity with a 10 px
+  blur in both themes, lighter in the light one, from a single token; somebody
+  who has asked for less transparency gets opacity alone. The Is-coloured line
+  around the milestone sheet was a focus ring on the dialog container: focus goes
+  to the first field now and the sheet's own border is gone, because a sheet is
+  Skymning on a dimmed page and needs no edge.
 - **Nothing user-created is create-only** (D146). A measurement can be taken
   back, and an activity can be amended in the form it was typed into, which were
   the last two entities on the wrong side of §3's rule.
@@ -483,6 +489,12 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The scrim and the sheet's edge, in both themes** (D152): the milestone sheet
+  opened at 360 px and desktop in dark and in light. Dark reports
+  `rgba(15, 20, 24, 0.72)` with `blur(10px)`, light the same blur at `0.45`, and
+  in both the focus sits on `#ms-label`, the first field, with no ring and no
+  border on the panel. Before this pass the ring was on the panel itself, in Is,
+  on a screen where Is means a raw reading;
 - **The version footer and the source offer** (D151): Inställningar at 360 px and
   desktop showing "Version dev · 107321a" with all five links resolving, and
   /integritet carrying the AGPL offer in words with the repository linked. The
