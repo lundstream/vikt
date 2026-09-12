@@ -234,6 +234,80 @@ describe("grams and kilograms", () => {
   });
 });
 
+/* ---------------------------------------------- a weight printed on a label */
+
+describe("a weight read off the packaging", () => {
+  const ctx = useTestApp(VISION, {
+    llm: stubLlm(
+      modelSays(
+        '{"items":[{"name":"Mammas köttbullar","amount":{"count":1000,"unit":"g"},"packageG":1000}]}',
+      ),
+    ),
+  });
+
+  /**
+   * The defect this rule exists for. The model read "1000 G" off a bag of
+   * meatballs and offered it as the amount; the database priced it at 2 173
+   * kcal and the row was one tap from the day's intake.
+   *
+   * A kilo on a bag says what the bag weighs. The prompt asks for that figure
+   * as `packageG`, and a row that carries one has **no amount** whatever the
+   * model also put in `amount` — which is the half that matters, because a
+   * model that follows the instruction perfectly would have sent null there
+   * anyway and a model that ignores it is the case worth defending against.
+   */
+  it("is not the amount, even when the model puts it in both fields", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const body = await parse(app, user);
+
+    expect(body.items?.[0]?.name).toBe("Mammas köttbullar");
+    expect(body.items?.[0]?.estimatedGrams).toBeNull();
+    expect(body.items?.[0]?.portionSource).toBe("unknown");
+  });
+});
+
+describe("a package weight reported on its own", () => {
+  const ctx = useTestApp(VISION, {
+    llm: stubLlm(
+      modelSays('{"items":[{"name":"Mammas köttbullar","amount":null,"packageG":1000}]}'),
+    ),
+  });
+
+  /** The compliant shape. The food survives; the figure does not become one. */
+  it("keeps the food and leaves the amount empty", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const body = await parse(app, user);
+
+    expect(body.items?.[0]?.name).toBe("Mammas köttbullar");
+    expect(body.items?.[0]?.estimatedGrams).toBeNull();
+  });
+});
+
+describe("a plate weight that is not a package weight", () => {
+  const ctx = useTestApp(VISION, {
+    llm: stubLlm(
+      modelSays('{"items":[{"name":"kokt potatis","amount":{"count":250,"unit":"g"}}]}'),
+    ),
+  });
+
+  /**
+   * The rule is about `packageG`, not about grams. An estimate of what is on
+   * the plate is the most useful answer this path can give and is unaffected.
+   */
+  it("is still an amount", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const body = await parse(app, user);
+
+    expect(body.items?.[0]?.estimatedGrams).toBe(250);
+  });
+});
+
 /* ------------------------------------------------------------- no calories */
 
 describe("a model that sends nutrition as a field", () => {
@@ -327,6 +401,13 @@ describe("the prompt", () => {
    * database, which is what makes a kebab pizza one line and a steak dinner
    * three.
    */
+  it("says a printed weight is the packet and not the meal", () => {
+    expect(PHOTO_SYSTEM_PROMPT).toContain("TRYCKT PÅ FÖRPACKNINGEN");
+    expect(PHOTO_SYSTEM_PROMPT).toContain("packageG");
+    // And what an amount is instead: what is on the plate, when it can be seen.
+    expect(PHOTO_SYSTEM_PROMPT).toContain("hur mycket som ligger på tallriken");
+  });
+
   it("asks for the rows a food database would have", () => {
     expect(PHOTO_SYSTEM_PROMPT).toContain("livsmedelsdatabas");
     expect(PHOTO_SYSTEM_PROMPT).toContain("kebabpizza är EN rad");

@@ -268,6 +268,21 @@ export const parsedPhotoItemSchema = z
       .strict()
       .nullish()
       .catch(null),
+    /**
+     * A weight printed on the packaging, in grams (D143, amended 2026-09-13).
+     *
+     * **Never an amount, and that is the whole reason the field exists.** The
+     * model read "1000 G" off a bag of meatballs and offered it as how much was
+     * being eaten; the database priced it at 2 173 kcal and the row was one tap
+     * from the day's intake. A kilo on a bag says what the bag weighs.
+     *
+     * So the prompt asks for it *here* instead, and a row that carries it has
+     * no amount — enforced in `pricePhotoItems` rather than asked for, because
+     * a model that ignores the instruction is the case this is defending
+     * against. The figure itself is read and dropped: it is a fact about the
+     * packet, not about the meal.
+     */
+    packageG: z.number().positive().max(20000).nullish().catch(null),
   })
   .strict();
 export type ParsedPhotoItem = z.infer<typeof parsedPhotoItemSchema>;

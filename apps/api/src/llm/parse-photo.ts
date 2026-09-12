@@ -40,7 +40,7 @@ import { findForbiddenKeys } from "./parse-food.js";
 export const PHOTO_SYSTEM_PROMPT = `Du tittar på ett fotografi av mat och skriver ned vad som finns på bilden.
 
 Svara ENDAST med JSON i exakt den här formen:
-{"items":[{"name":"kebabpizza","amount":{"count":1,"unit":"st"}},{"name":"Felix potatisbullar","amount":null}]}
+{"items":[{"name":"kebabpizza","amount":{"count":1,"unit":"st"}},{"name":"Felix potatisbullar","amount":null,"packageG":600}]}
 
 Regler:
 - name: livsmedlets namn på svenska, utan mängd och utan siffror.
@@ -51,7 +51,12 @@ Regler:
   varumärke och produktnamn. "Felix potatisbullar", inte "potatisbullar".
 - amount: mängden, som ett tal och en enhet. Enheten måste vara en av:
   ${HOUSEHOLD_UNITS.join(", ")}.
-- Kan du bedöma vikten, skriv den i gram: {"count":150,"unit":"g"}.
+- amount är hur mycket som ligger på tallriken, om du kan se det. Kan du bedöma
+  vikten av det som ligger framme, skriv den i gram: {"count":150,"unit":"g"}.
+- En vikt som står TRYCKT PÅ FÖRPACKNINGEN är förpackningens storlek, inte
+  mängden mat. "1000 G" på en påse köttbullar betyder att påsen väger ett kilo,
+  inte att någon äter ett kilo. Sätt då amount till null och skriv vikten i
+  packageG i stället: {"name":"köttbullar","amount":null,"packageG":1000}.
 - Kan du inte bedöma mängden, sätt amount till null. Det är ett riktigt svar
   och det vanligaste. Skriv ALDRIG "stor mängd", "en del", "spridd över",
   "lagom" eller liknande i enheten.

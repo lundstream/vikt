@@ -6384,6 +6384,63 @@ a home dinner, somebody else's cooking.
   attribute is what tells a phone to open the camera rather than the gallery,
   and that is the one thing a desktop run cannot show.
 
+#### Addendum, 2026-09-13: a weight printed on a label is not an amount
+
+The packaged-product run above ended with the meatball bag priced at **2 173
+kcal**. The model had read "1000 G" off the label and offered it as `amount`,
+the database priced a kilo of meatballs, and the row sat in the proposal list
+one tap from the day's intake. The proposal list is the safeguard and it worked;
+what it should not have to catch is a number the app had every means to
+recognise.
+
+A kilo on a bag says what the bag weighs. So the prompt now says that in as many
+words, gives the figure its own field, and says what an amount is instead:
+
+    - amount är hur mycket som ligger på tallriken, om du kan se det.
+    - En vikt som står TRYCKT PÅ FÖRPACKNINGEN är förpackningens storlek, inte
+      mängden mat. "1000 G" på en påse köttbullar betyder att påsen väger ett
+      kilo, inte att någon äter ett kilo. Sätt då amount till null och skriv
+      vikten i packageG i stället.
+
+`packageG` is **read and dropped**. It is a fact about the packet, not about the
+meal, and nothing in the app has a use for it. Its job is to give the number
+somewhere to go that is not `amount`.
+
+And the rule is enforced rather than asked for: a row that arrives carrying
+`packageG` has **no amount**, whatever the model also put in `amount`. A model
+that follows the instruction would have sent null there anyway; a model that
+ignores it is the case this is defending against, and `photo-parse.test.ts`
+covers both shapes plus the one it must not touch — a plate weight in grams,
+which is the most useful answer this path can give.
+
+**The three packages again, through the interface, against the real model.**
+Every one of them put the figure in `packageG` and left `amount` null:
+
+| photograph | the model's reply | the proposal list |
+|---|---|---|
+| Valio Laktosfri Yoghurt Mango & Vanilj | `{"name":"Valio Laktosfri Yoghurt Mango&Vanilj","amount":null,"packageG":250}` | Valio Laktosfri Yoghurt Mango&Vanilj · ≈ Uppskattad · inte än · Ingen träff i databasen, sparas utan energivärde |
+| Mammas köttbullar, 1000 g | `{"name":"Köttbullar","amount":null,"packageG":1000}` | Köttbullar frysvara · ≈ Uppskattad · inte än · inte än |
+| frischgold Färdigskivad Gräddost | `{"name":"frischgöld gräddost","amount":null,"packageG":250}` | frischgöld gräddost · ≈ Uppskattad · inte än · Ingen träff i databasen, sparas utan energivärde |
+
+Two things worth keeping from that.
+
+**The meatball row is the fix.** The same photograph that produced 1 000 g and
+2 173 kcal now produces a named food and an empty amount field, which is the
+honest state: the app knows what it is and does not know how much was eaten.
+
+**The yoghurt's 250 is wrong** — that carton is a kilo — and it does not matter,
+which is the point. A figure that is read and dropped cannot be wrong in a way
+anybody pays for. Had it been treated as an amount it would have been a
+plausible, unremarkable, incorrect 250 g, which is a worse failure than the
+kilo: nobody would have looked twice at it.
+
+The run also repeated the earlier finding about spelling. "Yogghurt" one run and
+"Yoghurt" the next, "frischgöld" for frischgold both times, at temperature 0 —
+the vision model is not deterministic across runs, and its spelling is what an
+exact-string search cannot survive. Nothing about that has changed, and it is
+still why D143 calls the photograph a shortcut to free text rather than an
+alternative to the barcode.
+
 ### D144 — The trend line is a curve between readings, not a staircase
 
 *2026-09-13.*

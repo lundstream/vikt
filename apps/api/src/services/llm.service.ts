@@ -240,7 +240,21 @@ async function pricePhotoItems(
     const household = householdHints(row?.category);
     const hints = packet || household ? { ...(household ?? {}), ...(packet ?? {}) } : null;
 
-    const amount = photoAmount(item.amount ?? null, hints, own);
+    /**
+     * A row that came with a package weight has no amount (D143, amended).
+     *
+     * The model read "1000 G" off a bag of meatballs and offered it as how much
+     * was being eaten; the database priced it at 2 173 kcal, one tap from the
+     * day's intake. The prompt now asks for that figure as `packageG` instead,
+     * and this drops whatever landed in `amount` beside it — enforced rather
+     * than asked for, because a reply that has told us the number is a packet
+     * has told us it is not a helping, and a model that puts it in both fields
+     * is exactly the case worth defending against.
+     */
+    const amount =
+      typeof item.packageG === "number"
+        ? { grams: null, source: "unknown" as const, portion: null }
+        : photoAmount(item.amount ?? null, hints, own);
 
     return {
       name: item.name,
