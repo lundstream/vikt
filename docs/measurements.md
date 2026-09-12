@@ -63,8 +63,8 @@ difference between the rows, so the right reading is "unchanged" rather than
 
 ## Can the models on the workstation see
 
-Asked before anything was built on the answer, with `scripts/probe-vision.mjs`
-against `OLLAMA_URL` on the LAN. Ollama reports a `vision` capability for four
+Asked before anything was built on the answer, with the probe that is now
+`pnpm --filter api probe:vision`, against `OLLAMA_URL` on the LAN. Ollama reports a `vision` capability for four
 of the models installed here, and a capability is a claim about a build rather
 than evidence that this tag on this box will do the thing.
 
@@ -142,6 +142,34 @@ Three things the probe settled that a paragraph could not:
   back as "Pizza (1 st)". That is the argument for the optional text line beside
   the photo — "kebabpizza, hel" costs four words and fixes what the picture
   cannot say — and for marking every amount from a photo as an estimate.
+
+### What a photograph costs the model that was already loaded
+
+One GPU, and now three models that want it. Measured through `/api/ps` on the
+workstation, with the probe printing what was resident before and after each
+call.
+
+| resident before | after a photograph | verdict |
+|---|---|---|
+| `gemma4:e4b` 4 GB (the text parser) | `gemma4:e4b` 4 GB + `qwen3-vl:8b` 15 GB | both stay |
+| `qwen3.6:27b` 21 GB (the coach) | `qwen3-vl:8b` 15 GB alone | the coach is evicted |
+
+**The text parser survives a photograph.** Four gigabytes and fifteen fit
+together, and a text parse immediately after a photo answered in **85 ms** —
+the same warm figure as before it. Somebody photographing dinner and then
+typing a second item pays nothing for the first.
+
+**The coach does not.** Twenty-one gigabytes and fifteen do not fit, so a photo
+evicts the conversation model. The next coach turn then pays a cold load:
+**12.7 s to the first token, against 118 to 181 ms warm.** The coach streams
+(D139), so what this costs is the wait before the first sentence appears, once,
+and only for a turn that directly follows a photograph.
+
+Not worth designing around, for two reasons. It is a self-hosted box with one
+user in front of it, so the sequence photo-then-immediately-chat is rare; and the
+alternative — keeping all three resident — is a hardware decision, not a code
+one. It is worth **knowing**, because "the coach felt slow that once" is
+otherwise an unexplainable observation, and this is the explanation.
 
 ---
 

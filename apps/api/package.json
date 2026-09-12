@@ -19,6 +19,7 @@
     "import:livsmedelsverket": "tsx src/scripts/import-livsmedelsverket.ts",
     "admin": "tsx src/scripts/make-admin.ts",
     "vapid": "tsx src/scripts/vapid.ts",
+    "probe:vision": "tsx src/scripts/probe-vision.ts",
     "mail:worker": "tsx src/scripts/mail-worker.ts",
     "mail:samples": "tsx src/scripts/send-samples.ts"
   },
