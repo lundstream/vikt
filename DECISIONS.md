@@ -6984,3 +6984,63 @@ reading logged for an empty 24 August through the calendar so it sat in the
 queue, another device writing that day while it waited, and the queue drained.
 One question, both readings shown, two buttons, and the queue row carrying the
 same two. Settling it with the waiting reading left **one row at 91,5**.
+
+### D151 — The build says what it is, and the source is offered where people are
+
+*2026-09-13.*
+
+Two things that had never been said out loud anywhere a person could read them:
+which version is running, and where the source is.
+
+#### The version is a property of the image, not a setting
+
+`APP_VERSION` and `APP_COMMIT` are **Docker build arguments**, set by
+`release.yml` from the tag and the commit, becoming `ENV` in the runtime stage.
+They are deliberately **not** in `env.ts`, and the distinction is the whole
+point: everything in the environment schema is a choice an operator makes, and a
+deployment that could claim to be a version it is not would make the version
+worth nothing at the moment somebody needs it. Keeping them out also keeps
+D147's stack-variable guard honest — no allowlist entry, because they are not
+stack variables.
+
+`release.yml` derives the version from the ref rather than trusting
+`github.ref_name`, which is the branch on a branch push: `main` is not a
+version. A build with no tag says `dev`.
+
+**A development run says `dev` and the sha.** `buildInfo` falls back to reading
+`.git/HEAD` and the ref it names — files, not a `git` subprocess, because this
+is called on a public endpoint and a process spawn per request is not a thing to
+add for a footer. A container has no `.git`, which is the correct answer there:
+the build argument is what speaks for an image, and it always wins over the
+checkout.
+
+#### One source, three readers
+
+`/api/health` carries `version` and `commit`, beside the modes and for the same
+reason D94 put those there: an operator checking a deployment should see its
+shape with one curl, and it discloses nothing an anonymous visitor could not
+read off a public repository.
+
+The boot log's **first line** is `vikt 1.1.0 (a1b2c3d)`. First rather than
+tidy-first: a log read from the top gives the version before the migrations that
+version applied, so every line under it can be read against the build that wrote
+it. The footer in Inställningar and the line under the Administration heading
+read the same endpoint through one query key, so the three cannot drift into
+three answers.
+
+#### The source, offered where somebody signed in can see it
+
+AGPL §13 obliges an offer of the source to anybody who interacts with the
+program over a network. The landing footer has carried the link since D106 —
+and **somebody signed in never sees that footer**. The app is where they are.
+
+So the foot of Inställningar carries the version and five text links: the source,
+Nyheter, `/integritet`, `/villkor` and the licence. In Sten, nothing an accent,
+nothing a button: it is reference, not an action (D134). `/integritet` also
+states the offer in words rather than in passing, names the licence and links
+the repository, and says where the running version is shown.
+
+Exercised at 360 px and desktop against the development API: the footer renders
+`Version dev · 107321a` with all five links resolving, and `/integritet` reads
+"Källkoden är öppen och finns att hämta … Koden till den här installationen
+finns på github.com/lundstream/vikt."

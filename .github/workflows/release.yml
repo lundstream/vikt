@@ -101,6 +101,23 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=ref,event=tag
 
+      # What the image should call itself (D151).
+      #
+      # The tag when there is one, `dev` otherwise. `github.ref_name` is the tag
+      # on a tag push and the branch on a branch push, so it is filtered rather
+      # than trusted: `main` is not a version.
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            tag="${{ github.event.release.tag_name }}"
+            echo "value=${tag#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -108,6 +125,11 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          # Baked in, so the running container can say what it is without
+          # anybody being able to tell it otherwise.
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.value }}
+            APP_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # A registry cache rather than GitHub's, so the layers are reachable

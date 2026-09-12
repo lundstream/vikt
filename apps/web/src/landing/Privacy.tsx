@@ -31,7 +31,7 @@ import { operatorName, siteConfig } from "../lib/site-config.js";
 
 
 export function Privacy() {
-  const { contact } = siteConfig();
+  const { contact, repo } = siteConfig();
   const operator = operatorName();
 
   return (
@@ -44,8 +44,35 @@ export function Privacy() {
           supportavdelning, så svaret kommer när det kommer, men det kommer.
         </P>
         <P>
-          Kör du din egen installation ansvarar du för den. Källkoden är öppen, och en självhostad Vikt skickar ingenting till den
+          Kör du din egen installation ansvarar du för den. En självhostad Vikt skickar ingenting till den
           som skrev den eller till någon annan.
+        </P>
+        <P>
+          Källkoden är öppen och finns att hämta. Vikt är licensierad under{" "}
+          <a
+            className="underline underline-offset-4 hover:text-ink"
+            href="https://www.gnu.org/licenses/agpl-3.0.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            AGPL-3.0
+          </a>
+          , som ger dig rätt att läsa, ändra och köra din egen kopia.{" "}
+          {repo === "" ? null : (
+            <>
+              Koden till den här installationen finns på{" "}
+              <a
+                className="underline underline-offset-4 hover:text-ink"
+                href={repo}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {repo.replace(/^https?:\/\//, "")}
+              </a>
+              .{" "}
+            </>
+          )}
+          Versionen som körs står längst ner under Inställningar, inne i appen.
         </P>
       </Section>
 

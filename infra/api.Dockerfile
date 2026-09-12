@@ -26,6 +26,18 @@ RUN pnpm --filter api build
 FROM base AS runtime
 ENV NODE_ENV=production
 
+# Which build this is (D151).
+#
+# Build arguments rather than stack variables on purpose: these are facts about
+# the binary, not choices an operator makes, and a deployment that could claim
+# to be a version it is not would make the version worth nothing at the moment
+# somebody needs it. `release.yml` sets them from the tag and the commit; a
+# local build leaves them at their defaults and the app says `dev`.
+ARG APP_VERSION=dev
+ARG APP_COMMIT=
+ENV APP_VERSION=$APP_VERSION
+ENV APP_COMMIT=$APP_COMMIT
+
 # `pg_dump`, for the scheduled backup the app runs itself (D103).
 #
 # D96 shipped a shell script that called `docker compose exec postgres pg_dump`,

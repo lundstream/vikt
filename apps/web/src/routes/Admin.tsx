@@ -9,6 +9,7 @@ import { MailSettings } from "./admin/MailSettings.js";
 import { Backup } from "./admin/Backup.js";
 import { Announcements } from "./admin/Announcements.js";
 import { Log } from "./admin/Log.js";
+import { AdminBuild } from "../components/AppVersion.js";
 
 /**
  * The admin area (D89, D95, D100).
@@ -76,7 +77,16 @@ export function Admin() {
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-8">
       <header className="mb-6 flex items-baseline justify-between gap-4">
-        <h1 className="text-title text-ink">{t("admin.title")}</h1>
+        <div>
+          <h1 className="text-title text-ink">{t("admin.title")}</h1>
+          {/*
+            Which build this installation is running (D151). Here because an
+            admin looking at a log line or a failed job needs to know which
+            version wrote it, and because this is the screen somebody opens when
+            something is wrong. Same source as the boot log's first line.
+          */}
+          <AdminBuild />
+        </div>
         <Link className="text-note text-muted underline underline-offset-4" to="/">
           {t("nav.dashboard")}
         </Link>

@@ -19,6 +19,7 @@ import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
 import { NewsMailToggle, RequestMailToggle } from "../components/NewsMailToggle.js";
+import { AppVersion } from "../components/AppVersion.js";
 import { Reminders } from "../components/Reminders.js";
 import { InstallApp } from "../components/InstallApp.js";
 import { ThemeChoice } from "../components/ThemeChoice.js";
@@ -287,6 +288,13 @@ export function Settings() {
       */}
 
       <DeleteAccount />
+
+      {/*
+        Last, in Sten: which build this is and where to read about it (D151).
+        Reference rather than an action, so it sits under everything anybody
+        came here to do, and nothing in it is a button.
+      */}
+      <AppVersion />
     </main>
   );
 }

@@ -237,6 +237,13 @@ export const sv = {
     "båda så att du kan välja, i stället för att skriva över något du inte sett.",
   "settings.conflictTheirs": "Sparad på servern",
   "settings.conflictMine": "Din väntande post",
+  // ------------------------------------------------ version och länkar (D151)
+  "about.version": "Version {version}",
+  // The build did not say, which is a fact rather than an error.
+  "about.versionUnknown": "Version okänd",
+  "about.source": "Källkod",
+  "about.privacy": "Integritet",
+  "about.terms": "Villkor",
   "settings.conflictKeepTheirs": "Behåll den sparade",
   "settings.conflictUseMine": "Använd den väntande",
   // Which collision it is (D150). Two creates for one day is one thing; an

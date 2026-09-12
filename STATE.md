@@ -38,6 +38,11 @@ when it will be down, and its mail goes out.
   them, a person confirms every row, and the picture is read and dropped. Amounts
   mostly arrive empty and are typed; a weight printed on a package is refused as an
   amount outright.
+- **The app says which build it is** (D151). The version and short commit sit at
+  the foot of Inställningar with links to the source, Nyheter, /integritet,
+  /villkor and the licence, under the Administration heading, and as the first
+  line of the boot log. They are build arguments baked into the image, not
+  settings, so a deployment cannot claim to be a version it is not.
 - **Editing a reading is an update, not a second reading** (D150). The calendar's
   edit sheet sends the row's id and the value it opened with, so the server can
   tell an edit arriving late from two devices disagreeing about a day. A real
@@ -434,7 +439,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1706 tests**: 494 shared, 321 web, 891 api. **Nine more run in CI**, and they
+**1713 tests**: 494 shared, 321 web, 898 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -478,6 +483,11 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The version footer and the source offer** (D151): Inställningar at 360 px and
+  desktop showing "Version dev · 107321a" with all five links resolving, and
+  /integritet carrying the AGPL offer in words with the repository linked. The
+  API reports the same pair on `/api/health`, which is where the boot log's own
+  first line gets it;
 - **Editing 25 August through the calendar** (D150): 90,1 to 90,2 at 360 px and
   desktop, the server holding 90,2 afterwards and Inställningar reading "Allt är
   skickat" with no conflict and nothing queued. That is the defect's absence;
@@ -651,6 +661,7 @@ somebody had read off a log with nothing behind it.
 | The chart's trend vertices are the calc's own values, one per reading (D144) | `apps/web/src/lib/trend-series.ts`, `apps/web/test/trend-series.test.ts` | Test |
 | The Portainer stack pins a version rather than `latest`, and both images move together (D148) | `infra/docker-compose.portainer.yml`, `apps/api/test/stack-variables.test.ts` | Test |
 | Every variable the API's env schema knows is forwarded by the Portainer compose and documented in .env.example (D147) | `apps/api/test/stack-variables.test.ts` | Test |
+| The version the config path reports is the one the build argument set (D151) | `apps/api/src/lib/build-info.ts`, `apps/api/test/build-info.test.ts` | Test |
 | An edit is an update to its row, and only two creates for one day are a same-day conflict (D150) | `apps/api/test/weight-update.test.ts`, `apps/web/test/weight-edit-queue.test.ts` | Test |
 | Every user-created row has an edit and a delete on the screen that shows it (D56, D146) | `apps/api/test/daily.test.ts`, `apps/web/test/render/day-edit-remove.test.tsx` | Test |
 | Every reading is reachable and editable, not the last five (D145) | `apps/web/src/components/MonthCalendar.tsx`, `apps/web/test/render/weight-calendar.test.tsx`, `apps/web/test/month-calendar.test.ts` | Test |
