@@ -122,208 +122,155 @@ phase 3.
 
 ## Inför nästa deploy
 
-**Every pass on `dev` appends to this list, and nothing merges to `main` until it has
-been read.** `main` is what production deploys from, so this is the handover: the four
-things that do not travel in a git diff and cannot be inferred from one.
+**The deploy is a runbook, and it is in `INFRA.md` under "Deploying a version, in
+order".** Eight steps: back up and prove the backup restores, set every new
+variable, merge and cut the version, wait for `release`, pin `IMAGE_TAG` and
+redeploy, read the named lines out of the API log, check it from a phone on
+mobile data, and roll back by editing one line.
 
-Cleared back to empty when a merge ships, not before.
+It lives there rather than here because it is about **this installation** and
+this file is public (D119). What stays here is the one thing that has to be
+pasted into the app rather than typed at a host.
 
-### Nya miljövariabler
-
-| Variabel | Vad den gör | Krävs? |
-|---|---|---|
-| `CONTACT_EMAIL` | Adressen `/integritet` namnger som personuppgiftsansvarig. Bygget lämnar `__CONTACT_EMAIL__` i `index.html` och `32-site-config.sh` fyller i den vid start (D121). | **Ja** när `LANDING_ENABLED` eller `REQUEST_ENABLED` är `true`. API:t vägrar starta utan den i produktion. |
-| `OPERATOR` | Vem som driver installationen, i sidfoten och på `/integritet`. | Nej, men sidan blir vagare utan. |
-| `REPO_URL` | Vart GitHub-länken pekar. | Nej, har ett förval. |
-| `SUPPORT_URL` | Länken "Bjud på en öl". Tom betyder att länken utgår helt. | Nej. |
-| `VAPID_PUBLIC_KEY` | Publik nyckel för push. Lämnas den tom finns påminnelserna inte alls: inget schemaläggs, ingen endpoint registreras och avsnittet i Inställningar ritas inte (D136). | Nej, men utan den finns inga påminnelser. |
-| `VAPID_PRIVATE_KEY` | Privat nyckel för push. Hemlig som `SECRET_KEY`. API:t vägrar starta om bara den ena av nycklarna är satt. | Bara om push ska vara på. |
-| `VAPID_SUBJECT` | `mailto:`-adress eller URL som push-tjänsten kontaktar om servern missköter sig. Krävs av specen. | Ja, om nycklarna är satta. |
-| `REQUEST_ENABLED` | Serverar formuläret för kodförfrågan på `/kod` och registrerar endpointen det skickar till. Av betyder 404 på båda (D127). | Nej, förvalet är `false`. |
-| `LLM_VISION_MODEL` | Modellen som får fotografier av mat (D143). Tom betyder att snabbvalet Fotografera maten inte finns. **Inget förval, och gissa inte ett**: Ollama rapporterar `vision` för modeller som tar emot en bild och sedan svarar som om ingen bifogats. Kör `pnpm --filter api probe:vision --selftest` mot `OLLAMA_URL` först och sätt den tagg som svarar SEES. | Nej. Utan den finns funktionen inte. |
-| `OLLAMA_VISION_TIMEOUT_MS` | Hur länge API:t väntar på en bildtolkning. Förval 60 000. Mätt: 0,2-1,3 s med modellen laddad, 5,9 s när den måste laddas. | Nej, har ett förval. |
-
-**Sätt dem innan avbilden som läser dem rullar ut.** En variabel den nuvarande
-avbilden inte känner till ignoreras, så det finns inget fönster där något går sönder
-av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
-`__CONTACT_EMAIL__`.
-
-### Migrationer som kommer att köras
-
-`0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
-fyra kolumner på `profiles` för de två påminnelserna. Additiv.
-
-`0029_app_settings` lägger till en liten nyckel-värde-tabell för sådant servern
-behöver komma ihåg om sig själv mellan starter. Första posten är den VAPID-nyckel
-installationen senast kördes med; den andra är svaret på om `LLM_VISION_MODEL`
-verkligen tittar på bilder (D143). Additiv.
-
-`0028_coach_tone` lägger till kolumnen `coach_tone` på `profiles`, med `torr` som
-standard. Additiv, och standardvärdet är den röst som redan fanns.
-
-`0027_coach` lägger till tabellerna `coach_conversations` och `coach_messages`,
-samt kolumnen `dismissed_at` på `weekly_reviews`. Additiv. Samtalen kaskaderar
-med kontot.
-
-`0026_habits` lägger till tabellerna `habits` och `habit_checks`. Vanorna är
-användarens egna ord, en rad per vana och dag, och båda tabellerna kaskaderar med
-kontot. Additiv.
-
-`0025_reminder_weekend` lägger till fyra kolumner till på `profiles`: en egen
-på-knapp och en egen tid för helgen, per påminnelse. De fyra som redan fanns behåller
-sina namn och är nu vardagstiderna. Migrationen kopierar vardagsvärdena till
-helgkolumnerna, så ett konto som hade 07:00 alla dagar har kvar 07:00 alla dagar
-tills någon ändrar det. Additiv.
-
-`0022_backup_smb` lägger till `smb_host`, `smb_share` och `smb_domain` på
-`backup_settings`, och `0023_backup_s3` tar bort dem igen och lägger till
-`s3_endpoint`, `s3_region`, `s3_bucket` och `s3_path_style`. Båda körs vid start.
-
-**Att 0023 tar bort kolumner är ett medvetet undantag** från regeln att
-migrationer bara lägger till. Det är ofarligt just här och bara här: 0022 har
-aldrig körts utanför utveckling, `main` har aldrig burit den, så ingen
-produktionsdatabas har kolumnerna och ingen har ett värde i dem. Produktionen
-lägger till tre kolumner och tar bort dem igen i samma uppstart.
-
-`0021_request_mail` lägger till kolumnen `request_mail` på `profiles`, med
-`DEFAULT true`. Den är additiv och körs av API-containerns entrypoint vid start,
-som alla andra. Ingen befintlig rad ändras, och en avbild som inte känner till
-kolumnen bryr sig inte om att den finns.
-
-**Byts VAPID-paret säger API:t till vid nästa start.** Loggen skriver en varning
-som säger hur många prenumerationer som är bundna till det gamla paret och att de
-svarar 403 tills var och en slår av och på påminnelserna igen. Ingenting raderas,
-och servern startar som vanligt.
-
-**403 från push-tjänsten raderar ingenting längre.** Byts VAPID-paret, eller
-klistras en nyckel in fel i stackens variabler, svarar push-tjänsten 403 för
-**alla** enheter samtidigt. Tidigare tolkades det som att prenumerationerna var
-döda och raderades vid första svepet; nu står raderna kvar och API-loggen
-skriver en varning per svep som namnger de troliga orsakerna. Det syns i loggen
-som `push rejected the signature (403)`.
-
-### Manuella steg på Portainer-värden
-
-- Sätt variablerna ovan i stacken `vikt` innan avbilden byts.
-- **Generera VAPID-nycklar en gång per installation** med `pnpm --filter api vapid`
-  och lägg dem i stackens miljö. Byts paret senare slutar alla befintliga
-  prenumerationer fungera, tyst, så gör det en gång. Utan nycklar finns
-  påminnelserna inte, och det är ett giltigt läge.
-- **Påminnelserna kräver en enda API-instans**, precis som mejlkön (D104). Två
-  processer sveper två gånger. Dubbla notiser går inte att få, det förhindrar
-  unikindexet, men arbetet görs två gånger.
-- **Backupmålet är nu antingen en katalog eller en S3-hink.** Att skriva till en
-  Windows-utdelning direkt finns inte längre: biblioteken talar NTLMv1 som dagens
-  servrar nekar (D132, D133). Vill du använda NAS:en, montera utdelningen på värden
-  och bind-montera katalogen in i api-containern, se README. Vill du använda S3,
-  eller NAS:ens egen S3-tjänst, fyll i adress, hink, nyckel och hemlighet under
-  Administration, Backup och tryck "Testa anslutningen" innan du litar på schemat.
-- **`REQUEST_ENABLED` behöver inte sättas.** Utan den är formuläret borta, vilket är
-  det avsedda läget. Sätt den till `true` bara om du vill kunna skicka adressen
-  `/kod` till någon. Ingenting länkar dit.
-- Ta bort den kvarglömda förfrågan `human-check-probe@example.test` under
-  Administration, Förfrågningar, Besvarade. Den blev kvar från verifieringen av
-  människokontrollen och kan inte tas bort härifrån.
+**Every pass on `dev` still appends to this section**, and nothing merges to
+`main` until it has been read. Anything operational that a pass discovers goes
+into the runbook; anything a user will see goes into the news post below.
 
 ### Till Nyheter
 
-En rad per synlig förändring, i appens register, färdig att klistra in:
+**Färdig text, klistra in som den är** under Administration, Meddelanden. Den
+täcker allt som syns sedan den version som körs i produktion i dag. Inga tankstreck
+(§5), och registret är appens eget: du, inte "användaren".
 
-- Viktgrafen ritar en kurva mellan vägningarna i stället för en trappa. Väger du
-  dig varje dag ser den likadan ut som förut. Väger du dig en gång i veckan låg
-  linjen förut stilla hela veckan och föll sedan allt på en dag, vilket inte var
-  vad som hade hänt. Siffrorna är oförändrade. Linjen slutar numera vid den
-  senaste vägningen i stället för att fortsätta rakt fram till i dag.
-- Alla vägningar går att ändra, inte bara de fem senaste. Under listan på
-  Översikt finns "alla vägningar", som öppnar en månadskalender där dagarna med
-  en vägning är markerade. Tryck på en av dem för att ändra eller ta bort den,
-  eller på en tom dag för att fylla i en vägning du missade.
-- Du kan fotografera maten i stället för att skriva vad du åt. Bilden skickas till
-  modellen på arbetsstationen, som säger vilka livsmedel den ser. Kalorierna kommer
-  som alltid från livsmedelsdatabasen, och ingenting sparas förrän du har läst
-  raderna och tryckt spara. **Bilden sparas aldrig** - varken på servern, i loggen
-  eller i telefonen - utan läses och kastas.
-  Mängderna är det bilden är sämst på: oftast står det "inte än" i mängdrutan och
-  du får fylla i själv, och en rad utan mängd går inte att spara. Raderna är
-  märkta som uppskattade. Har maten en streckkod är Skanna fortfarande det som ger
-  rätt produkt; fotot är till för tallriken som inte har någon.
-- Viktgrafens skala visar jämna steg igen, och alla vägningar får plats i bilden. Den
-  senaste vägningen kunde tidigare hamna utanför och ritades då inte alls.
-- Grafens ruta visar samma antal decimaler som siffran ovanför.
-- Saknas ett makrovärde står det numera varför: ingenting loggat, eller för få dagar
-  med uppgifter om just det makrot. Fibervärden saknas oftare än de andra i öppna
-  matdatabaser.
-- Att välja en träff i matsökningen stänger träfflistan.
-- Åtgärder som kostar något, som att radera ett konto eller ändra mejlservern, har fått
-  en egen färg. Att radera ett konto kräver att adressen skrivs in.
-- När du tittar på en tidigare dag i Mat kan du logga en rad, eller hela dagen, på
-  dagens datum. "Igen" under Senast loggat fyller fortfarande i dagen du tittar på.
-- Tryck på en loggad rad i Mat för att se protein, kolhydrater, fett och fiber för
-  just den raden, hur mycket det var och varifrån siffrorna kommer. Ändra, ta bort
-  och "Logga i dag" ligger numera där, i den öppnade raden.
-- Framsteg är omstuvad: potten och nykterhetsräknaren ligger ovanför listorna, och
-  milstolpar och sparregler är hopfällda med antal bredvid rubriken. Tryck för att
-  fälla ut. "Lägg till milstolpe" och "Ny sparregel" öppnar ett formulär i ett eget
-  fönster i stället för att stå framme hela tiden.
-- Formuläret för att be om en inbjudningskod ligger inte längre på startsidan. Det
-  har flyttat till en egen adress som inget länkar till, och den är avstängd om
-  inte den som driftar servern slår på den. Startsidan säger i stället att appen
-  kräver en inbjudan och att den som vill kan köra en egen kopia.
-- Nyheter kan nu innehålla rubriker, fetstil, punktlistor, numrerade listor och
-  länkar. Det gäller både i appen och i mejlet. Den som skriver ett meddelande ser
-  hur det kommer att se ut innan det sparas.
-- Den som administrerar får ett mejl när någon ber om en inbjudningskod, och en prick
-  vid Administration så länge något väntar på svar. Mejlet kan stängas av under
-  Inställningar. Pricken och listan finns kvar oavsett.
-- Backupen kan skrivas direkt till en Windows-utdelning. Server, utdelning, mapp,
-  användarnamn och lösenord ställs in under Administration, Backup, och lösenordet
-  lagras krypterat. Knappen "Testa anslutningen" skriver en liten fil och tar bort
-  den igen, så att man ser att det fungerar innan nattens körning.
-- Backupen skrivs till en S3-hink i stället för till en Windows-utdelning. Adress,
-  hink, mapp, nyckel och hemlighet ställs in under Administration, Backup, och
-  hemligheten lagras krypterat. Fungerar mot AWS, Backblaze, MinIO och de flesta
-  NAS-lådors egen S3-tjänst.
-- Knapparna har tre former i stället för fyra. Allt som gör något är en fylld knapp,
-  allt som bara tar dig därifrån (Avbryt, Tillbaka) är en textlänk, och det som
-  kostar något är fortfarande Honung. Den tunna konturknappen är borta.
-- På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
-  rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
-  sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
-- Coachen har tre tonlägen som du väljer under Coach: Torr, Peppig och Saklig.
-  Valet gäller både veckans sammanfattning och chatten. Saklig har ingen
-  personlighet alls och heter då bara Coachen.
-- Veckans sammanfattning skrivs numera av sig själv på söndagskvällen, klockan
-  20:00 i din egen tidszon. Har veckan färre än fyra loggade dagar skrivs ingen
-  alls, och då dyker inget kort upp på Översikt heller.
-- Under Mer finns Coach: en sida där Bengt sammanfattar veckan och svarar på frågor
-  om hur det går. Han utgår bara från dina egna siffror, hittar aldrig på några nya
-  och ändrar ingenting: loggar och planer sköter du själv. Svaret skrivs ut medan
-  det blir till.
-- Är veckans sammanfattning ny visas den överst på Översikt, en gång, med "Läs hela"
-  till Coach. Trycker du "Tack, läst" försvinner den på alla dina enheter.
-- Samtalen sparas på ditt konto, visas bara för dig och används inte till något
-  annat. Du kan ta bort ett samtal i taget eller allihop, och de följer med i
-  exporten.
-- Frågor om medicin, sjukdom och graviditet svarar han inte på, utan hänvisar till
-  vården i en mening.
-- Hela Coach finns bara om AI-lagret är påslaget på den här installationen.
-- Dagen har en egen checklista. Skriv in det du vill göra varje dag, med eller utan
-  ikon, och bocka av med ett tryck. Ett tryck till tar bort bocken. Under varje vana
-  står hur många dagar i rad du har den, och en dag du inte fyllde i listan alls
-  räknas som okänd i stället för som missad.
-- Varje vana kan ha en egen påminnelse, och den sätter du direkt när du skapar
-  vanan: samma tider för vardag och helg som de andra påminnelserna, avstängda tills
-  du slår på dem. Den hoppas över om du redan bockat av vanan den dagen, och under
-  Inställningar, Påminnelser står vilka vanor som har en.
-- Tar du bort en vana får du välja: behåll dagarna du redan bockat av, eller ta bort
-  dem också. Vad som händer står innan du bekräftar.
-- Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig
-  och en på kvällen om att fylla i dagen. Var och en har en tid för vardagar och en för
-  helgen, med var sin knapp, så morgonpåminnelsen kan vara 07:00 i veckan och 09:00 på
-  lördag och söndag, eller avstängd då. Alla fyra är avstängda tills du slår på dem.
-  Vilka dagar som är helg räknas i din egen tidszon. Morgonens hoppas över om du redan vägt dig,
-  kvällens om dagen redan är ifylld. Push fungerar i webbläsaren på Android och på
-  iPhone bara när appen är installerad på hemskärmen, vilket står bredvid knappen.
+<details>
+<summary>Nyhetstexten</summary>
+
+```markdown
+Det här är en stor uppdatering. Nedan står allt som syns, skärm för skärm.
+Inget av det du har loggat påverkas, och inga siffror räknas om.
+
+## Översikt
+
+Viktgrafen ritar en kurva mellan vägningarna i stället för en trappa. Väger du dig
+varje dag ser den likadan ut som förut. Väger du dig en gång i veckan låg linjen
+förut stilla hela veckan och föll sedan allt på en dag, vilket inte var vad som
+hade hänt. Siffrorna är oförändrade. Linjen slutar numera vid den senaste
+vägningen i stället för att fortsätta rakt fram till i dag.
+
+Skalan visar jämna steg igen, och alla vägningar får plats i bilden. Den senaste
+kunde tidigare hamna utanför och ritades då inte alls. Rutan som visas när du
+trycker på grafen har samma antal decimaler som siffran ovanför.
+
+**Alla vägningar går att ändra, inte bara de fem senaste.** Under listan finns
+"alla vägningar", som öppnar en månadskalender där dagarna med en vägning är
+markerade. Tryck på en av dem för att ändra eller ta bort den, eller på en tom dag
+för att fylla i en vägning du missade.
+
+Saknas ett makrovärde står det numera varför: ingenting loggat, eller för få dagar
+med uppgifter om just det makrot. Fibervärden saknas oftare än de andra i öppna
+matdatabaser.
+
+## Mat
+
+**Du kan fotografera maten i stället för att skriva vad du åt.** Bilden skickas
+till modellen på arbetsstationen, som säger vilka livsmedel den ser. Kalorierna
+kommer som alltid från livsmedelsdatabasen, och ingenting sparas förrän du har läst
+raderna och tryckt spara.
+
+**Bilden sparas aldrig.** Inte på servern, inte i loggen, inte i telefonen. Den
+läses en gång och kastas, och platsen och tidpunkten som kameran lägger i filen
+tas bort innan den skickas. Går det inte att skicka är bilden borta och du får ta
+en ny.
+
+Mängderna är det bilden är sämst på. Oftast står det "inte än" i mängdrutan och du
+får fylla i själv, och en rad utan mängd går inte att spara. Raderna är märkta som
+uppskattade. Har maten en streckkod är Skanna fortfarande det som ger rätt produkt.
+Fotot är till för tallriken som inte har någon.
+
+Skanna, Fotografera maten, Skriv in själv, Skriv vad du åt och Vad kan jag laga
+ligger nu på en rad, som runda snabbval med etikett under, i stället för som knappar
+utspridda på sidan. De som behöver en språkmodell försvinner när den är avstängd.
+
+Tryck på en loggad rad för att se protein, kolhydrater, fett och fiber för just den
+raden, hur mycket det var och varifrån siffrorna kommer. Ändra, ta bort och
+"Logga i dag" ligger numera där, i den öppnade raden.
+
+Tittar du på en tidigare dag kan du logga en rad, eller hela dagen, på dagens datum.
+"Igen" under Senast loggat fyller fortfarande i dagen du tittar på. Att välja en
+träff i matsökningen stänger träfflistan.
+
+## Dagen
+
+**Dagen har en egen checklista.** Skriv in det du vill göra varje dag, med eller
+utan ikon, och bocka av med ett tryck. Ett tryck till tar bort bocken. Under varje
+vana står hur många dagar i rad du har den, och en dag du inte fyllde i listan alls
+räknas som okänd i stället för som missad. Tar du bort en vana får du välja om
+dagarna du redan bockat av ska följa med.
+
+Varje vana kan ha en egen påminnelse, och den sätter du direkt när du skapar vanan.
+
+Loggar du en träning kan du trycka på raden för att ändra den i stället för att ta
+bort den och skriva in den igen. Måtten går att ta bort, inte bara skriva över.
+
+## Coach
+
+Under Mer finns Coach: en sida där veckan sammanfattas och där du kan ställa frågor
+om hur det går. Svaret bygger bara på dina egna siffror, hittar aldrig på några nya
+och ändrar ingenting. Loggar och planer sköter du själv. Svaret skrivs ut medan det
+blir till.
+
+Du väljer ton under Coach: Torr, Peppig eller Saklig. Valet gäller både
+sammanfattningen och chatten. Saklig har ingen personlighet alls.
+
+Veckans sammanfattning skrivs av sig själv på söndagskvällen, klockan 20:00 i din
+egen tidszon. Har veckan färre än fyra loggade dagar skrivs ingen alls. Är den ny
+visas den överst på Översikt, en gång, med "Läs hela" till Coach. Trycker du
+"Tack, läst" försvinner den på alla dina enheter.
+
+Samtalen sparas på ditt konto, visas bara för dig och används inte till något annat.
+Du kan ta bort ett samtal i taget eller allihop, och de följer med i exporten.
+Frågor om medicin, sjukdom och graviditet besvaras inte, utan hänvisas till vården
+i en mening.
+
+Hela Coach finns bara om AI-lagret är påslaget på den här installationen.
+
+## Påminnelser
+
+Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig
+och en på kvällen om att fylla i dagen. Var och en har en tid för vardagar och en
+för helgen, med var sin knapp, så morgonpåminnelsen kan vara 07:00 i veckan och
+09:00 på lördag och söndag, eller avstängd då. Alla fyra är avstängda tills du slår
+på dem. Vilka dagar som är helg räknas i din egen tidszon.
+
+Morgonens hoppas över om du redan vägt dig, kvällens om dagen redan är ifylld.
+
+Push fungerar i webbläsaren på Android. På iPhone fungerar det bara när appen är
+installerad på hemskärmen, vilket står bredvid knappen.
+
+## Runt omkring
+
+Framsteg är omstuvad: potten och nykterhetsräknaren ligger ovanför listorna, och
+milstolpar och sparregler är hopfällda med antal bredvid rubriken. "Lägg till
+milstolpe" och "Ny sparregel" öppnar ett formulär i ett eget fönster i stället för
+att stå framme hela tiden.
+
+Knapparna har tre former i stället för fyra. Allt som gör något är en fylld knapp,
+allt som bara tar dig därifrån är en textlänk, och det som kostar något har en egen
+färg. Att radera ett konto kräver att adressen skrivs in.
+
+Nyheter kan innehålla rubriker, fetstil, punktlistor, numrerade listor och länkar,
+både i appen och i mejlet.
+
+Formuläret för att be om en inbjudningskod ligger inte längre på startsidan. Det har
+flyttat till en egen adress som inget länkar till, och den är avstängd om inte den
+som driftar servern slår på den.
+
+Backupen skrivs numera till en katalog eller till en S3-hink, och hemligheten lagras
+krypterat. Knappen "Testa anslutningen" skriver en liten fil och tar bort den igen,
+så att du ser att det fungerar innan nattens körning.
+```
+
+</details>
 
 ## On `dev`, not yet on `main`
 

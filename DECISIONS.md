@@ -6797,3 +6797,68 @@ rolling back".
 that expects a dropped column fails when somebody opens the screen that reads
 it — not at startup, and nowhere the health check looks — which is why that case
 has to be planned before the deploy rather than discovered after it.
+
+### D149 — The deploy is a runbook, and the log says what it did
+
+*2026-09-13.*
+
+`STATE.md`'s "Inför nästa deploy" had grown into four sections of facts —
+variables, migrations, manual steps, news copy — with no order between them. It
+answered "what is true about the next deploy" and not "what do I do, and in what
+order, and how do I know it worked". Those are different documents and only the
+second is useful with a browser open at Portainer.
+
+So `INFRA.md` carries **"Deploying a version, in order"**: eight numbered steps
+from the backup to the rollback. It is in that file rather than in `STATE.md`
+because it is about *this installation*, which is the rule that created INFRA.md
+in the first place (D119). `STATE.md` keeps one thing and points at the rest.
+
+The two ordering constraints are marked as constraints rather than left as
+sequence. The backup is first because it is the only step that cannot be redone
+afterwards, and it is not done until `restore-check.sh` has read it back: a dump
+that has never been restored is a hope. The variables are second because an
+image that does not know a variable ignores it, so setting one early is free and
+setting one late renders `__CONTACT_EMAIL__` on a public page.
+
+#### The migrator names what it applied
+
+Step 6 is "read the API log", and it could not be written as it stands, because
+the log did not say enough to check anything against.
+
+`migrate.ts` printed `Migrations applied from <folder>` whether it had applied
+nine migrations or none. On a deploy that is exactly the distinction worth
+having: "nine applied, thirty recorded" is a schema where the new image expects
+it, and "none to apply" on a deploy that should have run nine is a container
+that started against the wrong database.
+
+It now counts `drizzle.__drizzle_migrations` before and after and names each one
+from the journal:
+
+```
+Migration applied: 0024_push
+...
+Migrations: 9 applied, 30 recorded in total
+```
+
+The names come from `meta/_journal.json` and the count says how far down it this
+database is; the two are in the same order because the migrator walks the
+journal. Proved against a scratch database created and dropped for the purpose,
+which printed all thirty, and against the development database, which printed
+`none to apply, 30 already recorded`.
+
+#### What the log must show, written down
+
+The runbook lists the four lines that are not the migrations, with **when each
+one is absent**, because absence is the ambiguous case and every one of them has
+a silent-success reading that is wrong:
+
+- the **SMTP import** says nothing when `SMTP_*` are empty, which is the
+  intended state (D102), and logs an *error* when `SMTP_*` is set without
+  `SECRET_KEY`;
+- the **VAPID check** says nothing on every ordinary boot, and something only on
+  the first one and on a changed pair (D136);
+- the **vision check** says nothing when it could not reach Ollama, and retries
+  hourly without saying so (D143). Silence there is not success.
+
+A runbook that said "check the log looks fine" would be worth nothing. The value
+is in saying which silences are expected.
