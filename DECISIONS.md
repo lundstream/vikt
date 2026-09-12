@@ -6147,3 +6147,239 @@ caught that. Both now carry a dated line pointing here, because "the option was
 invisible to the owner until he edited a habit" is the kind of fact that stops
 being obvious a month later, and the next person adding a second surface for one
 entity should meet it.
+
+### D143 — The photograph replaces the sentence, and the database still prices it
+
+*2026-09-12.*
+
+Logging a restaurant plate means typing "biff med pommes, bearnaise och en
+gurksallad" and then correcting four portions. A photograph says the same thing
+in one tap. So the photograph replaces **the sentence**, and nothing else: the
+model names what it can see, the database prices what it named, a person
+confirms every row, and the picture is discarded the moment it has been read.
+
+That is the same bargain as the text parser (D5, §6 phase 8), pointed at a new
+kind of input. It is worth saying what this is **not**: Phase 7 — a camera that
+recognises food and logs it — remains deferred, and this is not it. Nothing here
+estimates energy from a picture. Nothing here saves a row nobody read.
+
+#### Item 0: the probe, because a capability flag is not a test
+
+Nothing below was built until a model on this workstation had been shown to
+look. Ollama reports a `vision` capability for four of the models installed
+here, and a capability is a claim about a build rather than evidence that this
+tag on this box will do the thing. The probe sends a generated PNG — a red
+circle, a blue square and the word VIKT, 320x240, 2 kB — and asks what is in it.
+
+| model | reports vision | saw it | read the word | time |
+|---|---|---|---|---|
+| `qwen3-vl:8b` | yes | yes | **"VIKT"** | **11.0 s** |
+| `qwen3.6:27b` | yes | yes, circle and square with colours | "IKT" | 16.7 s |
+| `qwen3.6:latest` | yes | yes, and described the layout | "UIKIT" | 30.1 s |
+| `odytrice/gemma4-31b:5090` | yes | yes, colours and background | "VIKT" | 94.3 s |
+| `gemma4:e4b` | yes | **no**: "du har inte tillhandahållit någon bild" | — | 21.0 s |
+
+Then a real plate, at the size the client actually sends:
+
+| model | time | what it said |
+|---|---|---|
+| `qwen3-vl:8b` | **19.6 s** | Kött, 1 portion · Friterad potatis, stor mängd · Gurksallad med tomater och feta, ca 100 g · Krämig sås, ca 50 g |
+| `qwen3.6:27b` | 14.9 s | Grillad köttfarsbiff, ca 1 st · **Gulrots**- och gurksallad med fetaost · **Potatismat (fryst)**, ca 3-4 dl · Vit krämsås eller aioli |
+| `gemma4:e4b` | 10.5 s | "Jag kan tyvärr inte se någon tallrik eller någon mat i din fråga. Du har inte bifogat någon bild." |
+
+The three findings, verbatim from `docs/measurements.md`:
+
+- **A capability flag is not a test.** Ollama reports `vision` for `gemma4:e4b`,
+  which accepts the request and answers as though nothing was attached, twice.
+- **Seeing is not the same as not inventing.** `qwen3.6:27b` looked at the plate
+  and produced a carrot. The photo path needs the same discipline as the text
+  parser: the model names, the database prices, and a person confirms before
+  anything is saved.
+- **Amounts are the weak part, and a composite dish is weaker still.** "Stora
+  mängder" and "spridd över delar" are not quantities, and a kebab pizza came
+  back as "Pizza (1 st)". That is the argument for the optional text line beside
+  the photo — "kebabpizza, hel" costs four words and fixes what the picture
+  cannot say — and for marking every amount from a photo as an estimate.
+
+`LLM_VISION_MODEL` is therefore configuration with **no default**. A default
+would be this workstation's answer presented as everyone's, and the failure it
+produces is the quiet kind: a model that accepts the request and describes
+nothing.
+
+#### The image is read and dropped
+
+Not written to disk, not to any table, not to a log line, not to the offline
+queue. A photograph of a plate is a photograph of somebody's kitchen and of
+whoever they were eating with, and a self-hosted app asking for one has to be
+able to say where it went.
+
+Asserted rather than intended. `photo-transport.test.ts` carries a random marker
+inside the base64 and then looks for it in **every text column of every table**
+and in **every line the logger emitted** — and the scan is first shown finding a
+marker that really is there, because a search that finds nothing proves nothing
+until it has been seen finding something. The browser half asserts the queue
+stays empty after a failed request, where every other write on that screen would
+be sitting waiting for the network. What the log does carry is one line of
+counts: model, milliseconds, kilobytes, rows, and whether there was a note.
+
+The client resizes to 1280 px and re-encodes as JPEG at 0.8 through a canvas,
+which is also what **strips EXIF**: a phone photograph carries the coordinates
+of the kitchen, the time to the second and the model of the phone, and none of
+that has anything to do with what was for dinner.
+
+#### An amount is a number the app can price, or it is nothing
+
+The parse returns two fields per food — a name and an amount — and no more. No
+`estimatedGrams` the model guessed, no `confidence` it asserted: a photograph
+gives nothing to estimate grams from, and a confidence figure attached by the
+thing being judged is not evidence. The app sets the confidence.
+
+An amount survives only when it can be turned into grams: grams and kilograms
+directly, or a household unit **this food actually has a definition for**
+(D85). Everything else becomes null and stays null. The three phrases the probe
+produced each take a different shape and each has a test:
+
+- `"amount": "stor mängd"` — a bare string where an object belongs;
+- `"amount": {"count": 1, "unit": "spridd över delar"}` — a well-formed object
+  whose unit is a sentence;
+- `"amount": {"count": 1, "unit": "portion"}` — a unit the household table
+  really does know, which is still not an amount for a kebab pizza, because
+  nothing anywhere says what a portion of kebab pizza weighs.
+
+A malformed amount is caught to null rather than failing the reply, and this is
+the only tolerated malformed field in the codebase. The reason is what the
+malformed value is: the home plate came back with one unquantifiable side dish
+beside three foods the model had named correctly, and refusing the reply would
+have thrown those three away. A nutrition key is still refused outright, because
+that one is a claim rather than an absence — and a nutrition figure written into
+a *name* is cut out of the name, since the schema cannot see a number inside a
+string.
+
+The prompt asks for the rows **a Swedish food database would have**, which is
+sharper than either "split everything" or "name the dish": a kebab pizza is one
+row, a steak with chips and béarnaise is three, and a packaged product carries
+the brand and product name off its label.
+
+D81's model estimate is not reachable from here. It is licensed by the app
+having tried and failed — nothing found by search, and a decomposition that
+produced nothing or was rejected — and a photograph is a new input rather than
+an exhausted one. The endpoint's `after` enum has no value for it, so the path
+is shut at the schema and not by a convention somebody has to remember.
+
+#### The row that cannot be saved
+
+A row with no amount shows the food, an empty field and "inte än" where the
+figure would be. It cannot be saved, and it does not stop the rows beside it:
+pressing save writes everything that has a figure, leaves what does not on
+screen, and says how many were left. The alternative is the app inventing a
+number and attributing it to the person, which §2 never permits.
+
+Rows from a photograph are marked ≈ in Sten with a dashed edge — the whole list,
+because the uncertainty is in where they came from — and are saved with a
+lowered confidence, like D55's estimates. **Coverage counts them as usual**,
+because the database is what priced them; what is less certain is the naming.
+
+The proposal list is now one component for both ways in. A sentence and a
+photograph produce the same rows, and two lists would drift and then disagree
+about what an unpriced row is allowed to do.
+
+#### The boot check, and what the surface depends on
+
+The API does at boot what an operator would do by hand: it sends the probe's
+self-test image to `LLM_VISION_MODEL` and reads whether the answer describes the
+picture. Two of five vocabulary groups is the bar, which nothing clears by
+guessing, and the model that fails it says "du har inte bifogat någon bild" in
+as many words.
+
+The verdict is stored in `app_settings` with the model name beside it, so
+swapping the tag takes the surface away until the next boot has asked about the
+new one. An unreachable workstation writes nothing and is asked again every
+hour, silently — the box is somebody's desktop and that state becomes false on
+its own. A blind model is not retried, because that is a property of the tag; it
+gets one warning line naming it. The check is not awaited and is never fatal.
+
+The client reads the result through `/llm/health` as a `vision` boolean, the
+same path it already reads `LLM_ENABLED` from, because the question is not which
+tag is configured but whether this installation has proved that tag can see.
+
+The quick action sits beside Skanna and is **absent, never greyed**, in five
+ways: layer off, no model named, no boot check, an unreachable box, a model that
+answered without looking. It is also absent **offline**, which is not true of
+the others: they degrade to an unavailable answer, and this one cannot be
+attempted at all because the image is never queued. A door that opened onto "try
+again when you have signal" would be asking somebody to photograph their dinner
+twice.
+
+#### What the interface found that no test would have
+
+Every photograph went through the real screen against the real workstation, and
+the run produced four findings.
+
+**The parse answered "not available" for every picture.** `qwen3-vl:8b` under a
+`format` constraint returns an **empty `content` with the whole JSON object in
+`thinking`** — reproducibly, with `think: false` set and honoured: 27 eval
+tokens, no reasoning prose, 300 to 1100 ms. Drop the constraint and the same
+model reasons past 180 s on this prompt. So the client reads `thinking` when
+`content` is empty. That is the same shape as D71's finding that `/v1/` ignores
+`think`: Ollama labelling one field as the other for a particular build.
+
+**The wait is not the probe's figure.** 10 to 20 seconds was measured without
+the format constraint. Through the app it is **0.2 to 1.3 s warm and 5.9 s
+cold**, so the screen says "ett par sekunder, ibland upp till tio" — two numbers
+because there are two cases and the app cannot tell which it is in.
+
+**The constraint costs the amounts.** Unconstrained, the model said "ca 100 g"
+and "ca 50 g"; constrained, every amount comes back as "1 st", which resolves to
+null for almost every food. The feature is therefore "the photo names the foods
+and you type the amounts", and that is the honest description of it.
+
+**A long name ate the estimate tag.** It sat inside the truncating span, so
+"Bearnaisesås hemlagad" lost the one marker on the row that must not disappear.
+
+#### The packaged products, and what they decide
+
+Three products, photographed on a phone, through the whole path:
+
+| on the label | what the model read | what search found |
+|---|---|---|
+| Valio Laktosfri Yoghurt Mango & Vanilj | "Valio Laktosfri Yoghurt Mango&Vanilj" (once as "Yogghurt") | nothing |
+| Mammas köttbullar, originalet från Skara, 1000 g | "Köttbullar" | "Köttbullar frysvara" — a generic row, not this product |
+| frischgold Färdigskivad Gräddost | "frischgöld GRÄDDOST" | nothing |
+
+The model **reads labels well**: brand and product name came off two of the
+three, and the third it summarised. What it cannot do is spell them the way a
+database index does, and that is exactly what an exact-string search needs —
+"Yogghurt" and "frischgöld" both miss. The one that matched, matched because the
+model gave a *generic* name.
+
+Two more things the run showed. Adding the note "mammas köttbullar" made the
+answer "Mamma Måns köttbullar", a brand that does not exist, and search then
+found nothing where the unaided answer had found something: **a note helps a
+dish and hurts a product**. And the model read "1000 G" off the meatball bag and
+offered it as the amount — the whole package, at 2 173 kcal — which the proposal
+list is there to catch.
+
+**So the photograph is a shortcut to free text, not an alternative to the
+barcode.** A barcode gives the exact row and then asks for a portion. A
+photograph gives a name that may or may not find a row, and an amount that
+usually has to be typed. Where a product has a barcode, scanning it is still the
+right thing to do and the app still says so by putting Skanna first in the row.
+What the photograph is for is the plate that has no barcode: a restaurant meal,
+a home dinner, somebody else's cooking.
+
+#### The limits, stated
+
+- **Amounts usually have to be typed.** Six of seven rows on the home plate came
+  back with no usable amount. That is the design refusing to invent, and it is
+  also the main cost of using this.
+- **The model invents.** It produced a carrot that was not on the plate, a
+  turkey that was a chicken, and a brand that does not exist. Every row is read
+  and confirmed by a person, which is what makes that survivable.
+- **A photograph evicts the coach model** on this workstation: 21 GB and 15 GB
+  do not fit together, so the next coach turn pays a 12.7 s cold load against
+  118 ms warm. The text parser fits alongside and does not. See
+  `docs/measurements.md`.
+- **`capture="environment"` opening the camera has not been verified on a
+  phone.** The path was exercised end to end in a browser with a real file; the
+  attribute is what tells a phone to open the camera rather than the gallery,
+  and that is the one thing a desktop run cannot show.

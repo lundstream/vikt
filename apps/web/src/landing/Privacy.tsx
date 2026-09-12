@@ -148,6 +148,15 @@ export function Privacy() {
           skriver in i fritext och frågorna du ställer till coachen.
         </P>
         <P>
+          Fotograferar du maten behandlas bilden, men sparas inte. Den förminskas i telefonen, som samtidigt tar bort
+          platsen, tidpunkten och telefonmodellen som kameran lagt i filen. Sedan
+          skickas den till samma maskin som resten av AI-lagret, läses en gång och
+          kastas. Den skrivs inte till disk, inte till databasen, inte till loggen och
+          inte till kön för sådant som väntar på nätverk. Går det inte att skicka är
+          bilden borta och du får ta en ny. Det som kan sparas är raderna du själv
+          godkänner, alltså livsmedlets namn och mängden.
+        </P>
+        <P>
           Kontrollen på formuläret är ingen tredje part. Den ber din webbläsare räkna ut ett tal, och svaret
           går hit och ingen annanstans. Ingen extern tjänst blandas in, ingen cookie
           sätts, och ingenting om din webbläsare sparas.

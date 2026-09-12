@@ -93,6 +93,8 @@ Cleared back to empty when a merge ships, not before.
 | `VAPID_PRIVATE_KEY` | Privat nyckel för push. Hemlig som `SECRET_KEY`. API:t vägrar starta om bara den ena av nycklarna är satt. | Bara om push ska vara på. |
 | `VAPID_SUBJECT` | `mailto:`-adress eller URL som push-tjänsten kontaktar om servern missköter sig. Krävs av specen. | Ja, om nycklarna är satta. |
 | `REQUEST_ENABLED` | Serverar formuläret för kodförfrågan på `/kod` och registrerar endpointen det skickar till. Av betyder 404 på båda (D127). | Nej, förvalet är `false`. |
+| `LLM_VISION_MODEL` | Modellen som får fotografier av mat (D143). Tom betyder att snabbvalet Fotografera maten inte finns. **Inget förval, och gissa inte ett**: Ollama rapporterar `vision` för modeller som tar emot en bild och sedan svarar som om ingen bifogats. Kör `pnpm --filter api probe:vision --selftest` mot `OLLAMA_URL` först och sätt den tagg som svarar SEES. | Nej. Utan den finns funktionen inte. |
+| `OLLAMA_VISION_TIMEOUT_MS` | Hur länge API:t väntar på en bildtolkning. Förval 60 000. Mätt: 0,2-1,3 s med modellen laddad, 5,9 s när den måste laddas. | Nej, har ett förval. |
 
 **Sätt dem innan avbilden som läser dem rullar ut.** En variabel den nuvarande
 avbilden inte känner till ignoreras, så det finns inget fönster där något går sönder
@@ -106,7 +108,8 @@ fyra kolumner på `profiles` för de två påminnelserna. Additiv.
 
 `0029_app_settings` lägger till en liten nyckel-värde-tabell för sådant servern
 behöver komma ihåg om sig själv mellan starter. Första posten är den VAPID-nyckel
-installationen senast kördes med. Additiv.
+installationen senast kördes med; den andra är svaret på om `LLM_VISION_MODEL`
+verkligen tittar på bilder (D143). Additiv.
 
 `0028_coach_tone` lägger till kolumnen `coach_tone` på `profiles`, med `torr` som
 standard. Additiv, och standardvärdet är den röst som redan fanns.
@@ -179,6 +182,15 @@ som `push rejected the signature (403)`.
 
 En rad per synlig förändring, i appens register, färdig att klistra in:
 
+- Du kan fotografera maten i stället för att skriva vad du åt. Bilden skickas till
+  modellen på arbetsstationen, som säger vilka livsmedel den ser. Kalorierna kommer
+  som alltid från livsmedelsdatabasen, och ingenting sparas förrän du har läst
+  raderna och tryckt spara. **Bilden sparas aldrig** - varken på servern, i loggen
+  eller i telefonen - utan läses och kastas.
+  Mängderna är det bilden är sämst på: oftast står det "inte än" i mängdrutan och
+  du får fylla i själv, och en rad utan mängd går inte att spara. Raderna är
+  märkta som uppskattade. Har maten en streckkod är Skanna fortfarande det som ger
+  rätt produkt; fotot är till för tallriken som inte har någon.
 - Viktgrafens skala visar jämna steg igen, och alla vägningar får plats i bilden. Den
   senaste vägningen kunde tidigare hamna utanför och ritades då inte alls.
 - Grafens ruta visar samma antal decimaler som siffran ovanför.
@@ -370,6 +382,16 @@ here is the device that matters:
 **Report the device and the Chrome version** with the result, so this section
 can record what it was verified on rather than that it was verified.
 
+**Waiting on the owner, for the camera half of photo logging (D143):**
+
+The whole path is exercised and recorded above — the resize, the post, the
+model, the proposal list — but through a browser handed a file, because that is
+what a desktop can do. The one thing it cannot show is
+`capture="environment"`: the attribute that tells a phone to open the **camera**
+rather than the gallery. Open Mat on the phone, press Fotografera maten, and say
+whether the camera opens straight away. If it opens the picture gallery instead,
+that is the finding and it is a one-line change.
+
 **Blocked, not skipped:****Blocked, not skipped:** removing the probe request
 `human-check-probe@example.test` needs the production database, and the
 Portainer password was rotated after the deployment pass. It is under
@@ -377,7 +399,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1484 tests**: 494 shared, 269 web, 721 api. **Nine more run in CI**, and they
+**1542 tests**: 494 shared, 283 web, 765 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -421,6 +443,19 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **Photographing a meal, end to end against the real workstation** (D143): five
+  photographs taken on the owner's phone, resized in the browser, posted to
+  `qwen3-vl:8b` on the LAN and priced by the development database. The quick
+  action was present because the boot check had sent the self-test image and
+  recorded `{"model":"qwen3-vl:8b","sees":true}`; the waiting line, the proposal
+  list and a row with no amount were shot at 360 px and desktop. Four things
+  only the interface could show: the parse answered "not available" for every
+  picture until the client learned to read Ollama's `thinking` field, the wait
+  is 0.2 to 1.3 s warm rather than the probe's 10 to 20, a long food name pushed
+  the estimate tag out of its truncating span, and the note field's placeholder
+  rendered as a typed value. All four fixed. The hourly rate limit also fired
+  for real at the twenty-first photograph, which is the first time it has been
+  seen outside a test;
 - **The VAPID key watch, against the development database**: the first run wrote
   the key down, the second said nothing, a run with a mispasted key reported one
   affected subscription and the warning naming it, and a run with the real key
@@ -531,6 +566,9 @@ somebody had read off a log with nothing behind it.
 | The coach never makes a person the subject of a missing figure (D140) | `apps/api/src/llm/coach-guard.ts`, `apps/api/test/coach.test.ts` | Test |
 | Only 404 and 410 remove a push subscription; 403 and transient failures keep it (D136) | `apps/api/src/lib/push.ts`, `apps/api/test/push-removal.test.ts` | Test |
 | A changed VAPID pair is noticed at boot and warned about, not acted on (D136) | `apps/api/src/lib/vapid-watch.ts`, `apps/api/test/vapid-watch.test.ts` | Test |
+| A photographed meal is never written to disk, to a table, to a log line or to the queue (D143) | `apps/api/test/photo-transport.test.ts`, `apps/web/test/render/photo-entry.test.tsx` | Test |
+| An amount from a photograph is a number the app can price, or it is null (D143) | `apps/api/src/services/llm.service.ts`, `apps/api/test/photo-parse.test.ts` | Test |
+| The photo surface exists only where a model has been shown to see (D143) | `apps/api/src/lib/vision-watch.ts`, `apps/api/test/vision-watch.test.ts`, `apps/web/test/render/food-ways.test.tsx` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one
 entry that would have been removed is the guard STATE.md used to claim about
