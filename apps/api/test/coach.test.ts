@@ -174,6 +174,39 @@ describe("what the coach may say", () => {
     });
   });
 
+  /**
+   * The absence rule (D140's addendum), in both directions.
+   *
+   * Every live run before it existed produced at least one sentence making the
+   * person the subject of a missing figure, in at least one tone. The register
+   * the app has used since Phase 2 puts the data there instead.
+   */
+  it("refuses a sentence about what somebody did not log", () => {
+    for (const sentence of [
+      "Du har vägt dig fyra gånger utan att logga något intag.",
+      "Du har inte loggat någon mat den här veckan.",
+      "Du loggade inget intag alls i tisdags.",
+      "Du har glömt att fylla i dagen.",
+      "Du borde ha loggat mer.",
+    ]) {
+      expect(checkReply(sentence, FACTS), sentence).toMatchObject({
+        ok: false,
+        reason: "blame",
+      });
+    }
+  });
+
+  it("allows the same fact with the data as the subject", () => {
+    for (const sentence of [
+      "Intaget är inte ifyllt än för den här veckan.",
+      "Det finns ingen vikt för i går än.",
+      "Underhållsnivån saknas, eftersom matdata inte räcker än.",
+      "Det saknas matloggning för att räkna fram en underhållsnivå.",
+    ]) {
+      expect(checkReply(sentence, FACTS).ok, sentence).toBe(true);
+    }
+  });
+
   it("knows a medical question when it sees one", () => {
     expect(isMedicalQuestion("Kan min sköldkörtel förklara det här?")).toBe(true);
     expect(isMedicalQuestion("Ska jag byta medicin?")).toBe(true);

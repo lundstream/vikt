@@ -101,6 +101,12 @@ export function refusalMessage(reason: string, facts: CoachFacts): string {
         "Jag får inte föreslå en snabbare takt än 1 procent av kroppsvikten i veckan. " +
         "Appen räknar fram takten själv utifrån din plan, och den spärren sitter i planen."
       );
+    case "blame":
+      return (
+        "Jag höll på att skriva om vad du inte har gjort i stället för om vad appen inte har, " +
+        "så jag svarar inte alls. Det som saknas är uppgifter som inte är ifyllda än, " +
+        "och du fyller i dem där de hör hemma."
+      );
     case "untraceable":
       return (
         "Jag höll på att svara med en siffra som inte kommer ur dina egna uppgifter, så jag " +

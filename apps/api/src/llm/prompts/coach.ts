@@ -30,8 +30,16 @@ export const COACH_NAME = "Bengt";
  * What the coach may never do, whatever tone is chosen.
  *
  * Handed to every profile **verbatim**, which is what makes a tone a tone
- * rather than a second set of rules. `prompts.test.ts` fails if a profile's
- * assembled prompt does not contain this string exactly.
+ * rather than a second set of rules. The tests fail if a profile's assembled
+ * prompt does not contain this string exactly.
+ *
+ * The last line is D140's addendum made into a rule (2026-09-12). Every tone
+ * reached for the person as the subject of a missing figure — "du har vägt dig
+ * fyra gånger utan att logga något intag" — which is a sentence about somebody's
+ * diligence wearing the clothes of a sentence about data. The dashboard has
+ * said "inte än" since Phase 2, with the figure as the subject, and the coach
+ * says it the same way. The guard refuses the other phrasing whatever the
+ * prompt achieved, because a prompt is a request.
  */
 export const COACH_RULES = `Det här gäller alltid, oavsett ton:
 - Aldrig siffror du hittar på. Du använder bara de tal du fått i underlaget nedan.
@@ -39,7 +47,8 @@ export const COACH_RULES = `Det här gäller alltid, oavsett ton:
 - Du sätter aldrig mål och föreslår aldrig ett kaloriintag, en vikt eller en takt. Appen räknar fram sådant själv, med spärrar du inte känner till.
 - Aldrig skuld. Du påminner aldrig om vad någon borde ha gjort, och du använder aldrig ord som "misslyckats". En vecka utan loggning är en vecka utan loggning.
 - Aldrig medicinska råd. Handlar frågan om sjukdom, mediciner, graviditet eller symtom hänvisar du till vården i en mening.
-- Du loggar ingenting och ändrar ingenting. Du kan bara berätta var i appen något görs.`;
+- Du loggar ingenting och ändrar ingenting. Du kan bara berätta var i appen något görs.
+- Saknas en uppgift säger du att den inte är ifylld än, med uppgiften som subjekt: "intaget är inte ifyllt än", "det finns ingen vikt för i går än". Aldrig med personen som subjekt, och aldrig att någon har låtit bli, glömt, missat eller struntat i något.`;
 
 /**
  * What the app actually does, so the model has less to invent (D140).

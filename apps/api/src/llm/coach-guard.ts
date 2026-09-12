@@ -47,7 +47,7 @@ import type { CoachFacts, CoachFigures } from "./coach-context.js";
  * of calories is written in digits, or it is not an instruction anybody can
  * follow.
  */
-export type RefusalReason = "floor" | "rate" | "untraceable" | "empty";
+export type RefusalReason = "floor" | "rate" | "untraceable" | "blame" | "empty";
 
 export type GuardVerdict = { ok: true } | { ok: false; reason: RefusalReason; detail: string };
 
@@ -95,6 +95,39 @@ const PRESCRIPTIVE = [
   "satsa på",
   "mål bör",
   "målet bör",
+];
+
+/**
+ * Sentences that make a person the subject of a missing figure (D140 addendum).
+ *
+ * A **words-level** check rather than a numeric one, in the shape D72 used for
+ * recipe prose: a match refuses the reply rather than editing it, because a
+ * model that ignored this instruction ignored others too.
+ *
+ * The distinction it enforces: "intaget är inte ifyllt än" describes data,
+ * "du har vägt dig fyra gånger utan att logga något intag" describes a person's
+ * diligence, and only the first is something this app says. Every live run
+ * before the rule existed produced at least one of the second kind in at least
+ * one tone, which is why a line in the prompt was not enough.
+ *
+ * Deliberately narrow. It looks for a person **and** an absence **and** a
+ * logging verb in the same sentence, or for the words that can only be a
+ * reproach — "glömt", "missat", "struntat", "slarvat". A sentence that merely
+ * says a figure is missing has no person in it and passes.
+ */
+const BLAME = [
+  // "du har inte loggat", "du har aldrig fyllt i", "du har inget vägt"
+  /\bdu\b[^.!?]*\b(inte|aldrig|inget|ingen|inga)\b[^.!?]*\b(logg|fyll|väg|registrer|bock)/i,
+  // "du ... loggat inget intag alls"
+  /\bdu\b[^.!?]*\b(logg|fyll|väg|registrer|bock)[^.!?]*\b(inte|aldrig|inget|ingen|inga)\b/i,
+  // "utan att logga", "utan att fylla i"
+  /utan att (logga|fylla|väga|registrera|bocka)/i,
+  // Words that cannot be anything but a reproach.
+  /\bgl(ö|o)m(t|de|mer|ma)\b/i,
+  /\bmissa(t|de|r)\b/i,
+  /\bstrunta(t|de|r)\b/i,
+  /\bslarva(t|de|r)\b/i,
+  /\bborde ha\b/i,
 ];
 
 /** Questions this app does not answer, detected before the model is called. */
@@ -258,6 +291,15 @@ function isPrescriptive(sentence: string): boolean {
  * figure that fails is never rendered and then taken back.
  */
 export function checkSentence(sentence: string, facts: CoachFacts): GuardVerdict {
+  /**
+   * The absence rule first, because it needs no figures: a sentence blaming
+   * somebody for a gap is refused whether or not it contains a number.
+   */
+  for (const pattern of BLAME) {
+    const found = pattern.exec(sentence);
+    if (found) return { ok: false, reason: "blame", detail: found[0].slice(0, 60) };
+  }
+
   const prescriptive = isPrescriptive(sentence);
 
   for (const figure of figuresIn(sentence)) {

@@ -5901,6 +5901,49 @@ does compute the daily target from the plan. The numbers in all three replies
 were correct and traceable, which is exactly the shape of the limit: the figures
 are checked, the sentences around them are not.
 
+#### Addendum, 2026-09-12: absent data has the data as its subject
+
+The bad-week run above produced, in every tone, a sentence making the **person**
+the subject of a missing figure: "du har vägt dig fyra gånger utan att logga
+något intag", "loggat inget intag alls". The judgement recorded there was that
+these describe what the app cannot compute rather than somebody's diligence.
+That judgement was too generous. "Du har vägt dig fyra gånger utan att logga
+något intag" is a sentence about a person, and the app has had a register for
+this since Phase 2: the dashboard says **"Inte än"**, with the figure as the
+subject, and never says who failed to provide it.
+
+So the rule is in `COACH_RULES`, tone independent, where a warmer voice cannot
+opt out of it: a missing figure is described as not filled in yet, with the
+figure as the subject, and the coach never says that somebody did not log, did
+not fill in, forgot, missed or should have.
+
+**And it is checked on the reply**, because a prompt is a request. `BLAME` in
+`coach-guard.ts` is a words-level check in the shape D72 used for recipe prose:
+a person, an absence and a logging verb in one sentence, or a word that can only
+be a reproach — glömt, missat, struntat, slarvat, borde ha. A match refuses the
+whole reply. Both directions are tested: five person-as-subject sentences are
+refused, four data-as-subject ones pass, and a sentence that merely says a
+figure is missing has no person in it and is never touched.
+
+**Live, after the rule, on the same fixture and the same question:**
+
+> **Torr** — Trendvikten har ökat med 0,87 kg den senaste veckan. Det ligger
+> ovanför appens begränsning för säkert tempo. **Inget intag är loggat under
+> perioden**, så det går inte att koppla vikten till energiintaget.
+>
+> **Peppig** — Det har gått trögt den senaste tiden, med en viktökning på
+> 0,87 kg i veckan. Trendvikten har ökat totalt 3,5 kg under de senaste 28
+> dagarna. **Det finns inget loggat matintag att utgå ifrån just nu.**
+>
+> **Saklig** — Trendvikten har ökat med 0,87 kg under den senaste veckan till
+> ett nuvarande värde på 79,2 kg. **Det finns inga loggade intag för de senaste
+> 28 dagarna, vilket innebär att ingen underhållsnivå kunnat beräknas ännu.**
+
+Every sentence passed, including the guard that would have refused the previous
+phrasing, and no tone reached for the person. Peppig still does not cheer at a
+week going the wrong way: "det har gått trögt" is the plain sentence its block
+asks for.
+
 ---
 
 ### D141 — The Sunday job, and the week that is not worth summarising

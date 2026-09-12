@@ -37,6 +37,22 @@ describe("the prompt", () => {
     }
   });
 
+  /**
+   * The absence rule travels with the rest, in every tone (D140's addendum).
+   *
+   * It is in `COACH_RULES` rather than in the tone blocks precisely because a
+   * warmer voice is the one most likely to reach for "du har inte loggat" as a
+   * kindness.
+   */
+  it("carries the absent-data rule in every tone", () => {
+    expect(COACH_RULES).toMatch(/inte är ifylld än/);
+    expect(COACH_RULES).toMatch(/glömt/);
+
+    for (const tone of COACH_TONES) {
+      expect(buildCoachPrompt(tone, "x"), tone).toMatch(/inte är ifylld än/);
+    }
+  });
+
   /** The fact sheet exists to answer the false claim a live run produced. */
   it("says that no day is invalid, which is what the model got wrong", () => {
     expect(APP_FACTS).toMatch(/Ingen dag är ogiltig/);
