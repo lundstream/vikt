@@ -128,10 +128,24 @@ phase 3.
 ## Inför nästa deploy
 
 **The deploy is a runbook, and it is in `INFRA.md` under "Deploying a version, in
-order".** Eight steps: back up and prove the backup restores, set every new
+order".** Nine steps now, starting at **step 0: make `v1.0` a rollback target
+that exists**. Then back up and prove the backup restores, set every new
 variable, merge and cut the version, wait for `release`, pin `IMAGE_TAG` and
 redeploy, read the named lines out of the API log, check it from a phone on
 mobile data, and roll back by editing one line.
+
+**The build running in production is `v1.0`, and the next deploy is `v1.1.0`.**
+That build was never tagged when it shipped, which meant the compose could pin a
+version the registry had never heard of: the images were `docker load`ed onto
+the host and have never been in GHCR at all. Step 0 gives them a name in git and
+in the registry and then pulls the tag back, because a rollback that has not
+been pulled once is a sentence rather than a plan.
+
+**Two findings from writing it**, both of which would have surfaced at the worst
+moment: the GHCR packages are still **private** although the repository is
+public, so the stack would fail at the pull; and `d11c2fe` is a commit in
+`vikt-old`, not in this repository, so the git tag had to go there. The tag is
+made.
 
 It lives there rather than here because it is about **this installation** and
 this file is public (D119). What stays here is the one thing that has to be

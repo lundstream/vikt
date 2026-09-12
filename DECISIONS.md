@@ -6798,6 +6798,34 @@ that expects a dropped column fails when somebody opens the screen that reads
 it — not at startup, and nowhere the health check looks — which is why that case
 has to be planned before the deploy rather than discovered after it.
 
+#### Addendum, 2026-09-13: the rollback target did not exist
+
+This entry said a rollback is editing `IMAGE_TAG`, which is true and was not
+sufficient. **The images production runs have never been in a registry.** They
+were built on the workstation and `docker load`ed onto the host (D120), so they
+carry no `RepoDigest` at all and `ghcr.io/lundstream/vikt-api:v1.0` answered
+nothing. The one line to edit had nowhere to point.
+
+So the runbook gains a **step 0**, before the backup: tag the commit, push the
+running images to GHCR under `v1.0`, read the digest back — it exists only once
+the registry has computed it at push time — and then *pull the tag* to prove it.
+A rollback that has not been pulled once is a sentence in a document.
+
+Two things that step turned up, both of which would have surfaced at the pull
+rather than at the plan:
+
+- **The GHCR packages are private although the repository is public.** Package
+  visibility does not follow repository visibility. Checked: an anonymous token
+  request for `lundstream/vikt-api` answers `UNAUTHORIZED`.
+- **`d11c2fe` is not in this repository.** It is a commit in `vikt-old`, whose
+  history the public repo does not share, so the tag went there. Done:
+  `refs/tags/v1.0 -> d11c2fe848…`.
+
+And the version numbering moves with it. The build running in production **is**
+v1.0, so the next deploy is **v1.1.0** rather than v1.0.0. Calling the new build
+1.0 would leave the thing that has actually been serving for months with no
+version at all, which is precisely how it came to have no rollback target.
+
 ### D149 — The deploy is a runbook, and the log says what it did
 
 *2026-09-13.*
