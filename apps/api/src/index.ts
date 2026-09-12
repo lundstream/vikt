@@ -5,6 +5,7 @@ import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
 import { startReminderScheduler } from "./lib/reminder-scheduler.js";
 import { startReviewScheduler } from "./lib/review-scheduler.js";
+import { checkVapidKey } from "./lib/vapid-watch.js";
 import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
@@ -69,6 +70,40 @@ startBackupScheduler(app);
  */
 startReminderScheduler(app);
 startReviewScheduler(app);
+
+/**
+ * Whether the VAPID pair is the one this installation's subscriptions were made
+ * with (D136, amended).
+ *
+ * Not awaited and never fatal: it is a line in the log, and a database that is
+ * slow to answer at boot must not hold up the server that is about to serve
+ * from it. A failure here is logged and forgotten, because the alternative —
+ * refusing to boot over a diagnostic — is worse than the diagnostic missing.
+ */
+void checkVapidKey(app.db, env)
+  .then((check) => {
+    if (check.status === "first") {
+      app.log.info("noted this installation's VAPID public key");
+      return;
+    }
+
+    if (check.status !== "changed") return;
+
+    if (check.subscriptions === 0) {
+      app.log.info("the VAPID public key changed; no subscriptions existed to be affected");
+      return;
+    }
+
+    app.log.warn(
+      { subscriptions: check.subscriptions },
+      "the VAPID public key changed since the last boot. Every existing push " +
+        "subscription is bound to the previous pair and will answer 403 until its " +
+        "owner turns reminders off and on again. Nothing has been deleted",
+    );
+  })
+  .catch((error: unknown) => {
+    app.log.error({ err: error }, "could not check the VAPID key");
+  });
 
 /**
  * The mail drainer (D104), which D88 made a separate process and nothing ever

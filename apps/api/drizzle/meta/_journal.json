@@ -204,6 +204,13 @@
       "when": 1788310203000,
       "tag": "0028_coach_tone",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788310204000,
+      "tag": "0029_app_settings",
+      "breakpoints": true
     }
   ]
 }

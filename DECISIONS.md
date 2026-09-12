@@ -5383,6 +5383,42 @@ Tested in both directions at the mapping itself: 404 and 410 remove, 403 keeps
 and is counted, 429, 500, 503 and a network error keep. The sweep-level tests
 show the rows surviving a refusal and the count rising once per send.
 
+##### And the server notices when the key changes
+
+Keeping the rows through a 403 removes the destructive failure and leaves a
+quiet one: after a key rotation every subscription answers 403 forever,
+reminders simply stop arriving, and the settings screen still says the device is
+connected. Nothing on any screen is wrong, and nothing is wrong in the database.
+That is the hardest kind of fault to find, so the server writes down which
+public key it ran with.
+
+`app_settings` is a small key-value table for facts the server needs to remember
+about itself — not configuration somebody edits, which is what `mail_settings`
+and `backup_settings` are, and not secrets, which live in the environment. The
+first entry is `vapid_public_key`.
+
+At boot, `checkVapidKey`:
+
+- writes the key down when there is nothing stored, and says so quietly;
+- says nothing at all when it matches, which is every ordinary boot;
+- when it differs **and subscriptions exist**, logs one warning naming how many
+  are affected and saying they will answer 403 until their owners turn
+  reminders off and on again, then stores the new key so the next boot is quiet;
+- when it differs and no subscriptions exist, notes the change without warning
+  about nobody.
+
+**It refuses nothing, deletes nothing, and is never fatal.** Boot is not the
+moment to decide a table of subscriptions is rubbish: an operator who mispasted
+a key wants to paste the right one and carry on. The call is not awaited and its
+failure is logged and dropped, because refusing to serve over a diagnostic is
+worse than the diagnostic going missing.
+
+Exercised against the development database: first run wrote the key, the second
+was silent, a run with a mispasted key reported `{"status":"changed",
+"subscriptions":1}` with the warning, and running it again with the real key
+restored the record and went quiet. A boot of the API afterwards logged nothing
+about VAPID, which is the correct amount to say when nothing has changed.
+
 #### The settings screen says what it cannot do
 
 Three permission states and three different things to do about them, and a

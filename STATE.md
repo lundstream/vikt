@@ -104,7 +104,9 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
 
-Inga nya migrationer i den här passagen utöver de nedan.
+`0029_app_settings` lägger till en liten nyckel-värde-tabell för sådant servern
+behöver komma ihåg om sig själv mellan starter. Första posten är den VAPID-nyckel
+installationen senast kördes med. Additiv.
 
 `0028_coach_tone` lägger till kolumnen `coach_tone` på `profiles`, med `torr` som
 standard. Additiv, och standardvärdet är den röst som redan fanns.
@@ -137,6 +139,11 @@ lägger till tre kolumner och tar bort dem igen i samma uppstart.
 `DEFAULT true`. Den är additiv och körs av API-containerns entrypoint vid start,
 som alla andra. Ingen befintlig rad ändras, och en avbild som inte känner till
 kolumnen bryr sig inte om att den finns.
+
+**Byts VAPID-paret säger API:t till vid nästa start.** Loggen skriver en varning
+som säger hur många prenumerationer som är bundna till det gamla paret och att de
+svarar 403 tills var och en slår av och på påminnelserna igen. Ingenting raderas,
+och servern startar som vanligt.
 
 **403 från push-tjänsten raderar ingenting längre.** Byts VAPID-paret, eller
 klistras en nyckel in fel i stackens variabler, svarar push-tjänsten 403 för
@@ -367,7 +374,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1479 tests**: 494 shared, 269 web, 716 api. **Nine more run in CI**, and they
+**1484 tests**: 494 shared, 269 web, 721 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -411,6 +418,12 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The VAPID key watch, against the development database**: the first run wrote
+  the key down, the second said nothing, a run with a mispasted key reported one
+  affected subscription and the warning naming it, and a run with the real key
+  restored the record. Booting the API afterwards logged nothing about VAPID,
+  which is the right amount to say when nothing has changed, and no subscription
+  was touched at any point;
 - **The coach on a bad week again, after the absence rule** (D140's second
   addendum), against the real model: every tone now puts the data first ("Inget
   intag är loggat under perioden"), none makes the person the subject of a
@@ -514,6 +527,7 @@ somebody had read off a log with nothing behind it.
 | Every package typechecks under `strict` | `tsconfig.json` per package | Typecheck |
 | The coach never makes a person the subject of a missing figure (D140) | `apps/api/src/llm/coach-guard.ts`, `apps/api/test/coach.test.ts` | Test |
 | Only 404 and 410 remove a push subscription; 403 and transient failures keep it (D136) | `apps/api/src/lib/push.ts`, `apps/api/test/push-removal.test.ts` | Test |
+| A changed VAPID pair is noticed at boot and warned about, not acted on (D136) | `apps/api/src/lib/vapid-watch.ts`, `apps/api/test/vapid-watch.test.ts` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one
 entry that would have been removed is the guard STATE.md used to claim about

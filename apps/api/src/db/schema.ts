@@ -1721,3 +1721,28 @@ export const coachMessages = pgTable(
     index("coach_messages_conversation_idx").on(t.userId, t.conversationId, t.createdAt),
   ],
 );
+
+/* ------------------------------------------------------- the server's memory */
+
+/**
+ * Small facts the server needs to remember about itself between boots (D136).
+ *
+ * The first of them is the VAPID public key this installation last ran with:
+ * every push subscription is bound to the pair it was created with, so a key
+ * that changed means every subscription will answer 403 until the person turns
+ * reminders on again, and the only way to notice at boot is to have written the
+ * previous one down.
+ *
+ * Key-value rather than another singleton settings table, because what belongs
+ * here is unrelated to itself and to anything a user sets: `mail_settings` and
+ * `backup_settings` are configuration somebody edits on a screen, and this is
+ * the server's own notebook. A new entry should not need a migration.
+ *
+ * **No secrets.** The public key is public by construction; private values live
+ * in the environment, under `assertProdSecrets`.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
