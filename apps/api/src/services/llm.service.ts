@@ -11,6 +11,7 @@ import type {
 import type { ParsedPhotoItem, ServingHints } from "shared";
 import {
   HOUSEHOLD_UNITS,
+  PHOTO_CONFIDENCE,
   hintGrams,
   householdHints,
   normaliseUnit,
@@ -298,17 +299,6 @@ function photoAmount(
 
 const round = (value: number) => Math.round(value * 10) / 10;
 
-/**
- * The confidence every row from a photograph carries.
- *
- * A fixed figure rather than a computed one, and below anything the text path
- * produces, because the uncertainty is not in this row: it is in the fact that
- * a model looked at a picture. D55's estimates lower confidence rather than
- * excluding themselves from the arithmetic, and these do the same — the
- * coverage counts them, because the database priced them, and the confidence
- * says where they came from.
- */
-export const PHOTO_CONFIDENCE = 0.6;
 
 /**
  * Names and stated portions in, priced rows out.

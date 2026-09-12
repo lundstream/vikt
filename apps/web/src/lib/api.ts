@@ -39,7 +39,7 @@ import type {
   BarcodeLookup,
   CreateFoodEntry,
   CreatePlan,
-  ConfirmParsed,
+  ConfirmParsedInput,
   CreateTemplate,
   LlmHealth,
   ParseFoodResponse,
@@ -257,7 +257,7 @@ export const api = {
     }),
 
   /** The rows the user accepted, after correcting the portions. */
-  confirmParsedFood: (input: ConfirmParsed) =>
+  confirmParsedFood: (input: ConfirmParsedInput) =>
     request<{ entries: FoodEntry[] }>("/llm/parse-food/confirm", {
       method: "POST",
       body: JSON.stringify(input),

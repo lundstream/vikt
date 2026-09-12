@@ -197,6 +197,17 @@ export const PHOTO_MAX_EDGE = 1280;
 export const PHOTO_QUALITY = 0.8;
 
 /**
+ * The confidence every row from a photograph carries (D55, D143).
+ *
+ * A fixed figure rather than a computed one, and below anything the text path
+ * produces, because the uncertainty is not in any one row: it is in the fact
+ * that a model looked at a picture. D55's estimates lower confidence rather
+ * than excluding themselves from the arithmetic, and these do the same. The
+ * macro coverage still counts them, because the database is what priced them.
+ */
+export const PHOTO_CONFIDENCE = 0.6;
+
+/**
  * The same limit expressed in base64 characters, which is what the schema can
  * actually count.
  *
@@ -347,8 +358,28 @@ export const confirmParsedSchema = z.object({
     )
     .min(1)
     .max(30),
+  /**
+   * How sure the saved rows are, for the whole batch (D143).
+   *
+   * One figure rather than one per row, because the uncertainty is not in any
+   * particular row: it is in where the batch came from. A photograph makes
+   * every row on it an estimate in the D55 sense — the food was named by a
+   * model looking at a picture — and an estimate lowers confidence rather than
+   * excluding itself from the arithmetic. The coverage still counts these,
+   * because the database is what priced them.
+   *
+   * Defaults to 1, which is what a typed sentence a person then corrected is
+   * worth, and what every caller before this sent.
+   */
+  confidence: z.number().gt(0).max(1).default(1),
 });
 export type ConfirmParsed = z.infer<typeof confirmParsedSchema>;
+/**
+ * What a caller has to send, which is not what the server ends up with:
+ * `confidence` has a default, so it is optional on the way in and always
+ * present on the way out. The client types against this one.
+ */
+export type ConfirmParsedInput = z.input<typeof confirmParsedSchema>;
 
 /* ----------------------------------------------------------------- recipes */
 

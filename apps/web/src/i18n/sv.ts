@@ -1017,6 +1017,11 @@ export const sv = {
   "llm.noMatch": "Ingen träff i databasen, sparas utan energivärde",
   // Where the figure would be, when the picture did not say a quantity.
   "llm.amountUnknown": "inte än",
+  // A partial save: what had a mängd was written, what did not is still on
+  // screen. Saying how many is more use than naming them all in a toast.
+  "llm.someWithoutAmount":
+    "{count} rader saknar mängd och sparades inte. Fyll i mängden, eller ta bort raden.",
+  "llm.noneWithAmount": "Ingen rad har någon mängd än. Fyll i minst en.",
   "llm.include": "Ta med {name}",
   "llm.saveRows": "Spara {count} rader",
   "llm.nothingFound": "Hittade ingen mat i texten. Skriv om den, eller sök upp maten själv.",
@@ -1037,6 +1042,8 @@ export const sv = {
     "Bildtolkningen är inte igång just nu. Bilden sparades inte, så den behöver tas om. Skriv in maten själv så länge.",
   "photo.rateLimited": "Du har skickat många bilder den senaste timmen. Vänta en stund.",
   "photo.nothingFound": "Hittade ingen mat på bilden. Ta en ny, eller skriv in maten själv.",
+  "photo.checkBeforeSaving":
+    "Mängderna är uppskattade från bilden. Kolla dem innan du sparar. Kalorierna kommer från livsmedelsdatabasen.",
 
   "recipe.title": "Vad kan jag laga?",
   "recipe.intro":

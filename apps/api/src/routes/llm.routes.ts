@@ -176,9 +176,14 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
    *
    * Ordinary food entries, through the ordinary service: same upsert, same
    * `client_uuid` idempotency, same macro snapshot. Nothing about an entry
-   * records that a model suggested it, because by this point a person has read
+   * records *which* path suggested it, because by this point a person has read
    * every row and changed the ones that were wrong — which makes it their
    * entry, not the model's.
+   *
+   * The one thing that does travel is `confidence`, and only downwards. A batch
+   * from a photograph is an estimate in D55's sense however carefully it was
+   * read, so it says so on the row rather than being indistinguishable from a
+   * weighed one (D143).
    */
   app.post(
     "/llm/parse-food/confirm",
@@ -195,7 +200,7 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const { localDate, mealSlot, items } = request.body;
+      const { localDate, mealSlot, items, confidence } = request.body;
 
       /**
        * An unmatched row must arrive with a value (D74).
@@ -236,7 +241,12 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
              * they deliberately kept as a note.
              */
             ...(item.foodItemId ? {} : { kcal: item.kcal ?? 0 }),
-            confidence: 1,
+            /**
+             * The batch's figure, which is 1 for everything but a photograph
+             * (D143). Lowered rather than excluded, per D55: the row is real,
+             * the database priced it, and what is less certain is the naming.
+             */
+            confidence,
             confirmed: true,
           }),
         );

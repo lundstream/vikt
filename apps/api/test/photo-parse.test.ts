@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { parsedPhotoSchema } from "shared";
+import { PHOTO_CONFIDENCE, parsedPhotoSchema } from "shared";
 import type { ChatResult, LlmClient } from "../src/llm/client.js";
 import type { Db } from "../src/db/index.js";
-import { foodItems } from "../src/db/schema.js";
+import { foodEntries, foodItems } from "../src/db/schema.js";
 import { PHOTO_SYSTEM_PROMPT, stripNutrition } from "../src/llm/parse-photo.js";
 import { auth, createUser, type TestUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
@@ -339,6 +341,69 @@ describe("the prompt", () => {
       expect(PHOTO_SYSTEM_PROMPT).toContain(unit);
     }
     expect(PHOTO_SYSTEM_PROMPT).toContain("Gissa inte gram");
+  });
+});
+
+/* ------------------------------------------------------- what gets saved */
+
+describe("confirming rows that came from a photograph", () => {
+  const ctx = useTestApp(VISION, { llm: stubLlm(modelSays('{"items":[]}')) });
+
+  async function confirm(
+    app: FastifyInstance,
+    user: TestUser,
+    body: Record<string, unknown>,
+  ) {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/llm/parse-food/confirm",
+      headers: auth(user),
+      payload: {
+        localDate: "2026-09-12",
+        mealSlot: "snack",
+        items: [
+          {
+            clientUuid: randomUUID(),
+            foodItemId: null,
+            name: "kebabpizza",
+            grams: 450,
+            kcal: 1080,
+          },
+        ],
+        ...body,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    const [row] = await ctx()
+      .db.select()
+      .from(foodEntries)
+      .where(eq(foodEntries.userId, user.userId));
+    return row;
+  }
+
+  /**
+   * Lowered, not excluded (D55, D143). The row is real and the database priced
+   * it; what is less certain is that a model looking at a picture named the
+   * right food. So it goes in with a confidence that says where it came from,
+   * and the macro coverage counts it like any other priced row.
+   */
+  it("writes the batch's lowered confidence", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const row = await confirm(app, user, { confidence: PHOTO_CONFIDENCE });
+
+    expect(Number(row?.confidence)).toBe(PHOTO_CONFIDENCE);
+  });
+
+  /** And a caller that says nothing gets what every caller got before. */
+  it("defaults to full confidence when the field is absent", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const row = await confirm(app, user, {});
+
+    expect(Number(row?.confidence)).toBe(1);
   });
 });
 

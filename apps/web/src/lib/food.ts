@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ApplyTemplate,
-  ConfirmParsed,
+  ConfirmParsedInput,
   CreateEstimate,
   CreateFoodPortion,
   EstimateDishRequest,
@@ -254,7 +254,7 @@ export function useGenerateRecipe() {
 export function useConfirmParsedFood() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ConfirmParsed) => api.confirmParsedFood(input),
+    mutationFn: (input: ConfirmParsedInput) => api.confirmParsedFood(input),
     onSuccess: () => invalidateIntake(queryClient),
   });
 }

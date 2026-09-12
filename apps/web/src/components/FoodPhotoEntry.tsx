@@ -1,7 +1,9 @@
 import { useState, type ChangeEvent } from "react";
 import type { FoodMatch } from "shared";
-import { useParseFoodPhoto } from "../lib/food.js";
+import { PHOTO_CONFIDENCE } from "shared";
+import { useConfirmParsedFood, useParseFoodPhoto } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
+import { ParsedProposal } from "./ParsedProposal.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -37,8 +39,15 @@ import { t } from "../i18n/index.js";
  * kebab pizza came back from the model as "Pizza (1 st)": the picture shows one
  * round thing, and which round thing it is, is the part the person knows.
  */
-export function FoodPhotoEntry() {
+export function FoodPhotoEntry({
+  localDate,
+  onLogged,
+}: {
+  localDate: string;
+  onLogged: (message: string) => void;
+}) {
   const parse = useParseFoodPhoto();
+  const confirm = useConfirmParsedFood();
 
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -136,13 +145,29 @@ export function FoodPhotoEntry() {
       ) : null}
 
       {proposal ? (
-        <ul className="panel mt-4 space-y-1" data-testid="photo-proposal">
-          {proposal.map((item, index) => (
-            <li key={`${item.name}-${index}`} className="text-note text-ink">
-              {item.match?.name ?? item.name}
-            </li>
-          ))}
-        </ul>
+        <ParsedProposal
+          items={proposal}
+          /*
+            Every row from a photograph is an estimate by origin, so the whole
+            list is marked rather than the odd row: the uncertainty is in where
+            it came from, not in which food it happened to be.
+          */
+          uncertain
+          intro={t("photo.checkBeforeSaving")}
+          saving={confirm.isPending}
+          onConfirm={async (rows) => {
+            await confirm.mutateAsync({
+              localDate,
+              mealSlot: "snack",
+              items: rows,
+              // Lowered, never excluded (D55). The database priced these, so
+              // the coverage counts them; what is less certain is the naming.
+              confidence: PHOTO_CONFIDENCE,
+            });
+            onLogged(t("llm.logged", { count: rows.length }));
+          }}
+          onCancel={() => setProposal(null)}
+        />
       ) : null}
     </div>
   );
