@@ -914,7 +914,6 @@ export const sv = {
   "chart.trendValue": "Trend {value} kg",
   "chart.readValue": "Vägd {value} kg",
   "chart.importedValue": "Importerad {value} kg",
-  "chart.noReading": "Ingen vägning den dagen",
   "chart.summary": "Trendlinje: {from} kg till {to} kg över {days} dagar.",
   "chart.emptyLabel": "Trendlinje utan data än.",
 

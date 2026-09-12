@@ -14,6 +14,7 @@ import { formatDecimal } from "shared";
 import { formatLongDay } from "../lib/dates.js";
 import { alpha, usePrefersReducedMotion, useTokens } from "../lib/tokens.js";
 import { niceTicks } from "../lib/ticks.js";
+import { withTrendVertices } from "../lib/trend-series.js";
 import { LOCALE, t } from "../i18n/index.js";
 
 /**
@@ -98,9 +99,17 @@ export function TrendChart({
     [whtr],
   );
 
+  /**
+   * One row per day, and the trend **only on reading dates** (D144).
+   *
+   * `withTrendVertices` nulls the carried-forward days, and `connectNulls` on
+   * the line below draws the monotone curve across them. The rows themselves
+   * stay per-day because the x axis is categorical: dropping them would space
+   * two readings a month apart the same as two a day apart.
+   */
   const data = useMemo(
     () =>
-      points.map((point) => {
+      withTrendVertices(points).map((point) => {
         const ratio = whtrByDay.get(point.localDate);
         return {
           ...point,
@@ -261,6 +270,13 @@ export function TrendChart({
             <Line
               dataKey="trend"
               name={t("chart.trend")}
+              /*
+                Monotone, and the choice matters now that the vertices are
+                sparse. A natural cubic through a nine-day gap overshoots the
+                lower reading on its way there, drawing a weight nobody
+                recorded; monotone cannot leave the interval between two
+                neighbouring values.
+              */
               type="monotone"
               stroke={tokens.trend}
               strokeWidth={3}
@@ -270,6 +286,8 @@ export function TrendChart({
               activeDot={{ r: 4, fill: tokens.trend, stroke: tokens.paper, strokeWidth: 2 }}
               isAnimationActive={!reducedMotion}
               animationDuration={400}
+              // The gap days carry no vertex (D144); the curve spans them.
+              connectNulls
             />
 
             {/*
@@ -568,10 +586,19 @@ function TrendTooltip({
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
 
+  /**
+   * Reading dates only (D144).
+   *
+   * A day that carried the trend forward has nothing to report: the weight is
+   * unknown and the trend figure is the previous reading's, restated. Showing
+   * it invited the reading that the staircase already suggested, that the
+   * number held steady across the gap. What actually happened there is that
+   * nobody weighed, and the honest tooltip for that is none.
+   */
+  if (point.raw === null) return null;
+
   const readingLine =
-    point.raw === null
-      ? t("chart.noReading")
-      : point.source === "import"
+    point.source === "import"
         ? t("chart.importedValue", { value: formatDecimal(point.raw, { decimals: 1 }) })
         : t("chart.readValue", { value: formatDecimal(point.raw, { decimals: 1 }) });
 
