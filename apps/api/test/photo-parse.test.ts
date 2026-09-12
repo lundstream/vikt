@@ -340,7 +340,9 @@ describe("the prompt", () => {
     for (const unit of ["g", "kg", "dl", "msk", "portion", "skiva", "st"]) {
       expect(PHOTO_SYSTEM_PROMPT).toContain(unit);
     }
-    expect(PHOTO_SYSTEM_PROMPT).toContain("Gissa inte gram");
+    // And it says what to do when it cannot judge one, which is the answer the
+    // constrained model gives most of the time.
+    expect(PHOTO_SYSTEM_PROMPT).toContain("sätt amount till null");
   });
 });
 

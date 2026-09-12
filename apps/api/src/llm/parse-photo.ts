@@ -51,9 +51,10 @@ Regler:
   varumärke och produktnamn. "Felix potatisbullar", inte "potatisbullar".
 - amount: mängden, som ett tal och en enhet. Enheten måste vara en av:
   ${HOUSEHOLD_UNITS.join(", ")}.
-- Vet du inte mängden, sätt amount till null. Det är ett riktigt svar och det
-  vanligaste. Skriv ALDRIG "stor mängd", "en del", "spridd över", "lagom" eller
-  liknande. Gissa inte gram.
+- Kan du bedöma vikten, skriv den i gram: {"count":150,"unit":"g"}.
+- Kan du inte bedöma mängden, sätt amount till null. Det är ett riktigt svar
+  och det vanligaste. Skriv ALDRIG "stor mängd", "en del", "spridd över",
+  "lagom" eller liknande i enheten.
 - Ta bara med mat du faktiskt ser. Hitta inte på tillbehör som brukar ingå.
 - Dryck som står bredvid tallriken är inte mat på tallriken. Utelämna den.
 - Ange ALDRIG kalorier, energi, protein, kolhydrater, fett eller andra

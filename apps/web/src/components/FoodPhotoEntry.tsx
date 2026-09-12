@@ -106,19 +106,20 @@ export function FoodPhotoEntry({
 
   return (
     <div>
-      <label className="field mb-3 block">
-        <span className="mb-1 block text-micro text-muted">{t("photo.noteLabel")}</span>
-        <input
-          className="w-full bg-transparent text-note text-ink outline-none"
-          value={note}
-          placeholder={t("photo.notePlaceholder")}
-          onChange={(event) => setNote(event.target.value)}
-          disabled={working}
-        />
+      <label className="mb-1 block text-micro text-muted" htmlFor="photo-note">
+        {t("photo.noteLabel")}
       </label>
+      <input
+        id="photo-note"
+        className="field mb-3"
+        value={note}
+        placeholder={t("photo.notePlaceholder")}
+        onChange={(event) => setNote(event.target.value)}
+        disabled={working}
+      />
 
       <label className="btn inline-flex w-auto cursor-pointer items-center px-4">
-        {working ? t("photo.working") : t("photo.take")}
+        {working ? t("photo.working") : t("photo.shutter")}
         <input
           type="file"
           accept="image/*"
@@ -126,7 +127,7 @@ export function FoodPhotoEntry({
           capture="environment"
           className="sr-only"
           data-testid="photo-input"
-          aria-label={t("photo.take")}
+          aria-label={t("photo.shutter")}
           disabled={working}
           onChange={(event) => void chosen(event)}
         />

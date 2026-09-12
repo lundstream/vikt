@@ -265,8 +265,8 @@ describe("the proposal list", () => {
 describe("while the model works", () => {
   /**
    * The measured figure, in the app's own register. No spinner metaphor and no
-   * "snart klart": ten to twenty seconds is what it takes, and the honest thing
-   * to give somebody waiting is the number.
+   * "snart klart": a warm model answers in under a second and a cold one in
+   * about six, and the honest thing to give somebody waiting is the numbers.
    */
   it("says how long it takes", async () => {
     renderRoute(<FoodPhotoEntry localDate="2026-09-12" onLogged={() => {}} />, {
@@ -283,6 +283,6 @@ describe("while the model works", () => {
 
     fireEvent.change(screen.getByTestId("photo-input"), { target: { files: [aPhoto()] } });
 
-    expect(await screen.findByText(/tio till tjugo sekunder/)).toBeTruthy();
+    expect(await screen.findByText(/ett par sekunder/)).toBeTruthy();
   });
 });

@@ -176,7 +176,26 @@ export function createLlmClient(env: Env, fetchImpl: typeof fetch = fetch): LlmC
         return { ok: false, reason: "failed", detail: body.error.slice(0, 300) };
       }
 
-      const content = body.message?.content ?? "";
+      /**
+       * The answer, wherever Ollama decided to put it (D143).
+       *
+       * `qwen3-vl:8b` with a `format` constraint returns an **empty `content`
+       * and the whole JSON object in `thinking`** — reproducibly, for every
+       * photograph tried, with `think: false` set and honoured (27 eval tokens,
+       * no reasoning prose, 300 to 1100 ms). Drop the constraint and it behaves
+       * normally and reasons for 18 seconds instead.
+       *
+       * So this is not a model that reasons in secret; it is Ollama labelling
+       * one field as the other for this build, which is the same shape as D71's
+       * finding about `/v1/` ignoring `think`. The fallback costs nothing —
+       * `content` is only empty when the call had already failed — and it is a
+       * fallback rather than a preference, so a model that answers properly is
+       * unaffected.
+       */
+      const content = body.message?.content?.trim()
+        ? body.message.content
+        : (body.message?.thinking ?? "");
+
       if (content.trim() === "") {
         return { ok: false, reason: "failed", detail: "empty response" };
       }

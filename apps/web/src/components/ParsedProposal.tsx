@@ -178,10 +178,18 @@ export function ParsedProposal({
             />
 
             <span className="min-w-0">
-              <span className="block truncate text-note text-ink">
-                {item.match?.name ?? item.name}
+              {/*
+                The tag sits outside the truncating span, not inside it. Inside,
+                a long name pushed it off the end and the row lost its estimate
+                marker — which is the one thing on the row that must not be
+                allowed to disappear.
+              */}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-note text-ink">
+                  {item.match?.name ?? item.name}
+                </span>
                 {uncertain ? (
-                  <span className="tag tag-estimate ml-2 align-middle">
+                  <span className="tag tag-estimate shrink-0">
                     <span aria-hidden="true">≈</span>
                     {t("estimate.badge")}
                   </span>

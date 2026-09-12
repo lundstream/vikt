@@ -1030,10 +1030,16 @@ export const sv = {
 
   // ------------------------------------------------ maten som fotografi (D143)
   "photo.take": "Fotografera maten",
+  // The button inside the sheet. Shorter than the sheet's own title, which is
+  // the quick action's name: a heading and the control under it saying the same
+  // four words reads as a stutter.
+  "photo.shutter": "Ta ett foto",
   "photo.working": "Tittar på bilden…",
   // The measured figure, in the app's own register. No spinner metaphor: the
-  // honest thing to say to somebody waiting is how long it takes.
-  "photo.waiting": "Det tar ungefär tio till tjugo sekunder.",
+  // honest thing to say to somebody waiting is how long it takes. Two numbers
+  // because there are two cases and the app cannot tell which it is in: under a
+  // second with the model already running, about six when it has to load first.
+  "photo.waiting": "Det tar oftast ett par sekunder, ibland upp till tio.",
   "photo.noteLabel": "Vad är det, om bilden inte räcker",
   "photo.notePlaceholder": "kebabpizza, hela",
   "photo.tooLarge": "Bilden är för stor även efter förminskningen. Ta en ny.",

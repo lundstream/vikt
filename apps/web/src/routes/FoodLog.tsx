@@ -166,10 +166,11 @@ export function FoodLog() {
    * The ways into this screen's other surfaces (D135).
    *
    * Built here rather than inline so the conditional membership is one list
-   * somebody can read: scanning and typing an estimate need nothing, the two
-   * model-backed ones need a model that answers. `llm.data?.reachable` is the
-   * same check the sheets themselves use, so a box that goes away mid-session
-   * takes its doors with it rather than leaving two that open onto an error.
+   * somebody can read: scanning and typing an estimate need nothing, the three
+   * model-backed ones need a model that answers, and the photograph needs one
+   * that has been shown to look. `llm.data?.reachable` is the same check the
+   * sheets themselves use, so a box that goes away mid-session takes its doors
+   * with it rather than leaving three that open onto an error.
    */
   const waysIn: QuickAction[] = [
     {
@@ -178,13 +179,6 @@ export function FoodLog() {
       icon: barcodeIcon,
       onClick: () => setScannerOpen(true),
       testId: "scan",
-    },
-    {
-      key: "estimate",
-      label: "estimate.open",
-      icon: penIcon,
-      onClick: () => setTool("estimate"),
-      testId: "open-estimate",
     },
     /**
      * The photograph, beside the scanner (D143).
@@ -206,6 +200,13 @@ export function FoodLog() {
           },
         ] satisfies QuickAction[])
       : []),
+    {
+      key: "estimate",
+      label: "estimate.open",
+      icon: penIcon,
+      onClick: () => setTool("estimate"),
+      testId: "open-estimate",
+    },
     ...(llm.data?.reachable
       ? ([
           {
