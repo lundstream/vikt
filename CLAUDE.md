@@ -697,6 +697,17 @@ a commit on `main` is a commit that the next redeploy ships.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
 - Migrations are additive and checked in. Never edit an applied migration.
+- **Nine tests are CI-only by configuration, and the local run says so.** The S3
+  destination's live suite (`backup-s3-live.test.ts`) needs a real S3 server and
+  `pg_dump`; CI starts MinIO and sets `S3_TEST_ENDPOINT`, a workstation usually
+  has neither. They are **skipped rather than faked**, because a suite that goes
+  green when its subject is absent is worse than one that says it did not run —
+  that is the mistake the whole file exists to correct, and it is the reason the
+  local and CI totals differ by exactly nine. The file prints a line naming the
+  skip on every local run, and asserts that where the endpoint *is* configured
+  nothing is half-skipped, so a CI box that lost `pg_dump` fails instead of
+  quietly covering less. To run them here: start MinIO and set
+  `S3_TEST_ENDPOINT`, `S3_TEST_ACCESS_KEY`, `S3_TEST_SECRET_KEY`.
 - **Every third-party image is pinned by digest, and an image changes only when
   somebody changes the digest.** `postgres:16-alpine@sha256:...` in the compose
   files and the CI service, the same for the Node and nginx bases in

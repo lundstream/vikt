@@ -7,6 +7,12 @@ import { useMe } from "../lib/session.js";
 /**
  * Which voice the coach speaks in (D140).
  *
+ * **The labels are lowercase.** They are adjectives naming a setting's value,
+ * not names: "torr" is how the coach sounds, the way "mörkt" is how the screen
+ * looks. §5 requires sentence case rather than lowercase, so this is a choice
+ * inside that rule and not an exception to it, and the news rows in STATE.md
+ * quote the screen rather than a capitalised version of it.
+ *
  * Three, chosen here and applied to both the chat and the weekly review,
  * because they are one voice from one prompt and a person who picks a tone
  * picks it for both.

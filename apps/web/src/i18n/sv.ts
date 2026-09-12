@@ -420,9 +420,9 @@ export const sv = {
   "coach.limits":
     "Siffrorna i svaren kontrolleras mot dina egna uppgifter, men orden runt dem gör det inte: coachen kan ha fel om hur appen fungerar. Det som står på de andra skärmarna är det som gäller.",
   "coach.toneTitle": "Tonläge",
-  "coach.toneTorr": "Torr",
-  "coach.tonePeppig": "Peppig",
-  "coach.toneSaklig": "Saklig",
+  "coach.toneTorr": "torr",
+  "coach.tonePeppig": "peppig",
+  "coach.toneSaklig": "saklig",
   "coach.toneTorrWhat": "Kort och underdriven, och roligare när det går bra än när det går trögt.",
   "coach.tonePeppigWhat": "Varmare och gladare när det går bra, lika lugn när det går trögt.",
   "coach.toneSakligWhat": "Ingen personlighet alls. Siffrorna och vad de betyder.",

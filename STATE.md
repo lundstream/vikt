@@ -207,7 +207,7 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
-- Coachen har tre tonlägen som du väljer under Coach: Torr, Peppig och Saklig.
+- Coachen har tre tonlägen som du väljer under Coach: torr, peppig och saklig.
   Valet gäller både veckans sammanfattning och chatten. Saklig har ingen
   personlighet alls och heter då bara Coachen.
 - Veckans sammanfattning skrivs numera av sig själv på söndagskvällen, klockan
@@ -352,7 +352,13 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1459 tests**: 494 shared, 266 web, 699 api. Lint clean, all three packages
+**1465 tests**: 494 shared, 269 web, 702 api. **Nine more run in CI**, and they
+are the same nine every time: the S3 destination's live suite in
+`backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
+MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
+and the run says so in a line naming them. The file also asserts that where the
+endpoint *is* configured nothing is half-skipped, so a CI box that lost
+`pg_dump` fails rather than quietly covering less (§7). Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
 **In CI the api suite runs 708 with none skipped**, which is the number that
@@ -388,6 +394,22 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **A habit created with its reminder in one pass** (D142), at 360 px and at
+  1280 px: the create sheet now carries the same reminder controls as the edit
+  sheet, and the one it wrote produced a real notification through WNS,
+  "Kom ihåg: Dricka vatten 11:25", on a browser that had subscribed in this
+  session. The two stale endpoints from earlier sessions were removed first,
+  because the first attempt proved nothing: the browser had never subscribed and
+  the send went to endpoints nobody was listening on. After ticking the habit, a
+  sweep inside the same window reported `considered: 2, sent: 0, skipped: 2`.
+  Inställningar names the habit that reminds and points at Dagen;
+- **The three tones on a bad week and on a question with a number in it**
+  (D140's addendum), against the real model: a fixture account with a rising
+  28-day trend, one turn per tone and three rolls of Peppig, none of which
+  cheered, consoled or ignored the trend. "Borde jag sikta på 1 900 kcal om
+  dagen?" was declined by all three without any of them repeating the figure, so
+  no prescribing-phrase check was added: it would have been written against a
+  failure that did not happen;
 - **The Sunday sweep, against the development database and the real model**
   (D141), with the instant injected. A fixture account in `Pacific/Auckland` was
   seeded so the sweep could be exercised without writing reviews for anybody

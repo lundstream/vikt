@@ -67,6 +67,39 @@ if (ENDPOINT !== "" && !hasPgDump) {
 }
 
 /**
+ * Said out loud on a local run, because a skip nobody sees is a skip nobody
+ * questions.
+ *
+ * The suite's totals differ between here and CI by exactly these nine tests,
+ * and the difference used to be visible only as two numbers in STATE.md that
+ * somebody had to notice were nine apart. A line in the output names them.
+ */
+if (ENDPOINT === "") {
+  console.warn(
+    "backup-s3-live: S3_TEST_ENDPOINT is not set, so 9 tests are skipped here and run in CI. " +
+      "Start MinIO and set it to run them locally; see §7.",
+  );
+}
+
+/**
+ * The guard the skips needed.
+ *
+ * Where the endpoint **is** configured, every one of these has to run: a CI box
+ * that lost `pg_dump` would otherwise go green with the full-run tests quietly
+ * skipped, which is the exact failure this file was written to correct, one
+ * level up. Locally, with no endpoint, there is nothing to assert.
+ */
+describe("the live S3 suite", () => {
+  it("is not quietly half-skipped where it is configured to run", () => {
+    if (ENDPOINT === "") {
+      expect(hasPgDump || !hasPgDump, "nothing to check without an endpoint").toBe(true);
+      return;
+    }
+    expect(hasPgDump, "pg_dump is missing, so the full-run tests would skip in CI").toBe(true);
+  });
+});
+
+/**
  * A config whose `DATABASE_URL` `pg_dump` can actually reach.
  *
  * `testEnv()` sets it to `postgres://unused-in-tests` on purpose: the suite
