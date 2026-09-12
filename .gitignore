@@ -82,3 +82,6 @@ desktop.ini
 # them is a session log naming the owner's phone.
 INFRA.md
 INFRA-STATE.md
+
+# Test reports, read by scripts/check-skips.mjs
+.vitest-report.json

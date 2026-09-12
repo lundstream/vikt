@@ -697,6 +697,12 @@ a commit on `main` is a commit that the next redeploy ships.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
 - Migrations are additive and checked in. Never edit an applied migration.
+- **No test may be skipped, and CI fails if one is.** `scripts/check-skips.mjs`
+  reads the run's own JSON report and refuses any skipped or todo test outside a
+  one-file allowlist. A skipped test is not a failing test, which is exactly the
+  problem: it is silence, and this project has been caught by silence twice. The
+  guard also refuses an empty or missing report, because a guard that reads
+  nothing finds nothing.
 - **Nine tests are CI-only by configuration, and the local run says so.** The S3
   destination's live suite (`backup-s3-live.test.ts`) needs a real S3 server and
   `pg_dump`; CI starts MinIO and sets `S3_TEST_ENDPOINT`, a workstation usually

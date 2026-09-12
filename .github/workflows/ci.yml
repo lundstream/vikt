@@ -139,6 +139,15 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # A skipped test is not a failing test, which is the whole problem: it is
+      # silence, and this project has been caught by silence twice. STATE.md
+      # claimed "none skipped" for weeks on the strength of somebody reading a
+      # log; this reads the run. Only `backup-s3-live.test.ts` may skip, and
+      # only where `S3_TEST_ENDPOINT` is unset — which it is not, here, so even
+      # that one has to have run.
+      - name: No skipped tests
+        run: pnpm test:skips
+
       # Runs last because it needs the build. It fails if `__PLACEHOLDER__`
       # survives into `dist/` anywhere it is not meant to.
       - name: Build

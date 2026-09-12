@@ -470,6 +470,35 @@ suite.
 Bitnami's image withdrew its `latest` tag before that. If that step fails again,
 check whether the registry moved before reading the diff.
 
+## The guards, and what runs them
+
+Every guard this project's documents name, the file that implements it, and the
+CI step that runs it. A guard needs both to be on this list: one that exists but
+nothing runs is not a guard, and a line here without a file is a claim.
+
+The list was written by checking each one rather than by remembering it, after
+"in CI the api suite runs with none skipped" turned out to be a sentence
+somebody had read off a log with nothing behind it.
+
+| What it holds | File | CI step |
+|---|---|---|
+| Lingon belongs to the trend line and the wordmark, and nothing else gets an accent it has not earned (§5) | `apps/web/test/colour-meaning.test.ts` | Test |
+| No en or em dashes, no shouted words, no doubled spaces, in the register and in JSX (§5) | `apps/web/test/copy-style.test.ts` | Test |
+| Every class name resolves, nothing shouts through CSS, and Honung is only used where something costs (§5) | `apps/web/test/class-names.test.ts` | Test |
+| Every key the app asks for exists, and none is left behind unused | `apps/web/test/i18n.test.ts` | Test |
+| The two navigation surfaces list the same places, and every signed-in route is reachable (D115) | `apps/web/test/render/navigation.test.tsx` | Test |
+| The landing page's tap figures still match `docs/measurements.md` | `apps/web/test/landing-figures.test.ts` | Test |
+| The correlation view computes no statistic, and its response carries none (D34) | `packages/shared/src/calc/correlate.test.ts`, `apps/api/test/correlations.test.ts` | Test |
+| Services take `userId` first, so an unscoped read is a lint error rather than a leak (§3, D15) | `eslint-rules/user-id-first-param.js` | Lint |
+| Derived data has one owner, so two paths cannot write the same number (D44) | `eslint-rules/derived-data-owner.js` | Lint |
+| No test is skipped or left as a todo outside one named file (§7) | `scripts/check-skips.mjs` | No skipped tests |
+| No `__PLACEHOLDER__` survives into the built bundles (D98) | `apps/web/scripts/check-placeholders.mjs` | Check the build for unsubstituted placeholders |
+| Every package typechecks under `strict` | `tsconfig.json` per package | Typecheck |
+
+**Removed from the list rather than footnoted:** nothing this pass. The one
+entry that would have been removed is the guard STATE.md used to claim about
+skipped tests, which did not exist; it is on the list now because it does.
+
 ## Known gotchas carried into this project
 
 **A Docker Hub tag is not a stable reference.** It is a name the publisher can

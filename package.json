@@ -19,7 +19,8 @@
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",
     "dev:certs": "node scripts/dev-certs.mjs",
-    "dev:tunnel": "cloudflared tunnel --url https://localhost:5173 --no-tls-verify"
+    "dev:tunnel": "cloudflared tunnel --url https://localhost:5173 --no-tls-verify",
+    "test:skips": "node scripts/check-skips.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

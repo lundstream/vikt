@@ -8,7 +8,7 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest",
     "invite": "tsx src/scripts/invite.ts",
     "db:generate": "drizzle-kit generate",
