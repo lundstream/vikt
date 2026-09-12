@@ -6,6 +6,7 @@ import { startBackupScheduler } from "./lib/backup-scheduler.js";
 import { startReminderScheduler } from "./lib/reminder-scheduler.js";
 import { startReviewScheduler } from "./lib/review-scheduler.js";
 import { checkVapidKey } from "./lib/vapid-watch.js";
+import { startVisionWatch } from "./lib/vision-watch.js";
 import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
@@ -104,6 +105,20 @@ void checkVapidKey(app.db, env)
   .catch((error: unknown) => {
     app.log.error({ err: error }, "could not check the VAPID key");
   });
+
+/**
+ * Whether the configured vision model actually looks at images (D143).
+ *
+ * Same shape as the VAPID check above and for the same reasons: not awaited,
+ * never fatal, and a line in the log rather than a refusal. What it decides is
+ * whether the photo quick action exists at all, so the failure mode of getting
+ * no answer is a feature that is absent rather than one that is broken.
+ *
+ * While the workstation is unreachable it asks again every hour, silently. That
+ * is the ordinary state of this installation — the box is somebody's desktop —
+ * and an hourly log line about it would be noise about nothing.
+ */
+startVisionWatch(app.db, env, app.llm, app.log);
 
 /**
  * The mail drainer (D104), which D88 made a separate process and nothing ever

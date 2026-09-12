@@ -115,6 +115,25 @@ export const potIcon = (
   </>
 );
 
+/**
+ * A camera body with a lens, for photographing the plate (D143).
+ *
+ * The scanner's icon is a barcode inside a frame and this one is the camera
+ * itself, which is the distinction that matters on the row: one of them is
+ * about reading a code and the other is about the food. A lens rather than a
+ * shutter, because a circle in a rectangle is a camera at 24 px and a shutter
+ * is a smudge.
+ */
+export const cameraIcon = (
+  <>
+    <path
+      d="M4 7.5h3l1.5-2h7L17 7.5h3A1.5 1.5 0 0 1 21.5 9v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 17V9A1.5 1.5 0 0 1 4 7.5Z"
+      {...stroke}
+    />
+    <circle cx="12" cy="13" r="3.5" {...stroke} />
+  </>
+);
+
 /** A bowl with steam. Distinct in silhouette from both of the others. */
 const mealIcon = (
   <>

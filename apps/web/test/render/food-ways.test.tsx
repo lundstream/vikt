@@ -15,8 +15,10 @@ import { sv } from "../../src/i18n/sv.js";
  * down the page, which said "press me" three times for things that only open a
  * sheet; the fourth was already a circle. They are one shape now.
  *
- * The row has to read with **two, three or four** items, because the two
- * model-backed ones are absent rather than disabled when the box is off.
+ * The row has to read with **two, three, four or five** items, because the
+ * model-backed ones are absent rather than disabled when the box is off, and
+ * the photograph has a further condition of its own: some tag has to have been
+ * proved able to see, and this device has to be online (D143).
  */
 
 const ME = {
@@ -51,12 +53,15 @@ const INSIGHTS = {
   whtr: [], whtrRuleOfThumb: 0.5, bmi: null, macros: null, todayRemainingKcal: null,
 };
 
-function mount(llmReachable: boolean) {
+function mount(llmReachable: boolean, vision = true) {
   renderRoute(<FoodLog />, {
     responses: [
       { match: "/api/me", body: ME },
       { match: "/api/insights", body: INSIGHTS },
-      { match: "/api/llm/health", body: { enabled: llmReachable, reachable: llmReachable } },
+      {
+        match: "/api/llm/health",
+        body: { enabled: llmReachable, reachable: llmReachable, vision },
+      },
     ],
     stateful: [
       { match: "/api/food-entry/recent", get: () => ({ entries: [] }) },
@@ -68,13 +73,59 @@ function mount(llmReachable: boolean) {
 describe("the ways into the food screen", () => {
   afterEach(cleanup);
 
-  /** All four, when a model is answering. */
-  it("offers four when the model is reachable", async () => {
+  /** All five, when a model is answering and one of them can see. */
+  it("offers five when the model is reachable and can see", async () => {
     mount(true);
     await screen.findByTestId("scan");
 
-    for (const id of ["scan", "open-estimate", "open-text-entry", "open-recipe"]) {
+    for (const id of [
+      "scan",
+      "open-photo-entry",
+      "open-estimate",
+      "open-text-entry",
+      "open-recipe",
+    ]) {
       expect(screen.getByTestId(id), `missing ${id}`).toBeTruthy();
+    }
+  });
+
+  /**
+   * The photograph has a condition of its own (D143). A reachable workstation
+   * is not enough: some tag has to have been sent a picture and described it,
+   * which is what `vision` reports. Absent rather than greyed, like everything
+   * else in this phase.
+   */
+  it("leaves the photograph out when nothing has proved it can see", async () => {
+    mount(true, false);
+    await screen.findByTestId("scan");
+
+    expect(screen.queryByTestId("open-photo-entry")).toBeNull();
+    // The other three model-backed doors are unaffected.
+    expect(screen.getByTestId("open-text-entry")).toBeTruthy();
+    expect(screen.getByTestId("open-recipe")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toContain(sv["photo.take"]);
+  });
+
+  /**
+   * And offline it is absent too, which is not true of the others.
+   *
+   * They degrade to an unavailable answer; this one cannot be attempted at all,
+   * because the image is never queued. A door that opened onto "try again when
+   * you have signal" would be asking somebody to photograph their dinner twice.
+   */
+  it("leaves the photograph out when the device is offline", async () => {
+    const online = Object.getOwnPropertyDescriptor(
+      window.navigator.constructor.prototype,
+      "onLine",
+    );
+    Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+    try {
+      mount(true);
+      await screen.findByTestId("scan");
+      expect(screen.queryByTestId("open-photo-entry")).toBeNull();
+      expect(screen.getByTestId("open-text-entry")).toBeTruthy();
+    } finally {
+      if (online) Object.defineProperty(window.navigator, "onLine", online);
     }
   });
 
@@ -89,6 +140,7 @@ describe("the ways into the food screen", () => {
     expect(screen.getByTestId("open-estimate")).toBeTruthy();
     expect(screen.queryByTestId("open-text-entry")).toBeNull();
     expect(screen.queryByTestId("open-recipe")).toBeNull();
+    expect(screen.queryByTestId("open-photo-entry")).toBeNull();
 
     // And nothing says the missing ones exist.
     const body = document.body.textContent ?? "";
@@ -108,11 +160,12 @@ describe("the ways into the food screen", () => {
 
     const row = scan.closest("ul");
     expect(row).not.toBeNull();
-    expect(row!.querySelectorAll("li")).toHaveLength(4);
+    expect(row!.querySelectorAll("li")).toHaveLength(5);
 
     // Every one carries its label as text.
     for (const [id, label] of [
       ["scan", sv["action.scan"]],
+      ["open-photo-entry", sv["photo.take"]],
       ["open-estimate", sv["estimate.open"]],
       ["open-text-entry", sv["llm.title"]],
       ["open-recipe", sv["recipe.title"]],
@@ -129,7 +182,13 @@ describe("the ways into the food screen", () => {
     mount(true);
     const scan = await screen.findByTestId("scan");
 
-    for (const id of ["scan", "open-estimate", "open-text-entry", "open-recipe"]) {
+    for (const id of [
+      "scan",
+      "open-photo-entry",
+      "open-estimate",
+      "open-text-entry",
+      "open-recipe",
+    ]) {
       const element = screen.getByTestId(id);
       for (const tier of ["btn", "btn-small", "btn-link", "btn-impact"]) {
         expect(element.classList.contains(tier), `${id} is a ${tier}`).toBe(false);

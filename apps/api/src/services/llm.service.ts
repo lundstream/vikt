@@ -26,6 +26,7 @@ import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
 import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
 import { RateLimiter } from "../lib/rate-limit.js";
+import { visionAvailable } from "../lib/vision-watch.js";
 import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
 import { recipeMessages, readGeneratedRecipe } from "../llm/recipe.js";
 import { checkCompleteness, type CompletenessFailure } from "../llm/recipe-completeness.js";
@@ -50,11 +51,21 @@ import { getStaples, userHintsFor } from "./portions.service.js";
  * match harmless rather than a corrupted intake series.
  */
 
-export async function llmHealth(env: Env, client: LlmClient): Promise<LlmHealth> {
+export async function llmHealth(
+  env: Env,
+  client: LlmClient,
+  db: Db,
+): Promise<LlmHealth> {
   return {
     configured: client.enabled,
     reachable: await client.reachable(),
     models: { small: env.OLLAMA_MODEL_SMALL, large: env.OLLAMA_MODEL_LARGE },
+    /**
+     * The boot check's verdict, not the configuration (D143). A model name in
+     * the environment says what an operator intended; this says whether the tag
+     * was sent a picture and described it.
+     */
+    vision: await visionAvailable(db, env),
   };
 }
 

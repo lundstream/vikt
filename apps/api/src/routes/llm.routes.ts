@@ -46,7 +46,7 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
       preHandler: app.requireAuth,
       schema: { response: { 200: llmHealthSchema, 401: errorResponseSchema } },
     },
-    async () => llmHealth(app.config, app.llm),
+    async () => llmHealth(app.config, app.llm, app.db),
   );
 
   /**

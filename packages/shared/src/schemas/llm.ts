@@ -322,6 +322,17 @@ export const llmHealthSchema = z.object({
   /** Answered just now. False means the box is off, which is expected. */
   reachable: z.boolean(),
   models: z.object({ small: z.string(), large: z.string() }),
+  /**
+   * Whether the photo path may be offered (D143).
+   *
+   * Its own field rather than a model name, because the question the client is
+   * asking is not "which tag is configured" but "has this installation proved
+   * that tag can see". False covers every way the answer can be no: the layer
+   * is off, no model is named, the boot check has not run, it could not reach
+   * the workstation, or the model answered without looking. The surface is
+   * absent in all five, which is the same thing every other optional mode does.
+   */
+  vision: z.boolean(),
 });
 export type LlmHealth = z.infer<typeof llmHealthSchema>;
 

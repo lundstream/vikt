@@ -30,6 +30,7 @@ import { useLogDate } from "../lib/log-date.js";
 import { ApiError } from "../lib/api.js";
 import { clientUuid } from "../lib/uuid.js";
 import { SaveStalled } from "../lib/queue/enqueue.js";
+import { useOnline } from "../lib/queue/useQueue.js";
 import { readRequiredNumber } from "../lib/form-number.js";
 import { BarcodeScanner } from "../components/BarcodeScanner.js";
 import { DeleteButton } from "../components/DeleteButton.js";
@@ -37,12 +38,14 @@ import { Field, fieldAria } from "../components/Field.js";
 import { Disclosure } from "../components/Disclosure.js";
 import { DateSelector } from "../components/DateSelector.js";
 import { FoodTextEntry } from "../components/FoodTextEntry.js";
+import { FoodPhotoEntry } from "../components/FoodPhotoEntry.js";
 import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
 import {
   ActionButton,
   barcodeIcon,
+  cameraIcon,
   penIcon,
   potIcon,
   speechIcon,
@@ -136,7 +139,7 @@ export function FoodLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scannerOpen, setScannerOpen] = useState(() => searchParams.has("skanna"));
   /** Which occasional tool is open, if any. */
-  const [tool, setTool] = useState<"text" | "recipe" | "estimate" | null>(null);
+  const [tool, setTool] = useState<"text" | "photo" | "recipe" | "estimate" | null>(null);
   /**
    * Whether the optional layer is up, asked once here rather than inside each
    * tool. The two sheets ask for it too and share the query key, so this is the
@@ -144,6 +147,16 @@ export function FoodLog() {
    * which is what "no trace when the box is off" means from outside a sheet.
    */
   const llm = useLlmHealth();
+  /**
+   * The photo path needs the network in a way the other tools do not (D143).
+   *
+   * They degrade to an unavailable answer on a 200; this one cannot even be
+   * attempted, because the image is never queued — it is read, sent and
+   * dropped, and a queue would mean keeping somebody's kitchen on their phone
+   * until the network came back. So the door is absent offline rather than
+   * opening onto a thing that will not work.
+   */
+  const online = useOnline();
   const favourites = useFavourites();
   const [query, setQuery] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
@@ -173,6 +186,26 @@ export function FoodLog() {
       onClick: () => setTool("estimate"),
       testId: "open-estimate",
     },
+    /**
+     * The photograph, beside the scanner (D143).
+     *
+     * Four conditions, all of them absence rather than a greyed control: the
+     * layer off, no vision model named, no boot check that saw one, or this
+     * device offline. `vision` is the server's own verdict from having sent the
+     * model a picture — a model name in the environment says what somebody
+     * intended, and this says what the tag actually did.
+     */
+    ...(llm.data?.reachable && llm.data.vision && online
+      ? ([
+          {
+            key: "photo",
+            label: "photo.take",
+            icon: cameraIcon,
+            onClick: () => setTool("photo"),
+            testId: "open-photo-entry",
+          },
+        ] satisfies QuickAction[])
+      : []),
     ...(llm.data?.reachable
       ? ([
           {
@@ -699,6 +732,21 @@ export function FoodLog() {
         testId="text-entry-sheet"
       >
         <FoodTextEntry
+          localDate={today}
+          onLogged={(message) => {
+            announce(message);
+            setTool(null);
+          }}
+        />
+      </Sheet>
+
+      <Sheet
+        open={tool === "photo"}
+        onClose={() => setTool(null)}
+        title={t("photo.take")}
+        testId="photo-entry-sheet"
+      >
+        <FoodPhotoEntry
           localDate={today}
           onLogged={(message) => {
             announce(message);
