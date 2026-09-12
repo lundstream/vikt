@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { LOCALE, t, translationKeys } from "../src/i18n/index.js";
 import { habitReminderBody, REMINDER_TEXT } from "shared";
-import { sv } from "../src/i18n/sv.js";
+import { sv, type TranslationKey } from "../src/i18n/sv.js";
+import { ENDPOINTS } from "../src/lib/queue/sync.js";
+import type { QueueStatus } from "../src/lib/queue/db.js";
 
 /**
  * The interface is in Swedish, with no switcher — DECISIONS.md D21.
@@ -213,5 +215,33 @@ describe("the reminder notifications", () => {
    */
   it("say the same thing for a habit", () => {
     expect(sv["push.notifyHabit"]).toBe(habitReminderBody("{name}"));
+  });
+});
+
+
+/**
+ * Every queued kind has a name, and every state has a sentence (D153).
+ *
+ * The inspector reads `t(`queue.kind.${row.kind}`)` through a cast, so the
+ * compiler checks nothing here and a kind added without a string renders its own
+ * lookup key on screen. Two of them had: `weight-update` and `habit-check`,
+ * added with their endpoints and never with their labels, so the queue listed
+ * "queue.kind.weight-update" to anybody who opened it while an edit was waiting.
+ *
+ * `ENDPOINTS` is the runtime list of every kind there is, which makes this exact
+ * rather than a list to keep in step by hand.
+ */
+describe("the queue inspector's own labels", () => {
+  it("names every kind that can be queued", () => {
+    const missing = Object.keys(ENDPOINTS).filter((kind) => sv[`queue.kind.${kind}` as TranslationKey] === undefined);
+
+    expect(missing, "queued kinds with no label render their own key").toEqual([]);
+  });
+
+  it("names every state a queued row can be in", () => {
+    const states: QueueStatus[] = ["pending", "failed", "conflict"];
+    const missing = states.filter((state) => sv[`queue.status.${state}` as TranslationKey] === undefined);
+
+    expect(missing).toEqual([]);
   });
 });

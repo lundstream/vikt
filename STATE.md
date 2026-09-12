@@ -54,6 +54,11 @@ when it will be down, and its mail goes out.
   around the milestone sheet was a focus ring on the dialog container: focus goes
   to the first field now and the sheet's own border is gone, because a sheet is
   Skymning on a dimmed page and needs no edge.
+- **A queued edit whose reading was deleted does not die** (D153). The server
+  answers 404 only when the row is gone and the day is empty, so nothing on the
+  server disagrees with the waiting reading: the queue item becomes a question
+  with two answers, put it back or throw it away, instead of a refusal offering
+  a retry that could never succeed.
 - **Nothing user-created is create-only** (D146). A measurement can be taken
   back, and an activity can be amended in the form it was typed into, which were
   the last two entities on the wrong side of §3's rule.
@@ -489,6 +494,18 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **A queued edit meeting a deleted reading, through two browsers** (D153):
+  separate Edge profiles, because two tabs share an IndexedDB and would share
+  the queue. 88,4 logged for 8 September through the calendar; the first browser
+  put offline and the same day edited to 88,9, which queued as `weight-update`,
+  pending; the second browser deleting that reading, leaving the day empty; the
+  first brought back online and drained. One question, in the section and on the
+  queued row alike, with "Släng den" and "Lägg till igen" and no retry anywhere.
+  "Lägg till igen" left one reading at 88,9, the queue clean and the question
+  gone, and the fixture was left as it was found. Shot at 360 px and desktop.
+  The queued row also named itself: before this it read
+  `queue.kind.weight-update`, its own lookup key, because two kinds had been
+  added with their endpoints and never with their strings;
 - **The scrim and the sheet's edge, in both themes** (D152): the milestone sheet
   opened at 360 px and desktop in dark and in light. Dark reports
   `rgba(15, 20, 24, 0.72)` with `blur(10px)`, light the same blur at `0.45`, and

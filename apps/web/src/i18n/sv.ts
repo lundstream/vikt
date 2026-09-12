@@ -231,10 +231,12 @@ export const sv = {
   "settings.sendNow": "Skicka nu",
   "settings.retry": "Försök igen",
   "settings.discard": "Kasta",
-  "settings.conflicts": "Samma dag från två enheter",
+  // Heading and note cover all tre fall (D153), så varje rad får säga sitt eget.
+  // "Samma dag från två enheter" var sant om ett av dem och fel om resten.
+  "settings.conflicts": "Det här väntar på ditt svar",
   "settings.conflictsNote":
-    "Den här dagen skrevs på en annan enhet innan din post hann fram. Vi har behållit " +
-    "båda så att du kan välja, i stället för att skriva över något du inte sett.",
+    "Något du loggat kunde inte skickas som det var. Vi har behållit det du skrev så " +
+    "att du kan välja, i stället för att skriva över eller slänga något du inte sett.",
   "settings.conflictTheirs": "Sparad på servern",
   "settings.conflictMine": "Din väntande post",
   // ------------------------------------------------ version och länkar (D151)
@@ -252,6 +254,12 @@ export const sv = {
     "Två vägningar skrevs för samma dag, från olika enheter. Bara en kan gälla.",
   "settings.conflictChanged":
     "Vägningen du ändrade hade hunnit ändras någon annanstans. Bara en kan gälla.",
+  // Raden en ändring pekade på är borttagen och dagen är tom (D153). Ingen
+  // krock: det finns inget att jämföra med, bara ett val att göra.
+  "settings.conflictGone":
+    "Vägningen du ändrade är borttagen, och dagen har ingen vägning alls. Det du skrev finns kvar.",
+  "settings.conflictAddAgain": "Lägg till igen",
+  "settings.conflictDropMine": "Släng den",
   "settings.conflictOther": "Okänd post",
   /* --- installera som app (D116) ------------------------------------------ */
   "install.title": "Installera som app",
@@ -278,6 +286,10 @@ export const sv = {
     "veta att en siffra saknas än en gammal siffra som ser aktuell ut.",
 
   "queue.kind.weight": "Vikt",
+  // Två rader saknades och renderade sin egen nyckel i kölistan, eftersom
+  // uppslaget castas till en nyckel och typkollen därför inte såg det (D153).
+  "queue.kind.weight-update": "Ändrad vägning",
+  "queue.kind.habit-check": "Vana",
   "queue.kind.manual-intake": "Kalorier",
   "queue.kind.food-entry": "Mat",
   "queue.kind.daily": "Dagen",
@@ -288,6 +300,7 @@ export const sv = {
   "queue.status.pending": "Väntar",
   "queue.status.failed": "Nekad av servern",
   "queue.status.conflict": "Krockar med en annan enhet",
+  "queue.status.gone": "Raden är borttagen",
   "queue.attempts": "{n} försök",
   "queue.attemptOne": "1 försök",
 

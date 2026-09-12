@@ -206,6 +206,27 @@ async function send(
     }
 
     /**
+     * The row an edit is holding is gone, and the day it was on is empty
+     * (D153).
+     *
+     * Not a refusal, and this is the distinction the generic branch below got
+     * wrong. The server has read the request and found nothing to change; it
+     * has no opinion about the reading itself, and the day is free. Marking
+     * that `failed` gave the person "Försök igen", which sends the identical
+     * PUT to the identical absent row forever, and "Kasta", which throws away a
+     * reading they took and typed. Neither is an answer to the question, and
+     * the question has an obvious second answer: put it back.
+     *
+     * So it becomes the same two-choice shape as a conflict, with one reading
+     * instead of two. Only an update can reach this: every other kind posts to
+     * a collection, where a 404 is a routing fault and not a missing row.
+     */
+    if (response.status === 404 && mutation.kind === "weight-update") {
+      await recordConflict(mutation, body, "row_gone");
+      return "conflict";
+    }
+
+    /**
      * Any other 4xx is a considered refusal: a target under the floor, a value
      * out of range. Retrying sends the identical bytes to the identical rule
      * and gets the identical answer, so it stops here and asks a person (D42).
@@ -263,9 +284,11 @@ async function reschedule(mutation: QueuedMutation, attempts: number): Promise<v
 async function recordConflict(
   mutation: QueuedMutation,
   body: { error?: string; message?: string } | null,
+  /** Given for the 404 case, where the status rather than the body says which. */
+  forced?: "row_gone",
 ): Promise<void> {
   const reason =
-    body?.error === "changed_since" ? "changed_since" : "day_already_written";
+    forced ?? (body?.error === "changed_since" ? "changed_since" : "day_already_written");
 
   await db.conflicts.add({
     kind: mutation.kind,
@@ -283,9 +306,13 @@ async function recordConflict(
     status: "conflict",
     nextAttemptAt: null,
     failure: {
-      status: 409,
-      code: body?.error ?? "conflict",
-      message: body?.message ?? "Den här dagen skrevs redan från en annan enhet.",
+      status: reason === "row_gone" ? 404 : 409,
+      code: body?.error ?? (reason === "row_gone" ? "not_found" : "conflict"),
+      message:
+        body?.message ??
+        (reason === "row_gone"
+          ? "Vägningen du ändrade finns inte längre."
+          : "Den här dagen skrevs redan från en annan enhet."),
       at: new Date().toISOString(),
     },
   });
@@ -334,7 +361,13 @@ export async function discardMutation(id: number): Promise<void> {
  * and what makes the choice safe to offer.
  */
 
-/** Keep what the server has. The waiting write is dropped. */
+/**
+ * Keep what the server has. The waiting write is dropped.
+ *
+ * Where the server has nothing — `row_gone` (D153) — this is the same act with
+ * a different name, and the page calls it "Släng den": the reading is not being
+ * overruled by another, it is simply not being put back.
+ */
 export async function keepServerReading(conflictId: number): Promise<void> {
   const row = await db.conflicts.get(conflictId);
   if (row?.mutationId !== undefined) await db.mutations.delete(row.mutationId);
@@ -352,7 +385,9 @@ export async function keepServerReading(conflictId: number): Promise<void> {
  *
  * An update is re-sent as a create for the same reason. Its baseline is stale
  * by definition, since the row is what moved; re-checking it would refuse the
- * answer the person just gave.
+ * answer the person just gave. In the `row_gone` case it is stale in the
+ * strongest sense available, because the row it named does not exist, and a
+ * create for an empty day is exactly what "put it back" means (D153).
  */
 /**
  * The same two answers, reached from the queue row rather than from the

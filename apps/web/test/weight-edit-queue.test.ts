@@ -248,3 +248,124 @@ describe("an edit whose row moved underneath it", () => {
     expect(conflicts[0]?.mutationId).toBeDefined();
   });
 });
+
+
+describe("an edit whose row was deleted while it waited", () => {
+  /**
+   * The 404 case (D153).
+   *
+   * The server answers 404 only when the row is gone **and** the day is empty;
+   * a gone row on an occupied day is `changed_since`, because a live write
+   * replaces the day rather than updating the row. So this is the one shape
+   * where nothing on the server disagrees with the waiting reading: there is
+   * simply nothing there, and putting it back is a legitimate answer.
+   *
+   * What this holds is that the queue item does not die. Before, a 404 fell
+   * into the generic 4xx branch, `status: "failed"`, and the page offered
+   * "Försök igen" — the identical PUT to the identical absent row, forever —
+   * beside "Kasta", which throws away a reading somebody took and typed.
+   */
+  async function deleted() {
+    const { impl } = answering((url) => {
+      if (url.startsWith("/api/weight/")) {
+        return {
+          status: 404,
+          body: { error: "not_found", message: "Den vägningen finns inte längre." },
+        };
+      }
+      return { status: 200, body: {} };
+    });
+
+    await enqueue({
+      kind: "weight-update",
+      timezone: TZ,
+      localDate: "2026-08-24",
+      body: {
+        id: "row-1",
+        localDate: "2026-08-24",
+        baselineWeightKg: 110,
+        weightKg: 110.1,
+        fromQueue: true,
+      },
+    });
+
+    await drainQueue(impl);
+  }
+
+  it("asks the question instead of failing", async () => {
+    await deleted();
+
+    const conflicts = await db.conflicts.toArray();
+    expect(conflicts, "a deleted row recorded no question").toHaveLength(1);
+    expect(conflicts[0]?.reason).toBe("row_gone");
+    expect(conflicts[0]?.mine).toMatchObject({ weightKg: 110.1 });
+    // Nothing on the server, which is a fact rather than a missing value: the
+    // page shows one reading because there is one.
+    expect(conflicts[0]?.theirs).toEqual({});
+    expect(conflicts[0]?.mutationId).toBeDefined();
+
+    const mutations = await db.mutations.toArray();
+    expect(mutations).toHaveLength(1);
+    expect(mutations[0]?.status, "the queued edit was marked failed").toBe("conflict");
+    // 404 rather than 409 on the row, which is what lets the inspector say
+    // "Raden är borttagen" instead of naming a device that was not involved.
+    expect(mutations[0]?.failure?.status).toBe(404);
+    expect(mutations[0]?.failure?.code).toBe("not_found");
+  });
+
+  /**
+   * Answer one: put it back. A create for a day that is now empty, sent live
+   * and without `fromQueue`, exactly as the other two resolutions are.
+   */
+  it("adding it again posts the reading for that day", async () => {
+    await deleted();
+    const conflict = (await db.conflicts.toArray())[0]!;
+
+    const { impl, calls } = answering(() => ({ status: 200, body: {} }));
+    await applyQueuedReading(conflict.id!, impl);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.url).toBe("/api/weight");
+    expect(calls[0]?.body).toMatchObject({ localDate: "2026-08-24", weightKg: 110.1 });
+    // The id it was holding is gone, and so is the baseline that named it.
+    // Sending either would address a row that does not exist.
+    expect(calls[0]?.body).not.toHaveProperty("id");
+    expect(calls[0]?.body).not.toHaveProperty("baselineWeightKg");
+    expect(calls[0]?.body).not.toHaveProperty("fromQueue");
+
+    expect(await db.mutations.count()).toBe(0);
+    expect((await db.conflicts.get(conflict.id!))?.resolvedAt).not.toBeNull();
+  });
+
+  /** Answer two: leave it deleted. The waiting edit goes, and nothing is sent. */
+  it("discarding it leaves nothing waiting", async () => {
+    await deleted();
+    const conflict = (await db.conflicts.toArray())[0]!;
+
+    await keepServerReading(conflict.id!);
+
+    expect(await db.mutations.count()).toBe(0);
+    expect((await db.conflicts.get(conflict.id!))?.resolvedAt).not.toBeNull();
+  });
+
+  /**
+   * A 404 on anything else is still a refusal. Only an update addresses a row;
+   * every other kind posts to a collection, where a 404 is a routing fault and
+   * a question about which reading to keep would be nonsense.
+   */
+  it("leaves a 404 on a create as a refusal", async () => {
+    const { impl } = answering(() => ({ status: 404, body: { error: "not_found" } }));
+
+    await enqueue({
+      kind: "weight",
+      timezone: TZ,
+      localDate: "2026-08-24",
+      body: { localDate: "2026-08-24", weightKg: 108.2, fromQueue: true },
+    });
+    await drainQueue(impl);
+
+    expect(await db.conflicts.count()).toBe(0);
+    expect((await db.mutations.toArray())[0]?.status).toBe("failed");
+  });
+});

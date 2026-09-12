@@ -177,7 +177,40 @@ describe("editing a reading", () => {
     });
 
     expect(response.statusCode).toBe(404);
+    expect(response.json<{ error: string }>().error).toBe("not_found");
     expect(await readings(app, user)).toHaveLength(0);
+  });
+
+  /**
+   * The other half of the 404, which is what the client does with it (D153).
+   *
+   * A queued edit that meets a deleted row on an empty day is offered back to
+   * the person as "put it back", and putting it back is a plain create for that
+   * day. Held here because the answer only works if the day really is free:
+   * the whole reason this is a 404 rather than a 409 is that nothing occupies
+   * it, and a create that collided would make the offer a lie.
+   */
+  it("takes the reading again for the day the deleted row was on", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    const entry = await logOne(app, user, 110.0, localDate(-20));
+
+    await app.inject({
+      method: "DELETE",
+      url: `/api/weight/${entry.id}`,
+      headers: auth(user),
+    });
+
+    const again = await post(app, user, {
+      clientUuid: randomUUID(),
+      localDate: localDate(-20),
+      weightKg: 110.1,
+    });
+
+    expect(again.statusCode).toBe(200);
+    const rows = await readings(app, user);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.weightKg).toBe(110.1);
   });
 
   /** Scoped by user id as well as row id, like every other write (§3). */

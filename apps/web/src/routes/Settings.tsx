@@ -78,13 +78,24 @@ export function Settings() {
                   looked at in the first place.
                 */}
                 <p className="mt-1 max-w-prose text-micro text-muted">
-                  {row.reason === "changed_since"
-                    ? t("settings.conflictChanged")
-                    : t("settings.conflictSameDay")}
+                  {row.reason === "row_gone"
+                    ? t("settings.conflictGone")
+                    : row.reason === "changed_since"
+                      ? t("settings.conflictChanged")
+                      : t("settings.conflictSameDay")}
                 </p>
+                {/*
+                  One reading rather than two when the other one is gone (D153).
+                  A "Sparad på servern" line over an empty object would render
+                  "Okänd post" and invite a comparison with nothing.
+                */}
                 <dl className="num mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-micro text-muted">
-                  <dt>{t("settings.conflictTheirs")}</dt>
-                  <dd className="text-right text-ink">{describe(row.theirs)}</dd>
+                  {row.reason === "row_gone" ? null : (
+                    <>
+                      <dt>{t("settings.conflictTheirs")}</dt>
+                      <dd className="text-right text-ink">{describe(row.theirs)}</dd>
+                    </>
+                  )}
                   <dt>{t("settings.conflictMine")}</dt>
                   <dd className="text-right text-ink">{describe(row.mine)}</dd>
                 </dl>
@@ -104,7 +115,9 @@ export function Settings() {
                     className="btn w-auto px-4"
                     onClick={() => void keepServerReading(row.id!)}
                   >
-                    {t("settings.conflictKeepTheirs")}
+                    {row.reason === "row_gone"
+                      ? t("settings.conflictDropMine")
+                      : t("settings.conflictKeepTheirs")}
                   </button>
                   <button
                     type="button"
@@ -112,7 +125,9 @@ export function Settings() {
                     className="btn w-auto px-4"
                     onClick={() => void applyQueuedReading(row.id!)}
                   >
-                    {t("settings.conflictUseMine")}
+                    {row.reason === "row_gone"
+                      ? t("settings.conflictAddAgain")
+                      : t("settings.conflictUseMine")}
                   </button>
                 </div>
               </li>
@@ -174,7 +189,15 @@ export function Settings() {
                 </div>
 
                 <p className="num mt-1 text-micro text-muted">
-                  {t(`queue.status.${row.status}` as TranslationKey)}
+                  {/*
+                    A deleted row is not a clash (D153). The status is stored as
+                    `conflict` because the shape it needs is the conflict's, but
+                    "krockar med en annan enhet" would name a device that had
+                    nothing to do with it.
+                  */}
+                  {row.status === "conflict" && row.failure?.status === 404
+                    ? t("queue.status.gone")
+                    : t(`queue.status.${row.status}` as TranslationKey)}
                   {row.attempts > 0
                     ? ` · ${plural(row.attempts, "queue.attemptOne", "queue.attempts", {
                         n: formatDecimal(row.attempts, { decimals: 0 }),
@@ -209,7 +232,9 @@ export function Settings() {
                       className="btn w-auto px-4"
                       onClick={() => void keepServerForMutation(row.id!)}
                     >
-                      {t("settings.conflictKeepTheirs")}
+                      {row.failure?.status === 404
+                        ? t("settings.conflictDropMine")
+                        : t("settings.conflictKeepTheirs")}
                     </button>
                     <button
                       type="button"
@@ -217,7 +242,9 @@ export function Settings() {
                       className="btn w-auto px-4"
                       onClick={() => void applyQueuedForMutation(row.id!)}
                     >
-                      {t("settings.conflictUseMine")}
+                      {row.failure?.status === 404
+                        ? t("settings.conflictAddAgain")
+                        : t("settings.conflictUseMine")}
                     </button>
                   </div>
                 ) : row.status !== "pending" ? (

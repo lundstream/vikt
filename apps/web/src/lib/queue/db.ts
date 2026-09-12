@@ -116,20 +116,32 @@ export type QueueConflict = {
   localDate: string;
   /** What this device had queued. */
   mine: Record<string, unknown>;
-  /** What the server had when the queued row arrived. */
+  /**
+   * What the server had when the queued row arrived.
+   *
+   * Empty where the server had nothing, which is the `row_gone` case and is a
+   * fact rather than a missing value: the page shows one reading instead of
+   * two because there is one.
+   */
   theirs: Record<string, unknown>;
   /**
-   * Which kind of collision this is (D150).
+   * Which kind of collision this is (D150, D153).
    *
    * `day_already_written` is two creates for one day, which is what the page
    * has always said. `changed_since` is an edit whose row moved underneath it.
+   * `row_gone` is an edit whose row was **deleted** while it waited, on a day
+   * that is now empty, which is not a collision at all: nothing on the server
+   * disagrees with it, there is simply nothing there. It is here because the
+   * shape a person needs is the same one, two answers and a choice, and the
+   * alternative was the queue row dying with a refusal it could not act on.
+   *
    * They read differently and are resolved the same way, so the reason picks
-   * the sentence and nothing else.
+   * the sentences and the button labels and nothing else.
    *
    * Optional, and defaulted on read: rows written before this field existed
    * were all the first kind, because it was the only kind there was.
    */
-  reason?: "day_already_written" | "changed_since";
+  reason?: "day_already_written" | "changed_since" | "row_gone";
   /**
    * The queued row this conflict came from, so "use the waiting one" can find
    * it. Without it the resolution had nothing to send and the only offer the

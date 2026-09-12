@@ -7099,3 +7099,68 @@ is a second answer to a question already answered.
 Shot in both themes at 360 px and desktop. Dark: scrim
 `rgba(15, 20, 24, 0.72)`, `blur(10px)`, focus on `#ms-label`, no border and no
 ring on the panel. Light: the same with `0.45`.
+
+### D153 — A deleted row is a question, not a refusal
+
+*2026-09-13.*
+
+D150 gave an edit its own queue operation and three outcomes, and then treated
+one of them as a dead end. A queued `weight-update` whose row had been deleted
+came back 404, fell into the generic 4xx branch, and was marked `failed`. The
+page then offered the two controls a refusal gets: **"Försök igen"**, which
+sends the identical PUT to the identical absent row and will do so forever, and
+**"Kasta"**, which throws away a reading somebody took and typed.
+
+Neither is an answer, and the obvious second answer was sitting right there. The
+server answers 404 only when the row is gone **and** the day is empty — a gone
+row on an occupied day is `changed_since`, because a live write replaces the day
+rather than updating the row — so in this one case *nothing on the server
+disagrees with the waiting reading*. There is simply nothing there. Putting it
+back is a plain create for a free day.
+
+So it becomes the conflict's shape with one reading instead of two: `row_gone`,
+recorded as a question, resolved by the same two functions the other two
+collisions use. "Lägg till igen" is `applyQueuedReading`, which already strips
+`id` and `baselineWeightKg` and posts live; both of those name a row that does
+not exist, and sending either would address it.
+
+**It is not called a conflict on screen**, because it is not one. The queued row
+says "Raden är borttagen" rather than "Krockar med en annan enhet", which would
+name a device that had nothing to do with it, and the comparison shows one side
+rather than a "Sparad på servern" line over an empty object rendering "Okänd
+post". The section heading moved too: "Samma dag från två enheter" was true of
+one of the three cases and false of the rest, so the heading and its note say
+what all three have in common — something you logged could not be sent as it
+was, and both it and the choice are still here — and each row says which it is.
+
+Only an update can reach this. Every other kind posts to a collection, where a
+404 is a routing fault and a question about which reading to keep would be
+nonsense, so the branch is keyed on the kind and a 404 on a create is still a
+refusal.
+
+#### Two labels that were never written
+
+The inspector reads ``t(`queue.kind.${row.kind}`)`` through a cast, so the
+compiler checks nothing, and `weight-update` and `habit-check` had been added
+with their endpoints and never with their strings. The queue listed
+`queue.kind.weight-update` to anybody who opened it while an edit was waiting,
+which is exactly the screen this change sends them to. Both written, and a guard
+added over `ENDPOINTS`, which is the runtime list of every kind there is.
+
+#### Exercised with two browsers
+
+Two Edge processes with separate profiles, because two tabs share an IndexedDB
+and would share the queue. A reading logged for 8 September through the calendar
+at 88,4; the first browser put offline and the same day edited to 88,9, which
+queued as `weight-update`, pending; the second browser deleting that reading,
+leaving the day empty; the first brought back online and drained.
+
+One question, in both places, with **"Släng den"** and **"Lägg till igen"** and
+no retry anywhere. "Lägg till igen" left one reading at 88,9 on 8 September, the
+queue clean and the question gone. Shot at 360 px and desktop.
+
+One thing the interface showed that the tests could not: **a navigation while
+offline lands on the browser's error page, where the origin is gone and
+IndexedDB is denied**. That is a property of the probe rather than of the app —
+the app itself never navigates there — but it is why the offline half of this
+exercise stays on one page and drives the calendar rather than reloading it.
