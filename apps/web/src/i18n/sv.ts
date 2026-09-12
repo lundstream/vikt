@@ -237,7 +237,14 @@ export const sv = {
     "båda så att du kan välja, i stället för att skriva över något du inte sett.",
   "settings.conflictTheirs": "Sparad på servern",
   "settings.conflictMine": "Din väntande post",
-  "settings.conflictKeepTheirs": "Behåll den som redan finns",
+  "settings.conflictKeepTheirs": "Behåll den sparade",
+  "settings.conflictUseMine": "Använd den väntande",
+  // Which collision it is (D150). Two creates for one day is one thing; an
+  // edit whose rad ändrades under tiden är en annan.
+  "settings.conflictSameDay":
+    "Två vägningar skrevs för samma dag, från olika enheter. Bara en kan gälla.",
+  "settings.conflictChanged":
+    "Vägningen du ändrade hade hunnit ändras någon annanstans. Bara en kan gälla.",
   "settings.conflictOther": "Okänd post",
   /* --- installera som app (D116) ------------------------------------------ */
   "install.title": "Installera som app",

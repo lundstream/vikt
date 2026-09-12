@@ -89,6 +89,55 @@ export const createWeightEntrySchema = z.object({
 });
 export type CreateWeightEntry = z.infer<typeof createWeightEntrySchema>;
 
+/**
+ * Changing a reading that already exists (D150).
+ *
+ * A separate operation from creating one, and that is the whole point. Editing
+ * 24 August from 110,0 to 110,1 used to enqueue a **create** with a fresh
+ * `clientUuid`; the server saw a queued write for a day another uuid already
+ * held, applied D41's rule correctly, and reported "two devices wrote this
+ * day" about one device editing its own reading. The message was right about
+ * the rule and wrong about the world, and no wording could have fixed that: the
+ * request did not say what it was.
+ *
+ * So an update carries the row it means and **what the client saw when it
+ * opened**. The server applies it when the row still holds that value and
+ * refuses only when it does not, which is the one case where somebody's change
+ * would be silently thrown away.
+ */
+export const updateWeightEntrySchema = z.object({
+  /** The row being changed. Scoped to the user by the service, as always. */
+  id: z.string().uuid(),
+  /**
+   * The weight the client had on screen before the edit.
+   *
+   * The conflict baseline, and deliberately the *value* rather than a version
+   * column or a timestamp. What matters to the person is whether the number
+   * they were looking at is still the number stored; a row rewritten to the
+   * same weight by another device is not a conflict worth asking about.
+   */
+  baselineWeightKg: weightKgSchema,
+  weightKg: weightKgSchema,
+  bodyFatPct: z.number().min(1).max(75).nullish(),
+  note: z.string().trim().max(500).nullish(),
+  /**
+   * The day the reading should end up on. Usually unchanged; the edit sheet
+   * lets it move, and moving onto a day that already has a reading is a real
+   * same-day clash rather than a stale baseline.
+   */
+  localDate: localDateSchema,
+  /** Where `localDate` came from (D61). Checked, never stored. */
+  dateSource: dateSourceSchema.optional(),
+  /**
+   * Kept so a queued update is idempotent on replay like every other write
+   * (§3). It is **not** used to find the row: `id` does that.
+   */
+  clientUuid: clientUuidSchema,
+  /** Set by the queue, never by a live write. See the create schema. */
+  fromQueue: z.boolean().optional(),
+});
+export type UpdateWeightEntry = z.infer<typeof updateWeightEntrySchema>;
+
 export const weightEntrySchema = z.object({
   id: z.string().uuid(),
   clientUuid: clientUuidSchema,

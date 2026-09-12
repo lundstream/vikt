@@ -28,6 +28,7 @@ import type {
   MeasurementList,
   CreateManualIntake,
   CreateWeightEntry,
+  UpdateWeightEntry,
   DateRangeQuery,
   ErrorResponse,
   InsightsResponse,
@@ -145,6 +146,17 @@ export const api = {
    * and entirely the user's, and an "are you sure" on a mistyped weight is
    * friction on the recovery path rather than on the destructive one.
    */
+  /**
+   * Changing a reading that exists (D150). A PUT to the row, carrying the value
+   * the client had on screen, so the server can tell an edit from a second
+   * device's opinion.
+   */
+  updateWeight: (id: string, input: UpdateWeightEntry) =>
+    request<WeightEntry>(`/weight/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
   deleteWeight: (id: string) =>
     request<void>(`/weight/${encodeURIComponent(id)}`, { method: "DELETE" }),
 

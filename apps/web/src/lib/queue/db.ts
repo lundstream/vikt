@@ -70,6 +70,13 @@ export type DateSource = "device" | "chosen";
 
 export type MutationKind =
   | "weight"
+  /**
+   * Changing a reading that exists (D150). A separate kind from `weight`, not a
+   * flag on it, because it is a different request to a different endpoint with
+   * a different failure: a create can collide with another device's day, an
+   * update can only collide with the row moving under it.
+   */
+  | "weight-update"
   | "manual-intake"
   | "food-entry"
   | "daily"
@@ -111,6 +118,24 @@ export type QueueConflict = {
   mine: Record<string, unknown>;
   /** What the server had when the queued row arrived. */
   theirs: Record<string, unknown>;
+  /**
+   * Which kind of collision this is (D150).
+   *
+   * `day_already_written` is two creates for one day, which is what the page
+   * has always said. `changed_since` is an edit whose row moved underneath it.
+   * They read differently and are resolved the same way, so the reason picks
+   * the sentence and nothing else.
+   *
+   * Optional, and defaulted on read: rows written before this field existed
+   * were all the first kind, because it was the only kind there was.
+   */
+  reason?: "day_already_written" | "changed_since";
+  /**
+   * The queued row this conflict came from, so "use the waiting one" can find
+   * it. Without it the resolution had nothing to send and the only offer the
+   * page could make was to give up (D150).
+   */
+  mutationId?: number;
   createdAt: string;
   /** Cleared when the user has chosen. Never auto-resolved. */
   resolvedAt: string | null;

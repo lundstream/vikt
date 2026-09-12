@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { createWeightEntrySchema, formatForInput } from "shared";
+import type { CreateWeightEntry, UpdateWeightEntry } from "shared";
+import { createWeightEntrySchema, formatForInput, updateWeightEntrySchema } from "shared";
 import { ApiError } from "../lib/api.js";
 import {
   useDeleteManualIntake,
@@ -7,6 +8,7 @@ import {
   useManualIntakeLog,
   useSaveManualIntake,
   useSaveWeight,
+  useUpdateWeight,
 } from "../lib/log.js";
 import { describeDay, formatLongDay } from "../lib/dates.js";
 import { clientUuid } from "../lib/uuid.js";
@@ -58,8 +60,10 @@ export type QuickLogSheetProps = {
   /**
    * The reading being edited, when there is one.
    *
-   * Its only job is to put a delete on the screen that shows the row (§3, D56).
-   * Saving is an upsert on the day either way, so an edit needs no id.
+   * Two jobs now (D150): it puts a delete on the screen that shows the row
+   * (§3, D56), and it makes the save an **update** to that row rather than a
+   * create for its day. `weightKg` above is the baseline that travels with it,
+   * so the server can tell an edit arriving late from two devices disagreeing.
    */
   entryId?: string | null;
 };
@@ -78,6 +82,7 @@ export function QuickLogSheet({
   // The zone matters: it decides which day an entry belongs to (D39), and the
   // queue stamps that at creation rather than at send time.
   const saveWeight = useSaveWeight(timezone);
+  const updateWeight = useUpdateWeight(timezone);
   const saveIntake = useSaveManualIntake(timezone);
   const deleteIntake = useDeleteManualIntake();
   const manualLog = useManualIntakeLog();
@@ -105,6 +110,15 @@ export function QuickLogSheet({
 
   const weightInput = useRef<HTMLInputElement>(null);
   const wasOpen = useRef(false);
+  /**
+   * The weight the row held when this sheet opened (D150).
+   *
+   * A ref rather than state, and captured on open rather than read at submit:
+   * the baseline is what the **person saw**, and reading the prop at submit
+   * would pick up a background refetch that landed while they were typing,
+   * which is exactly the change the baseline exists to notice.
+   */
+  const baselineRef = useRef<number | null>(null);
 
   /**
    * Reset and focus on the closed -> open transition only. Reacting to the
@@ -117,6 +131,7 @@ export function QuickLogSheet({
     if (!justOpened) return;
 
     const openOn = date ?? today;
+    baselineRef.current = seedWeightKg ?? null;
     setWeightKg(formatForInput(seedWeightKg === undefined ? lastWeightKg : seedWeightKg));
     /**
      * The intake for the day being opened, not for today (D145).
@@ -135,6 +150,7 @@ export function QuickLogSheet({
     setErrors({});
     setSaved(false);
     saveWeight.reset();
+    updateWeight.reset();
     saveIntake.reset();
 
     // A frame's delay: focusing before the sheet is laid out loses the keypad
@@ -144,7 +160,8 @@ export function QuickLogSheet({
       weightInput.current?.select();
     });
     return () => cancelAnimationFrame(raf);
-  }, [open, today, date, seedWeightKg, lastWeightKg, todayIntakeKcal, manualLog.data, saveWeight, saveIntake]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see the guard above
+  }, [open, today, date, seedWeightKg, lastWeightKg, todayIntakeKcal, manualLog.data]);
 
   useEffect(() => {
     if (!open) return;
@@ -168,11 +185,34 @@ export function QuickLogSheet({
       return;
     }
 
-    const parsed = createWeightEntrySchema.safeParse({
-      clientUuid: clientUuid(),
-      localDate,
-      weightKg: weight.value,
-    });
+    /**
+     * A create or an update, and which one is a property of the sheet (D150).
+     *
+     * Opened on a day that already has a reading, this is an **edit**: it
+     * carries that row's id and the weight that was on screen when it opened,
+     * so the server can tell it from another device's opinion about the same
+     * day. Opened on an empty day, or from the quick action, it is a create.
+     *
+     * This used to always be a create with a fresh `clientUuid`, which is why
+     * editing 24 August produced "two devices wrote this day" and a queued row
+     * whose retry could never succeed.
+     */
+    const baseline = baselineRef.current;
+    const editing = entryId !== null && baseline !== null;
+
+    const parsed = editing
+      ? updateWeightEntrySchema.safeParse({
+          id: entryId,
+          clientUuid: clientUuid(),
+          localDate,
+          baselineWeightKg: baseline,
+          weightKg: weight.value,
+        })
+      : createWeightEntrySchema.safeParse({
+          clientUuid: clientUuid(),
+          localDate,
+          weightKg: weight.value,
+        });
 
     if (!parsed.success) {
       setErrors(fieldErrorsFrom(parsed.error.issues));
@@ -191,7 +231,11 @@ export function QuickLogSheet({
     }
 
     try {
-      await saveWeight.mutateAsync(parsed.data);
+      if (editing) {
+        await updateWeight.mutateAsync(parsed.data as UpdateWeightEntry);
+      } else {
+        await saveWeight.mutateAsync(parsed.data as CreateWeightEntry);
+      }
       if (kcalValue !== null) {
         await saveIntake.mutateAsync({
           clientUuid: clientUuid(),
@@ -207,16 +251,17 @@ export function QuickLogSheet({
     }
   }
 
+  const writeError = saveWeight.error ?? updateWeight.error;
   const submitError =
-    saveWeight.error instanceof ApiError
-      ? saveWeight.error.message
+    writeError instanceof ApiError
+      ? writeError.message
       : saveIntake.error instanceof ApiError
         ? saveIntake.error.message
-        : saveWeight.error || saveIntake.error
+        : writeError || saveIntake.error
           ? t("quick.unreachable")
           : null;
 
-  const pending = saveWeight.isPending || saveIntake.isPending;
+  const pending = saveWeight.isPending || updateWeight.isPending || saveIntake.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">

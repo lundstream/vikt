@@ -6862,3 +6862,97 @@ a silent-success reading that is wrong:
 
 A runbook that said "check the log looks fine" would be worth nothing. The value
 is in saying which silences are expected.
+
+### D150 — An edit is not a second opinion, and a conflict has two answers
+
+*2026-09-13.*
+
+Editing 24 August from 110,0 to 110,1 through the month calendar produced
+**"Samma dag från två enheter"** under Inställningar, and a queued row whose
+"Försök igen" could never succeed. One device, one reading, one person changing
+their own number.
+
+Nothing was wrong with the rule. `weight_log` is unique on
+`(user_id, local_date)`, and D41 says a queued write must not silently replace a
+day another device wrote, because it was composed before that day existed. The
+server applied that correctly. What was wrong is that **the request could not
+say what it was**: the edit sheet enqueued a *create* with a fresh
+`clientUuid`, so an edit and a second device's opinion arrived as the same bytes
+and the server had nothing to tell them apart by.
+
+So the fix is the model, not the message. A message can only be as true as the
+request it describes.
+
+#### Two operations, because there are two things
+
+- **create** — there is a reading for this day. Unchanged, and still refused
+  from the queue when the day is taken (D41).
+- **update** — this row is wrong. It carries the row's `id` and
+  `baselineWeightKg`, **the value the client had on screen when the sheet
+  opened**, and goes to `PUT /weight/:id`.
+
+The server applies an update while the row still holds that baseline, whether it
+came from the queue or not. A queued edit replaying against an unchanged row is
+the edit arriving late, not a collision, and that is the assertion the old model
+could not make.
+
+Three details that are decisions rather than plumbing:
+
+**The baseline is the value, not a version column or a timestamp.** What matters
+to the person is whether the number they were looking at is still stored. A row
+rewritten to the same weight by another device is not a question worth asking.
+
+**It is captured when the sheet opens, in a ref.** Reading the prop at submit
+would pick up a background refetch that landed while somebody was typing —
+exactly the change the baseline exists to notice.
+
+**A row that has vanished is usually not a deletion.** A live write from another
+device *replaces* the day: `deleteWeightForDayExcept` removes the old uuid and
+inserts a new one. So the id an edit holds disappears in precisely the case the
+person most needs told about. A bare 404 would say "that reading does not exist"
+about a day that plainly has one, so a missing row with an occupied day is
+`changed_since` and only an empty day is a 404.
+
+Moving a reading onto a day that already has one keeps D41's own code and
+message. That is the remaining same-day clash, and now it is the **only** thing
+that produces that sentence: the page is true again because the model is.
+
+#### A conflict is a question, so it has two answers
+
+The section offered one control: "Behåll den som redan finns". That is the shape
+of a dialog where the other answer is really "go away", and it is not what D41
+promises — "nothing is discarded, the user chooses in the inspector" reads
+oddly next to a single button that discards.
+
+Two filled buttons of the same tier, neither styled as the way out:
+
+- **Behåll den sparade** drops the waiting write and settles the question;
+- **Använd den väntande** sends it **live**, without `fromQueue`. That is the
+  whole point of the resolution: D41 refuses a queued write for an occupied day
+  because it was composed before that day existed, and once a person has looked
+  at both and chosen, it is a decision made now.
+
+Either one leaves exactly one row, which `(user_id, local_date)` guarantees and
+which is what makes the choice safe to offer.
+
+**A conflicted queue row shows the same two choices**, not "Försök igen".
+Retrying a conflict sends identical bytes to an identical rule and gets an
+identical answer; the control could never work, and offering it made the page
+look like the fault was the network's. The inspector lists the mutation and the
+section above lists the question, and they are the same conflict seen from two
+places, so either one settles it.
+
+The conflict row also records **which kind** it is, so an edit whose row moved
+does not get told two devices wrote the day.
+
+#### Exercised
+
+Through the calendar, against the development API, at 360 px and desktop: 25
+August edited from 90,1 to 90,2, the server holding 90,2 afterwards, and
+Inställningar reading **"Allt är skickat"** with no conflict and nothing queued.
+
+Then a real conflict, made the way one happens: the browser put offline, a
+reading logged for an empty 24 August through the calendar so it sat in the
+queue, another device writing that day while it waited, and the queue drained.
+One question, both readings shown, two buttons, and the queue row carrying the
+same two. Settling it with the waiting reading left **one row at 91,5**.

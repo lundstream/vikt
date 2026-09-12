@@ -27,6 +27,8 @@ import { db, type MutationKind, type QueuedMutation } from "./db.js";
 
 export const ENDPOINTS: Record<MutationKind, string> = {
   weight: "/weight",
+  // The row's own id goes in the path; see `requestFor` below.
+  "weight-update": "/weight",
   "manual-intake": "/manual-intake",
   "food-entry": "/food-entry",
   daily: "/daily",
@@ -135,15 +137,36 @@ export async function drainQueue(
 
 type Outcome = "sent" | "retry" | "failed" | "conflict";
 
+/**
+ * Where a queued mutation is sent, and how (D150).
+ *
+ * Every kind but one is a POST to a fixed path, which is why this was a lookup
+ * table. An update addresses a row, so it is a PUT to that row: the path is the
+ * authority on which reading is being changed, and a body that disagreed could
+ * not reach a different one.
+ */
+export function requestFor(mutation: {
+  kind: MutationKind;
+  body: Record<string, unknown>;
+}): { url: string; method: "POST" | "PUT" } {
+  if (mutation.kind === "weight-update") {
+    const id = String(mutation.body.id ?? "");
+    return { url: `/api/weight/${encodeURIComponent(id)}`, method: "PUT" };
+  }
+  return { url: `/api${ENDPOINTS[mutation.kind]}`, method: "POST" };
+}
+
 async function send(
   mutation: QueuedMutation,
   fetchImpl: typeof fetch,
 ): Promise<Outcome> {
   const attempts = mutation.attempts + 1;
 
+  const target = requestFor(mutation);
+
   try {
-    const response = await fetchImpl(`/api${ENDPOINTS[mutation.kind]}`, {
-      method: "POST",
+    const response = await fetchImpl(target.url, {
+      method: target.method,
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(mutation.body),
@@ -172,9 +195,10 @@ async function send(
     } | null;
 
     /**
-     * 409 is the day already written by another device (D41). Recorded as a
-     * conflict for the user to settle, not silently dropped and not silently
-     * applied over the top.
+     * 409 is a collision a person has to settle (D41, D150). Two kinds now: two
+     * creates for one day, and an edit whose row moved underneath it. Recorded
+     * rather than dropped and rather than applied over the top, with which kind
+     * it was, because the two read differently on the page.
      */
     if (response.status === 409) {
       await recordConflict(mutation, body);
@@ -240,11 +264,17 @@ async function recordConflict(
   mutation: QueuedMutation,
   body: { error?: string; message?: string } | null,
 ): Promise<void> {
+  const reason =
+    body?.error === "changed_since" ? "changed_since" : "day_already_written";
+
   await db.conflicts.add({
     kind: mutation.kind,
     localDate: mutation.localDate,
     mine: mutation.body,
     theirs: (body as { existing?: Record<string, unknown> } | null)?.existing ?? {},
+    reason,
+    // So "use the waiting one" has something to send (D150).
+    mutationId: mutation.id,
     createdAt: new Date().toISOString(),
     resolvedAt: null,
   });
@@ -288,4 +318,96 @@ export async function retryMutation(id: number): Promise<void> {
 /** Discard an entry the user has decided against. Their call, never automatic. */
 export async function discardMutation(id: number): Promise<void> {
   await db.mutations.delete(id);
+}
+
+/* ------------------------------------------------ settling a conflict (D150) */
+
+/**
+ * Two resolutions, and they are equals.
+ *
+ * The page offered one: "Behåll den som redan finns", which is the shape of a
+ * dialog where one answer is really "go away". A conflict is a question with
+ * two answers — the reading on the server, or the one waiting on this device —
+ * and the person is the only one who knows which is right.
+ *
+ * Both leave exactly one row, which is what `(user_id, local_date)` guarantees
+ * and what makes the choice safe to offer.
+ */
+
+/** Keep what the server has. The waiting write is dropped. */
+export async function keepServerReading(conflictId: number): Promise<void> {
+  const row = await db.conflicts.get(conflictId);
+  if (row?.mutationId !== undefined) await db.mutations.delete(row.mutationId);
+  await db.conflicts.update(conflictId, { resolvedAt: new Date().toISOString() });
+}
+
+/**
+ * Use the one waiting on this device.
+ *
+ * Sent **live**, without `fromQueue`, which is the whole point: D41 refuses a
+ * queued write for an occupied day precisely because it was composed before
+ * that day existed. Once a person has looked at both and chosen, it is no
+ * longer a write from the past — it is a decision made now, and a live write
+ * replaces the day.
+ *
+ * An update is re-sent as a create for the same reason. Its baseline is stale
+ * by definition, since the row is what moved; re-checking it would refuse the
+ * answer the person just gave.
+ */
+/**
+ * The same two answers, reached from the queue row rather than from the
+ * conflict row (D150).
+ *
+ * They are the same conflict seen from two places: the inspector lists the
+ * mutation, the section above lists the question. A person standing at either
+ * one should be able to settle it without hunting for the other.
+ */
+export async function keepServerForMutation(mutationId: number): Promise<void> {
+  const row = await db.conflicts.filter((c) => c.mutationId === mutationId).first();
+  if (row?.id !== undefined) return keepServerReading(row.id);
+
+  // A conflicted mutation with no recorded question: nothing to compare, so
+  // keeping the server's is simply dropping this one.
+  await db.mutations.delete(mutationId);
+}
+
+export async function applyQueuedForMutation(
+  mutationId: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const row = await db.conflicts.filter((c) => c.mutationId === mutationId).first();
+  if (row?.id !== undefined) return applyQueuedReading(row.id, fetchImpl);
+}
+
+export async function applyQueuedReading(
+  conflictId: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const row = await db.conflicts.get(conflictId);
+  if (!row) return;
+
+  const { fromQueue: _fromQueue, id: _id, baselineWeightKg: _baseline, ...body } = row.mine as {
+    fromQueue?: boolean;
+    id?: string;
+    baselineWeightKg?: number;
+    [key: string]: unknown;
+  };
+
+  const response = await fetchImpl("/api/weight", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      "conflict_unresolved",
+      "Kunde inte spara den väntande vägningen. Försök igen när du har täckning.",
+    );
+  }
+
+  if (row.mutationId !== undefined) await db.mutations.delete(row.mutationId);
+  await db.conflicts.update(conflictId, { resolvedAt: new Date().toISOString() });
 }

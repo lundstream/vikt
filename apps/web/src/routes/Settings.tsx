@@ -5,8 +5,15 @@ import {
   useQueueState,
   useUnresolvedConflicts,
 } from "../lib/queue/useQueue.js";
-import { db } from "../lib/queue/db.js";
-import { discardMutation, drainQueue, retryMutation } from "../lib/queue/sync.js";
+import {
+  discardMutation,
+  drainQueue,
+  keepServerForMutation,
+  keepServerReading,
+  retryMutation,
+  applyQueuedForMutation,
+  applyQueuedReading,
+} from "../lib/queue/sync.js";
 import { queueDegraded } from "../lib/queue/enqueue.js";
 import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
@@ -62,24 +69,51 @@ export function Settings() {
             {conflicts.map((row) => (
               <li key={row.id} className="py-3">
                 <p className="text-note text-ink">{formatLongDay(row.localDate, LOCALE)}</p>
+                {/*
+                  Which collision this is (D150). Two creates for one day is the
+                  case this section was written for; an edit whose row moved
+                  underneath it is the other, and saying "two devices" about a
+                  person editing their own reading is how this page came to be
+                  looked at in the first place.
+                */}
+                <p className="mt-1 max-w-prose text-micro text-muted">
+                  {row.reason === "changed_since"
+                    ? t("settings.conflictChanged")
+                    : t("settings.conflictSameDay")}
+                </p>
                 <dl className="num mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-micro text-muted">
                   <dt>{t("settings.conflictTheirs")}</dt>
                   <dd className="text-right text-ink">{describe(row.theirs)}</dd>
                   <dt>{t("settings.conflictMine")}</dt>
                   <dd className="text-right text-ink">{describe(row.mine)}</dd>
                 </dl>
-                <button
-                  type="button"
-                  data-testid={`resolve-${row.id}`}
-                  className="mt-2 px-2 py-2 text-micro text-ink underline underline-offset-4"
-                  onClick={() =>
-                    void db.conflicts.update(row.id!, {
-                      resolvedAt: new Date().toISOString(),
-                    })
-                  }
-                >
-                  {t("settings.conflictKeepTheirs")}
-                </button>
+                {/*
+                  Two answers, and they are equals (D150).
+
+                  This offered one, "Behåll den som redan finns", which is the
+                  shape of a dialog where the other answer is really "go away".
+                  A conflict is a question with two answers and the person is
+                  the only one who knows which is right, so both are filled
+                  buttons of the same tier and neither is styled as the way out.
+                */}
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    data-testid={`keep-server-${row.id}`}
+                    className="btn w-auto px-4"
+                    onClick={() => void keepServerReading(row.id!)}
+                  >
+                    {t("settings.conflictKeepTheirs")}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`use-mine-${row.id}`}
+                    className="btn w-auto px-4"
+                    onClick={() => void applyQueuedReading(row.id!)}
+                  >
+                    {t("settings.conflictUseMine")}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -156,7 +190,36 @@ export function Settings() {
                   <p className="mt-1 max-w-prose text-micro text-muted">{row.failure.message}</p>
                 ) : null}
 
-                {row.status !== "pending" ? (
+                {/*
+                  A conflicted row gets the conflict's own two answers, not
+                  "Försök igen" (D150).
+
+                  Retrying a conflict sends the identical bytes to the identical
+                  rule and gets the identical answer: the control could never
+                  work, and offering it made the page look like the fault was
+                  the network's. A conflict is a question, and this is where the
+                  person is already standing.
+                */}
+                {row.status === "conflict" ? (
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      data-testid={`queue-keep-server-${row.id}`}
+                      className="btn w-auto px-4"
+                      onClick={() => void keepServerForMutation(row.id!)}
+                    >
+                      {t("settings.conflictKeepTheirs")}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`queue-use-mine-${row.id}`}
+                      className="btn w-auto px-4"
+                      onClick={() => void applyQueuedForMutation(row.id!)}
+                    >
+                      {t("settings.conflictUseMine")}
+                    </button>
+                  </div>
+                ) : row.status !== "pending" ? (
                   <div className="mt-2 flex gap-4">
                     <button
                       type="button"

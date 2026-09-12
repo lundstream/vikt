@@ -88,6 +88,8 @@ export function useOnline(): boolean {
  */
 const AFFECTED: Record<MutationKind, readonly (readonly string[])[]> = {
   weight: [WEIGHT_KEY, INSIGHTS_KEY, DAY_KEY],
+  // The same lists: an edited reading moves the trend exactly as a new one does.
+  "weight-update": [WEIGHT_KEY, INSIGHTS_KEY, DAY_KEY],
   "manual-intake": [INTAKE_KEY, INSIGHTS_KEY],
   "food-entry": [RECENT_KEY, ENTRIES_KEY, INTAKE_KEY, INSIGHTS_KEY],
 

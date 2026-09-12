@@ -38,6 +38,11 @@ when it will be down, and its mail goes out.
   them, a person confirms every row, and the picture is read and dropped. Amounts
   mostly arrive empty and are typed; a weight printed on a package is refused as an
   amount outright.
+- **Editing a reading is an update, not a second reading** (D150). The calendar's
+  edit sheet sends the row's id and the value it opened with, so the server can
+  tell an edit arriving late from two devices disagreeing about a day. A real
+  conflict now offers two equal answers, keep the saved one or use the waiting
+  one, in the conflict list and on the queued row alike.
 - **Nothing user-created is create-only** (D146). A measurement can be taken
   back, and an activity can be amended in the form it was typed into, which were
   the last two entities on the wrong side of §3's rule.
@@ -415,7 +420,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1688 tests**: 494 shared, 313 web, 881 api. **Nine more run in CI**, and they
+**1706 tests**: 494 shared, 321 web, 891 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -459,6 +464,17 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **Editing 25 August through the calendar** (D150): 90,1 to 90,2 at 360 px and
+  desktop, the server holding 90,2 afterwards and Inställningar reading "Allt är
+  skickat" with no conflict and nothing queued. That is the defect's absence;
+  before this pass the same edit produced "Samma dag från två enheter" and a
+  queued row whose retry could not succeed;
+- **A real same-day conflict, made the way one happens** (D150): the browser put
+  offline, a reading logged for an empty 24 August through the calendar, another
+  device writing that day while it waited, then the queue drained. One question
+  with both readings and two buttons, the queued row carrying the same two rather
+  than "Försök igen", and settling it with the waiting reading left one row at
+  91,5;
 - **Dagen's two new controls, against the development API** (D146): a walk
   logged, then its row tapped to load it back into the form beneath, the
   duration changed from 40 to 30 and saved — one row afterwards, not two, with
@@ -621,6 +637,7 @@ somebody had read off a log with nothing behind it.
 | The chart's trend vertices are the calc's own values, one per reading (D144) | `apps/web/src/lib/trend-series.ts`, `apps/web/test/trend-series.test.ts` | Test |
 | The Portainer stack pins a version rather than `latest`, and both images move together (D148) | `infra/docker-compose.portainer.yml`, `apps/api/test/stack-variables.test.ts` | Test |
 | Every variable the API's env schema knows is forwarded by the Portainer compose and documented in .env.example (D147) | `apps/api/test/stack-variables.test.ts` | Test |
+| An edit is an update to its row, and only two creates for one day are a same-day conflict (D150) | `apps/api/test/weight-update.test.ts`, `apps/web/test/weight-edit-queue.test.ts` | Test |
 | Every user-created row has an edit and a delete on the screen that shows it (D56, D146) | `apps/api/test/daily.test.ts`, `apps/web/test/render/day-edit-remove.test.tsx` | Test |
 | Every reading is reachable and editable, not the last five (D145) | `apps/web/src/components/MonthCalendar.tsx`, `apps/web/test/render/weight-calendar.test.tsx`, `apps/web/test/month-calendar.test.ts` | Test |
 
