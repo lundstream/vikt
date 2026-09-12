@@ -5471,6 +5471,13 @@ Both are offered and neither is defaulted, because the difference is not
 recoverable. The gentler one is the sheet's own confirm; the irreversible one is
 the Honung button beside it, which is the same class as revoking an invite.
 
+#### Addendum, 2026-09-12: the reminder was only reachable by editing
+
+The create sheet offered a name and an icon; the reminder below existed only in
+the edit sheet. The option was therefore invisible until somebody reopened a
+habit they had already made, which is how the owner found it. One form now
+serves both, and `POST /habits` carries the reminder fields. See **D142**.
+
 #### The reminder is the existing one, with the habit's id in the kind
 
 No new machinery. A habit's reminder is `remind` / `remind_minute` and a weekend
@@ -5862,3 +5869,44 @@ reason this is still not worth a lock.
 The dashboard card is unchanged: it appears when a review exists and has not been
 dismissed, and the dismissal is on the row so that putting it away on the phone
 puts it away on the laptop (D139, D108).
+
+---
+
+### D142 — One habit, one form, and the reminder offered where the habit is made
+
+*2026-09-12.*
+
+The per-habit reminder existed in D136's shape, in the habit's **edit** sheet.
+The create sheet offered a name and an icon and nothing else. So the only way to
+discover that a habit can remind you at all was to create one, reopen it, and
+find the controls — which is how the owner found them, by accident, after the
+feature had shipped.
+
+That is not a copy problem, it is a shape problem: **one entity with two sets of
+controls**, where only one set was complete. It is the same defect class as a
+shared function with call sites that walk past it, and it has the same fix.
+There is now one `HabitForm`, handed either an empty habit or an existing one,
+and it is the only place a habit's fields are drawn.
+
+#### What changed
+
+- `POST /habits` accepts the reminder fields, optional and off by default. They
+  were on the update shape only, so the create sheet had nothing to send and
+  therefore nothing to offer.
+- The form **saves on submit** rather than per field. With a reminder in it, per
+  field saving would write four times while somebody sets one time, and a
+  half-applied reminder is a notification at the wrong hour.
+- Inställningar, Påminnelser gets **one line in Sten**, naming the habits that
+  have a reminder and saying they are changed on Dagen. Not a second editor: two
+  places to set one thing is the shape this decision exists to remove. With no
+  habit reminding, the line says so in the register "inte än" uses elsewhere,
+  and the whole section is still absent without VAPID keys.
+
+#### Why the addendum rather than a quiet fix
+
+D137 and the Phase 11 entry never said the create sheet should be minimal; the
+reminder simply was not wired into it, and nothing in either document would have
+caught that. Both now carry a dated line pointing here, because "the option was
+invisible to the owner until he edited a habit" is the kind of fact that stops
+being obvious a month later, and the next person adding a second surface for one
+entity should meet it.

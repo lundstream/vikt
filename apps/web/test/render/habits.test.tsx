@@ -7,6 +7,7 @@ import type { HabitDay } from "shared";
 import { renderRoute } from "./harness.js";
 import { HabitChecklist } from "../../src/components/HabitChecklist.js";
 import { HabitEditor } from "../../src/components/HabitEditor.js";
+import { HabitForm } from "../../src/components/HabitForm.js";
 
 /**
  * The checklist, through the interface (D137).
@@ -226,5 +227,111 @@ describe("removing a habit", () => {
 
     await waitFor(() => expect(deletes).toHaveLength(1));
     expect(deletes[0]).toContain("history=keep");
+  });
+});
+
+describe("creating a habit", () => {
+  afterEach(cleanup);
+
+  /**
+   * D142: the reminder is offered while the habit is being created.
+   *
+   * It used to exist only in the edit sheet, so the only way to learn that a
+   * habit can remind you was to make one and open it again. This is the
+   * assertion that the create path is not a reduced copy of the edit path.
+   */
+  it("offers the reminder in the same pass", async () => {
+    const posts: Record<string, unknown>[] = [];
+
+    renderRoute(<HabitForm habit={null} />, {
+      responses: [{ match: "/api/push/key", body: { publicKey: "test-key" } }],
+      stateful: [
+        {
+          match: "/api/habits",
+          get: () => ({ habits: [] }),
+          post: (body) => posts.push(body as Record<string, unknown>),
+          wrote: { id: "new", name: "Vitaminer", icon: null, sortOrder: 0 },
+        },
+      ],
+    });
+
+    // The controls are there before anything has been created.
+    expect(await screen.findByTestId("habit-remind")).toBeTruthy();
+    expect(screen.getByTestId("habit-remind-weekend")).toBeTruthy();
+    expect(screen.getByTestId("habit-remind-time")).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId("habit-name"), { target: { value: "Vitaminer" } });
+    fireEvent.click(screen.getByTestId("habit-remind"));
+
+    const time = screen.getByTestId("habit-remind-time");
+    fireEvent.change(time, { target: { value: "07:30" } });
+    fireEvent.blur(time);
+
+    fireEvent.click(screen.getByTestId("habit-add"));
+
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({
+      name: "Vitaminer",
+      remind: true,
+      remindMinute: 450,
+      // Off unless asked for, on both pairs.
+      remindWeekend: false,
+    });
+  });
+
+  /** Without push keys there is no reminder to offer, and none is drawn (D94). */
+  it("draws no reminder controls when push is not configured", async () => {
+    renderRoute(<HabitForm habit={null} />, {
+      responses: [{ match: "/api/habits", body: { habits: [] } }],
+      unauthorized: [],
+    });
+
+    // `/api/push/key` answers 200 with an empty body from the default stub, so
+    // this asserts the shape rather than the 404: no key, no controls.
+    await screen.findByTestId("habit-name");
+    expect(screen.queryByTestId("habit-remind")).toBeNull();
+  });
+
+  /** The same component with an existing habit shows that habit's reminder. */
+  it("shows an existing habit's reminder in the same fields", async () => {
+    const patches: Record<string, unknown>[] = [];
+
+    renderRoute(
+      <HabitForm
+        habit={{
+          id: "44444444-4444-4444-4444-444444444444",
+          name: "Vitaminer",
+          icon: null,
+          sortOrder: 0,
+          remind: true,
+          remindMinute: 450,
+          remindWeekend: false,
+          remindWeekendMinute: 480,
+          createdAt: "2026-09-01T00:00:00.000Z",
+        }}
+      />,
+      {
+        responses: [{ match: "/api/push/key", body: { publicKey: "test-key" } }],
+        stateful: [
+          {
+            match: "/api/habits/",
+            get: () => ({}),
+            post: (body) => patches.push(body as Record<string, unknown>),
+            wrote: { id: "44444444-4444-4444-4444-444444444444" },
+          },
+        ],
+      },
+    );
+
+    const time = (await screen.findByTestId(
+      "habit-remind-time-44444444-4444-4444-4444-444444444444",
+    )) as HTMLInputElement;
+    expect(time.value).toBe("07:30");
+
+    fireEvent.click(screen.getByTestId("habit-save-44444444-4444-4444-4444-444444444444"));
+
+    await waitFor(() => expect(patches).toHaveLength(1));
+    // One write carrying the whole habit, rather than four as fields blur.
+    expect(patches[0]).toMatchObject({ name: "Vitaminer", remind: true, remindMinute: 450 });
   });
 });

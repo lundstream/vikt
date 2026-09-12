@@ -26,9 +26,23 @@ const reminderFields = {
   remindWeekendMinute: z.number().int().min(0).max(1439),
 };
 
+/**
+ * Creating a habit, **including its reminder** (D142).
+ *
+ * The reminder fields were only on the update shape, so the create sheet had
+ * nothing to send and therefore nothing to offer. One entity, one set of
+ * fields: the same form now creates and edits, and both send the same body.
+ *
+ * Optional and off by default. A notification nobody asked for is the fastest
+ * way to have notifications turned off for good.
+ */
 export const createHabitSchema = z.object({
   name: z.string().trim().min(1).max(HABIT_NAME_MAX),
   icon: habitIconSchema.nullish(),
+  remind: reminderFields.remind.optional(),
+  remindMinute: reminderFields.remindMinute.optional(),
+  remindWeekend: reminderFields.remindWeekend.optional(),
+  remindWeekendMinute: reminderFields.remindWeekendMinute.optional(),
 });
 export type CreateHabit = z.infer<typeof createHabitSchema>;
 

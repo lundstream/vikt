@@ -105,6 +105,8 @@ av att de sätts för tidigt. Omvänd ordning ger en publik sida som visar
 `0024_push` lägger till tabellerna `push_subscriptions` och `reminder_sends` samt
 fyra kolumner på `profiles` för de två påminnelserna. Additiv.
 
+Inga nya migrationer i den här passagen utöver de nedan.
+
 `0028_coach_tone` lägger till kolumnen `coach_tone` på `profiles`, med `torr` som
 standard. Additiv, och standardvärdet är den röst som redan fanns.
 
@@ -228,8 +230,10 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
   ikon, och bocka av med ett tryck. Ett tryck till tar bort bocken. Under varje vana
   står hur många dagar i rad du har den, och en dag du inte fyllde i listan alls
   räknas som okänd i stället för som missad.
-- Varje vana kan ha en egen påminnelse, med samma tider för vardag och helg som de
-  andra påminnelserna. Den hoppas över om du redan bockat av vanan den dagen.
+- Varje vana kan ha en egen påminnelse, och den sätter du direkt när du skapar
+  vanan: samma tider för vardag och helg som de andra påminnelserna, avstängda tills
+  du slår på dem. Den hoppas över om du redan bockat av vanan den dagen, och under
+  Inställningar, Påminnelser står vilka vanor som har en.
 - Tar du bort en vana får du välja: behåll dagarna du redan bockat av, eller ta bort
   dem också. Vad som händer står innan du bekräftar.
 - Två påminnelser går att slå på under Inställningar: en på morgonen om att väga sig

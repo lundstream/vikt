@@ -49,6 +49,11 @@ export type HabitInsert = {
   name: string;
   icon: string | null;
   sortOrder: number;
+  /** The reminder, which may now be set as the habit is created (D142). */
+  remind?: boolean;
+  remindMinute?: number;
+  remindWeekend?: boolean;
+  remindWeekendMinute?: number;
 };
 
 export async function insertHabit(

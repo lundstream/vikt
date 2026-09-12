@@ -147,6 +147,17 @@ export async function createHabit(
       // Appended rather than inserted at the top: a new habit joins the end of
       // a list somebody has already put in an order they meant.
       sortOrder: last === undefined ? 0 : last.sortOrder + 1,
+      /**
+       * The reminder arrives with the habit now (D142). Absent means off, which
+       * is both the column default and the only defensible default for a
+       * notification.
+       */
+      ...(input.remind !== undefined ? { remind: input.remind } : {}),
+      ...(input.remindMinute !== undefined ? { remindMinute: input.remindMinute } : {}),
+      ...(input.remindWeekend !== undefined ? { remindWeekend: input.remindWeekend } : {}),
+      ...(input.remindWeekendMinute !== undefined
+        ? { remindWeekendMinute: input.remindWeekendMinute }
+        : {}),
     }),
   );
 }

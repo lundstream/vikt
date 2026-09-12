@@ -585,6 +585,8 @@ A daily checklist the user writes themselves, and the first push notification th
 > **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. Two times of day, in the user's timezone, off by default: see the two-time shape below.
 >
 > **A reminder for the checklist, if it gets one, inherits the shape.** A weekday pair and a weekend pair, each with its own switch, the same field names and the same helper, and no second notion of what a weekend is. A habit reminder that invented its own single time would be the one setting on the screen that behaves differently from the two beside it, and somebody would have to find out by being woken on a Sunday.
+>
+> **Amended 2026-09-12 (D142): it is offered where the habit is made.** The first build put the reminder in the habit's edit sheet only, so the option was invisible until somebody reopened a habit they had already created. One entity gets one form: creating and editing a habit now draw the same fields, including the reminder, and `POST /habits` carries them.
 
 #### The two reminders, and the foundation they pay for
 

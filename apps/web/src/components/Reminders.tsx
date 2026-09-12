@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMe } from "../lib/session.js";
+import { useHabits } from "../lib/habits.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -97,6 +98,12 @@ function readPermission(): Permission {
 
 export function Reminders() {
   const me = useMe();
+  /**
+   * The checklist, so this section can name the habits that remind. Read here
+   * rather than duplicated: the habit's own sheet stays the only place to
+   * change one.
+   */
+  const habits = useHabits();
   const queryClient = useQueryClient();
   const [permission, setPermission] = useState<Permission>(readPermission);
   const [notice, setNotice] = useState<string | null>(null);
@@ -231,6 +238,9 @@ export function Reminders() {
 
   const profile = me.data?.profile;
   const subscribed = endpoint !== null;
+
+  /** Habits with a reminder on either pair, in the order the checklist has. */
+  const reminding = (habits.data ?? []).filter((habit) => habit.remind || habit.remindWeekend);
 
   return (
     <section className="mt-10 border-t border-edge pt-6" data-testid="reminders">
@@ -368,6 +378,20 @@ export function Reminders() {
           ))}
         </div>
       ) : null}
+
+      {/*
+        The habits that remind, named here and changed where they live (D142).
+
+        One line, not a second editor. A habit's reminder belongs to the habit,
+        and two places to set the same thing is how the two halves of the habit
+        sheet drifted in the first place. This says what is on and where to
+        change it.
+      */}
+      <p className="mt-6 max-w-prose text-micro text-muted" data-testid="habit-reminders">
+        {reminding.length === 0
+          ? t("push.habitsNone")
+          : t("push.habitsOn", { names: reminding.map((habit) => habit.name).join(", ") })}
+      </p>
 
       {/* Confirm the device works before trusting it with tomorrow morning. */}
       {subscribed ? (

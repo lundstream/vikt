@@ -102,6 +102,53 @@ describe("writing the checklist", () => {
     ]);
   });
 
+  /**
+   * D142: the reminder arrives with the habit.
+   *
+   * It used to be settable only by editing, so the option was invisible until
+   * somebody reopened a habit they had already made. The endpoint now takes the
+   * same fields the edit path does.
+   */
+  it("stores a reminder given at creation", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/habits",
+      headers: auth(user),
+      payload: {
+        name: "Vitaminer",
+        icon: "tablett",
+        remind: true,
+        remindMinute: 7 * 60 + 30,
+        remindWeekend: true,
+        remindWeekendMinute: 10 * 60,
+      },
+    });
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      remind: true,
+      remindMinute: 450,
+      remindWeekend: true,
+      remindWeekendMinute: 600,
+    });
+  });
+
+  /** And a habit created without one is off, which is the only safe default. */
+  it("leaves the reminder off when creation does not mention it", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    const habit = await addHabit(app, user, "Stretcha");
+
+    const list = await app.inject({ method: "GET", url: "/api/habits", headers: auth(user) });
+    const stored = list.json<{ habits: { id: string; remind: boolean; remindWeekend: boolean }[] }>()
+      .habits.find((row) => row.id === habit.id);
+
+    expect(stored).toMatchObject({ remind: false, remindWeekend: false });
+  });
+
   /** An icon outside the closed set is refused rather than stored and blank. */
   it("refuses an icon it cannot draw", async () => {
     const { app, db } = ctx();

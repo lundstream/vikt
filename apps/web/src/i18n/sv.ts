@@ -483,6 +483,8 @@ export const sv = {
   "habit.change": "Ändra",
   "habit.moveUp": "Flytta upp",
   "habit.moveDown": "Flytta ner",
+  "habit.save": "Spara",
+  "habit.thisHabit": "vanan",
   "habit.remove": "Ta bort",
   "habit.removeTitle": "Ta bort {name}?",
   "habit.removeKeepBody":
@@ -530,6 +532,10 @@ export const sv = {
   "push.notifyWeigh": "Dags att väga dig",
   "push.notifyDay": "Dags att fylla i dagen",
   "push.notifyHabit": "Kom ihåg: {name}",
+  "push.habitsOn":
+    "Vanor med påminnelse: {names}. Tiderna ändrar du på Dagen, under Vanor, i vanans egen ruta.",
+  "push.habitsNone":
+    "Ingen vana har en påminnelse än. Du sätter den när du skapar vanan på Dagen, under Vanor.",
   "settings.requestMail": "Mejla mig när någon ber om en kod",
   "settings.requestMailHint":
     "Gäller bara dig som administrerar. Förfrågan hamnar i listan under Administration oavsett, och pricken vid Administration visas också oavsett. Det här handlar bara om mejlet.",
