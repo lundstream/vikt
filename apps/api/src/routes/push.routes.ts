@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { errorResponseSchema } from "shared";
 import { pushSubscriptions } from "../db/schema.js";
 import { pushEnabled, sendPush } from "../lib/push.js";
-import { payloadFor } from "../services/reminder.service.js";
+import { hostOf, payloadFor } from "../services/reminder.service.js";
 
 /**
  * Push subscriptions, one row per device (D136).
@@ -247,6 +247,10 @@ export const pushRoutes: FastifyPluginAsyncZod = async (app) => {
         if (outcome.status === "gone") {
           removed += 1;
           await app.db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, row.id));
+          request.log.info(
+            { subscription: row.id, host: hostOf(row.endpoint), reason: outcome.reason },
+            "push subscription removed",
+          );
         }
       }
 

@@ -89,6 +89,14 @@ export type SendOutcome =
 export async function sendPush(
   target: PushTarget,
   payload: PushPayload,
+  /**
+   * The delivery call, injectable so the **mapping** can be tested.
+   *
+   * Which status codes mean "this row is dead" is the decision in this file,
+   * and it was the one thing here with no test: the service-level tests drive
+   * `SendOutcome` directly, which assumes the mapping rather than checking it.
+   */
+  deliver: typeof webpush.sendNotification = webpush.sendNotification,
 ): Promise<SendOutcome> {
   const subscription: PushSubscription = {
     endpoint: target.endpoint,
@@ -96,7 +104,7 @@ export async function sendPush(
   };
 
   try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload), {
+    await deliver(subscription, JSON.stringify(payload), {
       /**
        * Four hours. A reminder that could not be delivered because the phone
        * was off is not worth showing at lunchtime — "late is worse than never"

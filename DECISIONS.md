@@ -5303,6 +5303,47 @@ Removable from **any** device (D56), because the commonest reason to want that i
 a phone somebody no longer has, and a control that only worked on the device
 being removed would be useless in exactly that case.
 
+#### Addendum, 2026-09-12: why two dead-looking rows survived a rule that removes dead rows
+
+A verification pass found two push subscriptions on the test account that no
+browser was listening to, and **removed them by hand** — through the app's own
+`DELETE /api/push/subscriptions/:id`, from a script, for every device the
+current browser did not recognise as itself. That is worth writing down rather
+than leaving as an unexplained tidy-up, because the obvious reading is that the
+automatic removal had failed.
+
+It had not. The rule above is exact about what it removes: a subscription the
+push service **answers 404, 410 or 403 for**. Those two rows were not that. WNS
+accepted every send to them — the sweep that morning logged `sent: 2` — because
+from the push service's point of view the channels were perfectly alive. What
+had gone was the **browser profile** on this machine, deleted by a harness
+script between sessions, and deleting a profile locally tells the push service
+nothing at all. A subscription becomes 410 when the browser unsubscribes or the
+service expires it, and a scratch profile that is simply erased does neither.
+
+So there is no defect in the removal, and there is also no way for the server to
+have known: "nobody is listening" is not observable from here, and inventing a
+heuristic for it — say, dropping a subscription that has not been *seen* for
+some number of days — would delete the phone of somebody who spent a month
+away. `lastSeenAt` exists so a person can recognise a stale device in the list
+and remove it themselves, which is what D56 asks of every row.
+
+**Two things were missing, and both are fixed:**
+
+- **One line per removal.** The sweep counted removals and the scheduler logged
+  the count, which tells an operator that something was dropped and never which
+  thing. `runReminders` now takes an `onRemoved` callback and the scheduler logs
+  the subscription id, the **host** and the reason, one line each. The host and
+  not the endpoint: the token in an endpoint is the capability to notify that
+  device, and a log file is not where that belongs.
+- **A test for the mapping itself.** The existing tests drive `SendOutcome`
+  directly — they prove `gone` deletes and `failed` does not, and say nothing
+  about which status is which, which is the decision that matters. `sendPush`
+  now takes the delivery call as an argument so it can be driven with a real
+  `WebPushError`: 404, 410 and 403 are `gone`; 429, 500, 503 and a network error
+  are `failed` and the row stays. A push service having a bad ten minutes must
+  not cost somebody their phone.
+
 #### The settings screen says what it cannot do
 
 Three permission states and three different things to do about them, and a

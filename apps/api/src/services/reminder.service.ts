@@ -335,6 +335,21 @@ async function habitsDueNow(db: Db, now: Date): Promise<DueReminder[]> {
 export type RunResult = { considered: number; sent: number; skipped: number; removed: number };
 
 /**
+ * The host of an endpoint, which is the part safe to log.
+ *
+ * The rest of the URL is a bearer token for notifying that device; a log file
+ * is not where that belongs, and the host is what an operator actually reads
+ * ("WNS is rejecting these", "FCM is").
+ */
+export function hostOf(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return "unknown host";
+  }
+}
+
+/**
  * One pass: find who is due, skip what has happened, claim the day, send.
  *
  * Returns counts rather than logging them, so the caller decides what a run is
@@ -345,6 +360,17 @@ export async function runReminders(
   env: Env,
   now: Date,
   send = sendPush,
+  /**
+   * Called once per deleted subscription, so the scheduler can log one line
+   * each (D136, amended 2026-09-12).
+   *
+   * A count told an operator that something was removed and never which
+   * device, which is the wrong half: "two endpoints were dropped" is a number,
+   * "the phone labelled Mozilla/5.0 … on wns2-db5p.notify.windows.com answered
+   * 410" is a fact somebody can act on. The **host**, never the whole endpoint:
+   * the token in it is the capability to notify that device.
+   */
+  onRemoved?: (device: { id: string; host: string; reason: string }) => void,
 ): Promise<RunResult> {
   const result: RunResult = { considered: 0, sent: 0, skipped: 0, removed: 0 };
   if (!pushEnabled(env)) return result;
@@ -402,6 +428,7 @@ export async function runReminders(
       if (outcome.status === "gone") {
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, device.id));
         result.removed += 1;
+        onRemoved?.({ id: device.id, host: hostOf(device.endpoint), reason: outcome.reason });
       }
     }
   }

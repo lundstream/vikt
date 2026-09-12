@@ -7,11 +7,18 @@ import { useMe } from "../lib/session.js";
 /**
  * Which voice the coach speaks in (D140).
  *
- * **The labels are lowercase.** They are adjectives naming a setting's value,
- * not names: "torr" is how the coach sounds, the way "mörkt" is how the screen
- * looks. §5 requires sentence case rather than lowercase, so this is a choice
- * inside that rule and not an exception to it, and the news rows in STATE.md
- * quote the screen rather than a capitalised version of it.
+ * **The labels are sentence case: Torr, Peppig, Saklig.** §5 asks for sentence
+ * case, and this row is the same component pattern as the theme selector, whose
+ * options read Mörkt and Ljust. Two rows of option buttons on neighbouring
+ * screens must not disagree about capitalisation, and one of them had to move;
+ * the theme buttons were here first.
+ *
+ * The rule, so the next row of buttons does not have to rediscover it: **an
+ * option button is sentence case** — it is a choice offered by the interface,
+ * and the interface writes in sentences. **A state chip stays lowercase** —
+ * loggat, importerad, ofullständig, from the graphic profile's states — because
+ * those are the app labelling a thing it is describing rather than offering
+ * something to press.
  *
  * Three, chosen here and applied to both the chat and the weekly review,
  * because they are one voice from one prompt and a person who picks a tone

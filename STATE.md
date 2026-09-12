@@ -207,7 +207,7 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 - På Mat ligger Skanna, Skriv in själv, Skriv vad du åt och Vad kan jag laga nu på en
   rad, som runda snabbval med etikett under, i stället för som knappar utspridda på
   sidan. De två som behöver en språkmodell försvinner som förut när den är avstängd.
-- Coachen har tre tonlägen som du väljer under Coach: torr, peppig och saklig.
+- Coachen har tre tonlägen som du väljer under Coach: Torr, Peppig och Saklig.
   Valet gäller både veckans sammanfattning och chatten. Saklig har ingen
   personlighet alls och heter då bara Coachen.
 - Veckans sammanfattning skrivs numera av sig själv på söndagskvällen, klockan
@@ -356,7 +356,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1465 tests**: 494 shared, 269 web, 702 api. **Nine more run in CI**, and they
+**1477 tests**: 494 shared, 269 web, 714 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -398,6 +398,11 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The coach on a bad week again, after the absence rule** (D140's second
+  addendum), against the real model: every tone now puts the data first ("Inget
+  intag är loggat under perioden"), none makes the person the subject of a
+  missing figure, and nothing was refused. The tone selector reads Torr, Peppig
+  and Saklig again, matching the theme row beside it;
 - **A habit created with its reminder in one pass** (D142), at 360 px and at
   1280 px: the create sheet now carries the same reminder controls as the edit
   sheet, and the one it wrote produced a real notification through WNS,
@@ -494,6 +499,8 @@ somebody had read off a log with nothing behind it.
 | No test is skipped or left as a todo outside one named file (§7) | `scripts/check-skips.mjs` | No skipped tests |
 | No `__PLACEHOLDER__` survives into the built bundles (D98) | `apps/web/scripts/check-placeholders.mjs` | Check the build for unsubstituted placeholders |
 | Every package typechecks under `strict` | `tsconfig.json` per package | Typecheck |
+| The coach never makes a person the subject of a missing figure (D140) | `apps/api/src/llm/coach-guard.ts`, `apps/api/test/coach.test.ts` | Test |
+| A rejected push subscription is removed and a transient failure is not (D136) | `apps/api/src/lib/push.ts`, `apps/api/test/push-removal.test.ts` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one
 entry that would have been removed is the guard STATE.md used to claim about

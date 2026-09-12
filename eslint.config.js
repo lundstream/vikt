@@ -81,6 +81,12 @@ export default tseslint.config(
              * scoped; the sweep itself has no one user to belong to.
              */
             "runWeeklyReviews",
+            /**
+             * Pulls the host out of a push endpoint so a removal can be logged
+             * without the token in it. String work on a value the caller holds;
+             * there is no row and nobody to scope to.
+             */
+            "hostOf",
 
             /**
              * Pure functions of their arguments. Neither touches the database,

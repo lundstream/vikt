@@ -49,7 +49,22 @@ export function startReminderScheduler(app: FastifyInstance): () => void {
     running = true;
 
     try {
-      const result = await runReminders(app.db, app.config, new Date());
+      const result = await runReminders(
+        app.db,
+        app.config,
+        new Date(),
+        undefined,
+        /**
+         * One line per removal (D136, amended). A subscription is deleted on
+         * the first 404, 410 or 403 and never retried, and this is where that
+         * becomes visible to whoever is reading the log.
+         */
+        (device) =>
+          app.log.info(
+            { subscription: device.id, host: device.host, reason: device.reason },
+            "push subscription removed",
+          ),
+      );
 
       /**
        * Silent on an empty sweep, which is most of them. A line every minute
