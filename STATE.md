@@ -38,6 +38,9 @@ when it will be down, and its mail goes out.
   them, a person confirms every row, and the picture is read and dropped. Amounts
   mostly arrive empty and are typed; a weight printed on a package is refused as an
   amount outright.
+- **Nothing user-created is create-only** (D146). A measurement can be taken
+  back, and an activity can be amended in the form it was typed into, which were
+  the last two entities on the wrong side of §3's rule.
 - **Logging works offline** and syncs on reconnect. A local store that opens and
   will not accept a row falls through to sending directly, and says so (D118).
 - **Mail is delivered** by a drainer inside the API process, and every link in
@@ -93,15 +96,14 @@ screen, because that is where this failure lives.
 log the food again rather than open it. The day's own list underneath is
 complete.
 
-Two gaps found that are not windows, both already named in D56, both still open
-and **not** touched in this pass:
-
-- **`measurement_log` has no delete at all**, at the API or on screen. There is
-  `POST /measurement` and `GET /measurement` and nothing else. The oldest open
-  item under §3's rule; it needs the endpoint before it can have a control.
-- **`activity_log` has delete and no update path.** Many-per-day, so re-logging
-  does not stand in for an edit: correcting a walk from 40 to 30 minutes means
-  removing it and typing it again.
+**Nothing is left open under §3's rule.** The audit's two remaining gaps —
+`measurement_log` with no delete at all, and `activity_log` with delete and no
+update path — were closed the pass after it found them (D146). `measurement_log`
+got `DELETE /measurement/:id` and a control under its own form;
+`activity_log`'s edit needed no endpoint, because every write here has been an
+upsert on `(user_id, client_uuid)` since phase 1 and the row's own id sent back
+*is* the update. `food_items` created by hand is the one entity with neither,
+deliberately and for the reasons D56 states.
 
 One smaller thing seen while auditing and left alone: the quick sheet's calorie
 hint still says "Matloggning kommer senare", which stopped being true in
@@ -466,7 +468,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1570 tests**: 494 shared, 307 web, 769 api. **Nine more run in CI**, and they
+**1581 tests**: 494 shared, 313 web, 774 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -510,6 +512,12 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **Dagen's two new controls, against the development API** (D146): a walk
+  logged, then its row tapped to load it back into the form beneath, the
+  duration changed from 40 to 30 and saved — one row afterwards, not two, with
+  the kcal figure recomputed by the server. The measurement delete armed under
+  its own form and read "Ta bort?" before it would fire. Both at 360 px and
+  desktop;
 - **The trend line on a sparse account, before and after** (D144): a seeded
   account, `gles@example.test` in the **development** database with the
   `SEED_PASSWORD` password, weighing about once a week over ninety days. It
@@ -664,6 +672,7 @@ somebody had read off a log with nothing behind it.
 | The photo surface exists only where a model has been shown to see (D143) | `apps/api/src/lib/vision-watch.ts`, `apps/api/test/vision-watch.test.ts`, `apps/web/test/render/food-ways.test.tsx` | Test |
 | A weight printed on a package is never an amount (D143, amended) | `apps/api/src/services/llm.service.ts`, `apps/api/test/photo-parse.test.ts` | Test |
 | The chart's trend vertices are the calc's own values, one per reading (D144) | `apps/web/src/lib/trend-series.ts`, `apps/web/test/trend-series.test.ts` | Test |
+| Every user-created row has an edit and a delete on the screen that shows it (D56, D146) | `apps/api/test/daily.test.ts`, `apps/web/test/render/day-edit-remove.test.tsx` | Test |
 | Every reading is reachable and editable, not the last five (D145) | `apps/web/src/components/MonthCalendar.tsx`, `apps/web/test/render/weight-calendar.test.tsx`, `apps/web/test/month-calendar.test.ts` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one

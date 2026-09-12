@@ -107,6 +107,116 @@ describe("POST /api/measurement", () => {
   });
 });
 
+describe("DELETE /api/measurement/:id", () => {
+  /**
+   * The oldest gap under §3's rule, closed (D56, D146). The entity had `POST`
+   * and `GET` and nothing else from phase 4 until now: re-logging the day was
+   * the edit, and there was no way to take a reading back at all.
+   */
+  it("removes a day's measurement", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const created = await post(app, user, "/api/measurement", {
+      clientUuid: randomUUID(),
+      localDate: localDate(),
+      waistCm: 94,
+    });
+    const id = created.json<{ id: string }>().id;
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/api/measurement/${id}`,
+      headers: auth(user),
+    });
+    expect(removed.statusCode).toBe(204);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/measurement",
+      headers: auth(user),
+    });
+    expect(list.json<{ entries: unknown[] }>().entries).toHaveLength(0);
+  });
+
+  /** Scoped by user id as well as row id, like every other delete (§3). */
+  it("cannot delete someone else's measurement", async () => {
+    const { app, db } = ctx();
+    const mine = await createUser(app, db);
+    const theirs = await createUser(app, db);
+
+    const created = await post(app, mine, "/api/measurement", {
+      clientUuid: randomUUID(),
+      localDate: localDate(),
+      waistCm: 94,
+    });
+    const id = created.json<{ id: string }>().id;
+
+    const attempt = await app.inject({
+      method: "DELETE",
+      url: `/api/measurement/${id}`,
+      headers: auth(theirs),
+    });
+    expect(attempt.statusCode).toBe(404);
+
+    const mineStill = await app.inject({
+      method: "GET",
+      url: "/api/measurement",
+      headers: auth(mine),
+    });
+    expect(mineStill.json<{ entries: unknown[] }>().entries).toHaveLength(1);
+  });
+
+  it("says so rather than pretending, when there is nothing there", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/measurement/${randomUUID()}`,
+      headers: auth(user),
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  /**
+   * A removed waist reading has to leave the waist-to-height series, which is
+   * computed on read from the rows that exist (D32). The insights endpoint is
+   * where anybody would notice if it did not.
+   */
+  it("takes the reading out of the waist series too", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    const day = localDate();
+
+    const created = await post(app, user, "/api/measurement", {
+      clientUuid: randomUUID(),
+      localDate: day,
+      waistCm: 94,
+    });
+
+    const before = await app.inject({
+      method: "GET",
+      url: `/api/insights?asOf=${day}`,
+      headers: auth(user),
+    });
+    expect(before.json<{ whtr: unknown[] }>().whtr.length).toBeGreaterThan(0);
+
+    await app.inject({
+      method: "DELETE",
+      url: `/api/measurement/${created.json<{ id: string }>().id}`,
+      headers: auth(user),
+    });
+
+    const after = await app.inject({
+      method: "GET",
+      url: `/api/insights?asOf=${day}`,
+      headers: auth(user),
+    });
+    expect(after.json<{ whtr: unknown[] }>().whtr).toHaveLength(0);
+  });
+});
+
 describe("POST /api/daily", () => {
   it("accepts one field on its own", async () => {
     const { app, db } = ctx();
@@ -264,6 +374,49 @@ describe("POST /api/activity", () => {
       headers: auth(user),
     });
     expect(list.json<{ entries: unknown[] }>().entries).toHaveLength(2);
+  });
+
+  /**
+   * The other half of D56's pair, and it needed no endpoint (D146). Every write
+   * here has been an upsert on `(user_id, client_uuid)` since phase 1 because
+   * the offline queue replays (§3), so sending the id back is the update. What
+   * was missing was a screen that sent it.
+   */
+  it("amends a session when the same client uuid comes back", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await logWeight(app, user, 80);
+    const clientUuid = randomUUID();
+    const day = localDate();
+
+    const first = await post(app, user, "/api/activity", {
+      clientUuid,
+      localDate: day,
+      activityType: "walk",
+      durationMin: 40,
+    });
+    const before = first.json<{ id: string; kcalEstimate: number }>();
+
+    const second = await post(app, user, "/api/activity", {
+      clientUuid,
+      localDate: day,
+      activityType: "walk",
+      durationMin: 30,
+    });
+    const after = second.json<{ id: string; durationMin: number; kcalEstimate: number }>();
+
+    // One row, not two.
+    expect(after.id).toBe(before.id);
+    expect(after.durationMin).toBe(30);
+    // And the estimate is recomputed on the server, not carried over (D33).
+    expect(after.kcalEstimate).toBeLessThan(before.kcalEstimate);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/activity",
+      headers: auth(user),
+    });
+    expect(list.json<{ entries: unknown[] }>().entries).toHaveLength(1);
   });
 
   it("cannot delete someone else's session", async () => {

@@ -21,6 +21,7 @@ import { HabitChecklist } from "../components/HabitChecklist.js";
 import {
   useDayLog,
   useDeleteActivity,
+  useDeleteMeasurement,
   useSaveActivity,
   useSaveDailyLog,
   useDeleteDailyLog,
@@ -86,6 +87,17 @@ export function DailyLog() {
   const saveMeasurement = useSaveMeasurement();
   const saveActivity = useSaveActivity();
   const deleteActivity = useDeleteActivity();
+  const deleteMeasurement = useDeleteMeasurement();
+  /**
+   * The activity being edited, by `clientUuid` (D56, closed 2026-09-13).
+   *
+   * Null means the form is adding. Set means it is amending a row, and the
+   * **same** `clientUuid` goes back to the server — which turns the insert
+   * into an update, because every write in this app has been an upsert on
+   * `(user_id, client_uuid)` since phase 1 (§3). The edit needs no endpoint;
+   * what it needed was a way to send the id back.
+   */
+  const [editingActivity, setEditingActivity] = useState<string | null>(null);
   const deleteDaily = useDeleteDailyLog();
 
   const [ratings, setRatings] = useState<Ratings>(EMPTY_RATINGS);
@@ -314,7 +326,16 @@ export function DailyLog() {
     }
 
     const parsed = createActivitySchema.safeParse({
-      clientUuid: clientUuid(),
+      /**
+       * The row's own id when amending, a fresh one when adding (D56, closed).
+       *
+       * That single line is the whole edit. Every write in this app is an
+       * upsert on `(user_id, client_uuid)` because the offline queue replays
+       * (§3), so sending the id back turns the insert into an update, and the
+       * kcal estimate is recomputed on the server from the MET table exactly as
+       * it was the first time (D33). What was missing was never an endpoint.
+       */
+      clientUuid: editingActivity ?? clientUuid(),
       localDate: today,
       activityType,
       durationMin: Math.round(duration.value ?? 0),
@@ -329,9 +350,24 @@ export function DailyLog() {
     try {
       await saveActivity.mutateAsync(parsed.data);
       setDurationMin("");
+      setEditingActivity(null);
     } catch (error) {
       setActivityErrors({ form: messageFor(error) });
     }
+  }
+
+  /** Loads a logged activity back into the form beneath it. */
+  function editActivity(entry: {
+    clientUuid: string;
+    activityType: string;
+    durationMin: number;
+    intensity: number | null;
+  }) {
+    setEditingActivity(entry.clientUuid);
+    setActivityType(entry.activityType);
+    setDurationMin(String(entry.durationMin));
+    setIntensity(entry.intensity);
+    setActivityErrors({});
   }
 
   const exercise = insights.data?.exerciseAdjustment;
@@ -608,26 +644,56 @@ export function DailyLog() {
           <ul className="mt-3 divide-y divide-edge border-y border-edge">
             {activities.map((entry) => (
               <li key={entry.id} className="flex items-center gap-3 py-2.5">
-                <span className="flex-1 text-note text-ink">
-                  {t(`activity.type.${entry.activityType}` as TranslationKey)}
-                  <span className="num ml-2 text-muted">
-                    {formatDecimal(entry.durationMin, { decimals: 0 })} min
-                  </span>
-                </span>
-                <span className="num text-note text-muted">
-                  {entry.kcalEstimate === null
-                    ? t("activity.noEstimate")
-                    : t("activity.approxKcal", { kcal: formatKcal(entry.kcalEstimate) })}
-                </span>
+                {/*
+                  The row opens itself in the form below (§3, D56). An activity
+                  is many-per-day, so re-logging does not stand in for an edit:
+                  correcting a walk from 40 minutes to 30 meant removing it and
+                  typing it again, which is the shape D56 named and left.
+                */}
                 <button
                   type="button"
-                  // Padded to a real target: a 16 px text link is not something
-                  // anyone hits reliably with a thumb.
-                  className="-mr-2 px-2 py-2.5 text-micro text-muted underline underline-offset-4"
-                  onClick={() => void deleteActivity.mutateAsync(entry.id)}
+                  data-testid={`edit-activity-${entry.id}`}
+                  className="flex flex-1 items-center gap-3 py-0.5 text-left"
+                  onClick={() =>
+                    editActivity({
+                      clientUuid: entry.clientUuid,
+                      activityType: entry.activityType,
+                      durationMin: entry.durationMin,
+                      intensity: entry.intensity,
+                    })
+                  }
                 >
-                  {t("activity.remove")}
+                  <span className="flex-1 text-note text-ink">
+                    {t(`activity.type.${entry.activityType}` as TranslationKey)}
+                    <span className="num ml-2 text-muted">
+                      {formatDecimal(entry.durationMin, { decimals: 0 })} min
+                    </span>
+                  </span>
+                  <span className="num text-note text-muted">
+                    {entry.kcalEstimate === null
+                      ? t("activity.noEstimate")
+                      : t("activity.approxKcal", { kcal: formatKcal(entry.kcalEstimate) })}
+                  </span>
                 </button>
+                {/*
+                  The two-tap confirm every other row uses (D10). This was a
+                  bare link that removed on the first tap, in a list where the
+                  neighbouring tap is now an edit.
+                */}
+                <DeleteButton
+                  testId={`delete-activity-${entry.id}`}
+                  label={t("activity.removeLabel", {
+                    what: t(`activity.type.${entry.activityType}` as TranslationKey),
+                  })}
+                  onDelete={async () => {
+                    await deleteActivity.mutateAsync(entry.id);
+                    // The form was holding this row; it now points at nothing.
+                    if (editingActivity === entry.clientUuid) {
+                      setEditingActivity(null);
+                      setDurationMin("");
+                    }
+                  }}
+                />
               </li>
             ))}
           </ul>
@@ -690,14 +756,36 @@ export function DailyLog() {
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            data-testid="add-activity"
-            className="btn mt-4"
-            disabled={saveActivity.isPending}
-          >
-            {t("activity.add")}
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              data-testid="add-activity"
+              className="btn w-auto px-4"
+              disabled={saveActivity.isPending}
+            >
+              {editingActivity ? t("activity.saveEdit") : t("activity.add")}
+            </button>
+
+            {/*
+              A way out of the edit that is not saving it. Without one, opening
+              a row by mistake leaves the form pointed at it and the next add
+              silently overwrites the wrong thing.
+            */}
+            {editingActivity ? (
+              <button
+                type="button"
+                data-testid="cancel-activity-edit"
+                className="min-h-11 px-1 text-note text-muted underline underline-offset-4"
+                onClick={() => {
+                  setEditingActivity(null);
+                  setDurationMin("");
+                  setActivityErrors({});
+                }}
+              >
+                {t("common.cancel")}
+              </button>
+            ) : null}
+          </div>
         </form>
 
         {/*
@@ -784,6 +872,35 @@ export function DailyLog() {
             {savedMeasurement ? (
               <p role="status" className="mt-2 text-center text-note text-logged">
                 {t("measure.saved")}
+              </p>
+            ) : null}
+
+            {/*
+              The half that was missing from phase 4 until now (§3, D56).
+
+              Re-logging the day was always the edit, and that is the right
+              shape for a one-row-per-day entity. What there was no way to do was
+              take a reading back: a waist typed as 92 instead of 82 could be
+              corrected, and a measurement taken by mistake stayed in the
+              waist-to-height series either way.
+
+              Only once there is a stored row, like the daily log's own delete:
+              a control that would 404 is worse than an absent one.
+            */}
+            {storedMeasurement ? (
+              <p className="mt-3 text-center">
+                <DeleteButton
+                  testId="delete-measurement"
+                  label={t("measure.removeLabel")}
+                  onDelete={async () => {
+                    await deleteMeasurement.mutateAsync(storedMeasurement.id);
+                    setMeasurements({});
+                    setSavedMeasurement(false);
+                    // The form seeds once per stored version, so the guard has
+                    // to be released or a re-saved day would not re-seed it.
+                    seededMeasurement.current = null;
+                  }}
+                />
               </p>
             ) : null}
           </form>

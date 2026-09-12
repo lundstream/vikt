@@ -6578,7 +6578,7 @@ is about lives in the UI and the API had both endpoints all along.
 - **Milestones, savings rules and savings events** are listed in full on
   Framsteg, and coach conversations in full under Coach. None is date-scoped.
 
-Two gaps found that are **not** windows and are not fixed in this pass:
+Two gaps found that are **not** windows and were not fixed in this pass:
 
 - **`measurement_log` has no delete at all**, at the API or on screen. D56 named
   it in its own audit and it is still true: `POST /measurement` and
@@ -6588,3 +6588,70 @@ Two gaps found that are **not** windows and are not fixed in this pass:
 - **`activity_log` has delete and no update path.** It is many-per-day, so
   re-logging does not stand in for an edit: correcting a walk from 40 to 30
   minutes means removing it and typing it again. Also D56's, also still true.
+
+**Both closed the next day, in D146.** The second one turned out to need no
+endpoint at all: the row's own `clientUuid` sent back is the update, because
+every write here is an upsert. That is worth reading before trusting the next
+plausible sentence in an audit.
+
+### D146 — The last two D56 gaps, closed six phases late
+
+*2026-09-13.*
+
+D56 wrote the rule into CLAUDE.md §3 — every user-created row ships with edit
+and delete in the phase that creates it — and then ran an audit that found two
+entities on the wrong side of it. Both were named, neither was fixed, and the
+audit line has been sitting in that entry and in STATE.md since phase 5. D145
+re-ran the audit and found the same two. Naming a gap twice is not closing it.
+
+#### `measurement_log` had no delete at all
+
+`POST /measurement` and `GET /measurement`, from phase 4 until now. Re-logging
+the day was the edit, which is the right shape for a one-row-per-day entity —
+and there was **no way to take a reading back**. A waist typed as 92 instead of
+82 could be corrected; a measurement taken by mistake stayed in the
+waist-to-height series with nothing to do about it.
+
+`DELETE /measurement/:id`, scoped by user id as well as row id like every other
+delete here, and a `DeleteButton` in the measurements section itself. Nothing
+derived needs rebuilding after it: the smoothed waist series and the ratio are
+computed **on read** from the rows that exist (D32), so the chart follows on the
+next request. The test asserts that, because "the row is gone" and "the line
+stopped showing it" are two different claims and only the second is the one
+anybody sees.
+
+A milestone already achieved stays achieved. That is deliberate and is D25's
+answer in a different place: `achieved_at` is a record of what happened, not a
+projection from the current series, and a fact about the past does not become
+untrue because a row went.
+
+#### `activity_log` had delete and no update path
+
+Many-per-day, so re-logging makes a second row: correcting a walk from 40
+minutes to 30 meant removing it and typing it again.
+
+**It needed no endpoint.** Every write in this app has been an upsert on
+`(user_id, client_uuid)` since phase 1, because the offline queue replays and
+§3 requires replays to be safe. So the row's own `clientUuid` sent back *is* the
+update, and the kcal estimate is recomputed on the server from the MET table
+exactly as it was the first time (D33). What was missing was a screen that sent
+it, which is one line in the form's submit and a row that is a button.
+
+That is worth stating plainly, because the audit had this filed under "needs a
+real update path" for six phases on the strength of a reasonable-sounding
+sentence about many-per-day entities. The sentence is right about food entries
+and savings events, whose screens mint a fresh id every time; it was wrong about
+this one, and nobody checked.
+
+#### Both controls are in the section the row was created in
+
+§3's other half: a delete belongs on the screen that displays the row, not in a
+settings page. The measurement delete sits under the measurement form; the
+activity edit loads the row into the form directly beneath the list it came
+from, and cancelling is a control of its own — without one, opening a row by
+mistake leaves the form pointed at it and the next add silently overwrites the
+wrong thing.
+
+The activity delete moved to the shared two-tap `DeleteButton` at the same time.
+It had been a bare link that removed on the first tap, which was tolerable while
+it was the only tap in the row and is not now that the row beside it is an edit.

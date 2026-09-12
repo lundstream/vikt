@@ -787,6 +787,7 @@ export const sv = {
   "measure.thigh": "Lår (cm)",
   "measure.arm": "Arm (cm)",
   "measure.save": "Spara mått",
+  "measure.removeLabel": "måtten för dagen",
   "measure.saved": "Sparat.",
   // Why the chart shows a smoothed line rather than the numbers just entered.
   "measure.smoothingNote":
@@ -802,7 +803,10 @@ export const sv = {
   "activity.intensityLow": "Lätt",
   "activity.intensityHigh": "Hårt",
   "activity.add": "Lägg till",
-  "activity.remove": "Ta bort",
+  // Named, for the two-tap confirm: "Ta bort promenad?" beats "Är du säker?".
+  "activity.removeLabel": "{what}",
+  // The same form, amending a row instead of adding one (D56, closed).
+  "activity.saveEdit": "Spara ändringen",
   "activity.approxKcal": "≈ {kcal} kcal",
   "activity.noEstimate": "Ingen uppskattning",
   "activity.dayTotal": "≈ {kcal} kcal i dag",

@@ -162,6 +162,13 @@ export const api = {
     request<void>(`/daily/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   /**
+   * Taking a measurement back (D56, closed). Re-logging the day was always the
+   * edit; this is the half that was missing from phase 4 until now.
+   */
+  deleteMeasurement: (id: string) =>
+    request<void>(`/measurement/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  /**
    * Removing the manual figure hands the day back to its food entries (D44).
    * The one operation that could not be done by overwriting, because a manual
    * row outranks the meals whatever number it holds.

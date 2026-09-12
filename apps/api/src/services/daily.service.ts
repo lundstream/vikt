@@ -21,6 +21,7 @@ import {
   deleteActivity,
   deleteDailyForDayExcept,
   deleteDailyLog,
+  deleteMeasurement,
   deleteMeasurementForDayExcept,
   findDailyForDay,
   findMeasurementForDay,
@@ -107,6 +108,28 @@ export async function getMeasurements(
 ): Promise<MeasurementEntry[]> {
   const rows = await listMeasurements(userId, db, range);
   return rows.map(toMeasurement);
+}
+
+/**
+ * Removing a day's measurement (D56, closed 2026-09-13).
+ *
+ * This was the oldest gap under §3's rule: the entity had `POST` and `GET` and
+ * nothing else, from phase 4 until now. Re-logging the day stood in for an
+ * edit, which is right for a one-row-per-day entity, and there was **no way at
+ * all to take a measurement back** — a waist typed as 92 instead of 82 could be
+ * corrected but not withdrawn, and it sat in the waist-to-height series either
+ * way.
+ *
+ * Nothing derived needs rebuilding afterwards. The smoothed waist series and
+ * the waist-to-height ratio are computed on read from the rows that exist
+ * (D32), and milestone detection is a record of what *was* reached rather than
+ * a projection from the current series, so removing a reading leaves an
+ * achieved milestone achieved. That is the same answer D25 gives for plans: a
+ * fact about the past does not become untrue because a row went.
+ */
+export async function removeMeasurement(userId: string, db: Db, id: string): Promise<void> {
+  const deleted = await deleteMeasurement(userId, db, id);
+  if (!deleted) throw notFound("There is no such measurement.");
 }
 
 /* -------------------------------------------------------------- daily log */
