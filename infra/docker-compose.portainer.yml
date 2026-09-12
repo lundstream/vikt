@@ -49,7 +49,18 @@ services:
       retries: 12
 
   api:
-    image: ${IMAGE_API:-ghcr.io/lundstream/vikt-api:latest}
+    # Pinned to a version, never to `latest` (D148).
+    #
+    # `IMAGE_TAG` is the one line a rollback edits: set it to the previous
+    # version, redeploy, done. It holds whatever kind of tag you want to pin —
+    # `1.1.0`, `1.1`, or `sha-<commit>` for something that was never released —
+    # because they all live in the same namespace on the registry.
+    #
+    # No default on purpose. `latest` as a fallback means a redeploy pulls
+    # whatever main happened to be when nobody was looking, and a stack that
+    # cannot say which version it is running cannot be rolled back to a known
+    # one either.
+    image: ghcr.io/lundstream/vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -140,7 +151,8 @@ services:
       start_period: 30s
 
   nginx:
-    image: ${IMAGE_WEB:-ghcr.io/lundstream/vikt-web:latest}
+    # The same tag as the API, always. See `IMAGE_TAG` above.
+    image: ghcr.io/lundstream/vikt-web:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
     restart: unless-stopped
     depends_on:
       api:

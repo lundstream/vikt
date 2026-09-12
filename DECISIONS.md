@@ -6728,3 +6728,72 @@ variable. The drift check was proved by breaking one.
 That the value is **correct** — only that it arrives. A `DATABASE_URL` pointing
 at the wrong host is a problem this test cannot see, and `assertProdSecrets` and
 the health endpoint are what cover that.
+
+### D148 — The stack pins a version, and a rollback is one line
+
+*2026-09-13.*
+
+`infra/docker-compose.portainer.yml` defaulted both images to `latest`. Three
+things follow from that and none of them is good: a redeploy pulls whatever
+`main` happened to be when nobody was looking, the running stack cannot say
+which version it is, and a rollback has no target to name. "Restore the dump" is
+not a rollback plan for a bad frontend build.
+
+#### One variable, no default
+
+```
+image: ghcr.io/lundstream/vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+image: ghcr.io/lundstream/vikt-web:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+```
+
+`IMAGE_TAG` replaces `IMAGE_API` and `IMAGE_WEB`, which were two variables for
+one decision — the two images are built from the same commit by the same
+workflow and there has never been a reason to run them at different versions.
+One variable is also what makes the rollback *one line*, which is the property
+worth having.
+
+It holds any kind of tag: `1.1.0`, `1.1`, or `sha-<commit>` for a build that was
+never released. They share one namespace on the registry, so nothing has to
+choose between them.
+
+**No default**, and the `:?` makes the stack refuse rather than guess. A
+`latest` fallback is exactly the behaviour this removes.
+
+#### A version tag on main now builds
+
+`release.yml` had `push: branches: [main]`, `release: published` and
+`workflow_dispatch`. `git tag v1.1.0 && git push --tags` fired nothing: the
+version tags in the metadata step were reachable only by publishing a GitHub
+release.
+
+`push: tags: ["v*.*.*"]` is added, and the runbook still says to cut a version
+with `gh release create` — because a tag push shares the `paths-ignore` written
+for branch pushes and a tag adds no commits for a path filter to look at, while
+the release event has no filter near it. One command does both, so the belt and
+the braces cost nothing.
+
+#### Whether an older image runs against a newer schema
+
+Asked and answered rather than hedged, because "usually works, but it is not a
+promise" is what the runbook used to say and that is not something anybody can
+act on at the moment they need to.
+
+**Twenty-nine of the thirty migrations are additive.** No `DROP TABLE`, no
+rename, no type change, and every added column carries a default — so an older
+image's inserts still satisfy every `NOT NULL`, and its selects name their own
+columns, which means a column added later is simply not selected.
+
+**One is not.** `0023_backup_s3` drops three `backup_settings` columns, as a
+deliberate exception its own header explains: they were added by
+`0022_backup_smb`, which has never run outside development, so no production
+database has ever held a value in them.
+
+Both sit inside the first release's set, so a rollback from any future version
+to any earlier one crosses only additive migrations. The full statement, with
+the one case that does cross 0023, is in INFRA.md under "Versions, images and
+rolling back".
+
+**If a future migration is not additive, the rollback is the dump.** An image
+that expects a dropped column fails when somebody opens the screen that reads
+it — not at startup, and nowhere the health check looks — which is why that case
+has to be planned before the deploy rather than discovered after it.
