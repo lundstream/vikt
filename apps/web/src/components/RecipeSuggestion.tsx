@@ -104,7 +104,11 @@ export function RecipeSuggestion({
       Object.fromEntries(
         result.items.map((item, index) => [
           index,
-          formatDecimal(item.estimatedGrams, { decimals: 0 }),
+          // Null is the photo path's "nobody knows yet" (D143): an empty
+          // field, never a number nobody stated.
+          item.estimatedGrams === null
+            ? ""
+            : formatDecimal(item.estimatedGrams, { decimals: 0 }),
         ]),
       ),
     );
@@ -260,9 +264,11 @@ export function RecipeSuggestion({
                     {item.match?.name ?? item.name}
                   </span>
                   <span className="num block text-micro text-muted">
-                    {item.match
-                      ? t("llm.matched", { kcal: formatKcal(item.match.kcal) })
-                      : t("llm.noMatch")}
+                    {item.match === null
+                      ? t("llm.noMatch")
+                      : item.match.kcal === null
+                        ? t("llm.amountUnknown")
+                        : t("llm.matched", { kcal: formatKcal(item.match.kcal) })}
                   </span>
                 </span>
 

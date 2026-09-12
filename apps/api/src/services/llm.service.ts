@@ -8,13 +8,22 @@ import type {
   RecipeTotal,
   EstimateResponse,
 } from "shared";
-import type { ServingHints } from "shared";
-import { householdHints, resolvePortion, scaleToGrams, toNumber, toNumberOrNull } from "shared";
+import type { ParsedPhotoItem, ServingHints } from "shared";
+import {
+  HOUSEHOLD_UNITS,
+  hintGrams,
+  householdHints,
+  normaliseUnit,
+  resolvePortion,
+  scaleToGrams,
+  toNumber,
+  toNumberOrNull,
+} from "shared";
 import type { Db } from "../db/index.js";
 import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
-import { parsePhotoMessages } from "../llm/parse-photo.js";
+import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
 import { RateLimiter } from "../lib/rate-limit.js";
 import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
 import { recipeMessages, readGeneratedRecipe } from "../llm/recipe.js";
@@ -153,10 +162,10 @@ export async function parseFoodPhoto(
 
   if (!reply.ok) return { available: false, reason: reply.reason };
 
-  const parsed = readParsedFood(reply.content);
+  const parsed = readParsedPhoto(reply.content);
   if (!parsed.ok) return { available: false, reason: parsed.reason };
 
-  const items = await priceAll(userId, db, parsed.items);
+  const items = await pricePhotoItems(userId, db, parsed.items);
 
   /**
    * One line, and everything in it is a count.
@@ -181,6 +190,125 @@ export async function parseFoodPhoto(
 
   return { available: true, items, model: reply.model, ms: reply.ms };
 }
+
+/**
+ * Photographed names and amounts in, priced rows out.
+ *
+ * The same two steps as the text path — match the name, then resolve the
+ * amount against that row's hints — with one rule that only exists here:
+ *
+ * **An amount that cannot be turned into grams is not an amount.** The text
+ * parser has an estimate to fall back on, because a sentence that says "en
+ * skiva bröd" was written by somebody who knows roughly what a slice is. A
+ * photograph has nothing behind it: the model's answers were "stor mängd",
+ * "spridd över delar" and "1 portion", and every one of those is a description
+ * of a picture. Turning them into a number would be the app inventing a figure
+ * and then showing it to the person as though they had given it.
+ *
+ * So the amount survives only when the unit is one the app can price — grams or
+ * kilograms directly, or a household unit this food actually has a definition
+ * for — and is null otherwise. Null rows are kept, named, and cannot be saved
+ * until somebody fills the figure in.
+ */
+async function pricePhotoItems(
+  userId: string,
+  db: Db,
+  parsed: ParsedPhotoItem[],
+): Promise<FoodMatch[]> {
+  const rows = await Promise.all(parsed.map((item) => matchRow(userId, db, item.name)));
+
+  const ids = rows.filter((row) => row !== null).map((row) => row!.id);
+  const userHints = await userHintsFor(userId, db, ids);
+
+  return parsed.map((item, index) => {
+    const row = rows[index] ?? null;
+    const packet = (row?.servingHints as ServingHints | null) ?? null;
+    const own = row ? (userHints.get(row.id) ?? null) : null;
+
+    const household = householdHints(row?.category);
+    const hints = packet || household ? { ...(household ?? {}), ...(packet ?? {}) } : null;
+
+    const amount = photoAmount(item.amount ?? null, hints, own);
+
+    return {
+      name: item.name,
+      estimatedGrams: amount.grams,
+      portion: amount.portion,
+      portionSource: amount.source,
+      /**
+       * The app's figure, not the model's (D55, D143). A photograph is
+       * evidence of a plate and not of a quantity, so every row from one
+       * carries the same lowered confidence, and a model asserting its own
+       * would be the thing being judged handing in the mark.
+       */
+      confidence: PHOTO_CONFIDENCE,
+      match: row === null ? null : priceRow(row, amount.grams, hints, own),
+    };
+  });
+}
+
+/**
+ * What a photographed amount is worth, or null.
+ *
+ * Grams and kilograms resolve on their own; everything else has to be a unit
+ * the household table knows **and** one this food has a definition for. "1
+ * portion" of yoghurt is 200 g because the table says so; "1 portion" of a
+ * kebab pizza is not a quantity, because nothing anywhere says what a portion
+ * of kebab pizza weighs, and inventing it here is exactly what this rule is for.
+ */
+function photoAmount(
+  amount: { count: number; unit: string } | null,
+  hints: ServingHints | null,
+  userHints: ServingHints | null,
+): {
+  grams: number | null;
+  source: FoodMatch["portionSource"];
+  portion: FoodMatch["portion"];
+} {
+  const nothing = { grams: null, source: "unknown", portion: null } as const;
+  if (amount === null) return nothing;
+
+  const unit = normaliseUnit(amount.unit);
+  if (!HOUSEHOLD_UNITS.includes(unit)) return nothing;
+
+  /**
+   * Grams and kilograms carry **no portion label**, because there is nothing
+   * left to label: the amount and the grams are the same fact, and "250 g ·
+   * 250 g" on one line is a screen repeating itself. The label exists for
+   * "1 portion" and "2 skivor", where the words and the mass are different
+   * things and the user needs both to judge the second by the first.
+   */
+  if (unit === "g") return { grams: round(amount.count), source: "hint", portion: null };
+  if (unit === "kg") {
+    return { grams: round(amount.count * 1000), source: "hint", portion: null };
+  }
+
+  const hint = hintGrams(unit, hints, userHints);
+  if (hint === null) return nothing;
+
+  return {
+    grams: round(amount.count * hint.grams),
+    source: hint.source,
+    // The label is capped by `statedPortionSchema`, and a count past it is not
+    // a portion anybody stated: it is the model having produced a gram figure
+    // under a household unit's name.
+    portion: amount.count <= 200 ? amount : null,
+  };
+}
+
+const round = (value: number) => Math.round(value * 10) / 10;
+
+/**
+ * The confidence every row from a photograph carries.
+ *
+ * A fixed figure rather than a computed one, and below anything the text path
+ * produces, because the uncertainty is not in this row: it is in the fact that
+ * a model looked at a picture. D55's estimates lower confidence rather than
+ * excluding themselves from the arithmetic, and these do the same — the
+ * coverage counts them, because the database priced them, and the confidence
+ * says where they came from.
+ */
+export const PHOTO_CONFIDENCE = 0.6;
 
 /**
  * Names and stated portions in, priced rows out.
@@ -266,10 +394,18 @@ async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemR
   return rows.find((candidate) => isPlausibleMatch(name, candidate.name)) ?? null;
 }
 
-/** The row's energy at the resolved grams. Computed here, never by the model. */
+/**
+ * The row's energy at the resolved grams. Computed here, never by the model.
+ *
+ * `grams` may be null, which is the photo path's honest answer when nobody
+ * knows the amount yet (D143). The food is still worth naming and its figure
+ * per hundred grams is still worth showing; what cannot be stated is what this
+ * particular helping is worth, so that field is null rather than a number
+ * standing on an assumed portion.
+ */
 function priceRow(
   row: FoodItemRow,
-  grams: number,
+  grams: number | null,
   hints: ServingHints | null,
   userHints: ServingHints | null,
 ): NonNullable<FoodMatch["match"]> {
@@ -284,7 +420,7 @@ function priceRow(
         saltG: toNumberOrNull(row.saltPer100),
       },
     },
-    grams,
+    grams ?? 0,
   );
 
   /**
@@ -301,8 +437,9 @@ function priceRow(
     name: row.name,
     brand: row.brand,
     kcalPer100: toNumber(row.kcalPer100),
-    // Computed here, from the row. Never from the model.
-    kcal: Math.round(scaled.kcal * 10) / 10,
+    // Computed here, from the row. Never from the model. Null when there are
+    // no grams to compute it at, which is not the same as zero.
+    kcal: grams === null ? null : Math.round(scaled.kcal * 10) / 10,
     servingHints: merged,
   };
 }

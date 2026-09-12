@@ -101,8 +101,15 @@ export const foodMatchSchema = z.object({
    * Named `estimatedGrams` since phase 8 shipped and kept for that reason, but
    * it is no longer always an estimate: `portionSource` says which it is, and
    * every screen showing the number shows that too.
+   *
+   * **Null means nobody knows yet** (D143). Only the photo path produces it: a
+   * model that answered "stor mängd" has not given an amount, and the app's
+   * options are to invent one or to say so. It says so, the field is empty on
+   * screen, and the row cannot be saved until a person fills it in. The text
+   * path never produces null, because a sentence that states no amount still
+   * gives the model something to estimate from and a photograph does not.
    */
-  estimatedGrams: z.number(),
+  estimatedGrams: z.number().nullable(),
   /** The portion as stated, for display. Never a claim about mass. */
   portion: statedPortionSchema.nullable(),
   /** `hint`, `user_hint` or `estimate`. See {@link portionSourceSchema}. */
@@ -114,8 +121,15 @@ export const foodMatchSchema = z.object({
       name: z.string(),
       brand: z.string().nullable(),
       kcalPer100: z.number(),
-      /** Computed from the item and the grams, by the server. */
-      kcal: z.number(),
+      /**
+       * Computed from the item and the grams, by the server.
+       *
+       * Null when the grams are null: the database knows what this food is
+       * worth per hundred grams and nobody knows how many grams there are, so
+       * there is no figure to state. The screen shows the food and an empty
+       * amount rather than a number that quietly assumed one (D143).
+       */
+      kcal: z.number().nullable(),
       /**
        * What this food can be counted in, source hints merged under the user's
        * own. Travels to the client so a portion picker does not need a second
@@ -207,6 +221,50 @@ export const PHOTO_MAX_BASE64 = Math.ceil(PHOTO_MAX_BYTES / 3) * 4;
  * what is on it is the part a person knows. Four words fix it, and they travel
  * with the image into the *same* call, not a second one.
  */
+/**
+ * One food the model found in a photograph.
+ *
+ * Two fields, and the shortness is the design. The text parser's item carries
+ * an `estimatedGrams` the model guessed and a `confidence` it asserted; neither
+ * belongs here. A photograph gives no ground truth to guess grams from — the
+ * probe's models said "stor mängd" and "spridd över delar", which are
+ * descriptions of a picture — and a confidence figure attached by the thing
+ * being judged is not evidence. The app sets the confidence, from the fact that
+ * this came from a photograph at all.
+ *
+ * `amount` is **nullable and stays null**. An amount is a number with a unit
+ * the app can turn into grams; anything else is not an amount, and the correct
+ * thing to do with "stor mängd" is to show the food with an empty amount field,
+ * not to invent 150 g behind the person's back. See `HOUSEHOLD_UNITS`.
+ */
+export const parsedPhotoItemSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    /**
+     * `.catch(null)` rather than a rejection, and this is the one place in the
+     * codebase where a malformed field is tolerated instead of refused.
+     *
+     * The reason is what the malformed value actually is. The home plate came
+     * back with `"amount": "stor mängd"` — a string where an object belongs —
+     * beside three foods the model had named correctly. Refusing the reply
+     * would throw those three away over one side dish nobody could quantify,
+     * and "no amount" is already a first-class answer here with a defined
+     * behaviour on screen. A nutrition key is still refused outright, because
+     * that one is a claim rather than an absence.
+     */
+    amount: z
+      .object({ count: z.number().positive().max(2000), unit: z.string().trim().min(1).max(30) })
+      .strict()
+      .nullish()
+      .catch(null),
+  })
+  .strict();
+export type ParsedPhotoItem = z.infer<typeof parsedPhotoItemSchema>;
+
+export const parsedPhotoSchema = z
+  .object({ items: z.array(parsedPhotoItemSchema).max(30) })
+  .strict();
+
 export const parseFoodPhotoRequestSchema = z.object({
   image: z.string().min(32).max(PHOTO_MAX_BASE64),
   note: z.string().trim().max(200).optional(),

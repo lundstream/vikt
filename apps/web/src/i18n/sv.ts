@@ -1015,6 +1015,8 @@ export const sv = {
     "Kolla mängderna innan du sparar. Kalorierna kommer från livsmedelsdatabasen, inte från tolkningen.",
   "llm.matched": "{kcal} kcal enligt databasen",
   "llm.noMatch": "Ingen träff i databasen, sparas utan energivärde",
+  // Where the figure would be, when the picture did not say a quantity.
+  "llm.amountUnknown": "inte än",
   "llm.include": "Ta med {name}",
   "llm.saveRows": "Spara {count} rader",
   "llm.nothingFound": "Hittade ingen mat i texten. Skriv om den, eller sök upp maten själv.",

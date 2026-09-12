@@ -99,7 +99,7 @@ describe("a photograph that parsed", () => {
     { LLM_VISION_MODEL: "qwen3-vl:8b", LOG_LEVEL: "info" },
     {
       llm: stubLlm(
-        modelSays([{ name: "kebabpizza", estimatedGrams: 500, confidence: 0.6 }]),
+        modelSays([{ name: "kebabpizza", amount: { count: 1, unit: "st" } }]),
         seen,
       ),
       logStream: stream,
