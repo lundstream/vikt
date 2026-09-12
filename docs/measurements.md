@@ -75,10 +75,17 @@ difference between "ignored the picture" and "looked and guessed badly".
 
 | model | reports vision | saw it | read the word | time |
 |---|---|---|---|---|
-| `qwen3.6:27b` | yes | yes, circle and square with colours | "IKT" | **16.7 s** |
+| `qwen3-vl:8b` | yes | yes | **"VIKT"** | **11.0 s** |
+| `qwen3.6:27b` | yes | yes, circle and square with colours | "IKT" | 16.7 s |
 | `qwen3.6:latest` | yes | yes, and described the layout | "UIKIT" | 30.1 s |
 | `odytrice/gemma4-31b:5090` | yes | yes, colours and background | "VIKT" | 94.3 s |
 | `gemma4:e4b` | yes | **no**: "du har inte tillhandahållit någon bild" | — | 21.0 s |
+
+`qwen3-vl:8b` was pulled for this comparison and is the only model that is both
+the fastest and the most accurate reader: 11 s, and the word right, against 94 s
+for the other model that read it. Eight billion parameters against twenty-seven
+and thirty-one, which is the expected shape for a model built for pictures
+rather than a general one that also accepts them.
 
 `gemma4:e4b` is the finding worth keeping: it advertises `vision`, accepts the
 request, and answers as though no image was attached. A flag is not a test.
@@ -87,9 +94,54 @@ The times are for a 2 kB image on an idle box. A photograph is two orders of
 magnitude larger and will not be anywhere near this fast, which is why the
 waiting state on the screen has to quote a measured figure rather than a hope.
 
-**Not yet measured: a real plate.** That probe needs a photograph taken by
-somebody, because a stock image is a picture a model may have been trained on,
-and it is the only test that answers the question the feature depends on.
+### And then a real plate
+
+Six photographs taken on a phone, resized to 1280 px on the long edge and
+re-encoded as JPEG at 0.8 — the size the client will actually send, so the
+timings are the ones a person will wait. 3-11 MB became 77-211 kB.
+
+**The home plate**: a grilled steak, a dollop of béarnaise, thick chips, and a
+salad of cucumber, cherry tomato and feta. 104 kB.
+
+| model | time | what it said |
+|---|---|---|
+| `qwen3-vl:8b` | **19.6 s** | Kött, 1 portion · Friterad potatis, stor mängd · Gurksallad med tomater och feta, ca 100 g · Krämig sås, ca 50 g |
+| `qwen3.6:27b` | 14.9 s | Grillad köttfarsbiff, ca 1 st · **Gulrots**- och gurksallad med fetaost, ca ½ cup · **Potatismat (fryst)**, ca 3-4 dl · Vit krämsås eller aioli, ca 2-3 msk |
+| `gemma4:e4b` | 10.5 s | "Jag kan tyvärr inte se någon tallrik eller någon mat i din fråga. Du har inte bifogat någon bild." |
+
+`qwen3-vl:8b` named all four things on the plate and put a plausible amount on
+each. `qwen3.6:27b` **sees but invents**: there is no carrot, the chips are not
+frozen, and "potatismat" is not a word. `gemma4:e4b` denies having been sent
+anything, exactly as it did with the generated image. `odytrice/gemma4-31b:5090`
+was not re-run on a photograph: it took 94 s on a 2 kB image, and nothing it
+could say would make a minute and a half acceptable on a screen somebody is
+waiting at.
+
+Two more, both `qwen3-vl:8b`:
+
+| photo | time | what it said |
+|---|---|---|
+| Caesar salad, 211 kB | **10.0 s** | Salladblad: stora mängder · Smörstekta bacon: 3-4 bitar · Kycklingbröst: 3-4 skivor · Tomater: 2-3 st · Croutons: 5-6 bitar · Ost (t.ex. Parmesan): stora mängder · Krämig dressing: spridd över delar |
+| Kebab pizza, 209 kB | **13.1 s** | Pizza (1 st) |
+
+#### What this decides
+
+**The model is `qwen3-vl:8b`**, and the wait to quote on screen is **10 to 20
+seconds** for a 1280 px photograph on an idle box.
+
+Three things the probe settled that a paragraph could not:
+
+- **A capability flag is not a test.** Ollama reports `vision` for `gemma4:e4b`,
+  which accepts the request and answers as though nothing was attached, twice.
+- **Seeing is not the same as not inventing.** `qwen3.6:27b` looked at the plate
+  and produced a carrot. The photo path needs the same discipline as the text
+  parser: the model names, the database prices, and a person confirms before
+  anything is saved.
+- **Amounts are the weak part, and a composite dish is weaker still.** "Stora
+  mängder" and "spridd över delar" are not quantities, and a kebab pizza came
+  back as "Pizza (1 st)". That is the argument for the optional text line beside
+  the photo — "kebabpizza, hel" costs four words and fixes what the picture
+  cannot say — and for marking every amount from a photo as an estimate.
 
 ---
 
