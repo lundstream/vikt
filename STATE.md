@@ -260,11 +260,14 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 43 commits, plus the one this
+between what is built and what is running. 46 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `2125306` | Notice at boot that the VAPID pair changed |
+| `1faaab0` | 403 keeps the push subscription, because the fault is usually ours |
+| `2af8dd7` | Record the pass: the skip guard's own line, and what is on dev |
 | `6da0adf` | Sentence case for option buttons, and why two dead push rows survived |
 | `9cb04bf` | Absent data has the data as its subject, in every tone |
 | `c35da79` | A guard for skipped tests, and an inventory of the rest |
@@ -383,8 +386,8 @@ endpoint *is* configured nothing is half-skipped, so a CI box that lost
 `pg_dump` fails rather than quietly covering less (§7). Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 723 with none skipped**, and that is now checked
-rather than read: `pnpm test:skips` reported "1486 tests reported, none skipped
+**In CI the api suite runs 730 with none skipped**, and that is now checked
+rather than read: `pnpm test:skips` reported "1493 tests reported, none skipped
 outside the allowlist (the live S3 suite ran)" on this commit, which is the number that
 matters: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
