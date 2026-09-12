@@ -511,7 +511,10 @@ build served by `vite preview`:
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
 - **The trend line on a sparse account, before and after** (D144): a seeded
-  account weighing about once a week over ninety days, shot at 360 px and
+  account, `gles@example.test` in the **development** database with the
+  `SEED_PASSWORD` password, weighing about once a week over ninety days. It
+  exists because the development account weighs most mornings and the staircase
+  is invisible at that cadence; delete it whenever. Shot at 360 px and
   desktop on either side of the change. Before, a staircase: flat for nine days
   and then a kilo in one step. After, a monotone curve through the reading
   dates, with the raw dots exactly where they were. The same fixture on the
