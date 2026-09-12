@@ -2,6 +2,7 @@ import type {
   FoodMatch,
   LlmHealth,
   ParseFoodResponse,
+  ParsePhotoResponse,
   RecipeBudget,
   RecipeResponse,
   RecipeTotal,
@@ -13,6 +14,9 @@ import type { Db } from "../db/index.js";
 import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
+import { parsePhotoMessages } from "../llm/parse-photo.js";
+import { RateLimiter } from "../lib/rate-limit.js";
+import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
 import { recipeMessages, readGeneratedRecipe } from "../llm/recipe.js";
 import { checkCompleteness, type CompletenessFailure } from "../llm/recipe-completeness.js";
 import { estimateMessages, readDishEstimate } from "../llm/estimate.js";
@@ -80,6 +84,102 @@ export async function parseFoodText(
     model: reply.model,
     ms: reply.ms,
   };
+}
+
+/**
+ * How many photographs one account may send in an hour.
+ *
+ * The coach's allowance, deliberately the same number and deliberately not the
+ * same bucket. The same number because both queue on the one GPU this
+ * installation has and neither is a thing a person does forty times an hour;
+ * separate buckets because a day of logging meals should not be able to use up
+ * the conversation, which is the surface where being told to come back later is
+ * worst.
+ */
+export const PHOTO_PARSES_PER_HOUR = COACH_TURNS_PER_HOUR;
+
+const photoLimiter = new RateLimiter(PHOTO_PARSES_PER_HOUR, 60 * 60_000);
+
+/**
+ * A photograph in, the same priced rows a sentence produces out.
+ *
+ * **The image is not kept.** It is decoded from the request, handed to Ollama,
+ * and dropped when this function returns: it is not written to disk, not
+ * written to any table, not put in a log line, and the client never queues it.
+ * A photograph of a plate is a photograph of somebody's kitchen, or of the
+ * people they were eating with, and the only reason this feature is acceptable
+ * in a self-hosted app is that the picture stops existing the moment it has
+ * been read. `apps/api/test/photo-transport.test.ts` holds that.
+ *
+ * Read-only in the same sense as the text parse, for the same reason: what
+ * comes back is a proposal, and nothing reaches `food_entries` until a person
+ * has looked at every row.
+ */
+export async function parseFoodPhoto(
+  userId: string,
+  db: Db,
+  env: Env,
+  client: LlmClient,
+  input: { image: string; note?: string },
+  log?: { info: (data: object, message: string) => void },
+): Promise<ParsePhotoResponse> {
+  /**
+   * No model named means the path does not exist here, which is a different
+   * answer from the box being off and is worth telling apart: one is an
+   * installation that has not been configured for this and one is a workstation
+   * somebody switched off.
+   */
+  const model = env.LLM_VISION_MODEL.trim();
+  if (model === "") return { available: false, reason: "not_configured" };
+
+  const limit = photoLimiter.check(`photo:${userId}`);
+  if (!limit.allowed) {
+    return {
+      available: false,
+      reason: "rate_limited",
+      retryAfterSeconds: limit.retryAfterSeconds,
+    };
+  }
+
+  const reply = await client.chat({
+    model,
+    messages: parsePhotoMessages(input.image, input.note),
+    json: true,
+    temperature: 0,
+    // Three times the text budget, measured rather than chosen. See the
+    // variable's own comment in env.ts.
+    timeoutMs: env.OLLAMA_VISION_TIMEOUT_MS,
+  });
+
+  if (!reply.ok) return { available: false, reason: reply.reason };
+
+  const parsed = readParsedFood(reply.content);
+  if (!parsed.ok) return { available: false, reason: parsed.reason };
+
+  const items = await priceAll(userId, db, parsed.items);
+
+  /**
+   * One line, and everything in it is a count.
+   *
+   * Enough to answer "is this being used and is it slow", which is what the
+   * operator of a self-hosted box actually wants from a log. The size is in
+   * kilobytes because the number is the useful part; the bytes themselves are
+   * the thing this whole path is arranged not to write down. `hadNote` rather
+   * than the note, for the same reason: "kebabpizza, hela" is not private, and
+   * the next one might be.
+   */
+  log?.info(
+    {
+      model: reply.model,
+      ms: reply.ms,
+      kb: Math.round((input.image.length * 3) / 4 / 1024),
+      items: items.length,
+      hadNote: (input.note?.trim() ?? "") !== "",
+    },
+    "photo parsed",
+  );
+
+  return { available: true, items, model: reply.model, ms: reply.ms };
 }
 
 /**

@@ -5,6 +5,7 @@ import type {
   CreateEstimate,
   CreateFoodPortion,
   EstimateDishRequest,
+  ParseFoodPhotoRequest,
   CreatePantryStaple,
   CreateSavedRecipe,
   RecipeRequest,
@@ -221,6 +222,22 @@ export function useLlmHealth() {
  */
 export function useParseFood() {
   return useMutation({ mutationFn: (text: string) => api.parseFood(text) });
+}
+
+/**
+ * A photograph of a plate to named foods (D143).
+ *
+ * **Never queued**, and for a stronger reason than the text parse's. The text
+ * parse is not queued because there is nothing an offline queue could do with
+ * it; the photograph is not queued because queueing it would mean writing the
+ * image to this device's storage and keeping it there until the network came
+ * back, and the one promise this feature makes is that the picture stops
+ * existing as soon as it has been read.
+ */
+export function useParseFoodPhoto() {
+  return useMutation({
+    mutationFn: (body: ParseFoodPhotoRequest) => api.parseFoodPhoto(body),
+  });
 }
 
 /**

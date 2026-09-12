@@ -28,7 +28,20 @@
 
 import type { Env } from "../env.js";
 
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+  /**
+   * Base64 images, which Ollama's native endpoint takes **on the message**
+   * rather than as a request option (D143).
+   *
+   * Optional and unset everywhere but the photo path. It is worth knowing that
+   * this field passing validation proves nothing: four models on this host
+   * advertise a `vision` capability, and one of them accepts the field and
+   * answers that no image was attached. See `docs/measurements.md`.
+   */
+  images?: string[];
+};
 
 export type ChatOk = { ok: true; content: string; model: string; ms: number };
 

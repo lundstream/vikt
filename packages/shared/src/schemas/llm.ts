@@ -155,6 +155,97 @@ export const parseFoodResponseSchema = z.discriminatedUnion("available", [
 ]);
 export type ParseFoodResponse = z.infer<typeof parseFoodResponseSchema>;
 
+/* ------------------------------------------------------------- photographs */
+
+/**
+ * The largest photograph the server will accept, after the client has resized
+ * it.
+ *
+ * The client reduces to 1280 px on the long edge and re-encodes as JPEG at
+ * about 0.8, which turned the phone's own 3 to 11 MB files into 77 to 211 kB
+ * when this was measured. Two megabytes is therefore an order of magnitude
+ * above anything the resize actually produces: it is the boundary that catches
+ * a client which did not resize at all, not a budget anybody is meant to spend.
+ */
+export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The long edge the client resizes to, and the JPEG quality it re-encodes at.
+ *
+ * Here rather than in the web app because they are the measurement the rest of
+ * this depends on, not a rendering preference. The 10 to 20 second wait quoted
+ * on screen, the vision timeout on the server and the byte ceiling above were
+ * all measured at 1280 px and quality 0.8; changing either without re-measuring
+ * makes all three wrong at once, and a reader who finds one of them should be
+ * able to find the others in the same place.
+ */
+export const PHOTO_MAX_EDGE = 1280;
+export const PHOTO_QUALITY = 0.8;
+
+/**
+ * The same limit expressed in base64 characters, which is what the schema can
+ * actually count.
+ *
+ * Base64 is four characters per three bytes, so the ceiling is the byte limit
+ * times four thirds, rounded up to the next quantum of four. Checked here as
+ * well as by the route's own body limit, because the two say different things:
+ * the body limit refuses to read an oversized request at all, and this refuses
+ * an oversized *image* inside a request that was small enough to read.
+ */
+export const PHOTO_MAX_BASE64 = Math.ceil(PHOTO_MAX_BYTES / 3) * 4;
+
+/**
+ * A photograph of a plate, and optionally a few words beside it.
+ *
+ * `image` is raw base64 with no data URL prefix: the prefix carries a media
+ * type the server would have to either trust or re-derive, and re-deriving it
+ * from the bytes is the only honest option, so the prefix is stripped by the
+ * client rather than sent and ignored.
+ *
+ * `note` is the line the photograph cannot say. The probe found that a kebab
+ * pizza comes back as "Pizza (1 st)" — the picture shows one round thing, and
+ * what is on it is the part a person knows. Four words fix it, and they travel
+ * with the image into the *same* call, not a second one.
+ */
+export const parseFoodPhotoRequestSchema = z.object({
+  image: z.string().min(32).max(PHOTO_MAX_BASE64),
+  note: z.string().trim().max(200).optional(),
+});
+export type ParseFoodPhotoRequest = z.infer<typeof parseFoodPhotoRequestSchema>;
+
+/**
+ * The answer, with the same two-branch shape as the text parse.
+ *
+ * The unavailable branch carries two reasons the text path has no use for.
+ * `not_configured` is an installation with no vision model named, which is a
+ * choice rather than a fault; `rate_limited` is the one place a photo is
+ * refused for being one too many, and it shares the coach's allowance because
+ * both queue on the same single GPU.
+ */
+export const parsePhotoResponseSchema = z.discriminatedUnion("available", [
+  z.object({
+    available: z.literal(true),
+    items: z.array(foodMatchSchema),
+    model: z.string(),
+    ms: z.number().int().min(0),
+  }),
+  z.object({
+    available: z.literal(false),
+    reason: z.enum([
+      "disabled",
+      "not_configured",
+      "unreachable",
+      "timeout",
+      "failed",
+      "unusable_output",
+      "rate_limited",
+    ]),
+    /** Seconds, and only on `rate_limited`. */
+    retryAfterSeconds: z.number().int().min(1).optional(),
+  }),
+]);
+export type ParsePhotoResponse = z.infer<typeof parsePhotoResponseSchema>;
+
 /** What the client asks before offering any of this in the UI. */
 export const llmHealthSchema = z.object({
   /** Configured at all. False means the operator has not set a host. */

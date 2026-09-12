@@ -1021,6 +1021,21 @@ export const sv = {
   "llm.unavailableNow": "Tolkningen är inte igång just nu. Sök upp maten själv så länge.",
   "llm.logged": "{count} rader loggade",
 
+  // ------------------------------------------------ maten som fotografi (D143)
+  "photo.take": "Fotografera maten",
+  "photo.working": "Tittar på bilden…",
+  // The measured figure, in the app's own register. No spinner metaphor: the
+  // honest thing to say to somebody waiting is how long it takes.
+  "photo.waiting": "Det tar ungefär tio till tjugo sekunder.",
+  "photo.noteLabel": "Vad är det, om bilden inte räcker",
+  "photo.notePlaceholder": "kebabpizza, hela",
+  "photo.tooLarge": "Bilden är för stor även efter förminskningen. Ta en ny.",
+  "photo.unreadable": "Bilden gick inte att läsa. Ta en ny.",
+  "photo.unavailableNow":
+    "Bildtolkningen är inte igång just nu. Bilden sparades inte, så den behöver tas om. Skriv in maten själv så länge.",
+  "photo.rateLimited": "Du har skickat många bilder den senaste timmen. Vänta en stund.",
+  "photo.nothingFound": "Hittade ingen mat på bilden. Ta en ny, eller skriv in maten själv.",
+
   "recipe.title": "Vad kan jag laga?",
   "recipe.intro":
     "Skriv vad du har hemma. Förslaget räknas om mot det som finns kvar av dagen, och alla energivärden kommer från livsmedelsdatabasen.",

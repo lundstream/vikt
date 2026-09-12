@@ -425,6 +425,34 @@ const envSchema = z.object({
   OLLAMA_MODEL_LARGE: z.string().default("qwen3.6:27b"),
 
   /**
+   * The model that gets sent photographs. Empty means the photo path is
+   * **absent**, like every other mode in this file.
+   *
+   * A third name rather than a reuse of the other two, because the capability
+   * is not a property of size: the small model here reports a `vision`
+   * capability, accepts an image, and answers that nothing was attached — twice,
+   * to a generated image and to a real plate (`docs/measurements.md`). Which tag
+   * can actually see is an installation fact, so it is configuration, and
+   * `pnpm --filter api probe:vision` is how an operator finds out.
+   *
+   * No default. A default here would be this workstation's answer presented as
+   * everyone's, and the failure it produces is the quiet kind: a model that
+   * accepts the request and describes nothing.
+   */
+  LLM_VISION_MODEL: z.string().trim().default(""),
+
+  /**
+   * The photo budget, separate from the text one and three times as long.
+   *
+   * Measured rather than chosen: `qwen3-vl:8b` took 10 to 20 s on the 1280 px
+   * photographs the client actually sends, against 0.56 s for a warm text
+   * parse. Running both off `OLLAMA_TIMEOUT_MS` would mean either timing out
+   * most photographs or making every text parse wait a minute before admitting
+   * the box is off.
+   */
+  OLLAMA_VISION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(180000).default(60000),
+
+  /**
    * The interactive budget. Short on purpose: a person is waiting, and the
    * honest answer after this long is "not available", which is a path this app
    * already has.

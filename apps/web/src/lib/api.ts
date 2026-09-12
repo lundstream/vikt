@@ -43,6 +43,8 @@ import type {
   CreateTemplate,
   LlmHealth,
   ParseFoodResponse,
+  ParseFoodPhotoRequest,
+  ParsePhotoResponse,
   CreateEstimate,
   CreateFoodPortion,
   EstimateDishRequest,
@@ -225,6 +227,20 @@ export const api = {
     request<ParseFoodResponse>("/llm/parse-food", {
       method: "POST",
       body: JSON.stringify({ text }),
+    }),
+
+  /**
+   * A photograph of a plate, and the words beside it (D143).
+   *
+   * Base64 in JSON rather than a multipart upload, because multipart is a file
+   * transfer and this is not one: there is no file at the other end. The image
+   * is read, handed to the model and dropped, and a shape that looks like an
+   * upload would invite somebody to give it somewhere to land.
+   */
+  parseFoodPhoto: (body: ParseFoodPhotoRequest) =>
+    request<ParsePhotoResponse>("/llm/parse-photo", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   /**
