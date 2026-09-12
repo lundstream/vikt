@@ -3,11 +3,12 @@ import { createWeightEntrySchema, formatForInput } from "shared";
 import { ApiError } from "../lib/api.js";
 import {
   useDeleteManualIntake,
+  useDeleteWeight,
   useManualIntakeLog,
   useSaveManualIntake,
   useSaveWeight,
 } from "../lib/log.js";
-import { describeDay } from "../lib/dates.js";
+import { describeDay, formatLongDay } from "../lib/dates.js";
 import { clientUuid } from "../lib/uuid.js";
 import { readNumber, readRequiredNumber } from "../lib/form-number.js";
 import { Field, fieldAria, fieldErrorsFrom, type FieldErrors } from "./Field.js";
@@ -44,6 +45,23 @@ export type QuickLogSheetProps = {
   lastWeightKg: number | null;
   /** Intake already logged for `today`, if any. */
   todayIntakeKcal: number | null;
+  /**
+   * The day to open on. Defaults to today, which is the quick path (D145).
+   *
+   * Set by the readings list and the month calendar, where the sheet is not a
+   * quick entry but the edit for a day somebody pointed at. The field is still
+   * there and still editable: the day is a starting point, not a lock.
+   */
+  date?: string;
+  /** Seeds the weight field instead of `lastWeightKg`. The day's own reading. */
+  weightKg?: number | null;
+  /**
+   * The reading being edited, when there is one.
+   *
+   * Its only job is to put a delete on the screen that shows the row (§3, D56).
+   * Saving is an upsert on the day either way, so an edit needs no id.
+   */
+  entryId?: string | null;
 };
 
 export function QuickLogSheet({
@@ -53,6 +71,9 @@ export function QuickLogSheet({
   today,
   lastWeightKg,
   todayIntakeKcal,
+  date,
+  weightKg: seedWeightKg,
+  entryId = null,
 }: QuickLogSheetProps) {
   // The zone matters: it decides which day an entry belongs to (D39), and the
   // queue stamps that at creation rather than at send time.
@@ -61,9 +82,11 @@ export function QuickLogSheet({
   const deleteIntake = useDeleteManualIntake();
   const manualLog = useManualIntakeLog();
 
+  const deleteWeight = useDeleteWeight();
+
   const [weightKg, setWeightKg] = useState("");
   const [kcal, setKcal] = useState("");
-  const [localDate, setLocalDate] = useState(today);
+  const [localDate, setLocalDate] = useState(date ?? today);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -93,9 +116,22 @@ export function QuickLogSheet({
     wasOpen.current = open;
     if (!justOpened) return;
 
-    setWeightKg(formatForInput(lastWeightKg));
-    setKcal(formatForInput(todayIntakeKcal, 0));
-    setLocalDate(today);
+    const openOn = date ?? today;
+    setWeightKg(formatForInput(seedWeightKg === undefined ? lastWeightKg : seedWeightKg));
+    /**
+     * The intake for the day being opened, not for today (D145).
+     *
+     * Seeding today's figure while editing the third of September would put
+     * today's calories on that day the moment somebody pressed save, and they
+     * would have no way of knowing they had. The manual log is already loaded
+     * for the delete below; this reads the same row.
+     */
+    const manualForDay =
+      openOn === today
+        ? todayIntakeKcal
+        : (manualLog.data?.find((entry) => entry.localDate === openOn)?.kcal ?? null);
+    setKcal(formatForInput(manualForDay, 0));
+    setLocalDate(openOn);
     setErrors({});
     setSaved(false);
     saveWeight.reset();
@@ -108,7 +144,7 @@ export function QuickLogSheet({
       weightInput.current?.select();
     });
     return () => cancelAnimationFrame(raf);
-  }, [open, today, lastWeightKg, todayIntakeKcal, saveWeight, saveIntake]);
+  }, [open, today, date, seedWeightKg, lastWeightKg, todayIntakeKcal, manualLog.data, saveWeight, saveIntake]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,7 +237,7 @@ export function QuickLogSheet({
       >
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 id="quicklog-title" className="text-lg font-semibold text-ink">
-            {t("quick.title")}
+            {entryId ? t("quick.editTitle") : t("quick.title")}
           </h2>
           <button
             type="button"
@@ -231,7 +267,7 @@ export function QuickLogSheet({
 
           <Field
             id="quick-kcal"
-            label={t("quick.calories")}
+            label={localDate === today ? t("quick.calories") : t("quick.caloriesThatDay")}
             error={errors.kcal}
             hint={t("quick.caloriesHint")}
           >
@@ -282,6 +318,24 @@ export function QuickLogSheet({
           <p className="text-micro text-muted" aria-live="polite">
             {describeDay(localDate, today, LOCALE)}
           </p>
+
+          {/*
+            The reading's own delete, on the screen that shows it (§3, D56).
+            Only when there is one: on an empty day there is nothing to remove,
+            and a control that would 404 is worse than no control.
+          */}
+          {entryId ? (
+            <DeleteButton
+              testId="delete-weight-entry"
+              label={t("quick.removeReadingLabel", {
+                day: formatLongDay(localDate, LOCALE),
+              })}
+              onDelete={async () => {
+                await deleteWeight.mutateAsync(entryId);
+                onClose();
+              }}
+            />
+          ) : null}
 
           {submitError ? (
             <p role="alert" className="text-note text-muted">

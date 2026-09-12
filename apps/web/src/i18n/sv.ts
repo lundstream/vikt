@@ -911,6 +911,22 @@ export const sv = {
   "chart.trend": "Trend",
   "chart.reading": "Daglig vägning",
   "chart.imported": "Importerad",
+  // ---------------------------------------------- månadskalendern (D145)
+  // Two letters, Monday first. The grid is seven columns on a 360 px screen and
+  // three-letter days do not fit without shrinking the figures beside them.
+  "weekday.mon": "må",
+  "weekday.tue": "ti",
+  "weekday.wed": "on",
+  "weekday.thu": "to",
+  "weekday.fri": "fr",
+  "weekday.sat": "lö",
+  "weekday.sun": "sö",
+  "calendar.allWeighings": "alla vägningar",
+  "calendar.hideWeighings": "dölj kalendern",
+  "calendar.weighingsLabel": "Vägningar per dag",
+  "calendar.weighing": "vägning",
+  "calendar.help":
+    "Tryck på en dag för att ändra vägningen, eller på en tom dag för att fylla i den.",
   "chart.trendValue": "Trend {value} kg",
   "chart.readValue": "Vägd {value} kg",
   "chart.importedValue": "Importerad {value} kg",
@@ -1204,9 +1220,15 @@ export const sv = {
 
   // -------------------------------------------------------------- quick log
   "quick.title": "Logga vikt",
+  // The same sheet, opened on a day that already has a reading (D145).
+  "quick.editTitle": "Ändra vägningen",
+  "quick.removeReadingLabel": "vägningen {day}",
   "quick.cancel": "Avbryt",
   "quick.weight": "Vikt (kg)",
   "quick.calories": "Kalorier i dag (frivilligt)",
+  // The same field with the sheet open on a past day (D145). "i dag" there
+  // named the wrong day, directly above a field holding that day's figure.
+  "quick.caloriesThatDay": "Kalorier den dagen (frivilligt)",
   "quick.caloriesHint": "En siffra för hela dagen. Matloggning kommer senare.",
   "quick.numberInvalid": "Skriv ett tal, med komma eller punkt som decimaltecken.",
   "quick.numberAmbiguous":

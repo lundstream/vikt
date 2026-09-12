@@ -6383,3 +6383,151 @@ a home dinner, somebody else's cooking.
   phone.** The path was exercised end to end in a browser with a real file; the
   attribute is what tells a phone to open the camera rather than the gallery,
   and that is the one thing a desktop run cannot show.
+
+### D144 — The trend line is a curve between readings, not a staircase
+
+*2026-09-13.*
+
+§4.1 returns one point per day, and on a day with no reading it carries the
+previous trend forward unchanged and marks the point `interpolated`. That is
+the correct answer to "what is the trend on the eleventh" and the wrong thing
+to hand a line chart, because **a line treats every point as a vertex it must
+pass through**. With sparse readings the result is a staircase: flat across the
+gap, then the whole move in a single day-wide step.
+
+The picture said the weight held steady for nine days and then fell a kilo
+overnight. Nothing in the data says that. What the data says is that two
+readings nine days apart produced two trend values, and the line between them
+is an interpolation the chart is supposed to draw.
+
+**The arithmetic is untouched.** Everything downstream of `computeTrend` — the
+maintenance figure, both projections, the hero number — reads the same series it
+always did, and this decision does not change a digit of it. What changed is the
+array handed to Recharts.
+
+#### What the chart receives
+
+`withTrendVertices` nulls the trend on every carried-forward day and
+`connectNulls` on the line spans them. So the line has **one vertex per reading
+date**, carrying §4.1's own value for that date.
+
+**Monotone, not a natural spline.** A cubic through a flat run and then a drop
+overshoots the lower reading on its way there, and a trend line that briefly
+shows a weight nobody recorded is the same invented number §2 forbids
+everywhere else. `type="monotone"` cannot leave the interval between two
+neighbouring values.
+
+**The rows stay one per day.** The x axis is categorical over them, so dropping
+the gap days would space two readings a month apart the same as two a day
+apart — a worse lie than the staircase was.
+
+**The tooltip is on reading dates only.** A carried-forward day has nothing to
+report: the weight is unknown and the trend figure is the previous reading's,
+restated. Showing it invited exactly the reading the staircase suggested.
+
+#### Why it survived this long
+
+With a reading every day the two are the same thing, and the owner weighs most
+mornings. It is visible only on an account that weighs weekly, which is why the
+test fixture is three readings in a fortnight and why the screenshots were taken
+against a seeded sparse account rather than the development one.
+
+The test asserts that each vertex equals the calc's trend for that date, to the
+bit. A transform that started smoothing or re-seeding on its own would make the
+line and the maintenance figure disagree about the same day, and nothing else in
+the suite would have noticed.
+
+---
+
+### D145 — Every reading is reachable, and the shape that reaches them is a month
+
+*2026-09-13.*
+
+The dashboard listed the **five most recent** readings, each with a delete. §3
+has said since D56 that every user-created row ships with edit and delete, and
+the weight log has had both in the API since phase 1 — so this was not a missing
+capability, it was a capability with a window five rows wide in front of it. A
+weight mistyped in July showed on the chart as a spike for three months, and the
+control that could have fixed it was out of reach.
+
+Five was never a decision. It was the number that kept the list from competing
+with the chart, which is a real constraint and the wrong thing to solve by
+truncating the only edit path.
+
+#### A month, not three hundred rows
+
+The fix is not a longer list. A ledger under the hero line is exactly what the
+five-row cap existed to prevent, and it is also not how anybody looks for a
+reading: not "the twelfth row from the bottom" but "that Tuesday".
+
+So `MonthCalendar` takes a **set of dates that have data** and a callback, and
+knows nothing else. Marked days are Gran, the colour that means logged
+everywhere else; today is Snö, because today is not a state anything was logged
+in; weeks start on Monday; month navigation is two text links, because two
+chevrons at 24 px are a smaller target than the words and say less.
+
+**Every day is a real `<button>`.** That is what makes the grid tabbable,
+operable with Enter and Space, and visible under `:focus-visible` without
+anything extra — §5's quality floor for the price of the right element.
+
+It is **generic on purpose and wired to one caller on purpose**. Dagen browses
+dates too, and a month of days with a daily log on them is the same picture; it
+is not adopted there in this pass, because a shared component adopted in the
+same breath as it is written is a component shaped around one caller. The seam
+is the props: a date set, a callback, and every noun passed in.
+
+#### One sheet, two ways in
+
+A tapped day opens `QuickLogSheet` on that day — the same sheet the quick action
+opens, with that day's value in the field, the date still editable, and the
+row's delete on it. A marked day is an edit; an empty day is an add.
+
+Two sheets would have been two places for the save rules to drift apart, so the
+sheet took three optional props instead: the day, the value, and the id of the
+row being edited. The id's only job is to put a delete on screen; saving is an
+upsert on the day either way, which is what D56 means by "re-logging is the
+edit" for a one-row-per-day entity.
+
+**The date a backfill is filed under is D61's, unchanged.** `enqueue` stamps
+`chosen` when the supplied date is not the device's own day and `device` when it
+is, so a reading added from the calendar on the third of September carries
+`chosen` without the calendar knowing the rule exists. The render test asserts
+the stamp rather than the absence of a bug.
+
+One defect fell out of the change and is fixed here: the sheet seeded its
+calorie field from **today's** intake whatever day it was opened on, and its
+label said "Kalorier i dag". Harmless while it only ever opened on today; once
+it opens on the third of September, pressing save would have written today's
+calories onto that day and nothing would have said so.
+
+#### The audit: what else has a window narrower than its history
+
+Run against every screen, not against the schema, because the gap this decision
+is about lives in the UI and the API had both endpoints all along.
+
+- **Weight** was the only one. Fixed here.
+- **Dagen's fields** — the daily log, measurements, habits and activities — all
+  follow the shared date selector (D62), which reaches any past day through a
+  native picker with `max` at today. Their edit window is their whole history.
+  What they do not have is a *picture* of which days carry data, which is the
+  gap the calendar was built generic for.
+- **Food entries** follow the same selector, and the day's list is complete for
+  the day on show with edit and delete on each row. "Senast loggat" is capped at
+  six, and that is not an edit surface: its rows log the food **again** rather
+  than open it.
+- **Manual intake** was reachable only through a sheet that opened on today.
+  The date field inside it always worked, so this was narrow rather than shut,
+  and it is now open on any day as a side effect of the above.
+- **Milestones, savings rules and savings events** are listed in full on
+  Framsteg, and coach conversations in full under Coach. None is date-scoped.
+
+Two gaps found that are **not** windows and are not fixed in this pass:
+
+- **`measurement_log` has no delete at all**, at the API or on screen. D56 named
+  it in its own audit and it is still true: `POST /measurement` and
+  `GET /measurement`, and nothing else. A measurement is edited by re-logging
+  the day, so the missing control is the delete, and it needs the endpoint
+  first. This is the oldest open item under §3's rule.
+- **`activity_log` has delete and no update path.** It is many-per-day, so
+  re-logging does not stand in for an edit: correcting a walk from 40 to 30
+  minutes means removing it and typing it again. Also D56's, also still true.
