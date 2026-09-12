@@ -155,7 +155,12 @@ export function TrendChart({
         vertical space to read as one — it needs room to the sides and nothing
         crowding it.
       */}
-      <div className="h-48 w-full sm:h-72">
+      {/*
+        The chart owns the horizontal axis (D154). A finger dragged sideways
+        across a line of readings is reading the line, so the section swipe
+        leaves any touch that starts in here alone.
+      */}
+      <div data-swipe-ignore className="h-48 w-full sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           {/*
             `accessibilityLayer` is off, which is what removes `tabIndex={0}`

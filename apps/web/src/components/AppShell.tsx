@@ -10,6 +10,7 @@ import { useServiceWorker } from "../lib/update.js";
 import { t, type TranslationKey } from "../i18n/index.js";
 import { HeaderLockup } from "./Wordmark.js";
 import { ThemeApplier } from "./ThemeChoice.js";
+import { SectionSwipe } from "./SectionSwipe.js";
 
 /**
  * One shell, two shapes.
@@ -248,6 +249,22 @@ export function destinationsFor(isAdmin: boolean, llm = true): Destination[] {
 /** The four in the bar, and everything that overflows into Mer. */
 export const inBar = (destination: Destination) => destination.inBar === true;
 
+/**
+ * The sections a swipe moves between, in the order the bar draws them (D154).
+ *
+ * The bar's four rather than every destination, because the bar is what the
+ * gesture is a shortcut for: swiping to a place that has no position in the
+ * navigation would leave nothing marked as current and no way to tell where you
+ * had ended up. Everything else is still a tap away in Mer, and a tap there
+ * gets the same slide.
+ *
+ * A module constant, not a computed one: it never varies by account, and a
+ * fresh array every render would re-attach the gesture's listeners on each one.
+ */
+export const SECTION_ORDER: readonly string[] = DESTINATIONS.filter(inBar).map(
+  (destination) => destination.to,
+);
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { updateReady, applyUpdate } = useServiceWorker();
 
@@ -288,7 +305,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         Bottom padding on mobile clears the bar, and only on mobile: on desktop
         the bar is not there and the space would be a gap under every screen.
       */}
-      <div className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
+      {/*
+        `overflow-x: clip` rather than `hidden` (D154). The content slides
+        sideways past both edges during a swipe and has to be cut off there, and
+        `hidden` would also turn this into a scroll container: it forces
+        `overflow-y` to `auto`, which changes what scrolls on every screen in
+        the app to fix an axis nothing scrolls on. `clip` cuts one axis and
+        leaves the other alone.
+      */}
+      <div className="min-w-0 flex-1 overflow-x-clip pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/*
           Above the screen rather than inside it (D108). A planned outage is a
           fact about the app, not about whatever page you happen to be on, and
@@ -298,7 +323,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="px-5 pt-4">
           <MaintenanceBanner />
         </div>
-        {children}
+        {/*
+          The banner stays put and the screen moves (D154). An outage is a fact
+          about the app rather than about the section you are on, so sliding it
+          out and back in would animate the one thing on the page that did not
+          change.
+        */}
+        <SectionSwipe order={SECTION_ORDER}>{children}</SectionSwipe>
       </div>
 
       <BottomBar />

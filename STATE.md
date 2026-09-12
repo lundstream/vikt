@@ -54,6 +54,13 @@ when it will be down, and its mail goes out.
   around the milestone sheet was a focus ring on the dialog container: focus goes
   to the first field now and the sheet's own border is gone, because a sheet is
   Skymning on a dimmed page and needs no edge.
+- **A swipe moves between sections on a phone** (D154). The page follows the
+  finger and completes past a quarter of the screen or on a flick, and a tap in
+  the bar runs the same slide. It stays out of five cases: the 24 px the
+  operating system's own back gesture owns, the weight graph, a range input,
+  anything that scrolls sideways, and any touch where horizontal movement does
+  not clearly beat vertical. Reduced motion removes the movement and keeps the
+  navigation.
 - **A queued edit whose reading was deleted does not die** (D153). The server
   answers 404 only when the row is gone and the day is empty, so nothing on the
   server disagrees with the waiting reading: the queue item becomes a question
@@ -433,6 +440,26 @@ here is the device that matters:
 **Report the device and the Chrome version** with the result, so this section
 can record what it was verified on rather than that it was verified.
 
+**Waiting on the owner, for the real phone half of the section swipe (D154):**
+
+Everything above was done in mobile emulation with dispatched touches, and that
+answers whether the gesture works. It cannot answer the only question that
+matters afterwards, which is whether it gets in the way:
+
+1. Open the app on the phone and swipe between Översikt, Dagen, Mat and
+   Framsteg, both directions, a few times each.
+2. Scroll each of those screens normally for a minute without meaning to swipe.
+   **Report any section that changed when you did not ask for it.**
+3. Drag sideways across the trend line on Översikt, and across a series on Data.
+   Neither should move the page.
+4. Start a drag from the very left edge, the way a thumb rests. The phone's own
+   back gesture should happen and the app should not move.
+5. If the phone is set to reduce motion, confirm the sections still change and
+   nothing slides.
+
+**Report the phone and the browser** with the result, so this section can record
+what it was verified on rather than that it was verified.
+
 **Waiting on the owner, for the camera half of photo logging (D143):**
 
 The whole path is exercised and recorded above — the resize, the post, the
@@ -494,6 +521,17 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The section swipe, with real touches in mobile emulation** (D154): 360 px,
+  `Input.dispatchTouchEvent` rather than dispatched objects, so the browser's own
+  hit testing decides where the touch lands. Forward and back both complete; a
+  short slow drag springs back and leaves no transform behind; a drag from
+  x = 8 does nothing while the **browser** goes back a history entry, which is
+  the edge guard earning its place rather than a hypothesis about it; a drag
+  starting on the trend line does nothing; a mostly downward drag does nothing;
+  a tap in the bar runs the same 200 ms slide; and with `prefers-reduced-motion`
+  emulated the section still changes and nothing moves. Mid-gesture shot at
+  360 px: the page 132 px left, the vacated strip the page colour, the bar still
+  marking the section not yet left. No horizontal overflow at rest;
 - **A queued edit meeting a deleted reading, through two browsers** (D153):
   separate Edge profiles, because two tabs share an IndexedDB and would share
   the queue. 88,4 logged for 8 September through the calendar; the first browser

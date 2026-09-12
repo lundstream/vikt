@@ -7164,3 +7164,112 @@ offline lands on the browser's error page, where the origin is gone and
 IndexedDB is denied**. That is a property of the probe rather than of the app —
 the app itself never navigates there — but it is why the offline half of this
 exercise stays on one page and drives the calendar rather than reloading it.
+
+### D154 — A swipe between sections, and the five times it must not fire
+
+*2026-09-13.*
+
+On a phone the four sections live in a bar at the bottom, which means moving to
+the one beside the current page is aiming at a 72 px target with the hand that is
+also holding the phone. A horizontal swipe is the gesture every other app on the
+device already uses for this, it needs no label, and it costs nothing to
+somebody who never discovers it.
+
+The interesting half is not the gesture. It is **when not to fire**, because a
+page of this app is full of things that are also horizontal, and firing on one
+of them is worse than not having the gesture at all: the person loses their
+place *and* the thing they were actually doing.
+
+#### The five guards
+
+**Within 24 px of either edge, nothing happens.** Both iOS and Android put their
+own back gesture there, and a touch that starts in that strip belongs to the
+operating system. This one is not theoretical: the live probe dragged from
+x = 8 and the *browser* went back a history entry while the app's own track
+never moved. That is the guard working, and it is exactly what would have
+fought the app if the strip were not reserved.
+
+**A touch that starts on the weight graph, on a range input, or inside anything
+that scrolls sideways is left alone.** The third is the general rule the first
+two are instances of: a sideways drag on something that can scroll sideways
+already means something. The chart is marked rather than detected, because a
+Recharts surface does not scroll and there is nothing about it in the DOM that
+says "the horizontal axis is mine" — it is a fact about what the thing *is*.
+
+**The gesture claims the touch only once horizontal movement clearly dominates
+vertical**, by half again, and only after 12 px. A page that scrolls is what a
+finger is usually doing and a swipe is the rare case, so the rare case has to
+prove itself. Once a touch has been read as a scroll it stays one for the rest
+of its life rather than flipping halfway down the page.
+
+**One finger.** Two is a pinch.
+
+**Below `sm` only**, which is where the bar it is a shortcut for exists.
+
+#### What it does when it does fire
+
+The page follows the finger, one transform on one wrapper. On release it
+completes past a quarter of the screen, or on a flick — 0.5 px/ms with a 48 px
+floor, so a twitch is not a flick — and otherwise springs back over 200 ms. Past
+the first section or the last, the page still moves a quarter as far and nothing
+happens on release: the resistance says so *before* the release rather than
+after it.
+
+A completed swipe **navigates immediately** and the incoming section starts at
+`width + handoff`, where the handoff is where the finger let go. That is what
+makes it continuous: the new page picks up exactly where the old one was rather
+than a full screen away. The alternative, sliding the outgoing page off first
+and only then navigating, puts 140 ms between the decision and anything
+happening — and the same code serves a **tap in the navigation**, where a delay
+before the page changes is simply lag.
+
+So a tap and a swipe produce the same movement, which is the point of having one
+at all: one way of changing section, two ways of asking for it. The direction
+comes from the order, not from the gesture, and a destination with no place in
+the order (anything in the Mer sheet) slides forward, because a slide has to go
+somewhere.
+
+**The four in the bar, not every destination.** Swiping to a place the bar does
+not draw would leave nothing marked as current and no way to tell where you had
+ended up.
+
+**`prefers-reduced-motion` removes all of it and keeps the navigation.** Not a
+shorter slide: a small animation is the same animation asking to be noticed
+less. The page does not follow the finger either, because that is movement too;
+the gesture is still recognised and still changes section.
+
+#### Two things that would have broken other screens
+
+**The transform is removed, not set to identity.** A transform makes an element
+the containing block for every `position: fixed` descendant, and this app's
+sheets are fixed and live inside the page. Leaving `translate3d(0,0,0)` behind
+would have pinned every sheet to the content column instead of the viewport, on
+every screen, permanently after the first swipe. It comes off on `transitionend`
+along with `will-change`.
+
+**`overflow-x: clip`, not `hidden`.** The content has to be cut off at both
+edges while it slides. `hidden` would also force `overflow-y` to `auto`, turning
+the content column into a scroll container and changing what scrolls on every
+screen in the app to fix an axis nothing scrolls on.
+
+`touch-action: pan-y` would have been simpler than a non-passive `touchmove`
+listener and is wrong for the same kind of reason: it applies to everything
+underneath, so it would break precisely the horizontally scrolling things the
+guards exist to protect.
+
+#### Exercised
+
+Twenty-two tests over synthetic touch events, one per guard and one per
+threshold. Then live, in headless mobile emulation at 360 px with real
+`Input.dispatchTouchEvent` touches, which is the part jsdom cannot answer: the
+gesture completes forwards and backwards, a short slow drag springs back and
+leaves no transform behind, a drag from the edge strip does nothing while the
+browser goes back, a drag starting on the trend line does nothing, a mostly
+downward drag does nothing, a tap in the bar runs the same 200 ms slide, and
+with `prefers-reduced-motion` emulated the section still changes and nothing
+moves. Mid-gesture at 360 px is shot: the page 132 px left, the vacated strip
+the page colour, the bar still marking the section you have not left yet.
+
+The real phone is listed in STATE.md as waiting on the owner. A headless browser
+can dispatch a touch; it cannot tell you whether the thumb that lives on the
+left edge of a phone triggers this by accident all day.
