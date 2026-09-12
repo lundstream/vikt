@@ -332,7 +332,21 @@ async function habitsDueNow(db: Db, now: Date): Promise<DueReminder[]> {
   return due;
 }
 
-export type RunResult = { considered: number; sent: number; skipped: number; removed: number };
+export type RunResult = {
+  considered: number;
+  sent: number;
+  skipped: number;
+  removed: number;
+  /**
+   * Sends the push service refused the signature of (403).
+   *
+   * Counted separately from `removed` and from failures because it means
+   * something different and needs a different response: nothing is wrong with
+   * these subscriptions, something is wrong with **this server's** VAPID
+   * configuration, and the rows must survive it.
+   */
+  unauthorized: number;
+};
 
 /**
  * The host of an endpoint, which is the part safe to log.
@@ -372,7 +386,7 @@ export async function runReminders(
    */
   onRemoved?: (device: { id: string; host: string; reason: string }) => void,
 ): Promise<RunResult> {
-  const result: RunResult = { considered: 0, sent: 0, skipped: 0, removed: 0 };
+  const result: RunResult = { considered: 0, sent: 0, skipped: 0, removed: 0, unauthorized: 0 };
   if (!pushEnabled(env)) return result;
 
   for (const reminder of await dueNow(db, now)) {
@@ -430,6 +444,14 @@ export async function runReminders(
         result.removed += 1;
         onRemoved?.({ id: device.id, host: hostOf(device.endpoint), reason: outcome.reason });
       }
+
+      /**
+       * A refused signature leaves the row exactly where it is. The count is
+       * what the scheduler warns about, once, rather than a line per device:
+       * a misconfigured key produces one of these for every subscription in
+       * the table, and forty identical lines say nothing the first one did not.
+       */
+      if (outcome.status === "unauthorized") result.unauthorized += 1;
     }
   }
 

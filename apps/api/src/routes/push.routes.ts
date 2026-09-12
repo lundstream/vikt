@@ -228,6 +228,7 @@ export const pushRoutes: FastifyPluginAsyncZod = async (app) => {
 
       let sent = 0;
       let removed = 0;
+      let unauthorized = 0;
 
       for (const row of rows) {
         const outcome = await sendPush(
@@ -251,7 +252,20 @@ export const pushRoutes: FastifyPluginAsyncZod = async (app) => {
             { subscription: row.id, host: hostOf(row.endpoint), reason: outcome.reason },
             "push subscription removed",
           );
+          continue;
         }
+
+        // 403 keeps the row. Counted here so the one warning below can be
+        // written once for the whole request rather than once per device.
+        if (outcome.status === "unauthorized") unauthorized += 1;
+      }
+
+      if (unauthorized > 0) {
+        request.log.warn(
+          { unauthorized },
+          "push rejected the signature (403) and no subscription was removed. " +
+            "Check the VAPID pair and that VAPID_SUBJECT is a mailto: address or a URL",
+        );
       }
 
       return { devices: rows.length, sent, removed };

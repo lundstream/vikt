@@ -5293,11 +5293,13 @@ row rather than adding a second that fires alongside the first — and the
 conflict updates `user_id` too, because a shared computer produces the same
 endpoint for a different person and the row has to follow.
 
-404, 410 **and 403** delete the row on the first failure. The first two mean the
-browser threw the subscription away; 403 means the VAPID key no longer matches
-the one it was created with, which happens when somebody regenerates the pair.
-All three are equally dead, and a queue that retries them forever is a queue that
-grows forever. Anything else is transient and the row stays.
+404 and 410 delete the row on the first failure: both mean the browser threw the
+subscription away, which is what RFC 8030 gives those two codes for, and a queue
+that retries them forever is a queue that grows forever. Anything else is
+transient and the row stays.
+
+**403 also keeps the row**, which is a correction rather than the original
+rule — see the addendum below.
 
 Removable from **any** device (D56), because the commonest reason to want that is
 a phone somebody no longer has, and a control that only worked on the device
@@ -5313,7 +5315,8 @@ than leaving as an unexplained tidy-up, because the obvious reading is that the
 automatic removal had failed.
 
 It had not. The rule above is exact about what it removes: a subscription the
-push service **answers 404, 410 or 403 for**. Those two rows were not that. WNS
+push service **answers 404 or 410 for** (403 was on that list when this was
+written; the next addendum says why it is not). Those two rows were not that. WNS
 accepted every send to them — the sweep that morning logged `sent: 2` — because
 from the push service's point of view the channels were perfectly alive. What
 had gone was the **browser profile** on this machine, deleted by a harness
@@ -5340,9 +5343,45 @@ and remove it themselves, which is what D56 asks of every row.
   directly — they prove `gone` deletes and `failed` does not, and say nothing
   about which status is which, which is the decision that matters. `sendPush`
   now takes the delivery call as an argument so it can be driven with a real
-  `WebPushError`: 404, 410 and 403 are `gone`; 429, 500, 503 and a network error
-  are `failed` and the row stays. A push service having a bad ten minutes must
+  `WebPushError`: 404 and 410 are `gone`; 403, 429, 500, 503 and a network error
+  all keep the row. A push service having a bad ten minutes must
   not cost somebody their phone.
+
+#### Addendum, 2026-09-12: 403 keeps the row, because the fault is usually here
+
+403 was grouped with 404 and 410 on the reading that a regenerated VAPID pair
+leaves a subscription permanently unusable, so keeping it would mean retrying a
+row that can only fail. That reading is true about the subscription and wrong
+about **where the fault is**.
+
+A 403 is the push service refusing a **signature**, and the signature is made on
+this server. The three ways it happens are all server-side and all produce 403
+for every device at once:
+
+- a key mispasted into the stack's variables, so the pair no longer matches
+  what browsers subscribed with;
+- a pair rotated deliberately, without anybody re-subscribing;
+- a `VAPID_SUBJECT` that is not a `mailto:` address or a URL, which some push
+  services reject outright.
+
+Under the old mapping, any one of those turned a misconfigured deploy into the
+**silent deletion of every subscription in the table**, at the first sweep,
+within a minute of boot. The rows are user data — each one is somebody having
+turned reminders on — and a configuration mistake must not destroy user data. The
+asymmetry decides it: a subscription kept after a genuine key rotation costs one
+failed send per sweep until that person taps the switch again, and a
+subscription deleted by a typo costs everybody their reminders with nothing on
+screen to explain it.
+
+So `sendPush` has a fourth outcome. 403 is `unauthorized`: the row stays, the
+sweep counts it beside `sent`, `skipped` and `removed`, and the scheduler writes
+**one warning per sweep** naming the three likely causes. One line, not one per
+device: a misconfigured key produces one refusal for every subscription there
+is, and forty identical lines say nothing the first one did not.
+
+Tested in both directions at the mapping itself: 404 and 410 remove, 403 keeps
+and is counted, 429, 500, 503 and a network error keep. The sweep-level tests
+show the rows surviving a refusal and the count rising once per send.
 
 #### The settings screen says what it cannot do
 

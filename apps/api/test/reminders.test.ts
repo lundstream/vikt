@@ -648,7 +648,7 @@ describe("without VAPID keys", () => {
       recorder.send,
     );
 
-    expect(result).toEqual({ considered: 0, sent: 0, skipped: 0, removed: 0 });
+    expect(result).toEqual({ considered: 0, sent: 0, skipped: 0, removed: 0, unauthorized: 0 });
     expect(recorder.calls).toEqual([]);
     expect(await db.select().from(reminderSends)).toEqual([]);
   });

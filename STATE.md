@@ -138,6 +138,13 @@ lägger till tre kolumner och tar bort dem igen i samma uppstart.
 som alla andra. Ingen befintlig rad ändras, och en avbild som inte känner till
 kolumnen bryr sig inte om att den finns.
 
+**403 från push-tjänsten raderar ingenting längre.** Byts VAPID-paret, eller
+klistras en nyckel in fel i stackens variabler, svarar push-tjänsten 403 för
+**alla** enheter samtidigt. Tidigare tolkades det som att prenumerationerna var
+döda och raderades vid första svepet; nu står raderna kvar och API-loggen
+skriver en varning per svep som namnger de troliga orsakerna. Det syns i loggen
+som `push rejected the signature (403)`.
+
 ### Manuella steg på Portainer-värden
 
 - Sätt variablerna ovan i stacken `vikt` innan avbilden byts.
@@ -360,7 +367,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1477 tests**: 494 shared, 269 web, 714 api. **Nine more run in CI**, and they
+**1479 tests**: 494 shared, 269 web, 716 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -506,7 +513,7 @@ somebody had read off a log with nothing behind it.
 | No `__PLACEHOLDER__` survives into the built bundles (D98) | `apps/web/scripts/check-placeholders.mjs` | Check the build for unsubstituted placeholders |
 | Every package typechecks under `strict` | `tsconfig.json` per package | Typecheck |
 | The coach never makes a person the subject of a missing figure (D140) | `apps/api/src/llm/coach-guard.ts`, `apps/api/test/coach.test.ts` | Test |
-| A rejected push subscription is removed and a transient failure is not (D136) | `apps/api/src/lib/push.ts`, `apps/api/test/push-removal.test.ts` | Test |
+| Only 404 and 410 remove a push subscription; 403 and transient failures keep it (D136) | `apps/api/src/lib/push.ts`, `apps/api/test/push-removal.test.ts` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one
 entry that would have been removed is the guard STATE.md used to claim about

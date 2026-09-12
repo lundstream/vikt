@@ -70,6 +70,14 @@ export function configurePush(env: Env): void {
 export type SendOutcome =
   | { status: "sent" }
   | { status: "gone"; reason: string }
+  /**
+   * The push service refused the **signature**, not the subscription.
+   *
+   * Its own status because it needs its own handling: the row stays, and
+   * somebody has to be told, which is a different thing from either "this
+   * device is gone" or "the network had a bad minute".
+   */
+  | { status: "unauthorized"; reason: string }
   | { status: "failed"; reason: string };
 
 /**
@@ -78,13 +86,23 @@ export type SendOutcome =
  * **404 and 410 mean the browser threw the subscription away** — the app was
  * uninstalled, site data was cleared, or the service expired it. Those are not
  * retried and not kept: the row is deleted on the first failure, which is what
- * §6 specifies and what stops a table filling with endpoints nothing will ever
- * accept again.
+ * §6 specifies, what RFC 8030 means by those two codes, and what stops a table
+ * filling with endpoints nothing will ever accept again.
  *
- * 403 is included with them deliberately. It means the VAPID key does not
- * match the one the subscription was created with, which happens when somebody
- * regenerates the pair. The subscription is equally dead, and keeping it would
- * mean every future run retrying a row that can only fail.
+ * **403 keeps the row** (amended 2026-09-12). It used to be treated as a third
+ * way of being dead, on the reading that a regenerated VAPID pair makes a
+ * subscription unusable. That reading missed where the fault usually is: a 403
+ * is a signature the push service would not accept, and the signature is made
+ * **here**. A mispasted key in the stack's variables, a rotated pair, a
+ * `VAPID_SUBJECT` that is not a `mailto:` — every one of those is a server-side
+ * mistake that produces 403 for *every* device at once, and the old mapping
+ * turned one bad deploy into the silent deletion of every subscription in the
+ * table on the first sweep. A configuration error must not destroy user data.
+ *
+ * So 403 is its own outcome: the row stays, the sweep counts it, and the log
+ * says once per sweep what is most likely wrong. Re-subscribing is a tap for
+ * somebody whose key really did change; restoring a table of deleted rows is
+ * not anything.
  */
 export async function sendPush(
   target: PushTarget,
@@ -118,8 +136,11 @@ export async function sendPush(
   } catch (error) {
     if (error instanceof WebPushError) {
       const code = error.statusCode;
-      if (code === 404 || code === 410 || code === 403) {
+      if (code === 404 || code === 410) {
         return { status: "gone", reason: `push service returned ${code}` };
+      }
+      if (code === 403) {
+        return { status: "unauthorized", reason: "push service returned 403" };
       }
       return { status: "failed", reason: `push service returned ${code}` };
     }

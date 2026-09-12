@@ -56,9 +56,19 @@ describe("what the push service's answer means", () => {
     expect(await sendPush(TARGET, PAYLOAD, rejectsWith(404))).toMatchObject({ status: "gone" });
   });
 
-  /** 403 means the VAPID pair was regenerated. Equally dead, deliberately. */
-  it("treats 403 as gone", async () => {
-    expect(await sendPush(TARGET, PAYLOAD, rejectsWith(403))).toMatchObject({ status: "gone" });
+  /**
+   * 403 **keeps** the row (amended 2026-09-12).
+   *
+   * It is the push service refusing the signature this server made, and the
+   * signature is made here: a mispasted key, a rotated pair or a
+   * `VAPID_SUBJECT` that is not a `mailto:` produces 403 for every device at
+   * once. Treating it as death turned one bad deploy into the silent deletion
+   * of every subscription in the table.
+   */
+  it("treats 403 as a refused signature rather than a dead subscription", async () => {
+    const outcome = await sendPush(TARGET, PAYLOAD, rejectsWith(403));
+    expect(outcome).toMatchObject({ status: "unauthorized" });
+    expect(outcome.status).not.toBe("gone");
   });
 
   /**
@@ -150,6 +160,58 @@ describe("what the sweep does about it", () => {
     expect(
       await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.userId)),
     ).toEqual([]);
+  });
+
+  /**
+   * The case the mapping change exists for: one misconfigured deploy must not
+   * empty the table.
+   */
+  it("keeps every row when the signature is refused, and counts it", async () => {
+    const { app, db } = ctx();
+    const user = await accountDue();
+
+    const removed: unknown[] = [];
+    const result = await runReminders(
+      db,
+      app.config,
+      NOW,
+      async () => ({ status: "unauthorized", reason: "push service returned 403" }),
+      (device) => removed.push(device),
+    );
+
+    expect(result.unauthorized).toBe(1);
+    expect(result.removed).toBe(0);
+    // Nothing to log per device: the warning is written once per sweep.
+    expect(removed).toEqual([]);
+    expect(
+      await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.userId)),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * And it stays one figure however many devices it happened to, which is what
+   * lets the scheduler warn once rather than forty times.
+   */
+  it("counts one refusal per send, not one per sweep", async () => {
+    const { app, db } = ctx();
+    const user = await accountDue();
+
+    await db.insert(pushSubscriptions).values({
+      userId: user.userId,
+      endpoint: `https://fcm.googleapis.com/fcm/send/${user.userId}`,
+      p256dh: "key",
+      auth: "auth",
+    });
+
+    const result = await runReminders(db, app.config, NOW, async () => ({
+      status: "unauthorized",
+      reason: "push service returned 403",
+    }));
+
+    expect(result.unauthorized).toBe(2);
+    expect(
+      await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.userId)),
+    ).toHaveLength(2);
   });
 
   it("keeps the row and reports nothing when the failure is transient", async () => {

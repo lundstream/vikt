@@ -74,6 +74,24 @@ export function startReminderScheduler(app: FastifyInstance): () => void {
       if (result.sent > 0 || result.removed > 0) {
         app.log.info({ ...result }, "reminders sent");
       }
+
+      /**
+       * One line per sweep, not per subscription (amended 2026-09-12).
+       *
+       * A 403 is the push service refusing the signature this server made, so
+       * a misconfigured VAPID pair produces one for every device at once. The
+       * warning names the three things it is nearly always caused by, because
+       * the operator reading this log is the person who can fix all three.
+       */
+      if (result.unauthorized > 0) {
+        app.log.warn(
+          { unauthorized: result.unauthorized },
+          "push rejected the signature (403) and no subscription was removed. " +
+            "Check VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are the pair this " +
+            "installation subscribed devices with, and that VAPID_SUBJECT is a " +
+            "mailto: address or a URL",
+        );
+      }
     } catch (error) {
       app.log.error({ err: error }, "the reminder sweep failed");
     } finally {
