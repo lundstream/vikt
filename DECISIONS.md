@@ -6655,3 +6655,76 @@ wrong thing.
 The activity delete moved to the shared two-tap `DeleteButton` at the same time.
 It had been a bare link that removed on the first tap, which was tolerable while
 it was the only tap in the row and is not now that the row beside it is an edit.
+
+### D147 — A variable the compose does not forward is not a variable
+
+*2026-09-13.*
+
+A stack variable set in Portainer that `docker-compose.portainer.yml` does not
+pass to the container is **silently absent**. Not a boot failure, not a warning:
+the schema's default takes over, the feature is off, and the panel the operator
+is looking at still shows the value they typed. Every visible signal says it was
+configured.
+
+That is the worst shape a deploy failure can take, and it is not hypothetical
+here. D120 found two such variables — `PUBLIC_BASE_URL` and `SECRET_KEY` — while
+writing the Portainer file, and fixed them in `docker-compose.yml`. Nothing
+checked the file production actually runs.
+
+#### What was missing
+
+Twenty of the API's variables, found by writing the test rather than by reading
+the file:
+
+| | |
+|---|---|
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | **push does not work at all** |
+| `OLLAMA_URL`, `OLLAMA_MODEL_SMALL`, `OLLAMA_MODEL_LARGE`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_JOB_TIMEOUT_MS`, `OLLAMA_VISION_TIMEOUT_MS`, `LLM_ENABLED`, `LLM_VISION_MODEL` | **the whole LLM layer is absent** |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE` | the one-time import into the settings table (D102) can never run |
+| `CORS_ORIGINS`, `MAIL_WORKER_IN_PROCESS`, `SYSTEM_INTAKE_FLOOR_KCAL` | pinned to their defaults, unsettable |
+
+The first two rows are the ones that matter. **STATE.md has been telling the
+owner to set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` in the
+Portainer panel before the next deploy since D136.** Doing exactly as instructed
+would have produced an installation with three variables set, no reminders, and
+nothing anywhere saying why: `pushEnabled(env)` would have read three empty
+strings, declined to register the subscribe endpoint, and drawn no section in
+Inställningar. The person would have concluded the feature did not work.
+
+Five were also missing from `infra/.env.example`, which is where anybody running
+their own copy finds out a variable exists: the three VAPID keys, `CORS_ORIGINS`
+and `MAIL_WORKER_IN_PROCESS`.
+
+#### The test
+
+`apps/api/test/stack-variables.test.ts` walks `Object.keys(envSchema.shape)` and
+asserts, for every name, that the compose forwards it to the **api** service and
+that the example file documents it. The schema is the source of truth because it
+is the only one of the three that the program actually reads; the other two are
+descriptions of it, and a description nothing checks is a description that drifts.
+
+Three details worth the space:
+
+**It reads the text, not a parsed YAML tree.** What matters is the block an
+operator reads and edits, and a YAML library would happily accept a key nested
+under the wrong service. The parser is shown working before anything is asserted
+with it — it finds `DATABASE_URL` under `api` and does **not** find
+`CONTACT_EMAIL`, which belongs to nginx.
+
+**The allowlist has one entry.** `PUBLIC_ORIGIN`, the deprecated alias for
+`PUBLIC_BASE_URL` (D109), which is deliberately not offered: two variables
+meaning one thing is the defect that entry is about. An allowlist is how a check
+like this rots, so the test also asserts the allowlisted name is *not* forwarded,
+which means a later decision to forward it has to come here and say so.
+
+**It checks the defaults too.** `${NAME:-value}` is a second copy of a default
+the schema already holds, and it has to be a copy because compose cannot ask the
+program. A copy that drifts is worse than no copy: the file says 30 000, the
+schema says 20 000, and which one is in force depends on whether anybody set the
+variable. The drift check was proved by breaking one.
+
+#### What it does not check
+
+That the value is **correct** — only that it arrives. A `DATABASE_URL` pointing
+at the wrong host is a problem this test cannot see, and `assertProdSecrets` and
+the health endpoint are what cover that.

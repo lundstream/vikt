@@ -14,6 +14,13 @@
 # Fill in the variables in the panel underneath the editor. CONTACT_EMAIL is
 # required wherever LANDING_ENABLED is true: the privacy page has to name
 # somebody the reader can write to, and the API refuses to boot without it.
+#
+# **Every variable the API's env schema knows is listed below, even the ones
+# almost nobody sets** (D147). A variable set in the Portainer panel that this
+# file does not forward is silently absent in the container: no boot failure, no
+# warning, the schema's default takes over, and the panel still shows the value
+# that was typed. `apps/api/test/stack-variables.test.ts` walks the schema and
+# fails if one is missing here or undocumented in `infra/.env.example`.
 
 name: vikt
 
@@ -69,6 +76,47 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-172.31.240.0/24}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Same-origin in this stack, since nginx proxies /api/. A comma-separated
+      # list only where something else has to reach the API directly.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      SYSTEM_INTAKE_FLOOR_KCAL: ${SYSTEM_INTAKE_FLOOR_KCAL:-1200}
+      # On by default: the alternative was a separate process nobody ran and a
+      # queue that sat still while every visible signal said mail worked (D104).
+      MAIL_WORKER_IN_PROCESS: ${MAIL_WORKER_IN_PROCESS:-true}
+
+      # Web push (D136). All three empty means the reminders do not exist at
+      # all: nothing is scheduled, no endpoint is registered, and the section in
+      # Inställningar is not drawn. Half-configured is refused at boot, because
+      # a public key with no private one produces subscriptions nothing can ever
+      # send to and no error anywhere.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+
+      # Read **once**, on first boot, and imported into the encrypted settings
+      # table (D102). Mail is configured in Administration, Mejlserver after
+      # that, and these can be emptied again. Leave them empty on a new install.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Vikt <noreply@localhost>}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+
+      # The optional LLM layer (§6 phase 8). `OLLAMA_URL` empty means every
+      # surface it backs is absent rather than greyed out, which is the whole
+      # design: the workstation it talks to is not always on.
+      LLM_ENABLED: ${LLM_ENABLED:-false}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL_SMALL: ${OLLAMA_MODEL_SMALL:-gemma4:e4b}
+      OLLAMA_MODEL_LARGE: ${OLLAMA_MODEL_LARGE:-qwen3.6:27b}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-20000}
+      OLLAMA_JOB_TIMEOUT_MS: ${OLLAMA_JOB_TIMEOUT_MS:-180000}
+      # Photographs of food (D143). No default model name on purpose: a tag that
+      # reports a vision capability is not a tag that looks at images, and the
+      # API proves it at boot before offering the surface.
+      LLM_VISION_MODEL: ${LLM_VISION_MODEL:-}
+      OLLAMA_VISION_TIMEOUT_MS: ${OLLAMA_VISION_TIMEOUT_MS:-60000}
     volumes:
       # Where the scheduled backup writes (D103). Bind it somewhere off this
       # host if the backups are to survive the host.

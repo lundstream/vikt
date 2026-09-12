@@ -225,7 +225,15 @@ const booleanish = z
   .enum(["true", "false", "1", "0"])
   .transform((v) => v === "true" || v === "1");
 
-const envSchema = z.object({
+/**
+ * Every variable the API reads, in one object.
+ *
+ * Exported so `stack-variables.test.ts` can walk it: a variable added here and
+ * not forwarded by `infra/docker-compose.portainer.yml` is set in Portainer and
+ * silently absent in the container, which is the worst shape a deploy failure
+ * can take (D147).
+ */
+export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   DATABASE_URL: z.string().min(1),
