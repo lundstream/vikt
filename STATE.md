@@ -64,15 +64,14 @@ Empty.
 
 ### What is not done
 
-- **Photos** (§6 phase 7) and the self-service deletion hook that waits on them.
-- **The local LLM layer** (§6 phase 8) and the coach (8b).
+- **Photos** (§6 phase 7), the oldest unbuilt item, and the self-service deletion
+  hook that waits on them.
 - **Group features** (§6 phase 9) and **device integrations** (§6 phase 10).
-- **SMB and S3 backup destinations**, named in the settings and refused with a
-  reason.
-- **Photos** are still the oldest unbuilt item (§6 phase 7), with the self-service
-  deletion hook that waits on them.
 - **MFA and importing from other apps** — phases 12 and 13, written down in
   CLAUDE.md §6 and not started.
+- **The rest of phase 8**: the recipe generator and the free-text parser are
+  built, and so is the coach (8b). What is left in that phase is the milestone
+  messages the persona was also meant to deliver.
 
 ## Inför nästa deploy
 
@@ -389,6 +388,18 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The Sunday sweep, against the development database and the real model**
+  (D141), with the instant injected. A fixture account in `Pacific/Auckland` was
+  seeded so the sweep could be exercised without writing reviews for anybody
+  else: its Sunday evening is Sunday morning in Stockholm. Swept as of its
+  Sunday 20:05, the sweep wrote one review in 2.8 s and one generation; swept
+  again fifteen minutes later, inside the same window, it wrote nothing, made
+  **no generation and three queries**, one of them the `weekly_reviews` lookup
+  that answered the question. A week carrying three logged days produced
+  `quiet: 1`, no row and no card. On Översikt the card appeared with the sweep's
+  own text, "Läs hela" led to Coach where the review sits with the others, and
+  "Tack, läst" removed it and it stayed removed after a reload, because the
+  dismissal is a row rather than a browser preference;
 - Coach at 360 px and at 1280 px with the tone selector, against the **real model
   on the LAN**: one turn per tone, every sentence of all three passing the guard,
   and the 800 kcal question asked again in each tone. None of them repeated the

@@ -213,6 +213,26 @@ export async function runWeeklyReviews(
     result.considered += 1;
 
     const weekStart = weekStartOf(localDate);
+
+    /**
+     * The cheapest question first: has this week already been written?
+     *
+     * Measured rather than assumed. The window is 30 minutes wide and the tick
+     * is a minute, so a Sunday evening sweeps the same account up to thirty
+     * times, and the first version answered "already done" only after three
+     * queries per account counting logged days. One indexed lookup answers it,
+     * and the counting only happens for a week that might actually get a
+     * review. `generateWeeklyReview` checks again inside its own transaction,
+     * because a fast path is not a guarantee.
+     */
+    const [existing] = await db
+      .select({ id: weeklyReviews.id })
+      .from(weeklyReviews)
+      .where(and(eq(weeklyReviews.userId, row.userId), eq(weeklyReviews.weekStart, weekStart)))
+      .limit(1);
+
+    if (existing) continue;
+
     const logged = await loggedDaysIn(row.userId, db, weekStart, localDate);
     if (logged < REVIEW_MIN_LOGGED_DAYS) {
       result.quiet += 1;
