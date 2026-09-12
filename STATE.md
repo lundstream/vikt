@@ -26,6 +26,18 @@ when it will be down, and its mail goes out.
   and trend line, adaptive TDEE and projections, the food database with barcode
   scanning and meal templates, measurements and the daily log, milestones and
   the savings pot, and the PWA with its offline queue.
+- **The trend line is a curve between readings** (D144). §4.1 still returns one
+  point per day and still carries the trend forward on a day with no reading; the
+  chart now takes a vertex per reading and draws a monotone curve between them,
+  which is what it always looked like on a daily series and never on a weekly one.
+- **Every reading is editable, through a month calendar** (D145). "alla vägningar"
+  under the readings list opens a month with the logged days marked; tapping one
+  opens the sheet on that day with its value and a delete, and tapping an empty day
+  adds a reading filed under it.
+- **A photograph of a meal** (D143): the model names the foods, the database prices
+  them, a person confirms every row, and the picture is read and dropped. Amounts
+  mostly arrive empty and are typed; a weight printed on a package is refused as an
+  amount outright.
 - **Logging works offline** and syncs on reconnect. A local store that opens and
   will not accept a row falls through to sending directly, and says so (D118).
 - **Mail is delivered** by a drainer inside the API process, and every link in
@@ -61,6 +73,39 @@ when it will be down, and its mail goes out.
 ### API without a screen
 
 Empty.
+
+### The edit-window audit (D145)
+
+§3 says every user-created row ships with edit and delete. The gap this pass
+closed was not a missing endpoint but a **window**: the weight log had both in
+the API since phase 1 and five rows of reach on screen. Run against every
+screen, because that is where this failure lives.
+
+| Entity | Reach | Verdict |
+|---|---|---|
+| Weight readings | the last five, now the whole history through the calendar | **was narrow, fixed this pass** |
+| Daily log, measurements, habits, activities | the shared date selector (D62) reaches any past day | whole history |
+| Food entries | the same selector; the day's list is complete, each row edits and deletes | whole history |
+| Manual intake | the quick sheet, which opened on today only and now opens on any day | was narrow, fixed as a side effect |
+| Milestones, savings rules, savings events, coach conversations | listed in full, not date-scoped | whole history |
+
+"Senast loggat" on Mat is capped at six and is **not** an edit surface: its rows
+log the food again rather than open it. The day's own list underneath is
+complete.
+
+Two gaps found that are not windows, both already named in D56, both still open
+and **not** touched in this pass:
+
+- **`measurement_log` has no delete at all**, at the API or on screen. There is
+  `POST /measurement` and `GET /measurement` and nothing else. The oldest open
+  item under §3's rule; it needs the endpoint before it can have a control.
+- **`activity_log` has delete and no update path.** Many-per-day, so re-logging
+  does not stand in for an edit: correcting a walk from 40 to 30 minutes means
+  removing it and typing it again.
+
+One smaller thing seen while auditing and left alone: the quick sheet's calorie
+hint still says "Matloggning kommer senare", which stopped being true in
+phase 3.
 
 ### What is not done
 
@@ -182,6 +227,15 @@ som `push rejected the signature (403)`.
 
 En rad per synlig förändring, i appens register, färdig att klistra in:
 
+- Viktgrafen ritar en kurva mellan vägningarna i stället för en trappa. Väger du
+  dig varje dag ser den likadan ut som förut. Väger du dig en gång i veckan låg
+  linjen förut stilla hela veckan och föll sedan allt på en dag, vilket inte var
+  vad som hade hänt. Siffrorna är oförändrade. Linjen slutar numera vid den
+  senaste vägningen i stället för att fortsätta rakt fram till i dag.
+- Alla vägningar går att ändra, inte bara de fem senaste. Under listan på
+  Översikt finns "alla vägningar", som öppnar en månadskalender där dagarna med
+  en vägning är markerade. Tryck på en av dem för att ändra eller ta bort den,
+  eller på en tom dag för att fylla i en vägning du missade.
 - Du kan fotografera maten i stället för att skriva vad du åt. Bilden skickas till
   modellen på arbetsstationen, som säger vilka livsmedel den ser. Kalorierna kommer
   som alltid från livsmedelsdatabasen, och ingenting sparas förrän du har läst
@@ -272,11 +326,24 @@ En rad per synlig förändring, i appens register, färdig att klistra in:
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 46 commits, plus the one this
+between what is built and what is running. 61 commits, plus the one this
 pass is about to add:
 
 | | |
 |---|---|
+| `a1343b8` | A weight printed on a label is not an amount |
+| `591e57d` | Every reading is reachable, through a month rather than a longer list |
+| `f804643` | The trend line is a curve between readings, not a staircase |
+| `05ad7c1` | STATE: the screenshot sweep this pass, and what it covered |
+| `c5a722b` | Photo logging, item 6: the record |
+| `10fddf1` | Photo logging, item 7: what the interface found, and three fixes it caused |
+| `2283468` | Photo logging, item 5: the probe is a maintained script, and what a photo costs |
+| `41438b9` | Photo logging, item 4: the surface, and proving the model can see |
+| `c277d0a` | Photo logging, item 3: one proposal list, and a row that cannot be saved |
+| `4142b7c` | Photo logging, item 2: what a photograph is allowed to say |
+| `1172842` | Photo logging, item 1: the picture goes and does not stay |
+| `0a970b0` | A model does see a plate, and it is qwen3-vl:8b |
+| `225918e` | Probe whether any model here can actually see, before building on it |
 | `2125306` | Notice at boot that the VAPID pair changed |
 | `1faaab0` | 403 keeps the push subscription, because the fault is usually ours |
 | `2af8dd7` | Record the pass: the skip guard's own line, and what is on dev |
@@ -399,7 +466,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1542 tests**: 494 shared, 283 web, 765 api. **Nine more run in CI**, and they
+**1570 tests**: 494 shared, 307 web, 769 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -443,6 +510,25 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The trend line on a sparse account, before and after** (D144): a seeded
+  account weighing about once a week over ninety days, shot at 360 px and
+  desktop on either side of the change. Before, a staircase: flat for nine days
+  and then a kilo in one step. After, a monotone curve through the reading
+  dates, with the raw dots exactly where they were. The same fixture on the
+  development account, which weighs most mornings, is unchanged, which is why
+  this survived as long as it did;
+- **The month calendar, against the same sparse account** (D145): "alla
+  vägningar" under the readings list opens September with the thirteen logged
+  days in Gran and today carrying its own ring without one, because nothing was
+  weighed on it. Tapping the second of September opened the sheet on that day
+  with 90,3 in the field, "Ändra vägningen" as the heading and "Ta bort" beside
+  the save. October is not offered, because it has not happened. The calorie
+  field's label follows the day: opening a past day said "Kalorier i dag" over a
+  field that would have written today's figure onto it, which is fixed;
+- **The three packaged products again, after the label rule** (D143 addendum):
+  every one of them now puts the printed weight in `packageG` and leaves the
+  amount empty. The meatball bag that offered 1 000 g at 2 173 kcal offers a
+  named food and an empty field;
 - **Photographing a meal, end to end against the real workstation** (D143): five
   photographs taken on the owner's phone, resized in the browser, posted to
   `qwen3-vl:8b` on the LAN and priced by the development database. The quick
@@ -527,8 +613,9 @@ build served by `vite preview`:
 
 `shoot2.mjs` was then run across every screen at both widths: twenty screens,
 forty shots, **no horizontal overflow on any of them and nothing blank**. The
-photo sheet was shot separately, because it needs a real photograph and a real
-model and neither belongs in a screenshot sweep.
+photo sheet and the month calendar were shot separately, because one needs a
+real photograph and a real model and the other needs a disclosure opened, and
+neither belongs in a screenshot sweep.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file
@@ -572,6 +659,9 @@ somebody had read off a log with nothing behind it.
 | A photographed meal is never written to disk, to a table, to a log line or to the queue (D143) | `apps/api/test/photo-transport.test.ts`, `apps/web/test/render/photo-entry.test.tsx` | Test |
 | An amount from a photograph is a number the app can price, or it is null (D143) | `apps/api/src/services/llm.service.ts`, `apps/api/test/photo-parse.test.ts` | Test |
 | The photo surface exists only where a model has been shown to see (D143) | `apps/api/src/lib/vision-watch.ts`, `apps/api/test/vision-watch.test.ts`, `apps/web/test/render/food-ways.test.tsx` | Test |
+| A weight printed on a package is never an amount (D143, amended) | `apps/api/src/services/llm.service.ts`, `apps/api/test/photo-parse.test.ts` | Test |
+| The chart's trend vertices are the calc's own values, one per reading (D144) | `apps/web/src/lib/trend-series.ts`, `apps/web/test/trend-series.test.ts` | Test |
+| Every reading is reachable and editable, not the last five (D145) | `apps/web/src/components/MonthCalendar.tsx`, `apps/web/test/render/weight-calendar.test.tsx`, `apps/web/test/month-calendar.test.ts` | Test |
 
 **Removed from the list rather than footnoted:** nothing this pass. The one
 entry that would have been removed is the guard STATE.md used to claim about
