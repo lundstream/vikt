@@ -153,6 +153,48 @@ function schemaDefault(name: string): string | null {
   return typeof value === "boolean" ? String(value) : String(value);
 }
 
+describe("the images the stack pulls", () => {
+  /**
+   * `.+` rather than `\S+`: a pinned image now carries
+   * `${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}`, which has spaces in it. The
+   * trailing `\s*` takes the carriage return on a CRLF checkout.
+   */
+  const images = readFileSync(COMPOSE, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.match(/^ {4}image: (.+?)\s*$/)?.[1])
+    .filter((image): image is string => image !== undefined);
+
+  it("found the image lines", () => {
+    // Two own images plus the pinned Postgres.
+    expect(images).toHaveLength(3);
+  });
+
+  /**
+   * A `latest` fallback means a redeploy pulls whatever `main` happened to be
+   * when nobody was looking, and a stack that cannot say which version it runs
+   * cannot be rolled back to a known one either (D148).
+   */
+  it("pins a version rather than latest", () => {
+    const own = images.filter((image) => image.includes("ghcr.io/lundstream/vikt-"));
+    expect(own).toHaveLength(2);
+
+    for (const image of own) {
+      expect(image, `${image} pulls a moving tag`).not.toContain("latest");
+      // `:?` rather than `:-`: the stack refuses rather than guessing.
+      expect(image, `${image} has a fallback tag`).toContain("${IMAGE_TAG:?");
+    }
+  });
+
+  /** Both images come from one commit and one workflow. One tag, always. */
+  it("moves both images together", () => {
+    const tags = images
+      .filter((image) => image.includes("ghcr.io/lundstream/vikt-"))
+      .map((image) => image.slice(image.indexOf(":") + 1));
+
+    expect(new Set(tags).size).toBe(1);
+  });
+});
+
 describe("the defaults written twice", () => {
   const defaults = composeDefaults();
 

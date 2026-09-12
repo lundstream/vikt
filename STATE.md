@@ -415,7 +415,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1685 tests**: 494 shared, 313 web, 878 api. **Nine more run in CI**, and they
+**1688 tests**: 494 shared, 313 web, 881 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -571,9 +571,9 @@ build served by `vite preview`:
 
 `shoot2.mjs` was then run across every screen at both widths: twenty screens,
 forty shots, **no horizontal overflow on any of them and nothing blank**. The
-photo sheet and the month calendar were shot separately, because one needs a
-real photograph and a real model and the other needs a disclosure opened, and
-neither belongs in a screenshot sweep.
+photo sheet, the month calendar and Dagen's two new controls were shot
+separately, because they need a real photograph, a disclosure opened or a row
+logged first, and none of that belongs in a screenshot sweep.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file
@@ -619,6 +619,7 @@ somebody had read off a log with nothing behind it.
 | The photo surface exists only where a model has been shown to see (D143) | `apps/api/src/lib/vision-watch.ts`, `apps/api/test/vision-watch.test.ts`, `apps/web/test/render/food-ways.test.tsx` | Test |
 | A weight printed on a package is never an amount (D143, amended) | `apps/api/src/services/llm.service.ts`, `apps/api/test/photo-parse.test.ts` | Test |
 | The chart's trend vertices are the calc's own values, one per reading (D144) | `apps/web/src/lib/trend-series.ts`, `apps/web/test/trend-series.test.ts` | Test |
+| The Portainer stack pins a version rather than `latest`, and both images move together (D148) | `infra/docker-compose.portainer.yml`, `apps/api/test/stack-variables.test.ts` | Test |
 | Every variable the API's env schema knows is forwarded by the Portainer compose and documented in .env.example (D147) | `apps/api/test/stack-variables.test.ts` | Test |
 | Every user-created row has an edit and a delete on the screen that shows it (D56, D146) | `apps/api/test/daily.test.ts`, `apps/web/test/render/day-edit-remove.test.tsx` | Test |
 | Every reading is reachable and editable, not the last five (D145) | `apps/web/src/components/MonthCalendar.tsx`, `apps/web/test/render/weight-calendar.test.tsx`, `apps/web/test/month-calendar.test.ts` | Test |
