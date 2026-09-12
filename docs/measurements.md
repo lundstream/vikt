@@ -61,6 +61,38 @@ difference between the rows, so the right reading is "unchanged" rather than
 
 ---
 
+## Can the models on the workstation see
+
+Asked before anything was built on the answer, with `scripts/probe-vision.mjs`
+against `OLLAMA_URL` on the LAN. Ollama reports a `vision` capability for four
+of the models installed here, and a capability is a claim about a build rather
+than evidence that this tag on this box will do the thing.
+
+The image is a generated PNG with a red circle, a blue square and the word VIKT
+in it: 320x240, 2 kB. It cannot tell you whether a model can read a plate. It
+tells you whether the `images` field reaches the model at all, which is the
+difference between "ignored the picture" and "looked and guessed badly".
+
+| model | reports vision | saw it | read the word | time |
+|---|---|---|---|---|
+| `qwen3.6:27b` | yes | yes, circle and square with colours | "IKT" | **16.7 s** |
+| `qwen3.6:latest` | yes | yes, and described the layout | "UIKIT" | 30.1 s |
+| `odytrice/gemma4-31b:5090` | yes | yes, colours and background | "VIKT" | 94.3 s |
+| `gemma4:e4b` | yes | **no**: "du har inte tillhandahållit någon bild" | — | 21.0 s |
+
+`gemma4:e4b` is the finding worth keeping: it advertises `vision`, accepts the
+request, and answers as though no image was attached. A flag is not a test.
+
+The times are for a 2 kB image on an idle box. A photograph is two orders of
+magnitude larger and will not be anywhere near this fast, which is why the
+waiting state on the screen has to quote a measured figure rather than a hope.
+
+**Not yet measured: a real plate.** That probe needs a photograph taken by
+somebody, because a stock image is a picture a model may have been trained on,
+and it is the only test that answers the question the feature depends on.
+
+---
+
 ## The human check
 
 ALTCHA proof of work (D112), solved in the browser. Measured with the real

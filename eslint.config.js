@@ -318,7 +318,14 @@ export default tseslint.config(
     // lives beside the build output it inspects.
     files: ["scripts/**/*.mjs", "**/scripts/**/*.mjs", "infra/**/*.mjs"],
     languageOptions: {
-      globals: { process: "readonly", console: "readonly", Buffer: "readonly" },
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        // Node has had both since 18; a script that talks to the LAN uses them.
+        fetch: "readonly",
+        AbortSignal: "readonly",
+      },
     },
   },
 
