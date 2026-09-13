@@ -158,8 +158,8 @@ phase 3.
 ## Inför nästa deploy
 
 **The deploy is a runbook, and it is in `INFRA.md` under "Deploying a version, in
-order".** Nine steps now, starting at **step 0: make `v1.0` a rollback target
-that exists**. Then back up and prove the backup restores, set every new
+order".** Nine steps, starting at **step 0: make `v1.0` a rollback target that
+exists**. Then back up and prove the backup restores, set every new
 variable, merge and cut the version, wait for `release`, pin `IMAGE_TAG` and
 redeploy, read the named lines out of the API log, check it from a phone on
 mobile data, and roll back by editing one line.
@@ -170,6 +170,12 @@ version the registry had never heard of: the images were `docker load`ed onto
 the host and have never been in GHCR at all. Step 0 gives them a name in git and
 in the registry and then pulls the tag back, because a rollback that has not
 been pulled once is a sentence rather than a plan.
+
+**`1.1.0` adds no migration.** The runbook's step 6 still expects nine named
+lines and a total of 30, exactly as it did before this pass: everything in the
+last four items is client side or prompt side, so a rollback to `v1.0` crosses
+nothing new. Step 7 carries a short list of what to look for on the phone,
+including the swipe, which is the one thing only a real phone can settle.
 
 **Two findings from writing it**, both of which would have surfaced at the worst
 moment: the GHCR packages are still **private** although the repository is
@@ -281,7 +287,47 @@ Du kan ta bort ett samtal i taget eller allihop, och de följer med i exporten.
 Frågor om medicin, sjukdom och graviditet besvaras inte, utan hänvisas till vården
 i en mening.
 
+**Coachen ser numera dina uppgifter, inte bara en sammanfattning av dem.** Den
+har intaget mot din uppmätta underhållsnivå och hur stor del av dagarna som är
+loggade, varje makro mot ditt eget mål och hur många dagar som legat under det,
+alkohol och nyktra dagar, träningspass och minuter, steg, sömn, energi och humör,
+vanor med streck, och måtten och hur de ändrats. Allt räknat över både sju och
+tjugoåtta dagar. Den ser också namnen på det du ätit den senaste veckan, bara
+namnen: inga mängder, inga kalorier och inga makron per maträtt. Frågar du brett,
+om upplägget eller om hur det går, svarar den från flera av områdena i stället för
+bara från vikten.
+
+Vad den får och inte får göra med dem. Den får berömma det siffrorna visar, så länge
+berömmet hänger på en uppgift som faktiskt står där. Den får ge högst två förslag
+i ett svar, och ett förslag är alltid ett alternativ: "du kan", "om du vill", "ett
+alternativ är". Aldrig "du måste", "du ska" eller "du bör". Den namnger en
+riktning, som mer protein, mer rörelse eller mer sömn, aldrig en siffra du inte
+själv har satt som mål.
+
+Två serier sätts bredvid varandra, aldrig som orsak och verkan. Appen räknar inga
+samband, och sidan Samband finns just för att du ska få titta på punkterna själv
+och dra dina egna slutsatser.
+
+Ett område du inte fyllt i sägs vara just det, inte noll. "Ingen rörelse är
+loggad" i stället för "0 pass", eftersom noll är en mätning och det här är en
+lucka.
+
 Hela Coach finns bara om AI-lagret är påslaget på den här installationen.
+
+## På telefonen
+
+**Du kan svepa mellan sidorna.** Ett svep åt vänster eller höger på Översikt,
+Dagen, Mat och Framsteg tar dig till nästa eller föregående, och sidan följer
+fingret medan du drar. Släpper du för tidigt glider den tillbaka. Att trycka i
+menyn längst ner ger samma rörelse.
+
+Svepet håller sig undan där det ska. De yttersta två centimetrarna längs
+kanterna tillhör telefonens egen bakåtgest. Viktgrafen, serierna under Data och
+allt annat som går att dra i sidled äger sitt eget drag. Och ett drag som mest
+går uppåt eller nedåt är fortfarande en scroll, inte ett svep.
+
+Har du bett telefonen om mindre rörelse byter sidorna som vanligt, utan
+animation.
 
 ## Påminnelser
 
@@ -314,6 +360,16 @@ Formuläret för att be om en inbjudningskod ligger inte längre på startsidan.
 flyttat till en egen adress som inget länkar till, och den är avstängd om inte den
 som driftar servern slår på den.
 
+Ändrar du en vägning utan nät, och samma vägning hinner tas bort någon annanstans
+innan din ändring kommer fram, försvinner inte det du skrev. Under Inställningar
+får du välja: lägg tillbaka vägningen på den dagen, eller släng den. Samma två
+svar som när två enheter har skrivit samma dag, fast med en vägning i stället för
+två att välja mellan.
+
+Bakom varje ruta som öppnas över sidan ligger sidan numera mörkare och lite
+suddig, i båda teman, och rutan har ingen egen kantlinje. Markören hamnar direkt i
+det första fältet när rutan öppnas.
+
 Backupen skrivs numera till en katalog eller till en S3-hink, och hemligheten lagras
 krypterat. Knappen "Testa anslutningen" skriver en liten fil och tar bort den igen,
 så att du ser att det fungerar innan nattens körning.
@@ -324,11 +380,26 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. 61 commits, plus the one this
-pass is about to add:
+between what is built and what is running. **76 commits**, and the next deploy is
+`v1.1.0`:
 
 | | |
 |---|---|
+| `7ebe70e` | The coach gets the data, and two rules about what it may do with it |
+| `7d3ae2f` | A swipe between sections, and the five times it must not fire |
+| `c0b8af0` | A deleted row is a question, not a refusal |
+| `a1ba060` | STATE: the scrim, and where the Is line actually came from |
+| `3ec204f` | One scrim, and the sheet has no edge of its own |
+| `739cafb` | The build says what it is, and the source is offered where people are |
+| `107321a` | The rollback target did not exist, so step 0 makes one |
+| `fabb44d` | An edit is not a second opinion, and a conflict has two answers |
+| `b4aa63b` | Assert the pinning in CI rather than on a deploy |
+| `5422a4c` | The deploy is a runbook, and the log says what it did |
+| `f405626` | Pin the stack to a version, and answer the rollback question |
+| `3e88bf1` | Every variable the API reads reaches the container |
+| `030224e` | Close the last two D56 gaps, six phases late |
+| `4ae10fc` | STATE: name the sparse development account the screenshots used |
+| `3e1387b` | Record the pass: the curve, the calendar, and the edit-window audit |
 | `a1343b8` | A weight printed on a label is not an amount |
 | `591e57d` | Every reading is reachable, through a month rather than a longer list |
 | `f804643` | The trend line is a curve between readings, not a staircase |
@@ -342,6 +413,7 @@ pass is about to add:
 | `1172842` | Photo logging, item 1: the picture goes and does not stay |
 | `0a970b0` | A model does see a plate, and it is qwen3-vl:8b |
 | `225918e` | Probe whether any model here can actually see, before building on it |
+| `9c9a3d3` | Record the pass: what CI ran and what is on dev |
 | `2125306` | Notice at boot that the VAPID pair changed |
 | `1faaab0` | 403 keeps the push subscription, because the fault is usually ours |
 | `2af8dd7` | Record the pass: the skip guard's own line, and what is on dev |
@@ -357,9 +429,10 @@ pass is about to add:
 | `48a33d1` | Record the coach pass: what CI ran and what is on dev |
 | `a511cb9` | Coach chat, phase 8b |
 | `da310ea` | Pin every third-party image by digest |
-| `feba0d0` | Record the weekend pass: what CI ran and where MinIO lives now |
+| `feba0d0` | Record the habits pass: what CI ran and where MinIO lives now |
 | `efe56a1` | Pull MinIO from quay.io, since Docker Hub now refuses it |
 | `8528155` | The habit checklist, the second half of Phase 11 |
+| `ff16556` | Record the weekend pass: what CI ran and what is on dev |
 | `5964645` | Each reminder gets a weekday time and a weekend one |
 | `2900709` | Reminders: the push foundation and the two that pay for it |
 | `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
@@ -484,7 +557,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1713 tests**: 494 shared, 321 web, 898 api. **Nine more run in CI**, and they
+**1764 tests**: 494 shared, 353 web, 917 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -493,10 +566,9 @@ endpoint *is* configured nothing is half-skipped, so a CI box that lost
 `pg_dump` fails rather than quietly covering less (§7). Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 730 with none skipped**, and that is now checked
-rather than read: `pnpm test:skips` reported "1493 tests reported, none skipped
-outside the allowlist (the live S3 suite ran)" on this commit, which is the number that
-matters: the nine S3 tests execute against a real MinIO with default settings
+**In CI the api suite runs 926 with none skipped**, and that is checked rather
+than read: `pnpm test:skips` reads the reports and names anything skipped outside
+the allowlist. What matters is the nine: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
 say so. The suite is also run with `SECRET_KEY` unset and under `TZ=UTC`, both
 of which have caught tests that passed only on this workstation.
@@ -699,9 +771,22 @@ build served by `vite preview`:
 
 `shoot2.mjs` was then run across every screen at both widths: twenty screens,
 forty shots, **no horizontal overflow on any of them and nothing blank**. The
-photo sheet, the month calendar and Dagen's two new controls were shot
-separately, because they need a real photograph, a disclosure opened or a row
-logged first, and none of that belongs in a screenshot sweep.
+photo sheet, the month calendar, Dagen's two new controls and the milestone
+sheet were shot separately, because they need a real photograph, a disclosure
+opened, a row logged or a sheet opened first, and none of that belongs in a
+screenshot sweep.
+
+**The verdict was taken separately from the pictures this time**, by
+`overflow.mjs`. `shoot2` prints one line per shot and ends with
+`process.exit(0)`, which truncates a buffered pipe: run in the background the
+forty files arrived and the forty lines did not, and a sweep whose assertion is
+lost is a sweep that proved nothing. The new probe asks the same question
+without taking the pictures, in two minutes rather than twenty, and it also
+reads the swipe's track on every screen: **0 of 40 with horizontal overflow, 0
+blank, and `transform` empty on every one of them**. That last one is D154's
+containing-block rule checked on the real pages rather than argued from the
+code, because a leftover identity transform would pin every sheet in the app to
+the content column.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file

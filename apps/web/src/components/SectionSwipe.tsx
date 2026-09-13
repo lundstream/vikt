@@ -56,6 +56,17 @@ const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const RUBBER = 0.25;
 
 /**
+ * Where all of this applies: the breakpoint the bottom bar appears at.
+ *
+ * The gesture and the slide share it. The slide exists to make a completed
+ * swipe continuous, so on a screen that cannot be swiped it would be motion
+ * added to a navigation nobody asked to change — and the shell's two shapes are
+ * a layout switch (D115), not two apps, so the rule is one line rather than two
+ * conditions that could drift.
+ */
+const PHONE = "(max-width: 639px)";
+
+/**
  * Whether a touch starting here belongs to something else.
  *
  * Walked from the touch target up to the track, because the thing that owns the
@@ -165,7 +176,7 @@ export function SectionSwipe({
     const offset = handoff.current;
     handoff.current = 0;
 
-    if (!element || reduced) return;
+    if (!element || reduced || !window.matchMedia(PHONE).matches) return;
 
     const width = element.offsetWidth || window.innerWidth;
     element.style.willChange = "transform";
@@ -194,8 +205,7 @@ export function SectionSwipe({
     const element = track.current;
     if (!element) return;
 
-    /** Phone only, matching the breakpoint where the bottom bar appears. */
-    const phone = window.matchMedia("(max-width: 639px)");
+    const phone = window.matchMedia(PHONE);
 
     let startX = 0;
     let startY = 0;

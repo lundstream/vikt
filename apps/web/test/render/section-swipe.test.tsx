@@ -332,6 +332,21 @@ describe("the slide", () => {
     expect(track.style.transition).toBe("none");
   });
 
+  /**
+   * And not above it. The slide is what makes a completed swipe continuous, so
+   * on a screen with no swipe it would be motion added to a navigation that was
+   * not being changed.
+   */
+  it("does not run above the phone breakpoint", () => {
+    phone = false;
+    const { track, where } = mount("/dag");
+
+    fireEvent.click(screen.getByTestId("go-food"));
+
+    expect(where()).toBe("/food");
+    expect(track.style.transform).toBe("");
+  });
+
   it("comes from the other side going back", () => {
     const { track } = mount("/dag");
 

@@ -7233,6 +7233,12 @@ somewhere.
 not draw would leave nothing marked as current and no way to tell where you had
 ended up.
 
+**Below `sm` only, the slide as well as the gesture.** The slide exists to make
+a completed swipe continuous, so on a screen that cannot be swiped it would be
+motion added to a navigation nobody asked to change. The shell'''s two shapes are
+a layout switch (D115) rather than two apps, so this is one line rather than two
+conditions that could drift apart.
+
 **`prefers-reduced-motion` removes all of it and keeps the navigation.** Not a
 shorter slide: a small animation is the same animation asking to be noticed
 less. The page does not follow the finger either, because that is movement too;
