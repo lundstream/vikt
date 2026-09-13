@@ -65,9 +65,24 @@ export function BarcodeScanner({
               ? t("food.cameraStarting")
               : ""}
         </p>
+        {/*
+          The secondary style with the two colours the surface demands, rather
+          than a button hand-rolled from scratch (D123). This bar is `bg-ink`
+          on purpose — a dark strip under a live viewfinder glares less and
+          reads better against it — so `border-edge text-ink` would be
+          dark-on-dark. Everything else about the button, the height that
+          clears a thumb, the radius, the focus ring and the disabled state,
+          comes from the shared class and stays in step with it.
+        */}
         <button
           type="button"
-          className="w-full rounded-md border border-paper/40 py-3 text-base text-paper"
+          /**
+           * The surface under this is a live viewfinder, so the link takes the
+           * page's light text rather than the app's muted one. No border: a
+           * `.btn-link` has none, and the override was left behind when this
+           * stopped being an outline (D135).
+           */
+          className="btn-link text-paper hover:text-paper/80"
           onClick={onClose}
         >
           {t("quick.cancel")}

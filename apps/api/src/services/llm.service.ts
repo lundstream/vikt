@@ -2,17 +2,32 @@ import type {
   FoodMatch,
   LlmHealth,
   ParseFoodResponse,
+  ParsePhotoResponse,
   RecipeBudget,
   RecipeResponse,
   RecipeTotal,
   EstimateResponse,
 } from "shared";
-import type { ServingHints } from "shared";
-import { householdHints, resolvePortion, scaleToGrams, toNumber, toNumberOrNull } from "shared";
+import type { ParsedPhotoItem, ServingHints } from "shared";
+import {
+  HOUSEHOLD_UNITS,
+  PHOTO_CONFIDENCE,
+  hintGrams,
+  householdHints,
+  normaliseUnit,
+  resolvePortion,
+  scaleToGrams,
+  toNumber,
+  toNumberOrNull,
+} from "shared";
 import type { Db } from "../db/index.js";
 import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
+import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
+import { RateLimiter } from "../lib/rate-limit.js";
+import { visionAvailable } from "../lib/vision-watch.js";
+import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
 import { recipeMessages, readGeneratedRecipe } from "../llm/recipe.js";
 import { checkCompleteness, type CompletenessFailure } from "../llm/recipe-completeness.js";
 import { estimateMessages, readDishEstimate } from "../llm/estimate.js";
@@ -36,11 +51,21 @@ import { getStaples, userHintsFor } from "./portions.service.js";
  * match harmless rather than a corrupted intake series.
  */
 
-export async function llmHealth(env: Env, client: LlmClient): Promise<LlmHealth> {
+export async function llmHealth(
+  env: Env,
+  client: LlmClient,
+  db: Db,
+): Promise<LlmHealth> {
   return {
     configured: client.enabled,
     reachable: await client.reachable(),
     models: { small: env.OLLAMA_MODEL_SMALL, large: env.OLLAMA_MODEL_LARGE },
+    /**
+     * The boot check's verdict, not the configuration (D143). A model name in
+     * the environment says what an operator intended; this says whether the tag
+     * was sent a picture and described it.
+     */
+    vision: await visionAvailable(db, env),
   };
 }
 
@@ -81,6 +106,224 @@ export async function parseFoodText(
     ms: reply.ms,
   };
 }
+
+/**
+ * How many photographs one account may send in an hour.
+ *
+ * The coach's allowance, deliberately the same number and deliberately not the
+ * same bucket. The same number because both queue on the one GPU this
+ * installation has and neither is a thing a person does forty times an hour;
+ * separate buckets because a day of logging meals should not be able to use up
+ * the conversation, which is the surface where being told to come back later is
+ * worst.
+ */
+export const PHOTO_PARSES_PER_HOUR = COACH_TURNS_PER_HOUR;
+
+const photoLimiter = new RateLimiter(PHOTO_PARSES_PER_HOUR, 60 * 60_000);
+
+/**
+ * A photograph in, the same priced rows a sentence produces out.
+ *
+ * **The image is not kept.** It is decoded from the request, handed to Ollama,
+ * and dropped when this function returns: it is not written to disk, not
+ * written to any table, not put in a log line, and the client never queues it.
+ * A photograph of a plate is a photograph of somebody's kitchen, or of the
+ * people they were eating with, and the only reason this feature is acceptable
+ * in a self-hosted app is that the picture stops existing the moment it has
+ * been read. `apps/api/test/photo-transport.test.ts` holds that.
+ *
+ * Read-only in the same sense as the text parse, for the same reason: what
+ * comes back is a proposal, and nothing reaches `food_entries` until a person
+ * has looked at every row.
+ */
+export async function parseFoodPhoto(
+  userId: string,
+  db: Db,
+  env: Env,
+  client: LlmClient,
+  input: { image: string; note?: string },
+  log?: { info: (data: object, message: string) => void },
+): Promise<ParsePhotoResponse> {
+  /**
+   * No model named means the path does not exist here, which is a different
+   * answer from the box being off and is worth telling apart: one is an
+   * installation that has not been configured for this and one is a workstation
+   * somebody switched off.
+   */
+  const model = env.LLM_VISION_MODEL.trim();
+  if (model === "") return { available: false, reason: "not_configured" };
+
+  const limit = photoLimiter.check(`photo:${userId}`);
+  if (!limit.allowed) {
+    return {
+      available: false,
+      reason: "rate_limited",
+      retryAfterSeconds: limit.retryAfterSeconds,
+    };
+  }
+
+  const reply = await client.chat({
+    model,
+    messages: parsePhotoMessages(input.image, input.note),
+    json: true,
+    temperature: 0,
+    // Three times the text budget, measured rather than chosen. See the
+    // variable's own comment in env.ts.
+    timeoutMs: env.OLLAMA_VISION_TIMEOUT_MS,
+  });
+
+  if (!reply.ok) return { available: false, reason: reply.reason };
+
+  const parsed = readParsedPhoto(reply.content);
+  if (!parsed.ok) return { available: false, reason: parsed.reason };
+
+  const items = await pricePhotoItems(userId, db, parsed.items);
+
+  /**
+   * One line, and everything in it is a count.
+   *
+   * Enough to answer "is this being used and is it slow", which is what the
+   * operator of a self-hosted box actually wants from a log. The size is in
+   * kilobytes because the number is the useful part; the bytes themselves are
+   * the thing this whole path is arranged not to write down. `hadNote` rather
+   * than the note, for the same reason: "kebabpizza, hela" is not private, and
+   * the next one might be.
+   */
+  log?.info(
+    {
+      model: reply.model,
+      ms: reply.ms,
+      kb: Math.round((input.image.length * 3) / 4 / 1024),
+      items: items.length,
+      hadNote: (input.note?.trim() ?? "") !== "",
+    },
+    "photo parsed",
+  );
+
+  return { available: true, items, model: reply.model, ms: reply.ms };
+}
+
+/**
+ * Photographed names and amounts in, priced rows out.
+ *
+ * The same two steps as the text path — match the name, then resolve the
+ * amount against that row's hints — with one rule that only exists here:
+ *
+ * **An amount that cannot be turned into grams is not an amount.** The text
+ * parser has an estimate to fall back on, because a sentence that says "en
+ * skiva bröd" was written by somebody who knows roughly what a slice is. A
+ * photograph has nothing behind it: the model's answers were "stor mängd",
+ * "spridd över delar" and "1 portion", and every one of those is a description
+ * of a picture. Turning them into a number would be the app inventing a figure
+ * and then showing it to the person as though they had given it.
+ *
+ * So the amount survives only when the unit is one the app can price — grams or
+ * kilograms directly, or a household unit this food actually has a definition
+ * for — and is null otherwise. Null rows are kept, named, and cannot be saved
+ * until somebody fills the figure in.
+ */
+async function pricePhotoItems(
+  userId: string,
+  db: Db,
+  parsed: ParsedPhotoItem[],
+): Promise<FoodMatch[]> {
+  const rows = await Promise.all(parsed.map((item) => matchRow(userId, db, item.name)));
+
+  const ids = rows.filter((row) => row !== null).map((row) => row!.id);
+  const userHints = await userHintsFor(userId, db, ids);
+
+  return parsed.map((item, index) => {
+    const row = rows[index] ?? null;
+    const packet = (row?.servingHints as ServingHints | null) ?? null;
+    const own = row ? (userHints.get(row.id) ?? null) : null;
+
+    const household = householdHints(row?.category);
+    const hints = packet || household ? { ...(household ?? {}), ...(packet ?? {}) } : null;
+
+    /**
+     * A row that came with a package weight has no amount (D143, amended).
+     *
+     * The model read "1000 G" off a bag of meatballs and offered it as how much
+     * was being eaten; the database priced it at 2 173 kcal, one tap from the
+     * day's intake. The prompt now asks for that figure as `packageG` instead,
+     * and this drops whatever landed in `amount` beside it — enforced rather
+     * than asked for, because a reply that has told us the number is a packet
+     * has told us it is not a helping, and a model that puts it in both fields
+     * is exactly the case worth defending against.
+     */
+    const amount =
+      typeof item.packageG === "number"
+        ? { grams: null, source: "unknown" as const, portion: null }
+        : photoAmount(item.amount ?? null, hints, own);
+
+    return {
+      name: item.name,
+      estimatedGrams: amount.grams,
+      portion: amount.portion,
+      portionSource: amount.source,
+      /**
+       * The app's figure, not the model's (D55, D143). A photograph is
+       * evidence of a plate and not of a quantity, so every row from one
+       * carries the same lowered confidence, and a model asserting its own
+       * would be the thing being judged handing in the mark.
+       */
+      confidence: PHOTO_CONFIDENCE,
+      match: row === null ? null : priceRow(row, amount.grams, hints, own),
+    };
+  });
+}
+
+/**
+ * What a photographed amount is worth, or null.
+ *
+ * Grams and kilograms resolve on their own; everything else has to be a unit
+ * the household table knows **and** one this food has a definition for. "1
+ * portion" of yoghurt is 200 g because the table says so; "1 portion" of a
+ * kebab pizza is not a quantity, because nothing anywhere says what a portion
+ * of kebab pizza weighs, and inventing it here is exactly what this rule is for.
+ */
+function photoAmount(
+  amount: { count: number; unit: string } | null,
+  hints: ServingHints | null,
+  userHints: ServingHints | null,
+): {
+  grams: number | null;
+  source: FoodMatch["portionSource"];
+  portion: FoodMatch["portion"];
+} {
+  const nothing = { grams: null, source: "unknown", portion: null } as const;
+  if (amount === null) return nothing;
+
+  const unit = normaliseUnit(amount.unit);
+  if (!HOUSEHOLD_UNITS.includes(unit)) return nothing;
+
+  /**
+   * Grams and kilograms carry **no portion label**, because there is nothing
+   * left to label: the amount and the grams are the same fact, and "250 g ·
+   * 250 g" on one line is a screen repeating itself. The label exists for
+   * "1 portion" and "2 skivor", where the words and the mass are different
+   * things and the user needs both to judge the second by the first.
+   */
+  if (unit === "g") return { grams: round(amount.count), source: "hint", portion: null };
+  if (unit === "kg") {
+    return { grams: round(amount.count * 1000), source: "hint", portion: null };
+  }
+
+  const hint = hintGrams(unit, hints, userHints);
+  if (hint === null) return nothing;
+
+  return {
+    grams: round(amount.count * hint.grams),
+    source: hint.source,
+    // The label is capped by `statedPortionSchema`, and a count past it is not
+    // a portion anybody stated: it is the model having produced a gram figure
+    // under a household unit's name.
+    portion: amount.count <= 200 ? amount : null,
+  };
+}
+
+const round = (value: number) => Math.round(value * 10) / 10;
+
 
 /**
  * Names and stated portions in, priced rows out.
@@ -166,10 +409,18 @@ async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemR
   return rows.find((candidate) => isPlausibleMatch(name, candidate.name)) ?? null;
 }
 
-/** The row's energy at the resolved grams. Computed here, never by the model. */
+/**
+ * The row's energy at the resolved grams. Computed here, never by the model.
+ *
+ * `grams` may be null, which is the photo path's honest answer when nobody
+ * knows the amount yet (D143). The food is still worth naming and its figure
+ * per hundred grams is still worth showing; what cannot be stated is what this
+ * particular helping is worth, so that field is null rather than a number
+ * standing on an assumed portion.
+ */
 function priceRow(
   row: FoodItemRow,
-  grams: number,
+  grams: number | null,
   hints: ServingHints | null,
   userHints: ServingHints | null,
 ): NonNullable<FoodMatch["match"]> {
@@ -184,7 +435,7 @@ function priceRow(
         saltG: toNumberOrNull(row.saltPer100),
       },
     },
-    grams,
+    grams ?? 0,
   );
 
   /**
@@ -201,8 +452,9 @@ function priceRow(
     name: row.name,
     brand: row.brand,
     kcalPer100: toNumber(row.kcalPer100),
-    // Computed here, from the row. Never from the model.
-    kcal: Math.round(scaled.kcal * 10) / 10,
+    // Computed here, from the row. Never from the model. Null when there are
+    // no grams to compute it at, which is not the same as zero.
+    kcal: grams === null ? null : Math.round(scaled.kcal * 10) / 10,
     servingHints: merged,
   };
 }

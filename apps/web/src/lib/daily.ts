@@ -131,6 +131,21 @@ export function useDeleteDailyLog() {
   return useDayMutation<string, void>((id) => api.deleteDailyLog(id), [DAILY_KEY]);
 }
 
+/**
+ * Removing a day's measurement (D56, closed).
+ *
+ * Invalidates insights as well as the measurement list, for the same reason the
+ * save does: the waist-to-height series on the dashboard chart is computed on
+ * the server from these rows (D32), so a removed reading moves a line on
+ * another screen.
+ */
+export function useDeleteMeasurement() {
+  return useDayMutation<string, void>(
+    (id) => api.deleteMeasurement(id),
+    [MEASUREMENT_KEY, INSIGHTS_KEY],
+  );
+}
+
 export function useDeleteActivity() {
   return useDayMutation<string, void>((id) => api.deleteActivity(id), [ACTIVITY_KEY]);
 }

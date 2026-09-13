@@ -1,4 +1,12 @@
 import type {
+  CoachConversation,
+  CoachConversationList,
+  CoachReview,
+  CoachReviewList,
+  CreateHabit,
+  Habit,
+  HabitList,
+  UpdateHabit,
   CreateMilestone,
   UpdateMilestone,
   CreateOffset,
@@ -20,6 +28,7 @@ import type {
   MeasurementList,
   CreateManualIntake,
   CreateWeightEntry,
+  UpdateWeightEntry,
   DateRangeQuery,
   ErrorResponse,
   InsightsResponse,
@@ -31,10 +40,12 @@ import type {
   BarcodeLookup,
   CreateFoodEntry,
   CreatePlan,
-  ConfirmParsed,
+  ConfirmParsedInput,
   CreateTemplate,
   LlmHealth,
   ParseFoodResponse,
+  ParseFoodPhotoRequest,
+  ParsePhotoResponse,
   CreateEstimate,
   CreateFoodPortion,
   EstimateDishRequest,
@@ -135,6 +146,17 @@ export const api = {
    * and entirely the user's, and an "are you sure" on a mistyped weight is
    * friction on the recovery path rather than on the destructive one.
    */
+  /**
+   * Changing a reading that exists (D150). A PUT to the row, carrying the value
+   * the client had on screen, so the server can tell an edit from a second
+   * device's opinion.
+   */
+  updateWeight: (id: string, input: UpdateWeightEntry) =>
+    request<WeightEntry>(`/weight/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
   deleteWeight: (id: string) =>
     request<void>(`/weight/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
@@ -150,6 +172,13 @@ export const api = {
 
   deleteDailyLog: (id: string) =>
     request<void>(`/daily/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  /**
+   * Taking a measurement back (D56, closed). Re-logging the day was always the
+   * edit; this is the half that was missing from phase 4 until now.
+   */
+  deleteMeasurement: (id: string) =>
+    request<void>(`/measurement/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   /**
    * Removing the manual figure hands the day back to its food entries (D44).
@@ -220,6 +249,20 @@ export const api = {
     }),
 
   /**
+   * A photograph of a plate, and the words beside it (D143).
+   *
+   * Base64 in JSON rather than a multipart upload, because multipart is a file
+   * transfer and this is not one: there is no file at the other end. The image
+   * is read, handed to the model and dropped, and a shape that looks like an
+   * upload would invite somebody to give it somewhere to land.
+   */
+  parseFoodPhoto: (body: ParseFoodPhotoRequest) =>
+    request<ParsePhotoResponse>("/llm/parse-photo", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /**
    * A recipe from what is in the fridge, priced by the database.
    *
    * Slow on purpose: the large model takes several seconds warm and around
@@ -233,7 +276,7 @@ export const api = {
     }),
 
   /** The rows the user accepted, after correcting the portions. */
-  confirmParsedFood: (input: ConfirmParsed) =>
+  confirmParsedFood: (input: ConfirmParsedInput) =>
     request<{ entries: FoodEntry[] }>("/llm/parse-food/confirm", {
       method: "POST",
       body: JSON.stringify(input),
@@ -349,6 +392,51 @@ export const api = {
 
   /** Everything logged for one day, so the daily screen opens filled in. */
   dayLog: (localDate: string) => request<DayLog>(`/day?localDate=${localDate}`),
+
+  /* -------------------------------------------------------------- coach */
+
+  coachConversations: () => request<CoachConversationList>("/coach/conversations"),
+
+  coachConversation: (id: string) => request<CoachConversation>(`/coach/conversations/${id}`),
+
+  removeConversation: (id: string) =>
+    request<void>(`/coach/conversations/${id}`, { method: "DELETE" }),
+
+  removeAllConversations: () =>
+    request<{ removed: number }>("/coach/conversations", { method: "DELETE" }),
+
+  coachReviews: () => request<CoachReviewList>("/coach/reviews"),
+
+  coachCurrentReview: () => request<{ review: CoachReview | null }>("/coach/review/current"),
+
+  writeReview: (asOf: string) =>
+    request<{ status: string; review: CoachReview | null }>("/coach/reviews", {
+      method: "POST",
+      body: JSON.stringify({ asOf }),
+    }),
+
+  dismissReview: (id: string) =>
+    request<{ ok: true }>(`/coach/reviews/${id}/dismiss`, { method: "POST" }),
+
+  /* ------------------------------------------------------------- habits */
+
+  listHabits: () => request<HabitList>("/habits"),
+
+  createHabit: (input: CreateHabit) =>
+    request<Habit>("/habits", { method: "POST", body: JSON.stringify(input) }),
+
+  updateHabit: (id: string, patch: UpdateHabit) =>
+    request<Habit>(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  reorderHabits: (ids: readonly string[]) =>
+    request<HabitList>("/habits/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
+
+  /**
+   * `history` is in the query string rather than the body because a DELETE with
+   * a body is a thing proxies drop. `keep` archives, `remove` takes the ticks.
+   */
+  removeHabit: (id: string, history: "keep" | "remove") =>
+    request<void>(`/habits/${id}?history=${history}`, { method: "DELETE" }),
 
   listActivities: (range: DateRangeQuery = {}) =>
     request<ActivityList>(`/activity${queryString(range)}`),

@@ -59,6 +59,26 @@ export async function editProfile(
       ? { addExerciseToTarget: input.addExerciseToTarget }
       : {}),
     ...(input.newsMail !== undefined ? { newsMail: input.newsMail } : {}),
+    ...(input.requestMail !== undefined ? { requestMail: input.requestMail } : {}),
+    ...(input.remindWeigh !== undefined ? { remindWeigh: input.remindWeigh } : {}),
+    ...(input.remindWeighMinute !== undefined
+      ? { remindWeighMinute: input.remindWeighMinute }
+      : {}),
+    ...(input.remindDay !== undefined ? { remindDay: input.remindDay } : {}),
+    ...(input.remindDayMinute !== undefined ? { remindDayMinute: input.remindDayMinute } : {}),
+    ...(input.coachTone !== undefined ? { coachTone: input.coachTone } : {}),
+    ...(input.remindWeighWeekend !== undefined
+      ? { remindWeighWeekend: input.remindWeighWeekend }
+      : {}),
+    ...(input.remindWeighWeekendMinute !== undefined
+      ? { remindWeighWeekendMinute: input.remindWeighWeekendMinute }
+      : {}),
+    ...(input.remindDayWeekend !== undefined
+      ? { remindDayWeekend: input.remindDayWeekend }
+      : {}),
+    ...(input.remindDayWeekendMinute !== undefined
+      ? { remindDayWeekendMinute: input.remindDayWeekendMinute }
+      : {}),
     ...(input.theme !== undefined ? { theme: input.theme } : {}),
     ...(input.soberAssumeUnloggedDry !== undefined
       ? { soberAssumeUnloggedDry: input.soberAssumeUnloggedDry }

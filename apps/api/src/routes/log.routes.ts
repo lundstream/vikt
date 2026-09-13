@@ -9,6 +9,7 @@ import {
   localDateSchema,
   manualIntakeListSchema,
   manualIntakeSchema,
+  updateWeightEntrySchema,
   weightEntrySchema,
   weightListSchema,
 } from "shared";
@@ -16,6 +17,7 @@ import {
   getWeightEntries,
   removeWeightEntry,
   saveWeightEntry,
+  updateWeightEntry,
 } from "../services/weight.service.js";
 import {
   getIntakeSeries,
@@ -67,16 +69,50 @@ export const logRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   /**
+   * Changing a reading that exists (D150).
+   *
+   * Not the same POST as logging, which is what it used to be. A create says
+   * "there is a reading for this day"; an update says "this row is wrong", and
+   * only the second one can carry the value the client was looking at. Without
+   * that, an edit and a second device's opinion arrive as the same request and
+   * the server has to guess which it is. It guessed, correctly by its own rule,
+   * and told the owner two devices had written a day he had edited on one.
+   *
+   * 409 here means the row changed under the edit, which is the one case worth
+   * asking about. Moving a reading onto an occupied day keeps D41's own code.
+   */
+  app.put(
+    "/weight/:id",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: updateWeightEntrySchema,
+        response: {
+          200: weightEntrySchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+          422: errorResponseSchema,
+        },
+      },
+    },
+    async (request) =>
+      updateWeightEntry(request.userId!, app.db, {
+        ...request.body,
+        // The path is the authority on which row, so a body that disagrees
+        // cannot address a different one.
+        id: request.params.id,
+      }),
+  );
+
+  /**
    * Removes a reading.
    *
    * Everything derived from the weight series is recomputed on the next read,
    * so this needs no companion cleanup: the trend, both projections and the
    * maintenance figure simply come back different. An achieved milestone is
    * **not** revoked (D8): it happened.
-   *
-   * Editing is the same POST as logging. `(user_id, local_date)` holds one
-   * canonical reading per day, so re-posting the day replaces it, which is what
-   * "edit" means for this table.
    */
   app.delete(
     "/weight/:id",

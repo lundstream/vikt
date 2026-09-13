@@ -40,10 +40,13 @@ import { mailSettingsRoutes } from "./routes/mail-settings.routes.js";
 import { backupRoutes } from "./routes/backup.routes.js";
 import { accountRoutes } from "./routes/account.routes.js";
 import { announcementRoutes } from "./routes/announcement.routes.js";
+import { pushRoutes } from "./routes/push.routes.js";
 import { exportRoutes } from "./routes/export.routes.js";
 import { createMailer, type Mailer } from "./mail/sender.js";
 import { portionRoutes } from "./routes/portions.routes.js";
 import { dailyRoutes } from "./routes/daily.routes.js";
+import { habitRoutes } from "./routes/habit.routes.js";
+import { coachRoutes } from "./routes/coach.routes.js";
 import { progressRoutes } from "./routes/progress.routes.js";
 import type { FoodAdapter } from "./food/adapter.js";
 import { OpenFoodFactsAdapter } from "./food/openfoodfacts.js";
@@ -257,6 +260,8 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
       await api.register(insightsRoutes);
       await api.register(foodRoutes);
       await api.register(dailyRoutes);
+      await api.register(habitRoutes);
+      await api.register(coachRoutes);
       await api.register(progressRoutes);
       await api.register(llmRoutes);
       await api.register(portionRoutes);
@@ -267,6 +272,7 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
       await api.register(backupRoutes);
       await api.register(accountRoutes);
       await api.register(announcementRoutes);
+      await api.register(pushRoutes);
       await api.register(exportRoutes);
     },
     { prefix: "/api" },

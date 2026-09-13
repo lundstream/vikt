@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, t } from "../i18n/index.js";
 import { announcementBody, useAnnouncements, useMarkSeen } from "../lib/announcements.js";
+import { AnnouncementBody } from "../components/Announcement.js";
 
 /**
  * Nyheter (D108).
@@ -42,6 +43,7 @@ export function News() {
     // a new object every render. `seen` is a stable mutation object and is
     // deliberately not a dependency: listing it would re-run this on every
     // settled mutation, which is exactly the loop this is trying not to be.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unreadKey]);
 
   return (
@@ -76,11 +78,16 @@ export function News() {
                 {formatLongDay(entry.createdAt.slice(0, 10), LOCALE)}
               </p>
 
-              {announcementBody(entry) ? (
-                <p className="mt-2 max-w-prose text-note text-muted">
-                  {announcementBody(entry)}
-                </p>
-              ) : null}
+              {/*
+                The whole body, formatted (D128). `baseLevel` is 2 because the
+                entry's own title above it is an h2, so a heading inside the
+                body starts at h3 and the outline stays walkable.
+              */}
+              <AnnouncementBody
+                markdown={announcementBody(entry)}
+                baseLevel={2}
+                className="mt-2"
+              />
             </li>
           ))}
         </ul>

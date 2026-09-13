@@ -4,11 +4,13 @@ import { SyncIndicator } from "./SyncIndicator.js";
 import { Sheet } from "./Sheet.js";
 import { useLogout, useMe } from "../lib/session.js";
 import { useAnnouncements } from "../lib/announcements.js";
+import { useLlmHealth } from "../lib/food.js";
 import { MaintenanceBanner } from "./MaintenanceBanner.js";
 import { useServiceWorker } from "../lib/update.js";
 import { t, type TranslationKey } from "../i18n/index.js";
 import { HeaderLockup } from "./Wordmark.js";
 import { ThemeApplier } from "./ThemeChoice.js";
+import { SectionSwipe } from "./SectionSwipe.js";
 
 /**
  * One shell, two shapes.
@@ -48,6 +50,14 @@ type Destination = {
   inBar?: boolean;
   /** Drawn for admins only (D100). The server decides everything else. */
   adminOnly?: boolean;
+  /**
+   * Drawn only where the LLM layer is configured (D139, D94).
+   *
+   * Absent rather than disabled, and the same rule the server follows: with
+   * the flag off the routes do not exist, so a link to one would be a link
+   * to a 404 wearing a label.
+   */
+  llmOnly?: boolean;
 };
 
 const stroke = {
@@ -123,6 +133,22 @@ const DESTINATIONS: Destination[] = [
       <>
         <path d="M4 4v16h16" {...stroke} />
         <path d="M8 16v-4M12 16v-7M16 16v-2M20 16v-5" {...stroke} />
+      </>
+    ),
+  },
+  {
+    /**
+     * The coach is a place, not an icon (§6 phase 8b). It sits in the list
+     * with everything else, reached the same way, and it is not in the bar:
+     * four is what a thumb can hit across 360 px.
+     */
+    to: "/coach",
+    label: "coach.title",
+    llmOnly: true,
+    icon: (
+      <>
+        <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H9.5L5.5 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z" {...stroke} />
+        <path d="M8 10.5h8M8 13h5" {...stroke} />
       </>
     ),
   },
@@ -213,12 +239,31 @@ const SIGN_OUT_ICON = (
  * Exported so the navigation test can assert the two surfaces cover the same
  * set without reaching into a module-private constant.
  */
-export function destinationsFor(isAdmin: boolean): Destination[] {
-  return DESTINATIONS.filter((destination) => !destination.adminOnly || isAdmin);
+export function destinationsFor(isAdmin: boolean, llm = true): Destination[] {
+  return DESTINATIONS.filter(
+    (destination) =>
+      (!destination.adminOnly || isAdmin) && (!destination.llmOnly || llm),
+  );
 }
 
 /** The four in the bar, and everything that overflows into Mer. */
 export const inBar = (destination: Destination) => destination.inBar === true;
+
+/**
+ * The sections a swipe moves between, in the order the bar draws them (D154).
+ *
+ * The bar's four rather than every destination, because the bar is what the
+ * gesture is a shortcut for: swiping to a place that has no position in the
+ * navigation would leave nothing marked as current and no way to tell where you
+ * had ended up. Everything else is still a tap away in Mer, and a tap there
+ * gets the same slide.
+ *
+ * A module constant, not a computed one: it never varies by account, and a
+ * fresh array every render would re-attach the gesture's listeners on each one.
+ */
+export const SECTION_ORDER: readonly string[] = DESTINATIONS.filter(inBar).map(
+  (destination) => destination.to,
+);
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { updateReady, applyUpdate } = useServiceWorker();
@@ -260,7 +305,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         Bottom padding on mobile clears the bar, and only on mobile: on desktop
         the bar is not there and the space would be a gap under every screen.
       */}
-      <div className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
+      {/*
+        `overflow-x: clip` rather than `hidden` (D154). The content slides
+        sideways past both edges during a swipe and has to be cut off there, and
+        `hidden` would also turn this into a scroll container: it forces
+        `overflow-y` to `auto`, which changes what scrolls on every screen in
+        the app to fix an axis nothing scrolls on. `clip` cuts one axis and
+        leaves the other alone.
+      */}
+      <div className="min-w-0 flex-1 overflow-x-clip pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/*
           Above the screen rather than inside it (D108). A planned outage is a
           fact about the app, not about whatever page you happen to be on, and
@@ -270,7 +323,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="px-5 pt-4">
           <MaintenanceBanner />
         </div>
-        {children}
+        {/*
+          The banner stays put and the screen moves (D154). An outage is a fact
+          about the app rather than about the section you are on, so sliding it
+          out and back in would animate the one thing on the page that did not
+          change.
+        */}
+        <SectionSwipe order={SECTION_ORDER}>{children}</SectionSwipe>
       </div>
 
       <BottomBar />
@@ -319,8 +378,12 @@ function DestinationRow({
 function Sidebar() {
   const { pathname } = useLocation();
   const me = useMe();
+  /** Whether this installation has the LLM layer at all (D94, D139). */
+  const llm = useLlmHealth();
   const signOut = useLogout();
   const unread = useAnnouncements().data?.unread ?? 0;
+  /** Requests waiting for an answer, zero for anyone who is not an admin (D129). */
+  const pending = me.data?.pendingRequests ?? 0;
 
   return (
     <nav
@@ -344,7 +407,7 @@ function Sidebar() {
         place.
       */}
       <ul className="space-y-1">
-        {destinationsFor(me.data?.isAdmin ?? false).map((destination) => (
+        {destinationsFor(me.data?.isAdmin ?? false, llm.data?.configured === true).map((destination) => (
           <li key={destination.to} className="relative">
             <DestinationRow
               destination={destination}
@@ -362,6 +425,24 @@ function Sidebar() {
               <span
                 data-testid="side-unread"
                 aria-label={t("news.unread")}
+                className="pointer-events-none absolute right-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
+              />
+            ) : null}
+
+            {/*
+              The same dot again, for requests waiting to be answered (D129).
+
+              Gran, like the news one, because it marks a thing to look at
+              rather than a problem: somebody has asked politely and is waiting,
+              which is work rather than a failure. A dot and not a count, for
+              the reason D108 gives: the number is never large enough to be
+              information, and a numbered badge is the shape of an app that
+              wants attention rather than one that has something to say.
+            */}
+            {destination.to === "/admin" && pending > 0 ? (
+              <span
+                data-testid="side-pending"
+                aria-label={t("admin.pending")}
                 className="pointer-events-none absolute right-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
               />
             ) : null}
@@ -415,6 +496,7 @@ function BottomBar() {
   const { pathname, search } = useLocation();
   const unread = useAnnouncements().data?.unread ?? 0;
   const me = useMe();
+  const pending = me.data?.pendingRequests ?? 0;
   const reachable = destinationsFor(me.data?.isAdmin ?? false).filter(inBar);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -493,7 +575,7 @@ function BottomBar() {
                 attention rather than one that has something to say. Gran,
                 because it marks a thing to look at rather than a problem.
               */}
-              {unread > 0 ? (
+              {unread > 0 || pending > 0 ? (
                 <span
                   data-testid="more-unread"
                   aria-label={t("news.unread")}
@@ -525,8 +607,10 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const signOut = useLogout();
   const me = useMe();
   const { pathname } = useLocation();
+  const pending = me.data?.pendingRequests ?? 0;
 
-  const links = destinationsFor(me.data?.isAdmin ?? false).filter(
+  const llm = useLlmHealth();
+  const links = destinationsFor(me.data?.isAdmin ?? false, llm.data?.configured === true).filter(
     (destination) => !inBar(destination),
   );
 
@@ -534,7 +618,20 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Sheet open={open} onClose={onClose} title={t("nav.more")} testId="more-sheet">
       <ul className="divide-y divide-edge border-y border-edge">
         {links.map((destination) => (
-          <li key={destination.to}>
+          <li key={destination.to} className="relative">
+            {/*
+              The dot the Mer button carries, on the row it is actually about
+              (D129). Without it the button says "something in here" and the
+              sheet does not say which of five things, which is the state the
+              news dot was never in because Nyheter is in the bar on a phone.
+            */}
+            {destination.to === "/admin" && pending > 0 ? (
+              <span
+                data-testid="more-pending"
+                aria-label={t("admin.pending")}
+                className="pointer-events-none absolute right-1 top-1/2 size-2 -translate-y-1/2 rounded-full bg-logged"
+              />
+            ) : null}
             <DestinationRow
               destination={destination}
               current={pathname === destination.to}

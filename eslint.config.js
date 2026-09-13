@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 import isolation from "./eslint-rules/user-id-first-param.js";
 import ownership from "./eslint-rules/derived-data-owner.js";
 
@@ -55,6 +56,37 @@ export default tseslint.config(
              * a signature.
              */
             "llmHealth",
+            /**
+             * Splits a habit id out of a reminder kind string (D137). Pure
+             * string work on a value the caller already holds: it reads no row,
+             * touches no database and has no user to scope to. Scoping it would
+             * suggest the answer could differ per account.
+             */
+            "habitIdOf",
+            /**
+             * Builds the sentence shown when the coach's own guardrail refuses
+             * a reply (D139). Pure text assembly from values the caller already
+             * holds: no row, no database, nothing to scope.
+             */
+            "refusalMessage",
+            /**
+             * The Monday on or before a date. Calendar arithmetic on a string;
+             * whose date it is, is the caller's question.
+             */
+            "weekStartOf",
+            /**
+             * The Sunday sweep (D141), which is the same shape as `runReminders`
+             * beside it: it runs for **every** account and finds whose local
+             * clock has just passed Sunday at eight. Its per-user work is
+             * scoped; the sweep itself has no one user to belong to.
+             */
+            "runWeeklyReviews",
+            /**
+             * Pulls the host out of a push endpoint so a removal can be logged
+             * without the token in it. String work on a value the caller holds;
+             * there is no row and nobody to scope to.
+             */
+            "hostOf",
 
             /**
              * Pure functions of their arguments. Neither touches the database,
@@ -77,6 +109,28 @@ export default tseslint.config(
             "approveInviteRequest",
             "rejectInviteRequest",
             "deleteInviteRequest",
+            /**
+             * How many requests are waiting (D129). Installation-wide: there is
+             * one queue of requests, every admin sees the same number, and the
+             * rows it counts belong to people who do not have accounts yet.
+             * `getMe` asks it only for an admin, and `requireAdmin` guards
+             * every route that acts on what it counts.
+             */
+            "countPendingInviteRequests",
+            /**
+             * The reminder scheduler (D136). It runs on a timer with no session
+             * and its whole job is to sweep **every** profile: a `userId` first
+             * parameter would be a lie about what it does. The per-user reads
+             * it makes — `alreadyDone`, `claimDay` — take one and are absent
+             * from this list for that reason.
+             *
+             * `insideWindow` and `payloadFor` are pure: a number and a string,
+             * no row of any kind.
+             */
+            "insideWindow",
+            "payloadFor",
+            "dueNow",
+            "runReminders",
 
             /**
              * Password reset is pre-session by definition: the caller has lost
@@ -132,6 +186,21 @@ export default tseslint.config(
             "nextRunAt",
             "runBackup",
             "latestBackupFile",
+            /**
+             * Writes a probe file to the one destination this installation has
+             * and deletes it again (D130). Like every other backup function it
+             * takes an `actor` for the audit row, which is who pressed the
+             * button rather than whose data is being written, because the
+             * answer to that is everybody's.
+             */
+            "testBackupDestination",
+            /**
+             * Formats the one destination this installation has, for a log line
+             * and an audit row (D132). Pure: it takes settings and returns a
+             * string, touches no row, and there is no user whose destination it
+             * could be, because there is one per installation.
+             */
+            "describeDestination",
 
             /**
              * Announcements are per installation (D108): one notice, everybody
@@ -249,7 +318,53 @@ export default tseslint.config(
     // lives beside the build output it inspects.
     files: ["scripts/**/*.mjs", "**/scripts/**/*.mjs", "infra/**/*.mjs"],
     languageOptions: {
-      globals: { process: "readonly", console: "readonly", Buffer: "readonly" },
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        // Node has had both since 18; a script that talks to the LAN uses them.
+        fetch: "readonly",
+        AbortSignal: "readonly",
+      },
+    },
+  },
+
+  /**
+   * Rules of hooks.
+   *
+   * A `useState` was placed below an early `return null`, so the screen ran a
+   * different number of hooks depending on whether a query had resolved. React
+   * threw "Rendered more hooks than during the previous render" at runtime and
+   * every render test failed on missing elements rather than on the cause,
+   * which cost an afternoon. The rule is static and would have named the line.
+   *
+   * `exhaustive-deps` is a warning rather than an error on purpose: a stale
+   * closure is a real defect but the rule cannot tell an intentionally narrow
+   * dependency list from a forgotten one, and `eslint .` does not fail on
+   * warnings. Rules of hooks has no such judgement in it — a conditional hook
+   * is always wrong — so it is an error.
+   */
+  {
+    files: ["apps/web/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+
+  /**
+   * The hand-written half of the service worker (D136).
+   *
+   * It runs in a worker, where `self` is the global scope and there is no
+   * `window`. Declared here rather than with a file-level eslint comment,
+   * because the scope is a property of where the file runs rather than an
+   * exception somebody decided to make.
+   */
+  {
+    files: ["apps/web/public/app/push-sw.js"],
+    languageOptions: {
+      globals: { self: "readonly", clients: "readonly", registration: "readonly" },
     },
   },
 

@@ -294,6 +294,31 @@ export const HOUSEHOLD_MEASURES: Record<FoodCategory, ServingHints> = {
   drink: { dl: 100, glas: 200, burk: 330, flaska: 500 },
 };
 
+/**
+ * Every unit the household table knows, plus the two the app stores in.
+ *
+ * This is the **whole vocabulary an amount may be stated in** (D143). A
+ * photograph comes back with amounts like "stor mängd" and "spridd över delar",
+ * which are descriptions of a picture and not quantities, and the difference
+ * between the two cannot be decided by looking at the words: it is decided by
+ * whether the app can turn the words into grams. This list is that boundary,
+ * written down once so the prompt can name the units and the parser can refuse
+ * everything else.
+ *
+ * Derived from the table rather than typed out beside it, because a unit added
+ * to a category and not to the list would be a unit the model is forbidden to
+ * use and the app knows how to resolve.
+ */
+export const HOUSEHOLD_UNITS: string[] = [
+  "g",
+  "kg",
+  ...[
+    ...new Set(
+      Object.values(HOUSEHOLD_MEASURES).flatMap((hints) => Object.keys(hints)),
+    ),
+  ].sort(),
+];
+
 /** The household hints for a category, or null when the food has none. */
 export function householdHints(category: string | null | undefined): ServingHints | null {
   return isFoodCategory(category) ? HOUSEHOLD_MEASURES[category] : null;

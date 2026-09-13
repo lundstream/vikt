@@ -44,7 +44,7 @@ export function Celebration({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-ink/70 px-5"
+      className="scrim fixed z-50 grid place-items-center px-5"
       role="dialog"
       aria-modal="true"
       aria-labelledby="celebration-title"

@@ -44,7 +44,26 @@ export function Sheet({
     if (!open) return;
 
     returnTo.current = document.activeElement as HTMLElement | null;
-    panel.current?.focus();
+
+    /**
+     * Focus goes to the **first field**, not to the dialog box (D152).
+     *
+     * Focusing the container drew a ring around the whole sheet: in the dark
+     * theme `:focus-visible` is `--data`, so an Is-coloured line appeared round
+     * the panel and read as the sheet being selected, on a screen where Is
+     * means a raw reading. Chromium matches `:focus-visible` on a
+     * programmatically focused `tabindex="-1"` element, so the ring was correct
+     * CSS applied to the wrong thing.
+     *
+     * The first field is also where somebody is going anyway: every sheet in
+     * this app opens onto a form. The container keeps its `tabIndex` and is the
+     * fallback for a sheet that has nothing focusable in it, which is what
+     * keeps focus inside the dialog either way.
+     */
+    const first = panel.current?.querySelector<HTMLElement>(
+      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])',
+    );
+    (first ?? panel.current)?.focus();
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -68,7 +87,7 @@ export function Sheet({
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-ink/40"
+        className="scrim absolute"
         aria-label={t("quick.cancel")}
         onClick={onClose}
       />
@@ -80,9 +99,17 @@ export function Sheet({
         aria-label={title}
         tabIndex={-1}
         data-testid={testId}
-        className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border-t
-                   border-edge bg-paper px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5
-                   outline-none sm:max-h-[80dvh] sm:rounded-2xl sm:border"
+        /*
+          No edge (D152). A sheet is Skymning standing on a dimmed, blurred
+          page; the separation is the scrim behind it, and a hairline on top of
+          that is a second answer to a question already answered. `outline-none`
+          and `focus-visible:outline-none` because the container is a focus
+          target of last resort and should never draw a ring when it is.
+        */
+        className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl
+                   bg-paper px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5
+                   outline-none focus-visible:outline-none focus-visible:ring-0
+                   sm:max-h-[80dvh] sm:rounded-2xl"
       >
         <div className="mb-4 flex items-baseline justify-between gap-4">
           <h2 className="text-lg font-semibold text-ink">{title}</h2>

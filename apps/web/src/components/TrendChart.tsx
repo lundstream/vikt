@@ -14,6 +14,7 @@ import { formatDecimal } from "shared";
 import { formatLongDay } from "../lib/dates.js";
 import { alpha, usePrefersReducedMotion, useTokens } from "../lib/tokens.js";
 import { niceTicks } from "../lib/ticks.js";
+import { withTrendVertices } from "../lib/trend-series.js";
 import { LOCALE, t } from "../i18n/index.js";
 
 /**
@@ -98,9 +99,17 @@ export function TrendChart({
     [whtr],
   );
 
+  /**
+   * One row per day, and the trend **only on reading dates** (D144).
+   *
+   * `withTrendVertices` nulls the carried-forward days, and `connectNulls` on
+   * the line below draws the monotone curve across them. The rows themselves
+   * stay per-day because the x axis is categorical: dropping them would space
+   * two readings a month apart the same as two a day apart.
+   */
   const data = useMemo(
     () =>
-      points.map((point) => {
+      withTrendVertices(points).map((point) => {
         const ratio = whtrByDay.get(point.localDate);
         return {
           ...point,
@@ -146,7 +155,12 @@ export function TrendChart({
         vertical space to read as one — it needs room to the sides and nothing
         crowding it.
       */}
-      <div className="h-48 w-full sm:h-72">
+      {/*
+        The chart owns the horizontal axis (D154). A finger dragged sideways
+        across a line of readings is reading the line, so the section swipe
+        leaves any touch that starts in here alone.
+      */}
+      <div data-swipe-ignore className="h-48 w-full sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           {/*
             `accessibilityLayer` is off, which is what removes `tabIndex={0}`
@@ -261,6 +275,13 @@ export function TrendChart({
             <Line
               dataKey="trend"
               name={t("chart.trend")}
+              /*
+                Monotone, and the choice matters now that the vertices are
+                sparse. A natural cubic through a nine-day gap overshoots the
+                lower reading on its way there, drawing a weight nobody
+                recorded; monotone cannot leave the interval between two
+                neighbouring values.
+              */
               type="monotone"
               stroke={tokens.trend}
               strokeWidth={3}
@@ -270,6 +291,8 @@ export function TrendChart({
               activeDot={{ r: 4, fill: tokens.trend, stroke: tokens.paper, strokeWidth: 2 }}
               isAnimationActive={!reducedMotion}
               animationDuration={400}
+              // The gap days carry no vertex (D144); the curve spans them.
+              connectNulls
             />
 
             {/*
@@ -463,12 +486,43 @@ export function yDomain(points: readonly TrendPoint[]): [number, number] {
   const trends = points.map((point) => point.trend).filter(Number.isFinite);
   if (trends.length === 0) return [0, 1];
 
-  const min = Math.min(...trends);
-  const max = Math.max(...trends);
+  /**
+   * Every raw reading in the window is inside the domain.
+   *
+   * This used to bound the axis by the **trend alone**, on the reasoning that
+   * the line is the hero and a couple of outlying readings should not squash
+   * it into the middle quarter of the plot. That reasoning was right about the
+   * hero and wrong about the arithmetic: the trend is an exponential moving
+   * average, so it lags, and on a real series it sits well inside the readings
+   * that produced it. A morning weigh-in of 106,9 against a trend still at
+   * 108,4 landed outside a domain built from the trend and was clipped —
+   * the most recent reading, the one a person opens the app to see, simply not
+   * drawn.
+   *
+   * Clipping made it invisible rather than wrong, which is why it survived: the
+   * chart looked fine, and the missing point looked like a day nobody logged.
+   *
+   * The line stays readable because the two series are not independent. The
+   * trend is drawn from these readings, so it runs through the middle of them
+   * by construction, and widening to hold them costs the line the noise band
+   * around it rather than half the plot.
+   */
+  const readings = points
+    .map((point) => point.raw)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
-  // A flat line still needs a band to sit in, or it lands on the axis.
-  const spread = max - min;
-  const padding = Math.max(spread * 0.25, 0.4);
+  const values = [...trends, ...readings];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  /**
+   * Padding proportional to the **trend's** spread, not the combined one, so a
+   * single noisy morning widens the domain by its own distance and not by a
+   * quarter of itself again. A flat line still needs a band to sit in, or it
+   * lands on the axis.
+   */
+  const trendSpread = Math.max(...trends) - Math.min(...trends);
+  const padding = Math.max(trendSpread * 0.2, (max - min) * 0.06, 0.3);
 
   return [round(min - padding), round(max + padding)];
 }
@@ -494,8 +548,16 @@ export function yTicks(
   count = 5,
   maxStep?: number,
 ): number[] {
-  return niceTicks(domain[0], domain[1], count, formatKg, maxStep);
+  /**
+   * `KG_QUANTUM` is what makes the marks evenly spaced *as printed*. The labels
+   * carry one decimal, so a step has to be a whole number of tenths — see
+   * `candidateSteps` in ticks.ts, which this axis is the reason for.
+   */
+  return niceTicks(domain[0], domain[1], count, formatKg, maxStep, KG_QUANTUM);
 }
+
+/** One decimal is the precision `formatKg` prints at, so 0.1 kg is the quantum. */
+const KG_QUANTUM = 0.1;
 
 /**
  * Above this span the one-kilo cap is dropped. Ten kilos at one mark each is
@@ -529,18 +591,35 @@ function TrendTooltip({
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
 
+  /**
+   * Reading dates only (D144).
+   *
+   * A day that carried the trend forward has nothing to report: the weight is
+   * unknown and the trend figure is the previous reading's, restated. Showing
+   * it invited the reading that the staircase already suggested, that the
+   * number held steady across the gap. What actually happened there is that
+   * nobody weighed, and the honest tooltip for that is none.
+   */
+  if (point.raw === null) return null;
+
   const readingLine =
-    point.raw === null
-      ? t("chart.noReading")
-      : point.source === "import"
+    point.source === "import"
         ? t("chart.importedValue", { value: formatDecimal(point.raw, { decimals: 1 }) })
         : t("chart.readValue", { value: formatDecimal(point.raw, { decimals: 1 }) });
 
   return (
     <div className="rounded-lg border border-edge bg-card px-3 py-2 text-note shadow-lg">
       <p className="text-micro text-muted">{formatLongDay(point.localDate, LOCALE)}</p>
+      {/*
+        One decimal, like the headline trend weight and like the axis. The
+        tooltip carried two, so tapping the chart turned 86,9 into 86,93 and
+        invited a reader to believe the second digit. The trend is an average
+        over a fortnight of scale readings that are themselves ±0.1 at best;
+        the second decimal is arithmetic, not measurement, and §5's rule that
+        uncertainty is never dressed up applies to precision as much as colour.
+      */}
       <p className="num mt-1 text-metric-sm text-ink">
-        {t("chart.trendValue", { value: formatDecimal(point.trend, { decimals: 2 }) })}
+        {t("chart.trendValue", { value: formatDecimal(point.trend, { decimals: 1 }) })}
       </p>
       <p className="num text-muted">{readingLine}</p>
       {showWhtr && typeof point.whtr === "number" ? (

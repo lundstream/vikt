@@ -3,7 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { LOCALE, t, translationKeys } from "../src/i18n/index.js";
-import { sv } from "../src/i18n/sv.js";
+import { habitReminderBody, REMINDER_TEXT } from "shared";
+import { sv, type TranslationKey } from "../src/i18n/sv.js";
+import { ENDPOINTS } from "../src/lib/queue/sync.js";
+import type { QueueStatus } from "../src/lib/queue/db.js";
 
 /**
  * The interface is in Swedish, with no switcher — DECISIONS.md D21.
@@ -90,6 +93,10 @@ const COMPUTED_PREFIXES = [
   // `t(`admin.mail.${row.status}`)` in the admin view, over the queue's status
   // column (D88).
   "admin.mail.",
+  // `t(`habit.icon.${key}`)` over the closed icon set in `packages/shared`
+  // (D137). The labels are what a screen reader reads for a round icon button,
+  // so a missing one is audible rather than invisible.
+  "habit.icon.",
 ];
 
 describe("the translation layer", () => {
@@ -182,5 +189,59 @@ describe("translation coverage", () => {
     const forbidden = /\b(misslyckad|misslyckats|du missade|fel på dig|bruten)\b/i;
     const offenders = Object.entries(sv).filter(([, value]) => forbidden.test(value));
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * The notification copy has one owner (D136).
+ *
+ * The server builds the payload and the settings screen previews it, so the
+ * words live in `shared`. The dictionary keeps its own entries because that is
+ * where the copy guards look — a string that arrives on a lock screen is
+ * interface copy that happens to be displayed somewhere else — and this is what
+ * stops the two from drifting apart.
+ */
+describe("the reminder notifications", () => {
+  it("say the same thing in the dictionary as on the wire", () => {
+    expect(sv["push.notifyWeigh"]).toBe(REMINDER_TEXT.weigh);
+    expect(sv["push.notifyDay"]).toBe(REMINDER_TEXT.day);
+  });
+
+  /**
+   * A habit's notification is its own name with two words in front of it, and
+   * those two words are copy like any other (D137). Compared through the
+   * placeholder, because the name comes from the user and the register can only
+   * hold the part the app wrote.
+   */
+  it("say the same thing for a habit", () => {
+    expect(sv["push.notifyHabit"]).toBe(habitReminderBody("{name}"));
+  });
+});
+
+
+/**
+ * Every queued kind has a name, and every state has a sentence (D153).
+ *
+ * The inspector reads `t(`queue.kind.${row.kind}`)` through a cast, so the
+ * compiler checks nothing here and a kind added without a string renders its own
+ * lookup key on screen. Two of them had: `weight-update` and `habit-check`,
+ * added with their endpoints and never with their labels, so the queue listed
+ * "queue.kind.weight-update" to anybody who opened it while an edit was waiting.
+ *
+ * `ENDPOINTS` is the runtime list of every kind there is, which makes this exact
+ * rather than a list to keep in step by hand.
+ */
+describe("the queue inspector's own labels", () => {
+  it("names every kind that can be queued", () => {
+    const missing = Object.keys(ENDPOINTS).filter((kind) => sv[`queue.kind.${kind}` as TranslationKey] === undefined);
+
+    expect(missing, "queued kinds with no label render their own key").toEqual([]);
+  });
+
+  it("names every state a queued row can be in", () => {
+    const states: QueueStatus[] = ["pending", "failed", "conflict"];
+    const missing = states.filter((state) => sv[`queue.status.${state}` as TranslationKey] === undefined);
+
+    expect(missing).toEqual([]);
   });
 });

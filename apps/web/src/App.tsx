@@ -18,6 +18,7 @@ import { Admin } from "./routes/Admin.js";
 import { ResetPassword } from "./routes/ResetPassword.js";
 import { Diagnostics } from "./routes/Diagnostics.js";
 import { Progress } from "./routes/Progress.js";
+import { Coach } from "./routes/Coach.js";
 import { t } from "./i18n/index.js";
 
 export function App() {
@@ -65,6 +66,13 @@ export function App() {
       <Route path="/samband" element={<Navigate to="/data?vy=samband" replace />} />
       <Route path="/data" element={signedIn(me.data, <Data />)} />
       <Route path="/framsteg" element={signedIn(me.data, <Progress />)} />
+      {/*
+        The Coach page (D139). Registered unconditionally here and reachable
+        only through a navigation entry the LLM flag decides: the server does
+        not serve its data with the layer off, so the screen renders its
+        unavailable state rather than a 404 for somebody who typed the path.
+      */}
+      <Route path="/coach" element={signedIn(me.data, <Coach />)} />
       {/*
         Not linked from anywhere. It exists so the BarcodeDetector path can be
         checked on a real phone, which no headless browser can stand in for.

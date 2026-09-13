@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ApplyTemplate,
-  ConfirmParsed,
+  ConfirmParsedInput,
   CreateEstimate,
   CreateFoodPortion,
   EstimateDishRequest,
+  ParseFoodPhotoRequest,
   CreatePantryStaple,
   CreateSavedRecipe,
   RecipeRequest,
@@ -224,6 +225,22 @@ export function useParseFood() {
 }
 
 /**
+ * A photograph of a plate to named foods (D143).
+ *
+ * **Never queued**, and for a stronger reason than the text parse's. The text
+ * parse is not queued because there is nothing an offline queue could do with
+ * it; the photograph is not queued because queueing it would mean writing the
+ * image to this device's storage and keeping it there until the network came
+ * back, and the one promise this feature makes is that the picture stops
+ * existing as soon as it has been read.
+ */
+export function useParseFoodPhoto() {
+  return useMutation({
+    mutationFn: (body: ParseFoodPhotoRequest) => api.parseFoodPhoto(body),
+  });
+}
+
+/**
  * A recipe from what is in the fridge.
  *
  * A mutation rather than a query, and not because it writes anything — it
@@ -237,7 +254,7 @@ export function useGenerateRecipe() {
 export function useConfirmParsedFood() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ConfirmParsed) => api.confirmParsedFood(input),
+    mutationFn: (input: ConfirmParsedInput) => api.confirmParsedFood(input),
     onSuccess: () => invalidateIntake(queryClient),
   });
 }

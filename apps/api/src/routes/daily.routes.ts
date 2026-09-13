@@ -20,6 +20,7 @@ import {
   getActivities,
   getDailyLogs,
   removeDailyLog,
+  removeMeasurement,
   getDayLog,
   getMeasurements,
   removeActivity,
@@ -74,6 +75,29 @@ export const dailyRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => ({
       entries: await getMeasurements(request.userId!, app.db, request.query),
     }),
+  );
+
+  /**
+   * Removing a day's measurement (D56, closed).
+   *
+   * The entity had `POST` and `GET` and nothing else from phase 4 until now,
+   * which made it the oldest open item under §3's rule that every user-created
+   * row ships with edit and delete. Re-logging the day was the edit; there was
+   * no way to take a reading back at all.
+   */
+  app.delete(
+    "/measurement/:id",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 204: z.null(), 401: errorResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      await removeMeasurement(request.userId!, app.db, request.params.id);
+      return reply.code(204).send(null);
+    },
   );
 
   /* ------------------------------------------------------------ daily log */

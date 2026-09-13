@@ -105,6 +105,18 @@ const macroLineSchema = z.object({
   weeklyMeanG: z.number().nullable(),
   /** How many of the last seven days contributed to that mean. */
   weeklyDays: z.number().int().min(0).max(7),
+  /**
+   * How many of the last seven days had **anything** logged, whether or not
+   * this macro's coverage cleared the threshold (D122).
+   *
+   * The pair is what lets the interface say *why* a mean is missing. With no
+   * days logged it is "nothing here yet"; with six days logged and one clearing
+   * coverage it is "the entries do not carry this figure", which is a different
+   * sentence and a different thing for the reader to do about it. Fibre is
+   * where this shows up, because crowdsourced food data omits it far more often
+   * than protein — the same window can withhold fibre and show the other three.
+   */
+  weeklyDaysLogged: z.number().int().min(0).max(7),
 });
 export type MacroLineDto = z.infer<typeof macroLineSchema>;
 

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { createWeightEntrySchema, formatForInput } from "shared";
+import type { CreateWeightEntry, UpdateWeightEntry } from "shared";
+import { createWeightEntrySchema, formatForInput, updateWeightEntrySchema } from "shared";
 import { ApiError } from "../lib/api.js";
 import {
   useDeleteManualIntake,
+  useDeleteWeight,
   useManualIntakeLog,
   useSaveManualIntake,
   useSaveWeight,
+  useUpdateWeight,
 } from "../lib/log.js";
-import { describeDay } from "../lib/dates.js";
+import { describeDay, formatLongDay } from "../lib/dates.js";
 import { clientUuid } from "../lib/uuid.js";
 import { readNumber, readRequiredNumber } from "../lib/form-number.js";
 import { Field, fieldAria, fieldErrorsFrom, type FieldErrors } from "./Field.js";
@@ -44,6 +47,25 @@ export type QuickLogSheetProps = {
   lastWeightKg: number | null;
   /** Intake already logged for `today`, if any. */
   todayIntakeKcal: number | null;
+  /**
+   * The day to open on. Defaults to today, which is the quick path (D145).
+   *
+   * Set by the readings list and the month calendar, where the sheet is not a
+   * quick entry but the edit for a day somebody pointed at. The field is still
+   * there and still editable: the day is a starting point, not a lock.
+   */
+  date?: string;
+  /** Seeds the weight field instead of `lastWeightKg`. The day's own reading. */
+  weightKg?: number | null;
+  /**
+   * The reading being edited, when there is one.
+   *
+   * Two jobs now (D150): it puts a delete on the screen that shows the row
+   * (§3, D56), and it makes the save an **update** to that row rather than a
+   * create for its day. `weightKg` above is the baseline that travels with it,
+   * so the server can tell an edit arriving late from two devices disagreeing.
+   */
+  entryId?: string | null;
 };
 
 export function QuickLogSheet({
@@ -53,17 +75,23 @@ export function QuickLogSheet({
   today,
   lastWeightKg,
   todayIntakeKcal,
+  date,
+  weightKg: seedWeightKg,
+  entryId = null,
 }: QuickLogSheetProps) {
   // The zone matters: it decides which day an entry belongs to (D39), and the
   // queue stamps that at creation rather than at send time.
   const saveWeight = useSaveWeight(timezone);
+  const updateWeight = useUpdateWeight(timezone);
   const saveIntake = useSaveManualIntake(timezone);
   const deleteIntake = useDeleteManualIntake();
   const manualLog = useManualIntakeLog();
 
+  const deleteWeight = useDeleteWeight();
+
   const [weightKg, setWeightKg] = useState("");
   const [kcal, setKcal] = useState("");
-  const [localDate, setLocalDate] = useState(today);
+  const [localDate, setLocalDate] = useState(date ?? today);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -82,6 +110,15 @@ export function QuickLogSheet({
 
   const weightInput = useRef<HTMLInputElement>(null);
   const wasOpen = useRef(false);
+  /**
+   * The weight the row held when this sheet opened (D150).
+   *
+   * A ref rather than state, and captured on open rather than read at submit:
+   * the baseline is what the **person saw**, and reading the prop at submit
+   * would pick up a background refetch that landed while they were typing,
+   * which is exactly the change the baseline exists to notice.
+   */
+  const baselineRef = useRef<number | null>(null);
 
   /**
    * Reset and focus on the closed -> open transition only. Reacting to the
@@ -93,12 +130,27 @@ export function QuickLogSheet({
     wasOpen.current = open;
     if (!justOpened) return;
 
-    setWeightKg(formatForInput(lastWeightKg));
-    setKcal(formatForInput(todayIntakeKcal, 0));
-    setLocalDate(today);
+    const openOn = date ?? today;
+    baselineRef.current = seedWeightKg ?? null;
+    setWeightKg(formatForInput(seedWeightKg === undefined ? lastWeightKg : seedWeightKg));
+    /**
+     * The intake for the day being opened, not for today (D145).
+     *
+     * Seeding today's figure while editing the third of September would put
+     * today's calories on that day the moment somebody pressed save, and they
+     * would have no way of knowing they had. The manual log is already loaded
+     * for the delete below; this reads the same row.
+     */
+    const manualForDay =
+      openOn === today
+        ? todayIntakeKcal
+        : (manualLog.data?.find((entry) => entry.localDate === openOn)?.kcal ?? null);
+    setKcal(formatForInput(manualForDay, 0));
+    setLocalDate(openOn);
     setErrors({});
     setSaved(false);
     saveWeight.reset();
+    updateWeight.reset();
     saveIntake.reset();
 
     // A frame's delay: focusing before the sheet is laid out loses the keypad
@@ -108,7 +160,8 @@ export function QuickLogSheet({
       weightInput.current?.select();
     });
     return () => cancelAnimationFrame(raf);
-  }, [open, today, lastWeightKg, todayIntakeKcal, saveWeight, saveIntake]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see the guard above
+  }, [open, today, date, seedWeightKg, lastWeightKg, todayIntakeKcal, manualLog.data]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,11 +185,34 @@ export function QuickLogSheet({
       return;
     }
 
-    const parsed = createWeightEntrySchema.safeParse({
-      clientUuid: clientUuid(),
-      localDate,
-      weightKg: weight.value,
-    });
+    /**
+     * A create or an update, and which one is a property of the sheet (D150).
+     *
+     * Opened on a day that already has a reading, this is an **edit**: it
+     * carries that row's id and the weight that was on screen when it opened,
+     * so the server can tell it from another device's opinion about the same
+     * day. Opened on an empty day, or from the quick action, it is a create.
+     *
+     * This used to always be a create with a fresh `clientUuid`, which is why
+     * editing 24 August produced "two devices wrote this day" and a queued row
+     * whose retry could never succeed.
+     */
+    const baseline = baselineRef.current;
+    const editing = entryId !== null && baseline !== null;
+
+    const parsed = editing
+      ? updateWeightEntrySchema.safeParse({
+          id: entryId,
+          clientUuid: clientUuid(),
+          localDate,
+          baselineWeightKg: baseline,
+          weightKg: weight.value,
+        })
+      : createWeightEntrySchema.safeParse({
+          clientUuid: clientUuid(),
+          localDate,
+          weightKg: weight.value,
+        });
 
     if (!parsed.success) {
       setErrors(fieldErrorsFrom(parsed.error.issues));
@@ -155,7 +231,11 @@ export function QuickLogSheet({
     }
 
     try {
-      await saveWeight.mutateAsync(parsed.data);
+      if (editing) {
+        await updateWeight.mutateAsync(parsed.data as UpdateWeightEntry);
+      } else {
+        await saveWeight.mutateAsync(parsed.data as CreateWeightEntry);
+      }
       if (kcalValue !== null) {
         await saveIntake.mutateAsync({
           clientUuid: clientUuid(),
@@ -171,22 +251,23 @@ export function QuickLogSheet({
     }
   }
 
+  const writeError = saveWeight.error ?? updateWeight.error;
   const submitError =
-    saveWeight.error instanceof ApiError
-      ? saveWeight.error.message
+    writeError instanceof ApiError
+      ? writeError.message
       : saveIntake.error instanceof ApiError
         ? saveIntake.error.message
-        : saveWeight.error || saveIntake.error
+        : writeError || saveIntake.error
           ? t("quick.unreachable")
           : null;
 
-  const pending = saveWeight.isPending || saveIntake.isPending;
+  const pending = saveWeight.isPending || updateWeight.isPending || saveIntake.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-ink/40"
+        className="scrim absolute"
         aria-label="Close"
         onClick={onClose}
       />
@@ -201,7 +282,7 @@ export function QuickLogSheet({
       >
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 id="quicklog-title" className="text-lg font-semibold text-ink">
-            {t("quick.title")}
+            {entryId ? t("quick.editTitle") : t("quick.title")}
           </h2>
           <button
             type="button"
@@ -231,7 +312,7 @@ export function QuickLogSheet({
 
           <Field
             id="quick-kcal"
-            label={t("quick.calories")}
+            label={localDate === today ? t("quick.calories") : t("quick.caloriesThatDay")}
             error={errors.kcal}
             hint={t("quick.caloriesHint")}
           >
@@ -282,6 +363,24 @@ export function QuickLogSheet({
           <p className="text-micro text-muted" aria-live="polite">
             {describeDay(localDate, today, LOCALE)}
           </p>
+
+          {/*
+            The reading's own delete, on the screen that shows it (§3, D56).
+            Only when there is one: on an empty day there is nothing to remove,
+            and a control that would 404 is worse than no control.
+          */}
+          {entryId ? (
+            <DeleteButton
+              testId="delete-weight-entry"
+              label={t("quick.removeReadingLabel", {
+                day: formatLongDay(localDate, LOCALE),
+              })}
+              onDelete={async () => {
+                await deleteWeight.mutateAsync(entryId);
+                onClose();
+              }}
+            />
+          ) : null}
 
           {submitError ? (
             <p role="alert" className="text-note text-muted">

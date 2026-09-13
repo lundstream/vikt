@@ -219,6 +219,61 @@ export const profiles = pgTable("profiles", {
    */
   newsMail: boolean("news_mail").notNull().default(true),
   /**
+   * Whether this account is mailed when somebody asks for an invite code
+   * (D129). Only ever read for an admin, and default on.
+   *
+   * On every profile rather than only on admins', because `is_admin` can be set
+   * at any time and a preference that existed only for current admins would
+   * have to be created at the moment somebody is promoted. A column with a
+   * default costs one boolean per row and removes that whole case.
+   */
+  requestMail: boolean("request_mail").notNull().default(true),
+
+  /**
+   * The two reminders (D136), off until somebody turns them on.
+   *
+   * A notification nobody asked for is the fastest way to have notifications
+   * turned off for good, so the default is the one where nothing arrives.
+   *
+   * The times are **minutes past midnight in this user's own timezone**, the
+   * same shape the backup schedule uses. 07:00 is 420 and 22:00 is 1320. Never
+   * a UTC hour: seven in the morning is a different instant for two accounts,
+   * and a different instant for one account in March.
+   */
+  remindWeigh: boolean("remind_weigh").notNull().default(false),
+  remindWeighMinute: integer("remind_weigh_minute").notNull().default(420),
+  remindDay: boolean("remind_day").notNull().default(false),
+  remindDayMinute: integer("remind_day_minute").notNull().default(1320),
+  /**
+   * The same two reminders again, for Saturday and Sunday (D136, amended).
+   *
+   * Each reminder has two independent pairs, so the morning one can be 07:00 on
+   * a Tuesday and 09:00 on a Sunday, or off on a Sunday entirely. Off on the
+   * weekend is a setting somebody will want on purpose and is not the same as
+   * having the reminder off.
+   *
+   * The columns above keep their names and are now the **weekday** pair, which
+   * is why this is additive: every existing row was already correct for Monday
+   * to Friday, and `0025_reminder_weekend` seeded these from them so an account
+   * that had 07:00 every day still has 07:00 every day.
+   *
+   * Which days are the weekend is decided from the date the user is having, not
+   * the server's. `isWeekend(toLocalDate(now, timezone))` in shared, one place,
+   * and `reminder.service.ts` is the only caller.
+   */
+  /**
+   * Which voice the coach speaks in (D140): `torr`, `peppig` or `saklig`.
+   *
+   * On the profile rather than in the browser, because the weekly review is
+   * written by a scheduler with no browser to ask, and because a tone chosen
+   * on the phone is meant on the laptop.
+   */
+  coachTone: text("coach_tone").notNull().default("torr"),
+  remindWeighWeekend: boolean("remind_weigh_weekend").notNull().default(false),
+  remindWeighWeekendMinute: integer("remind_weigh_weekend_minute").notNull().default(420),
+  remindDayWeekend: boolean("remind_day_weekend").notNull().default(false),
+  remindDayWeekendMinute: integer("remind_day_weekend_minute").notNull().default(1320),
+  /**
    * Which theme to use: `system`, `dark` or `light` (D117).
    *
    * On the account rather than in `localStorage`, because it is a preference
@@ -799,6 +854,14 @@ export const weeklyReviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * When the dashboard card for this review was dismissed (D139).
+     *
+     * On the row rather than in the browser, for D108's reason: a card put away
+     * on the phone has to stay away on the laptop, and a per-device dismissal
+     * is a card that comes back for the same person on the same news.
+     */
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("weekly_reviews_week_key").on(t.userId, t.weekStart)],
 );
@@ -1226,23 +1289,54 @@ export const backupSettings = pgTable("backup_settings", {
   /**
    * Where backups go.
    *
-   * Only `local` is implemented. `smb` and `s3` are in the enum because the
-   * column is the thing that would have to change to add them and a migration
-   * later is worse than a value that is refused today with a clear reason. The
-   * service says plainly that it cannot use them rather than pretending.
+   * `local` and `s3` are implemented (D103, D133).
+   *
+   * `smb` remains in the enum and is refused. Removing a value from a Postgres
+   * enum-as-text is free, but the *reason* is worth keeping visible: both Node
+   * SMB clients speak NTLMv1, which current servers refuse, and D132 records
+   * why writing NTLMv2 by hand was not the answer. Somebody who wants a Windows
+   * share mounts it on the host and picks a directory destination.
    */
   destinationKind: text("destination_kind", { enum: ["local", "smb", "s3"] })
     .notNull()
     .default("local"),
 
-  /** A filesystem path for `local`, a share or bucket URL for the others. */
+  /**
+   * A filesystem path for `local`, a prefix inside the bucket for `s3`.
+   *
+   * Empty means the root. It keeps its column and changes what it is relative
+   * to, which is why neither remote destination needed a migration for it.
+   */
   destinationPath: text("destination_path").notNull().default(""),
 
   /**
    * Credentials for a destination that needs them, encrypted like the mail
    * password. Empty for `local`, which needs none.
+   *
+   * For `s3` this holds one JSON object, `{ accessKeyId, secretAccessKey }`,
+   * encrypted as a whole under `SECRET_USES.backupDestination` (D133). One
+   * value rather than two columns because the two are only ever read together,
+   * and an access key that survived a lost key without its secret would be a
+   * half-configured destination that looks configured.
    */
   credentialsEncrypted: text("credentials_encrypted").notNull().default(""),
+
+  /**
+   * The S3 destination (D133). Empty for every other kind.
+   *
+   * Not secrets, so they are plain columns: the screen shows them back, and an
+   * operator checking where the backups go should not have to decrypt anything
+   * to find out. The access key and secret are the secrets, and they live in
+   * `credentialsEncrypted` above.
+   *
+   * `s3Endpoint` empty means AWS itself. `s3PathStyle` defaults to true because
+   * self-hosted is the case this project is for: MinIO and most NAS endpoints
+   * require `host/bucket/key`, and AWS's `bucket.host/key` is the exception.
+   */
+  s3Endpoint: text("s3_endpoint").notNull().default(""),
+  s3Region: text("s3_region").notNull().default(""),
+  s3Bucket: text("s3_bucket").notNull().default(""),
+  s3PathStyle: boolean("s3_path_style").notNull().default(true),
 
   /** Minutes past midnight, local time, or null for no schedule at all. */
   scheduleMinute: integer("schedule_minute"),
@@ -1392,3 +1486,263 @@ export const announcementSeen = pgTable(
     index("announcement_seen_user_idx").on(t.userId),
   ],
 );
+
+/**
+ * One push subscription per browser per account (D136).
+ *
+ * Per device rather than per account, because the same person has a phone and
+ * a laptop and they subscribe separately. `endpoint` is the push service's URL
+ * for that device and is unique table-wide: re-subscribing the same browser
+ * updates the row rather than making a second one, which is what stops a
+ * reinstalled app from collecting duplicates that all fire at once.
+ *
+ * Cascades with the account (D107). A subscription is a way to reach a person,
+ * so it goes when they do.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /** Opaque to this app: stored, and handed back to the push library. */
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+
+    /**
+     * What the browser calls itself, so somebody with three devices can tell
+     * which row is the phone they no longer have. Editable and removable from
+     * any other device, per D56.
+     */
+    label: text("label").notNull().default(""),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Touched when a push service accepts a notification for this device, so a
+     * row nothing has reached for months is visible as one.
+     */
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    endpointKey: uniqueIndex("push_subscriptions_endpoint_key").on(t.endpoint),
+    userIdx: index("push_subscriptions_user_idx").on(t.userId),
+  }),
+);
+
+/**
+ * What has already been sent, so a reminder is never sent twice for one day
+ * (D136).
+ *
+ * The unique index on `(user_id, kind, local_date)` **is** the guard, rather
+ * than a check in code: a retry, a second process, or a clock that steps
+ * backwards all converge on one row. Inserting is how a send claims the day,
+ * and a conflict means somebody else already has it.
+ *
+ * `local_date` is the user's own day (§3), never derived from a UTC timestamp.
+ */
+export const reminderSends = pgTable(
+  "reminder_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * `weigh`, `day`, or `habit:<habit id>` (D137).
+     *
+     * A habit's reminder puts the habit's id **in the kind** rather than in a
+     * column of its own, and that is what makes the existing unique index the
+     * guard for it too: two habits reminded on the same day are two different
+     * kinds, so neither can claim the other's row, and nothing about
+     * `(user_id, kind, local_date)` had to change to make room.
+     */
+    kind: text("kind").notNull(),
+    localDate: date("local_date").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    once: uniqueIndex("reminder_sends_key").on(t.userId, t.kind, t.localDate),
+  }),
+);
+
+
+/* ------------------------------------------------------------- habits */
+
+/**
+ * A habit: the user's own words, ticked once a day (D137).
+ *
+ * The first table in this schema whose **content** is written by the user
+ * rather than chosen from something the app named. "D-vitamin", "stretcha
+ * rygg", "ta tabletten" — that last one is a medication schedule, which is the
+ * same special category as the weights (D107), so a habit name is health data
+ * and is handled like one: never in a group view (D9), in the export, and
+ * deleted with the account.
+ *
+ * No target value and no unit. A habit with a number attached is a
+ * measurement, and the daily log already holds measurements.
+ */
+export const habits = pgTable(
+  "habits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /**
+     * A key into the app's closed line icon set, or null.
+     *
+     * Closed because an open one is an upload endpoint, and because the set is
+     * drawn to the profile's stroke so a checklist keeps looking like this app.
+     */
+    icon: text("icon"),
+    sortOrder: integer("sort_order").notNull().default(0),
+
+    /**
+     * The habit's own reminder, in the two-time shape D136 settled: a weekday
+     * pair and a weekend pair, each with its own switch. 08:00 by default,
+     * which is a guess about vitamins rather than a claim about anything.
+     */
+    remind: boolean("remind").notNull().default(false),
+    remindMinute: integer("remind_minute").notNull().default(480),
+    remindWeekend: boolean("remind_weekend").notNull().default(false),
+    remindWeekendMinute: integer("remind_weekend_minute").notNull().default(480),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Set when the habit is taken off the checklist with its history kept.
+     *
+     * A timestamp nothing cascades to (§3), not a boolean and not a deletion:
+     * the checks that already exist name this row, so something has to keep
+     * saying what the habit was called.
+     */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("habits_user_idx").on(t.userId, t.sortOrder)],
+);
+
+/**
+ * One row per habit per day, ticked or deliberately not (D137).
+ *
+ * `checked: false` is a row that says "asked today, did not do it", and it is
+ * not the same as no row at all. The streak needs the difference: a day nobody
+ * answered is **unknown** and stops the count, a day answered with no tick is a
+ * **miss** and spends the grace day (D35's shape, and §4.6's grace rule).
+ *
+ * `client_uuid` and a client-computed `local_date` like every other log row, so
+ * the offline queue replays a tick made in a shop basement safely.
+ */
+export const habitChecks = pgTable(
+  "habit_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    habitId: uuid("habit_id")
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    clientUuid: uuid("client_uuid").notNull(),
+    localDate: date("local_date").notNull(),
+    checked: boolean("checked").notNull().default(true),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("habit_checks_client_key").on(t.userId, t.clientUuid),
+    uniqueIndex("habit_checks_day_key").on(t.userId, t.habitId, t.localDate),
+    index("habit_checks_habit_idx").on(t.userId, t.habitId, t.localDate),
+    index("habit_checks_day_idx").on(t.userId, t.localDate),
+  ],
+);
+
+
+/* -------------------------------------------------------------- the coach */
+
+/**
+ * One conversation with the coach (D139), §6 phase 8b.
+ *
+ * History is per user, held under D9: it is not training data, not context for
+ * anybody else, not an input to any aggregate and not read by the weekly
+ * review. It is in the export, deletable one conversation at a time and all at
+ * once, and it cascades with the account.
+ */
+export const coachConversations = pgTable(
+  "coach_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The first question, trimmed. Nobody should have to name a conversation. */
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("coach_conversations_user_idx").on(t.userId, t.lastMessageAt)],
+);
+
+/**
+ * One line in a conversation.
+ *
+ * A refused reply stores the **refusal**, not the text that was refused. The
+ * post-check exists to stop a figure the app did not produce from reaching a
+ * reader; keeping that sentence in the history would put it in front of the
+ * same reader later, with the check no longer in the way.
+ *
+ * `contextChars` and `replyChars` are here because the context has to fit the
+ * model variant's `num_ctx` with room for the answer, and a context that grows
+ * quietly is precisely what that constraint fails against.
+ */
+export const coachMessages = pgTable(
+  "coach_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => coachConversations.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "coach"] }).notNull(),
+    body: text("body").notNull(),
+    model: text("model"),
+    /** Why a reply was refused, when it was. Null on an ordinary turn. */
+    refusal: text("refusal"),
+    contextChars: integer("context_chars"),
+    replyChars: integer("reply_chars"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("coach_messages_conversation_idx").on(t.userId, t.conversationId, t.createdAt),
+  ],
+);
+
+/* ------------------------------------------------------- the server's memory */
+
+/**
+ * Small facts the server needs to remember about itself between boots (D136).
+ *
+ * The first of them is the VAPID public key this installation last ran with:
+ * every push subscription is bound to the pair it was created with, so a key
+ * that changed means every subscription will answer 403 until the person turns
+ * reminders on again, and the only way to notice at boot is to have written the
+ * previous one down.
+ *
+ * Key-value rather than another singleton settings table, because what belongs
+ * here is unrelated to itself and to anything a user sets: `mail_settings` and
+ * `backup_settings` are configuration somebody edits on a screen, and this is
+ * the server's own notebook. A new entry should not need a migration.
+ *
+ * **No secrets.** The public key is public by construction; private values live
+ * in the environment, under `assertProdSecrets`.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

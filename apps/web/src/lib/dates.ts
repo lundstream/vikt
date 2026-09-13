@@ -1,3 +1,4 @@
+import { toLocalDate as sharedLocalDate } from "shared";
 import { t } from "../i18n/index.js";
 
 /**
@@ -9,17 +10,21 @@ import { t } from "../i18n/index.js";
  * the UTC instant on the server would file it under tomorrow.
  */
 
-/** `YYYY-MM-DD` for `date` in `timezone`. `en-CA` formats as ISO. */
+/**
+ * `YYYY-MM-DD` for `date` in `timezone`, forgiving on the client.
+ *
+ * The computation lives in `shared` now, because the reminder scheduler needs
+ * the same answer on the server and a day boundary written twice is a day
+ * boundary that will disagree with itself (D136).
+ *
+ * What stays here is the **policy**: an unknown zone must not stop somebody
+ * logging, so this falls back to the device's own. The server deliberately does
+ * not, because its zone is not the user's.
+ */
 export function toLocalDate(date: Date, timezone: string): string {
   try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date);
+    return sharedLocalDate(date, timezone);
   } catch {
-    // An unknown zone must not stop someone logging. Fall back to the device's.
     return new Intl.DateTimeFormat("en-CA", {
       year: "numeric",
       month: "2-digit",

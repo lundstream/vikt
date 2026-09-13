@@ -64,7 +64,7 @@ async function makeAdmin(db: Awaited<ReturnType<ReturnType<typeof useTestApp>>>[
 
 describe("requesting an invite", () => {
   // The endpoint only exists where the landing page does (D94).
-  const ctx = useTestApp({ LANDING_ENABLED: true });
+  const ctx = useTestApp({ REQUEST_ENABLED: true });
 
   it("stores the address and queues a receipt", async () => {
     const { app, db } = ctx();
@@ -183,7 +183,7 @@ describe("requesting an invite", () => {
 });
 
 describe("the admin view", () => {
-  const ctx = useTestApp({ LANDING_ENABLED: true });
+  const ctx = useTestApp({ REQUEST_ENABLED: true });
 
   /** A non-admin gets 404, not 403: these endpoints are not theirs to know about. */
   it("is invisible to an ordinary account", async () => {
@@ -339,14 +339,14 @@ describe("the admin view", () => {
 });
 
 /**
- * The mode itself (D94).
+ * The mode itself (D94, D127).
  *
- * Not registered rather than registered-and-refusing: a private install should
- * not have a public write path at all, and 404 is what "there is no such
- * endpoint here" looks like from outside.
+ * Not registered rather than registered-and-refusing: an installation that
+ * does not take requests should not have a public write path at all, and 404
+ * is what "there is no such endpoint here" looks like from outside.
  */
-describe("with the landing mode off", () => {
-  const ctx = useTestApp({ LANDING_ENABLED: false });
+describe("with the request mode off", () => {
+  const ctx = useTestApp({ REQUEST_ENABLED: false });
 
   it("has no invite-request endpoint at all, and no challenge either", async () => {
     const { app } = ctx();
@@ -381,5 +381,45 @@ describe("with the landing mode off", () => {
     });
 
     expect(response.statusCode).toBe(200);
+  });
+});
+
+/**
+ * The two modes are separate questions (D127).
+ *
+ * A landing page is something to read; a request form takes a stranger's name
+ * and address and makes the owner responsible for whoever it lets in. The
+ * common configuration is the first without the second, and before this it was
+ * not expressible: turning the page on turned the form on with it.
+ */
+describe("with a landing page but no request form", () => {
+  const ctx = useTestApp({ LANDING_ENABLED: true, REQUEST_ENABLED: false });
+
+  it("serves no request endpoint", async () => {
+    const { app } = ctx();
+
+    const posted = await app.inject({
+      method: "POST",
+      url: "/api/invite-requests",
+      payload: { name: "Hopeful", email: "hopeful@example.test", altcha: "irrelevant" },
+    });
+    expect(posted.statusCode).toBe(404);
+
+    const challenge = await app.inject({
+      method: "GET",
+      url: "/api/invite-requests/challenge",
+    });
+    expect(challenge.statusCode).toBe(404);
+  });
+
+  /** And the health endpoint reports the shape an operator just configured. */
+  it("reports both modes separately", async () => {
+    const { app } = ctx();
+
+    const response = await app.inject({ method: "GET", url: "/api/health" });
+    const body = response.json() as { modes: { landing: boolean; request: boolean } };
+
+    expect(body.modes.landing).toBe(true);
+    expect(body.modes.request).toBe(false);
   });
 });

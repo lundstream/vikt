@@ -14,12 +14,22 @@ name: release
 on:
   push:
     branches: ["main"]
+    # A version tag on main, which is what makes a release (D148). The images
+    # come out tagged `1.1.0`, `1.1`, `sha-<commit>` and `latest`, and the stack
+    # pins the version one so a rollback is editing a line rather than finding a
+    # commit.
+    tags: ["v*.*.*"]
     # Docs-only pushes should not produce an image. The stack would pull an
     # identical binary under a new tag and call it a deployment.
+    #
+    # Path filters and tag pushes do not mix reliably — a tag adds no commits
+    # for a filter to look at — which is why the `release` trigger below is kept
+    # and is the one the runbook uses: `gh release create` fires it with no path
+    # filter anywhere near it.
     paths-ignore:
       - "**/*.md"
       - "docs/**"
-  # A version tag, for a release worth naming and rolling back to.
+  # A published release, which is how INFRA.md's runbook cuts a version.
   release:
     types: [published]
   workflow_dispatch:
@@ -77,12 +87,36 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image.outputs.ref }}
+          # Four kinds of tag, and each one is for a different question.
+          #
+          #   1.1.0        what the stack pins. A rollback is one edit (D148).
+          #   1.1          follows the patch releases inside a minor.
+          #   sha-<commit> what a `main` build with no version is reachable as.
+          #   latest       only from the default branch, and only for a local
+          #                `docker run`. Nothing in production pins it.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
-            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+
+      # What the image should call itself (D151).
+      #
+      # The tag when there is one, `dev` otherwise. `github.ref_name` is the tag
+      # on a tag push and the branch on a branch push, so it is filtered rather
+      # than trusted: `main` is not a version.
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            tag="${{ github.event.release.tag_name }}"
+            echo "value=${tag#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -91,6 +125,11 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          # Baked in, so the running container can say what it is without
+          # anybody being able to tell it otherwise.
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.value }}
+            APP_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # A registry cache rather than GitHub's, so the layers are reachable

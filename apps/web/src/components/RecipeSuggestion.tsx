@@ -104,7 +104,11 @@ export function RecipeSuggestion({
       Object.fromEntries(
         result.items.map((item, index) => [
           index,
-          formatDecimal(item.estimatedGrams, { decimals: 0 }),
+          // Null is the photo path's "nobody knows yet" (D143): an empty
+          // field, never a number nobody stated.
+          item.estimatedGrams === null
+            ? ""
+            : formatDecimal(item.estimatedGrams, { decimals: 0 }),
         ]),
       ),
     );
@@ -209,7 +213,7 @@ export function RecipeSuggestion({
         <button
           type="submit"
           data-testid="generate-recipe"
-          className="shrink-0 rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+          className="btn w-auto  disabled:opacity-50"
           disabled={have.trim().length < 2 || generate.isPending}
         >
           {generate.isPending ? t("recipe.thinking") : t("recipe.generate")}
@@ -260,9 +264,11 @@ export function RecipeSuggestion({
                     {item.match?.name ?? item.name}
                   </span>
                   <span className="num block text-micro text-muted">
-                    {item.match
-                      ? t("llm.matched", { kcal: formatKcal(item.match.kcal) })
-                      : t("llm.noMatch")}
+                    {item.match === null
+                      ? t("llm.noMatch")
+                      : item.match.kcal === null
+                        ? t("llm.amountUnknown")
+                        : t("llm.matched", { kcal: formatKcal(item.match.kcal) })}
                   </span>
                 </span>
 
@@ -366,7 +372,7 @@ export function RecipeSuggestion({
             <button
               type="button"
               data-testid="log-recipe"
-              className="btn-secondary w-auto px-4"
+              className="btn w-auto px-4"
               onClick={() => void log()}
               disabled={confirm.isPending}
             >

@@ -1,5 +1,7 @@
 # Build context is the repo root.
-FROM node:22-bookworm-slim AS base
+# Pinned by digest (D138). The tag still reads as the version it is; the
+# digest is what actually gets pulled, here and on the build runner.
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /app
@@ -23,6 +25,18 @@ RUN pnpm --filter api build
 # --------------------------------------------------------------- runtime
 FROM base AS runtime
 ENV NODE_ENV=production
+
+# Which build this is (D151).
+#
+# Build arguments rather than stack variables on purpose: these are facts about
+# the binary, not choices an operator makes, and a deployment that could claim
+# to be a version it is not would make the version worth nothing at the moment
+# somebody needs it. `release.yml` sets them from the tag and the commit; a
+# local build leaves them at their defaults and the app says `dev`.
+ARG APP_VERSION=dev
+ARG APP_COMMIT=
+ENV APP_VERSION=$APP_VERSION
+ENV APP_COMMIT=$APP_COMMIT
 
 # `pg_dump`, for the scheduled backup the app runs itself (D103).
 #

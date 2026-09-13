@@ -101,8 +101,15 @@ export const foodMatchSchema = z.object({
    * Named `estimatedGrams` since phase 8 shipped and kept for that reason, but
    * it is no longer always an estimate: `portionSource` says which it is, and
    * every screen showing the number shows that too.
+   *
+   * **Null means nobody knows yet** (D143). Only the photo path produces it: a
+   * model that answered "stor mängd" has not given an amount, and the app's
+   * options are to invent one or to say so. It says so, the field is empty on
+   * screen, and the row cannot be saved until a person fills it in. The text
+   * path never produces null, because a sentence that states no amount still
+   * gives the model something to estimate from and a photograph does not.
    */
-  estimatedGrams: z.number(),
+  estimatedGrams: z.number().nullable(),
   /** The portion as stated, for display. Never a claim about mass. */
   portion: statedPortionSchema.nullable(),
   /** `hint`, `user_hint` or `estimate`. See {@link portionSourceSchema}. */
@@ -114,8 +121,15 @@ export const foodMatchSchema = z.object({
       name: z.string(),
       brand: z.string().nullable(),
       kcalPer100: z.number(),
-      /** Computed from the item and the grams, by the server. */
-      kcal: z.number(),
+      /**
+       * Computed from the item and the grams, by the server.
+       *
+       * Null when the grams are null: the database knows what this food is
+       * worth per hundred grams and nobody knows how many grams there are, so
+       * there is no figure to state. The screen shows the food and an empty
+       * amount rather than a number that quietly assumed one (D143).
+       */
+      kcal: z.number().nullable(),
       /**
        * What this food can be counted in, source hints merged under the user's
        * own. Travels to the client so a portion picker does not need a second
@@ -155,6 +169,167 @@ export const parseFoodResponseSchema = z.discriminatedUnion("available", [
 ]);
 export type ParseFoodResponse = z.infer<typeof parseFoodResponseSchema>;
 
+/* ------------------------------------------------------------- photographs */
+
+/**
+ * The largest photograph the server will accept, after the client has resized
+ * it.
+ *
+ * The client reduces to 1280 px on the long edge and re-encodes as JPEG at
+ * about 0.8, which turned the phone's own 3 to 11 MB files into 77 to 211 kB
+ * when this was measured. Two megabytes is therefore an order of magnitude
+ * above anything the resize actually produces: it is the boundary that catches
+ * a client which did not resize at all, not a budget anybody is meant to spend.
+ */
+export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The long edge the client resizes to, and the JPEG quality it re-encodes at.
+ *
+ * Here rather than in the web app because they are the measurement the rest of
+ * this depends on, not a rendering preference. The 10 to 20 second wait quoted
+ * on screen, the vision timeout on the server and the byte ceiling above were
+ * all measured at 1280 px and quality 0.8; changing either without re-measuring
+ * makes all three wrong at once, and a reader who finds one of them should be
+ * able to find the others in the same place.
+ */
+export const PHOTO_MAX_EDGE = 1280;
+export const PHOTO_QUALITY = 0.8;
+
+/**
+ * The confidence every row from a photograph carries (D55, D143).
+ *
+ * A fixed figure rather than a computed one, and below anything the text path
+ * produces, because the uncertainty is not in any one row: it is in the fact
+ * that a model looked at a picture. D55's estimates lower confidence rather
+ * than excluding themselves from the arithmetic, and these do the same. The
+ * macro coverage still counts them, because the database is what priced them.
+ */
+export const PHOTO_CONFIDENCE = 0.6;
+
+/**
+ * The same limit expressed in base64 characters, which is what the schema can
+ * actually count.
+ *
+ * Base64 is four characters per three bytes, so the ceiling is the byte limit
+ * times four thirds, rounded up to the next quantum of four. Checked here as
+ * well as by the route's own body limit, because the two say different things:
+ * the body limit refuses to read an oversized request at all, and this refuses
+ * an oversized *image* inside a request that was small enough to read.
+ */
+export const PHOTO_MAX_BASE64 = Math.ceil(PHOTO_MAX_BYTES / 3) * 4;
+
+/**
+ * A photograph of a plate, and optionally a few words beside it.
+ *
+ * `image` is raw base64 with no data URL prefix: the prefix carries a media
+ * type the server would have to either trust or re-derive, and re-deriving it
+ * from the bytes is the only honest option, so the prefix is stripped by the
+ * client rather than sent and ignored.
+ *
+ * `note` is the line the photograph cannot say. The probe found that a kebab
+ * pizza comes back as "Pizza (1 st)" — the picture shows one round thing, and
+ * what is on it is the part a person knows. Four words fix it, and they travel
+ * with the image into the *same* call, not a second one.
+ */
+/**
+ * One food the model found in a photograph.
+ *
+ * Two fields, and the shortness is the design. The text parser's item carries
+ * an `estimatedGrams` the model guessed and a `confidence` it asserted; neither
+ * belongs here. A photograph gives no ground truth to guess grams from — the
+ * probe's models said "stor mängd" and "spridd över delar", which are
+ * descriptions of a picture — and a confidence figure attached by the thing
+ * being judged is not evidence. The app sets the confidence, from the fact that
+ * this came from a photograph at all.
+ *
+ * `amount` is **nullable and stays null**. An amount is a number with a unit
+ * the app can turn into grams; anything else is not an amount, and the correct
+ * thing to do with "stor mängd" is to show the food with an empty amount field,
+ * not to invent 150 g behind the person's back. See `HOUSEHOLD_UNITS`.
+ */
+export const parsedPhotoItemSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    /**
+     * `.catch(null)` rather than a rejection, and this is the one place in the
+     * codebase where a malformed field is tolerated instead of refused.
+     *
+     * The reason is what the malformed value actually is. The home plate came
+     * back with `"amount": "stor mängd"` — a string where an object belongs —
+     * beside three foods the model had named correctly. Refusing the reply
+     * would throw those three away over one side dish nobody could quantify,
+     * and "no amount" is already a first-class answer here with a defined
+     * behaviour on screen. A nutrition key is still refused outright, because
+     * that one is a claim rather than an absence.
+     */
+    amount: z
+      .object({ count: z.number().positive().max(2000), unit: z.string().trim().min(1).max(30) })
+      .strict()
+      .nullish()
+      .catch(null),
+    /**
+     * A weight printed on the packaging, in grams (D143, amended 2026-09-13).
+     *
+     * **Never an amount, and that is the whole reason the field exists.** The
+     * model read "1000 G" off a bag of meatballs and offered it as how much was
+     * being eaten; the database priced it at 2 173 kcal and the row was one tap
+     * from the day's intake. A kilo on a bag says what the bag weighs.
+     *
+     * So the prompt asks for it *here* instead, and a row that carries it has
+     * no amount — enforced in `pricePhotoItems` rather than asked for, because
+     * a model that ignores the instruction is the case this is defending
+     * against. The figure itself is read and dropped: it is a fact about the
+     * packet, not about the meal.
+     */
+    packageG: z.number().positive().max(20000).nullish().catch(null),
+  })
+  .strict();
+export type ParsedPhotoItem = z.infer<typeof parsedPhotoItemSchema>;
+
+export const parsedPhotoSchema = z
+  .object({ items: z.array(parsedPhotoItemSchema).max(30) })
+  .strict();
+
+export const parseFoodPhotoRequestSchema = z.object({
+  image: z.string().min(32).max(PHOTO_MAX_BASE64),
+  note: z.string().trim().max(200).optional(),
+});
+export type ParseFoodPhotoRequest = z.infer<typeof parseFoodPhotoRequestSchema>;
+
+/**
+ * The answer, with the same two-branch shape as the text parse.
+ *
+ * The unavailable branch carries two reasons the text path has no use for.
+ * `not_configured` is an installation with no vision model named, which is a
+ * choice rather than a fault; `rate_limited` is the one place a photo is
+ * refused for being one too many, and it shares the coach's allowance because
+ * both queue on the same single GPU.
+ */
+export const parsePhotoResponseSchema = z.discriminatedUnion("available", [
+  z.object({
+    available: z.literal(true),
+    items: z.array(foodMatchSchema),
+    model: z.string(),
+    ms: z.number().int().min(0),
+  }),
+  z.object({
+    available: z.literal(false),
+    reason: z.enum([
+      "disabled",
+      "not_configured",
+      "unreachable",
+      "timeout",
+      "failed",
+      "unusable_output",
+      "rate_limited",
+    ]),
+    /** Seconds, and only on `rate_limited`. */
+    retryAfterSeconds: z.number().int().min(1).optional(),
+  }),
+]);
+export type ParsePhotoResponse = z.infer<typeof parsePhotoResponseSchema>;
+
 /** What the client asks before offering any of this in the UI. */
 export const llmHealthSchema = z.object({
   /** Configured at all. False means the operator has not set a host. */
@@ -162,6 +337,17 @@ export const llmHealthSchema = z.object({
   /** Answered just now. False means the box is off, which is expected. */
   reachable: z.boolean(),
   models: z.object({ small: z.string(), large: z.string() }),
+  /**
+   * Whether the photo path may be offered (D143).
+   *
+   * Its own field rather than a model name, because the question the client is
+   * asking is not "which tag is configured" but "has this installation proved
+   * that tag can see". False covers every way the answer can be no: the layer
+   * is off, no model is named, the boot check has not run, it could not reach
+   * the workstation, or the model answered without looking. The surface is
+   * absent in all five, which is the same thing every other optional mode does.
+   */
+  vision: z.boolean(),
 });
 export type LlmHealth = z.infer<typeof llmHealthSchema>;
 
@@ -198,8 +384,28 @@ export const confirmParsedSchema = z.object({
     )
     .min(1)
     .max(30),
+  /**
+   * How sure the saved rows are, for the whole batch (D143).
+   *
+   * One figure rather than one per row, because the uncertainty is not in any
+   * particular row: it is in where the batch came from. A photograph makes
+   * every row on it an estimate in the D55 sense — the food was named by a
+   * model looking at a picture — and an estimate lowers confidence rather than
+   * excluding itself from the arithmetic. The coverage still counts these,
+   * because the database is what priced them.
+   *
+   * Defaults to 1, which is what a typed sentence a person then corrected is
+   * worth, and what every caller before this sent.
+   */
+  confidence: z.number().gt(0).max(1).default(1),
 });
 export type ConfirmParsed = z.infer<typeof confirmParsedSchema>;
+/**
+ * What a caller has to send, which is not what the server ends up with:
+ * `confidence` has a default, so it is optional on the way in and always
+ * present on the way out. The client types against this one.
+ */
+export type ConfirmParsedInput = z.input<typeof confirmParsedSchema>;
 
 /* ----------------------------------------------------------------- recipes */
 

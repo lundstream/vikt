@@ -23,6 +23,7 @@ export type MailTemplate =
   | "invite_requested"
   | "invite_approved"
   /** Announcements, one per kind, so the admin queue says which (D108). */
+  | "invite_request_admin"
   | "announcement_maintenance"
   | "announcement_news"
   | "announcement_notice"
@@ -127,8 +128,23 @@ function block(text: string): string {
 }
 
 export function wrap(text: string): string {
-  const body = text.trim().split(/\n{2,}/).map(block).join("\n");
+  return shell(text.trim().split(/\n{2,}/).map(block).join("\n"));
+}
 
+/**
+ * The chrome, around block HTML somebody else rendered (D128).
+ *
+ * `wrap` used to be the only way in, which meant the only thing a mail could
+ * contain was paragraphs of escaped text. Announcements carry a small Markdown
+ * subset now, and its renderer produces headings and lists that `block` cannot.
+ * Splitting the chrome from the paragraph-maker is what lets both use the same
+ * frame, wordmark and footer.
+ *
+ * **The caller owns the escaping.** Everything here is literal, so anything
+ * passed in is markup by definition. There are exactly two callers: `wrap`,
+ * which escapes, and the announcement renderer, which escapes.
+ */
+export function shell(body: string): string {
   return [
     // The outer table is the background. Outlook ignores a background colour on
     // a div and honours one on a table cell, which is the whole reason for it.
@@ -159,7 +175,23 @@ export function wrap(text: string): string {
   ].join("");
 }
 
-function escapeHtml(value: string): string {
+/**
+ * The inline styles the Markdown renderer needs, in the mail's palette.
+ *
+ * Here rather than in `shared`, because the palette belongs to the templates
+ * and the parser has no business knowing what Lingon is. The heading is a
+ * weight and a colour rather than a size: a mail read at 15 px does not have
+ * room for a type scale, and the profile's own rule is that emphasis is one
+ * step, not three.
+ */
+export const ANNOUNCEMENT_STYLE = {
+  body: `margin:0 0 18px;color:${SKYMNING};word-break:break-word`,
+  heading: `margin:20px 0 8px;font-family:${FONT_DISPLAY};font-size:16px;font-weight:700;color:${SKYMNING}`,
+  link: `color:${LINGON};text-decoration:underline`,
+  list: `margin:0 0 18px;padding-left:20px;color:${SKYMNING}`,
+} as const;
+
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -208,6 +240,48 @@ Adressen används bara för det här. Säger vi nej raderas den.`;
   return {
     template: "invite_requested",
     subject: "Din förfrågan om åtkomst till Vikt har kommit fram",
+    text,
+    html: wrap(text),
+  };
+}
+
+/**
+ * The other side of that receipt: an admin has something to answer (D129).
+ *
+ * A request sits in a list nobody has a reason to open, which is how a person
+ * who asked politely waits three weeks for an answer that was one click away.
+ * This is the whole point of the feature, so it is written to be actionable in
+ * one read: who asked, what they said, and a link that lands on the list.
+ *
+ * **The address and the line are quoted, not summarised.** The decision is made
+ * by reading them, and a mail that says "somebody asked" only moves the reading
+ * somewhere else.
+ *
+ * The link goes to the requests tab, not to a per-request page: there is no
+ * such page, the tab is the default view of the admin screen, and a request is
+ * answered from the row.
+ */
+export function inviteRequestAdminMail(input: {
+  name: string | null;
+  email: string;
+  reason: string | null;
+  link: string;
+}): RenderedMail {
+  const who = input.name === null ? input.email : `${input.name} (${input.email})`;
+
+  const text = [
+    `${who} har bett om en inbjudningskod till Vikt.`,
+    input.reason === null ? null : `Så här skrev de:\n\n${input.reason}`,
+    `Svara här:\n${input.link}`,
+    "Godkänner du skickas en kod. Nekar du raderas raden, och inget mejl går ut.",
+    "Vill du inte ha de här mejlen kan du stänga av dem under Inställningar.",
+  ]
+    .filter((part) => part !== null)
+    .join("\n\n");
+
+  return {
+    template: "invite_request_admin",
+    subject: "Någon har bett om en kod till Vikt",
     text,
     html: wrap(text),
   };

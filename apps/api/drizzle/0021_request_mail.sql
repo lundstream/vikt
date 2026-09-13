@@ -1,0 +1,12 @@
+-- Whether an admin is mailed when somebody asks for a code (D129).
+--
+-- Per admin and default on: an access request is work that has to be done by a
+-- person, and a request nobody was told about sits until somebody happens to
+-- open the admin screen. Opt-out rather than opt-in for the same reason the
+-- maintenance mail is: the default has to be the one where the thing gets
+-- noticed.
+--
+-- The column is on every profile, not only on admins'. An account can be made
+-- an admin at any time, and a preference that only exists for current admins
+-- would have to be created at the moment somebody is promoted.
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "request_mail" boolean NOT NULL DEFAULT true;

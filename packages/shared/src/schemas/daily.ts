@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { habitDaySchema } from "./habits.js";
 import { ACTIVITY_TYPES } from "../calc/activity.js";
 import { MEASUREMENT_RANGE_CM, type MeasurementSite } from "../calc/measurements.js";
 import { clientUuidSchema, localDateSchema } from "./log.js";
@@ -160,6 +161,13 @@ export const dayLogSchema = z.object({
   activities: z.array(activitySchema),
   /** Today's weight reading if there is one, so the screen can show it in place. */
   weightKg: z.number().nullable(),
+  /**
+   * The habit checklist for this day, each row carrying its own answer and its
+   * own streak (D137). Part of the day rather than a second request, because
+   * the checklist is part of "what happened today" and a screen that loads in
+   * two stages ticks in two stages.
+   */
+  habits: z.array(habitDaySchema),
   /**
    * The savings rules that accrued today, so "I did buy the lunch after all"
    * is part of the same single pass rather than a separate errand (D37). Only

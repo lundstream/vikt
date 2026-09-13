@@ -53,6 +53,8 @@ export default {
         logged: token("--logged"),
         data: token("--data"),
         reward: token("--reward"),
+        /* Text on a Honung surface. Fixed dark in both themes: see tokens.css. */
+        "on-reward": token("--on-reward"),
         nutrition: token("--nutrition"),
         uncertain: token("--uncertain"),
       },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateManualIntake, CreateWeightEntry } from "shared";
+import type { CreateManualIntake, CreateWeightEntry, UpdateWeightEntry } from "shared";
 import { api } from "./api.js";
 import { DAY_KEY } from "./daily.js";
 import { enqueueAndSync } from "./queue/enqueue.js";
@@ -95,6 +95,33 @@ export function useSaveWeight(timezone = "Europe/Stockholm") {
       // `GET /api/day` carries the day's reading, so the daily screen is stale
       // too. This fires on enqueue; `useQueueSync` fires the same set again
       // once the server actually has it, which is the one that has the entry.
+      void queryClient.invalidateQueries({ queryKey: DAY_KEY });
+    },
+  });
+}
+
+/**
+ * Changing a reading that exists (D150).
+ *
+ * Queued like the create, and for the same reason: an edit made on a train has
+ * to survive the tunnel. What differs is the **kind**, which decides the method
+ * and the path, and the baseline it carries, which is what lets the server tell
+ * an edit arriving late from two devices disagreeing about a day.
+ */
+export function useUpdateWeight(timezone = "Europe/Stockholm") {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateWeightEntry) =>
+      enqueueAndSync({
+        kind: "weight-update",
+        timezone,
+        localDate: input.localDate,
+        clientUuid: input.clientUuid,
+        body: input,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: WEIGHT_KEY });
+      void queryClient.invalidateQueries({ queryKey: INSIGHTS_KEY });
       void queryClient.invalidateQueries({ queryKey: DAY_KEY });
     },
   });

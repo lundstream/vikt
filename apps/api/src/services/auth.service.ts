@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { RegisterRequest, LoginRequest, Theme } from "shared";
 import { themeSchema } from "shared";
 import { toNumber, toNumberOrNull } from "shared";
+import { coachToneSchema } from "shared";
 import type { Db } from "../db/index.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { hashToken, newSessionToken } from "../auth/tokens.js";
@@ -23,6 +24,7 @@ import {
   insertUser,
 } from "../repositories/users.repo.js";
 import { conflict, notFound, unauthorized, unprocessable } from "../lib/errors.js";
+import { countPendingInviteRequests } from "./invite-request.service.js";
 
 /**
  * Registration, login, session resolution.
@@ -42,6 +44,8 @@ export type AuthedUser = {
   createdAt: string;
   /** Whether the admin screens are reachable. Authorises nothing (D89, D100). */
   isAdmin: boolean;
+  /** Invite requests waiting for an answer, or 0 for a non-admin (D129). */
+  pendingRequests: number;
   /** When this account agreed to the privacy text, or null (D107). */
   consentedAt: string | null;
   profile: {
@@ -56,6 +60,23 @@ export type AuthedUser = {
     soberAssumeUnloggedDry: boolean;
     /** Whether news announcements are also mailed (D108). */
     newsMail: boolean;
+    /** Whether an admin is mailed about a new invite request (D129). */
+    requestMail: boolean;
+    /**
+     * The two reminders (D136), and their times as local minutes. Two pairs
+     * each: the plain names are the weekday times, `Weekend` is Saturday and
+     * Sunday.
+     */
+    remindWeigh: boolean;
+    remindWeighMinute: number;
+    remindDay: boolean;
+    remindDayMinute: number;
+    /** Which voice the coach uses (D140). */
+    coachTone: "torr" | "peppig" | "saklig";
+    remindWeighWeekend: boolean;
+    remindWeighWeekendMinute: number;
+    remindDayWeekend: boolean;
+    remindDayWeekendMinute: number;
     /** Which theme to use: system, dark or light (D117). */
     theme: Theme;
     lastDrinkOn: string | null;
@@ -199,12 +220,21 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
   const profile = await findProfile(userId, db);
   if (!profile) throw notFound("This account has no profile row.");
 
+  /**
+   * How many requests are waiting, for the marker on the admin entry (D129).
+   *
+   * Only asked for an admin: for everybody else the answer is always zero and
+   * a count query on every `/me` would be work done to produce a constant.
+   */
+  const pendingRequests = user.isAdmin ? await countPendingInviteRequests(db) : 0;
+
   return {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
     isAdmin: user.isAdmin,
+    pendingRequests,
     consentedAt: user.consentedAt?.toISOString() ?? null,
     profile: {
       heightCm: toNumberOrNull(profile.heightCm),
@@ -216,6 +246,16 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
       addExerciseToTarget: profile.addExerciseToTarget,
       soberAssumeUnloggedDry: profile.soberAssumeUnloggedDry,
       newsMail: profile.newsMail,
+      requestMail: profile.requestMail,
+      remindWeigh: profile.remindWeigh,
+      remindWeighMinute: profile.remindWeighMinute,
+      remindDay: profile.remindDay,
+      remindDayMinute: profile.remindDayMinute,
+      coachTone: coachToneSchema.catch("torr").parse(profile.coachTone),
+      remindWeighWeekend: profile.remindWeighWeekend,
+      remindWeighWeekendMinute: profile.remindWeighWeekendMinute,
+      remindDayWeekend: profile.remindDayWeekend,
+      remindDayWeekendMinute: profile.remindDayWeekendMinute,
       theme: themeSchema.catch("system").parse(profile.theme),
       lastDrinkOn: profile.lastDrinkOn,
       /**

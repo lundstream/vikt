@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   addDays,
@@ -9,17 +9,18 @@ import {
   type WeightEntry,
 } from "shared";
 import { useLogout, useMe } from "../lib/session.js";
-import { useDeleteWeight, useInsights, useWeightLog } from "../lib/log.js";
+import { useInsights, useWeightLog } from "../lib/log.js";
 import { formatLongDay, todayLocalDate } from "../lib/dates.js";
 import { TrendChart, type ChartPoint } from "../components/TrendChart.js";
+import { MonthCalendar, monthOf } from "../components/MonthCalendar.js";
 import { QuickLogSheet } from "../components/QuickLogSheet.js";
 import { RangeSelector, rangeDays, type RangeKey } from "../components/RangeSelector.js";
 import { InsightsPanel } from "../components/InsightsPanel.js";
 import { DayCard } from "../components/DayCard.js";
 import { WelcomeCard } from "../components/WelcomeCard.js";
+import { ReviewCard } from "../components/ReviewCard.js";
 import { Disclosure } from "../components/Disclosure.js";
 import { QuickActions, quickActions } from "../components/QuickActions.js";
-import { DeleteButton } from "../components/DeleteButton.js";
 import { Tooltip } from "../components/Tooltip.js";
 import { OfflineNotice } from "../components/SyncIndicator.js";
 import { PlanReviewNotice } from "../components/PlanReviewNotice.js";
@@ -89,15 +90,67 @@ export function Dashboard() {
     if (searchParams.has("logga")) setLogOpen(true);
   }, [searchParams]);
   const [reviewDismissed, setReviewDismissed] = useState(false);
-  const deleteWeight = useDeleteWeight();
   const navigate = useNavigate();
+
+  /**
+   * The day the sheet is open on, when it was opened from a reading or from
+   * the calendar rather than from the quick action (D145).
+   *
+   * Null means the quick path: today, seeded from the last reading. Anything
+   * else carries the day, that day's value if it has one, and the row's id so
+   * the sheet can offer a delete.
+   */
+  const [editing, setEditing] = useState<{
+    date: string;
+    weightKg: number | null;
+    entryId: string | null;
+  } | null>(null);
+
+  /** The month calendar, folded away until somebody asks for every reading. */
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState<string | null>(null);
 
   const profile = me.data?.profile;
   const timezone = profile?.timezone ?? "Europe/Stockholm";
   const today = todayLocalDate(timezone);
   const insights = useInsights(today);
 
-  const readings: WeightEntry[] = weightLog.data ?? [];
+  /**
+   * Memoised for its identity, not for its cost. `?? []` mints a fresh array
+   * on every render while the query has no data, and two memos below depend on
+   * this value — so without it they recompute on every render of an empty
+   * dashboard, which is exactly the state a new account is in.
+   */
+  const readings = useMemo<WeightEntry[]>(() => weightLog.data ?? [], [weightLog.data]);
+
+  /**
+   * Readings by day, for the calendar's marks and for opening the sheet on one.
+   *
+   * A map rather than a scan per cell: a year's calendar is 365 cells and a
+   * linear search inside each is the kind of thing that is fine until somebody
+   * has two years of history.
+   */
+  const readingsByDate = useMemo(
+    () => new Map(readings.map((entry) => [entry.localDate, entry])),
+    [readings],
+  );
+  const markedDates = useMemo(
+    () => new Set(readingsByDate.keys()),
+    [readingsByDate],
+  );
+
+  /** Opens the sheet on a day, whether or not that day has a reading yet. */
+  const editDay = useCallback(
+    (localDate: string) => {
+      const entry = readingsByDate.get(localDate) ?? null;
+      setEditing({
+        date: localDate,
+        weightKg: entry?.weightKg ?? null,
+        entryId: entry?.id ?? null,
+      });
+    },
+    [readingsByDate],
+  );
 
   /**
    * The last few, newest first. Deliberately short: the chart is the hero (§5)
@@ -253,6 +306,13 @@ export function Dashboard() {
           the first thing on a new account and nothing above it would be true
           yet, and gone by itself once its three suggestions are done.
         */}
+        {/*
+          The week's review, once, when there is a new one (D139). Above the
+          trend figure like the welcome card, and gone as soon as it is put
+          away: it is news, not furniture.
+        */}
+        <ReviewCard />
+
         <WelcomeCard
           hasWeight={readings.length > 0}
           hasHeight={profile?.heightCm != null}
@@ -468,24 +528,72 @@ export function Dashboard() {
             >
             <ul className="mt-2 divide-y divide-edge border-y border-edge">
               {recentReadings.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex items-baseline justify-between gap-3 py-2.5"
-                >
-                  <span className="min-w-0 truncate text-note text-ink">
-                    {formatLongDay(entry.localDate, LOCALE)}
-                  </span>
-                  <span className="num shrink-0 text-note text-muted">
-                    {formatKg(entry.weightKg)} kg
-                  </span>
-                  <DeleteButton
-                    testId={`delete-weight-${entry.id}`}
-                    label={`${formatKg(entry.weightKg)} kg, ${formatLongDay(entry.localDate, LOCALE)}`}
-                    onDelete={() => deleteWeight.mutateAsync(entry.id)}
-                  />
+                <li key={entry.id}>
+                  {/*
+                    The whole row opens the sheet on that day (D145). It was a
+                    line of text with a delete beside it, so the only thing a
+                    mistyped weight could be was removed and typed again.
+                  */}
+                  <button
+                    type="button"
+                    data-testid={`edit-weight-${entry.id}`}
+                    className="flex w-full items-baseline justify-between gap-3 py-2.5 text-left"
+                    onClick={() => editDay(entry.localDate)}
+                  >
+                    <span className="min-w-0 truncate text-note text-ink">
+                      {formatLongDay(entry.localDate, LOCALE)}
+                    </span>
+                    <span className="num shrink-0 text-note text-muted">
+                      {formatKg(entry.weightKg)} kg
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
+
+            {/*
+              Every reading, not the last five (§3, D56).
+
+              The list stays short because the chart is the hero and a ledger
+              under it would compete with the line. What was wrong was that the
+              five were the only ones reachable at all: a weight typed wrong in
+              July was visible on the chart as a spike and could not be touched.
+              A month of days is a smaller thing to put on this page than three
+              hundred rows, and it is also the shape somebody looks in: not
+              "the twelfth row from the bottom" but "that Tuesday".
+            */}
+            <div className="mt-3">
+              <button
+                type="button"
+                data-testid="open-calendar"
+                className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+                onClick={() => {
+                  setCalendarOpen((open) => !open);
+                  setCalendarMonth((month) => month ?? monthOf(today));
+                }}
+                aria-expanded={calendarOpen}
+              >
+                {calendarOpen ? t("calendar.hideWeighings") : t("calendar.allWeighings")}
+              </button>
+            </div>
+
+            {calendarOpen ? (
+              <div className="mt-3">
+                <MonthCalendar
+                  testId="weight-calendar"
+                  month={calendarMonth ?? monthOf(today)}
+                  onMonthChange={setCalendarMonth}
+                  marked={markedDates}
+                  today={today}
+                  onSelect={editDay}
+                  markedLabel={t("calendar.weighing")}
+                  label={t("calendar.weighingsLabel")}
+                />
+                <p className="mt-2 max-w-prose text-micro text-muted">
+                  {t("calendar.help")}
+                </p>
+              </div>
+            ) : null}
             </Disclosure>
           </div>
         ) : null}
@@ -499,11 +607,18 @@ export function Dashboard() {
         pass set out to remove (D53). It also sat directly over the bottom bar
         on a phone, which is why the first quick action is the one that stayed.
       */}
+      {/*
+        One sheet, two ways in (D145). The quick action opens it on today
+        seeded from the last reading; a row or a calendar day opens it on that
+        day with that day's value and a delete. Two sheets would be two places
+        for the save rules to drift apart.
+      */}
       <QuickLogSheet
         timezone={timezone}
-        open={logOpen}
+        open={logOpen || editing !== null}
         onClose={() => {
           setLogOpen(false);
+          setEditing(null);
           // Drop the parameter, or navigating back to `/?logga` from the bar
           // would be a no-op the second time.
           if (searchParams.has("logga")) setSearchParams({}, { replace: true });
@@ -511,6 +626,9 @@ export function Dashboard() {
         today={today}
         lastWeightKg={lastReading?.weightKg ?? null}
         todayIntakeKcal={todayIntakeKcal}
+        {...(editing
+          ? { date: editing.date, weightKg: editing.weightKg, entryId: editing.entryId }
+          : {})}
       />
     </div>
   );

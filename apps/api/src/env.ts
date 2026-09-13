@@ -138,13 +138,17 @@ export function assertProdSecrets(env: NodeJS.ProcessEnv = process.env): void {
    * legible: a container that will not start with a reason in its log beats a
    * page that renders an empty sentence and is read by nobody who can fix it.
    */
-  if (env.NODE_ENV === "production" && env.LANDING_ENABLED === "true") {
+  const publicFace =
+    env.LANDING_ENABLED === "true" || env.REQUEST_ENABLED === "true";
+
+  if (env.NODE_ENV === "production" && publicFace) {
     const contact = env.CONTACT_EMAIL?.trim() ?? "";
     if (contact === "") {
       problems.push(
-        "CONTACT_EMAIL is not set, and LANDING_ENABLED is true. /integritet has " +
-          "to name someone the reader can write to about their own data, and " +
-          "that person is whoever runs this installation",
+        "CONTACT_EMAIL is not set, and LANDING_ENABLED or REQUEST_ENABLED is " +
+          "true. /integritet has to name someone the reader can write to " +
+          "about their own data, and that person is whoever runs this " +
+          "installation",
       );
     }
   }
@@ -165,6 +169,41 @@ export function assertProdSecrets(env: NodeJS.ProcessEnv = process.env): void {
         "Generate one with `openssl rand -hex 32`",
     );
   }
+  /**
+   * VAPID, when push is configured at all (D136).
+   *
+   * Half-configured is the case worth refusing. A public key with no private
+   * key produces subscriptions the server can never send to: the browser says
+   * yes, the row is stored, the person waits for a reminder that has no way to
+   * arrive, and nothing anywhere reports an error. That is worse than push
+   * being off, because off is visible.
+   */
+  const vapidPublic = env.VAPID_PUBLIC_KEY?.trim() ?? "";
+  const vapidPrivate = env.VAPID_PRIVATE_KEY?.trim() ?? "";
+  const vapidSubject = env.VAPID_SUBJECT?.trim() ?? "";
+
+  if (vapidPublic !== "" || vapidPrivate !== "") {
+    if (vapidPublic === "" || vapidPrivate === "") {
+      problems.push(
+        "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY go together: one without the " +
+          "other accepts subscriptions it can never send to. Generate a pair " +
+          "with `pnpm --filter api vapid`, or unset both to turn push off",
+      );
+    }
+    if (vapidSubject === "") {
+      problems.push(
+        "VAPID_SUBJECT is not set. It is the mailto: or URL a push service " +
+          "contacts about this server, it is required by the spec, and some " +
+          "services refuse a subscription without it",
+      );
+    } else if (!/^(mailto:|https?:\/\/)/.test(vapidSubject)) {
+      problems.push(
+        `VAPID_SUBJECT is "${vapidSubject}". It has to be a mailto: address or ` +
+          "an https URL",
+      );
+    }
+  }
+
   if (secretKeyFile && secretKey) {
     problems.push(
       "SECRET_KEY and SECRET_KEY_FILE are both set. The file wins, so the variable is " +
@@ -186,7 +225,15 @@ const booleanish = z
   .enum(["true", "false", "1", "0"])
   .transform((v) => v === "true" || v === "1");
 
-const envSchema = z.object({
+/**
+ * Every variable the API reads, in one object.
+ *
+ * Exported so `stack-variables.test.ts` can walk it: a variable added here and
+ * not forwarded by `infra/docker-compose.portainer.yml` is set in Portainer and
+ * silently absent in the container, which is the worst shape a deploy failure
+ * can take (D147).
+ */
+export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   DATABASE_URL: z.string().min(1),
@@ -277,13 +324,32 @@ const envSchema = z.object({
    */
 
   /**
-   * Serve the landing page at `/` and accept invite requests.
+   * Serve the landing page at `/`.
    *
-   * Off means `/` redirects to `/app` and `POST /invite-requests` does not
-   * exist — a 404 rather than a disabled endpoint, because an endpoint that
-   * answers at all is one that can be probed and rate-limited around.
+   * Off means `/` redirects to `/app` and the landing bundle is never served:
+   * a private install has no public face rather than a public face nobody
+   * links to.
+   *
+   * It no longer carries the request form with it. See `REQUEST_ENABLED`
+   * (D127): the two are separate questions, and the answer to the second is
+   * no far more often than the answer to the first.
    */
   LANDING_ENABLED: booleanish.default("false"),
+
+  /**
+   * Accept requests for an invite code, at the unlinked path `/kod` (D127).
+   *
+   * Off means the page and the endpoint **do not exist** — 404, not a disabled
+   * form and not a 403. An endpoint that answers at all is one that can be
+   * probed and rate-limited around, and this one takes a name and an address
+   * from a stranger.
+   *
+   * Off by default and independent of `LANDING_ENABLED`, because a landing
+   * page is something to read and a request form is something that creates
+   * work and responsibility for whoever runs the installation. Most people who
+   * want the first do not want the second.
+   */
+  REQUEST_ENABLED: booleanish.default("false"),
 
   /**
    * Every phase 8 surface. Off means they are **absent**, not greyed out.
@@ -293,6 +359,25 @@ const envSchema = z.object({
    * that does not mention them.
    */
   LLM_ENABLED: booleanish.default("false"),
+
+  /* ------------------------------------------------------------ web push */
+  /**
+   * VAPID, which is what lets this server identify itself to a push service
+   * (D136). Both empty means push is **absent**, not degraded: the toggles do
+   * not appear, the subscribe endpoint is not registered, and nothing in the
+   * interface mentions a feature that cannot work.
+   *
+   * The private key is a secret and is checked by `assertProdSecrets` like the
+   * others. The public key is not — it is handed to every browser that
+   * subscribes, which is its whole job.
+   *
+   * `VAPID_SUBJECT` is the `mailto:` or URL a push service contacts if this
+   * server misbehaves. The RFC requires one; it is not optional in practice,
+   * because some services refuse a subscription without it.
+   */
+  VAPID_PUBLIC_KEY: z.string().trim().default(""),
+  VAPID_PRIVATE_KEY: z.string().trim().default(""),
+  VAPID_SUBJECT: z.string().trim().default(""),
 
   /* -------------------------------------------------------- outbound mail */
   /**
@@ -348,6 +433,34 @@ const envSchema = z.object({
   OLLAMA_MODEL_LARGE: z.string().default("qwen3.6:27b"),
 
   /**
+   * The model that gets sent photographs. Empty means the photo path is
+   * **absent**, like every other mode in this file.
+   *
+   * A third name rather than a reuse of the other two, because the capability
+   * is not a property of size: the small model here reports a `vision`
+   * capability, accepts an image, and answers that nothing was attached — twice,
+   * to a generated image and to a real plate (`docs/measurements.md`). Which tag
+   * can actually see is an installation fact, so it is configuration, and
+   * `pnpm --filter api probe:vision` is how an operator finds out.
+   *
+   * No default. A default here would be this workstation's answer presented as
+   * everyone's, and the failure it produces is the quiet kind: a model that
+   * accepts the request and describes nothing.
+   */
+  LLM_VISION_MODEL: z.string().trim().default(""),
+
+  /**
+   * The photo budget, separate from the text one and three times as long.
+   *
+   * Measured rather than chosen: `qwen3-vl:8b` took 10 to 20 s on the 1280 px
+   * photographs the client actually sends, against 0.56 s for a warm text
+   * parse. Running both off `OLLAMA_TIMEOUT_MS` would mean either timing out
+   * most photographs or making every text parse wait a minute before admitting
+   * the box is off.
+   */
+  OLLAMA_VISION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(180000).default(60000),
+
+  /**
    * The interactive budget. Short on purpose: a person is waiting, and the
    * honest answer after this long is "not available", which is a path this app
    * already has.
@@ -401,6 +514,7 @@ export function describeModes(env: Env, mailEnabled = false): string {
 
   return [
     on("landing", env.LANDING_ENABLED),
+    on("request", env.REQUEST_ENABLED),
     /**
      * Mail is no longer an environment question (D102). It is on when the
      * settings table holds a server whose password the app can actually read,

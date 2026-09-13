@@ -30,6 +30,7 @@ import { useLogDate } from "../lib/log-date.js";
 import { ApiError } from "../lib/api.js";
 import { clientUuid } from "../lib/uuid.js";
 import { SaveStalled } from "../lib/queue/enqueue.js";
+import { useOnline } from "../lib/queue/useQueue.js";
 import { readRequiredNumber } from "../lib/form-number.js";
 import { BarcodeScanner } from "../components/BarcodeScanner.js";
 import { DeleteButton } from "../components/DeleteButton.js";
@@ -37,10 +38,19 @@ import { Field, fieldAria } from "../components/Field.js";
 import { Disclosure } from "../components/Disclosure.js";
 import { DateSelector } from "../components/DateSelector.js";
 import { FoodTextEntry } from "../components/FoodTextEntry.js";
+import { FoodPhotoEntry } from "../components/FoodPhotoEntry.js";
 import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
-import { ActionButton, barcodeIcon } from "../components/QuickActions.js";
+import {
+  ActionButton,
+  barcodeIcon,
+  cameraIcon,
+  penIcon,
+  potIcon,
+  speechIcon,
+  type QuickAction,
+} from "../components/QuickActions.js";
 import {
   type TranslationKey, LOCALE, t } from "../i18n/index.js";
 
@@ -111,7 +121,7 @@ export function FoodLog() {
    * this file because that is what every call site below already means by it:
    * the day the entries belong to.
    */
-  const { date: today, isToday } = useLogDate();
+  const { date: today, today: deviceToday, isToday } = useLogDate();
   const dayWord = isToday ? t("quick.today").toLowerCase() : t("food.dayThis");
 
   const recent = useRecentFoods(12);
@@ -129,7 +139,7 @@ export function FoodLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scannerOpen, setScannerOpen] = useState(() => searchParams.has("skanna"));
   /** Which occasional tool is open, if any. */
-  const [tool, setTool] = useState<"text" | "recipe" | "estimate" | null>(null);
+  const [tool, setTool] = useState<"text" | "photo" | "recipe" | "estimate" | null>(null);
   /**
    * Whether the optional layer is up, asked once here rather than inside each
    * tool. The two sheets ask for it too and share the query key, so this is the
@@ -137,10 +147,107 @@ export function FoodLog() {
    * which is what "no trace when the box is off" means from outside a sheet.
    */
   const llm = useLlmHealth();
+  /**
+   * The photo path needs the network in a way the other tools do not (D143).
+   *
+   * They degrade to an unavailable answer on a 200; this one cannot even be
+   * attempted, because the image is never queued — it is read, sent and
+   * dropped, and a queue would mean keeping somebody's kitchen on their phone
+   * until the network came back. So the door is absent offline rather than
+   * opening onto a thing that will not work.
+   */
+  const online = useOnline();
   const favourites = useFavourites();
   const [query, setQuery] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [pending, setPending] = useState<FoodItem | null>(null);
+
+  /**
+   * The ways into this screen's other surfaces (D135).
+   *
+   * Built here rather than inline so the conditional membership is one list
+   * somebody can read: scanning and typing an estimate need nothing, the three
+   * model-backed ones need a model that answers, and the photograph needs one
+   * that has been shown to look. `llm.data?.reachable` is the same check the
+   * sheets themselves use, so a box that goes away mid-session takes its doors
+   * with it rather than leaving three that open onto an error.
+   */
+  const waysIn: QuickAction[] = [
+    {
+      key: "scan",
+      label: "action.scan",
+      icon: barcodeIcon,
+      onClick: () => setScannerOpen(true),
+      testId: "scan",
+    },
+    /**
+     * The photograph, beside the scanner (D143).
+     *
+     * Four conditions, all of them absence rather than a greyed control: the
+     * layer off, no vision model named, no boot check that saw one, or this
+     * device offline. `vision` is the server's own verdict from having sent the
+     * model a picture — a model name in the environment says what somebody
+     * intended, and this says what the tag actually did.
+     */
+    ...(llm.data?.reachable && llm.data.vision && online
+      ? ([
+          {
+            key: "photo",
+            label: "photo.take",
+            icon: cameraIcon,
+            onClick: () => setTool("photo"),
+            testId: "open-photo-entry",
+          },
+        ] satisfies QuickAction[])
+      : []),
+    {
+      key: "estimate",
+      label: "estimate.open",
+      icon: penIcon,
+      onClick: () => setTool("estimate"),
+      testId: "open-estimate",
+    },
+    ...(llm.data?.reachable
+      ? ([
+          {
+            key: "text",
+            label: "llm.title",
+            icon: speechIcon,
+            onClick: () => setTool("text"),
+            testId: "open-text-entry",
+          },
+          {
+            key: "recipe",
+            label: "recipe.title",
+            icon: potIcon,
+            onClick: () => setTool("recipe"),
+            testId: "open-recipe",
+          },
+        ] satisfies QuickAction[])
+      : []),
+  ];
+
+  /** True while a whole day is being copied forward (D124). */
+  const [copyingDay, setCopyingDay] = useState(false);
+
+  /**
+   * Picking a food ends the search (D122).
+   *
+   * The results list used to stay behind the portion sheet and still be there
+   * when it closed, so logging two things in a row meant clearing the field by
+   * hand between them. The query is what drives the list, so clearing it is
+   * what dismisses it; `searchEnabled` goes back to false so a keystroke does
+   * not re-run the search that was just answered.
+   *
+   * Focus needs no work here: the amount field inside the sheet carries
+   * `autoFocus`, which is the right place for it — the sheet owns the field, so
+   * the sheet decides what is focused when it opens.
+   */
+  function choose(item: FoodItem) {
+    setPending(item);
+    setQuery("");
+    setSearchEnabled(false);
+  }
   const [flash, setFlash] = useState<string | null>(null);
   /**
    * Which row is being saved, by id.
@@ -221,6 +328,92 @@ export function FoodLog() {
       announce(saveProblem(error), true);
     } finally {
       setSavingId(null);
+    }
+  }
+
+  /**
+   * Copies one past entry onto **the device's own today** (D124).
+   *
+   * The date is `deviceToday`, not the selected `today`, and that is the whole
+   * difference between this and "Igen" below. Both put a row in the log; they
+   * put it on different days:
+   *
+   *  - **"Igen", under Senast loggat**, writes to the day being *viewed*. That
+   *    is backfilling — somebody filling in last Tuesday wants last Tuesday.
+   *  - **"Logga i dag", on a past day's rows**, writes to *today*. That is
+   *    somebody looking at yesterday and eating the same thing again.
+   *
+   * Passing the device's own day is also what makes `dateSource` come out as
+   * `device` rather than `chosen` without this function saying so: `enqueue`
+   * compares the supplied date against the boundary the device would have
+   * computed, and equality means `device` (D61). Writing "today" here is
+   * therefore a statement about a clock, which is exactly what it is.
+   *
+   * A fresh `clientUuid` per copy, because this is a new row and not an
+   * amendment of the one being copied.
+   */
+  async function copyToToday(entry: FoodEntry) {
+    setSavingId(entry.id);
+    try {
+      await saveEntry.mutateAsync({
+        clientUuid: clientUuid(),
+        localDate: deviceToday,
+        mealSlot: entry.mealSlot,
+        foodItemId: entry.foodItemId,
+        freetext: entry.foodItemId ? null : entry.name,
+        grams: entry.grams,
+        kcal: entry.foodItemId ? null : entry.kcal,
+        confidence: entry.confidence,
+        confirmed: true,
+      });
+      announce(t("food.copiedToToday", { name: entry.name }));
+    } catch (error) {
+      announce(saveProblem(error), true);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  /**
+   * The whole day, for somebody who ate the same as yesterday.
+   *
+   * Sequential rather than `Promise.all`: each write goes through the offline
+   * queue, and a burst of parallel IndexedDB transactions on a phone is how
+   * D118's stall was reached. One at a time is fast enough for a day's worth of
+   * rows and cannot wedge the store.
+   *
+   * A partial result is reported as a partial result. If the fourth of six
+   * fails there is no undo here and no pretending: the count says how many
+   * landed, and the rest are still on the day being viewed to try again.
+   */
+  async function copyDayToToday(entries: FoodEntry[]) {
+    setCopyingDay(true);
+    let copied = 0;
+    try {
+      for (const entry of entries) {
+        await saveEntry.mutateAsync({
+          clientUuid: clientUuid(),
+          localDate: deviceToday,
+          mealSlot: entry.mealSlot,
+          foodItemId: entry.foodItemId,
+          freetext: entry.foodItemId ? null : entry.name,
+          grams: entry.grams,
+          kcal: entry.foodItemId ? null : entry.kcal,
+          confidence: entry.confidence,
+          confirmed: true,
+        });
+        copied += 1;
+      }
+      announce(t("food.copiedDay", { n: copied }));
+    } catch (error) {
+      announce(
+        copied === 0
+          ? saveProblem(error)
+          : t("food.copiedDayPartial", { n: copied, total: entries.length }),
+        true,
+      );
+    } finally {
+      setCopyingDay(false);
     }
   }
 
@@ -317,42 +510,29 @@ export function FoodLog() {
         ) : null}
 
         {/*
-          Scan and search first, because they are the everyday path for
-          something that is not already in the lists below, and because the pair
-          is one line.
+          Search first, because typing a name is the everyday path for something
+          that is not already in the lists below.
 
-          Three earlier changes stand. The scan control has **no label**: it sat
-          under the circle and pushed the control taller than the field beside
-          it, so nothing shared a centre line and the two halves of one action
-          read as two blocks. The **heading is gone** with it, since "Hitta mat"
-          above a scanner and a box labelled "Sök på namn" restated the two
-          controls under it. And they are **centred against each other** rather
-          than top-aligned, which is what makes them one row.
+          **The scan control moved out of this row** (D135). It used to sit
+          beside the field, unlabelled, because a label underneath made it
+          taller than the input and nothing shared a centre line. That was the
+          right fix for the wrong arrangement: scanning is not part of
+          searching, it is one of four ways into this screen, and the other
+          three were sitting further down pretending to be buttons. They are one
+          row of quick actions now, directly below.
+
+          The heading stays gone: a box labelled "Sök på namn" does not need
+          "Hitta mat" above it.
         */}
-        <section aria-label={t("food.find")} className="mb-8">
-          <div className="flex items-center gap-3">
-            <ActionButton
-              action={{
-                key: "scan",
-                label: "action.scan",
-                icon: barcodeIcon,
-                onClick: () => setScannerOpen(true),
-                testId: "scan",
-              }}
-              labelled={false}
-            />
-
-            <div className="min-w-0 flex-1">
-              <SearchBox
-                query={query}
-                onQuery={(value) => {
-                  setQuery(value);
-                  setSearchEnabled(false);
-                }}
-                onSubmit={() => setSearchEnabled(true)}
-              />
-            </div>
-          </div>
+        <section aria-label={t("food.find")} className="mb-6">
+          <SearchBox
+            query={query}
+            onQuery={(value) => {
+              setQuery(value);
+              setSearchEnabled(false);
+            }}
+            onSubmit={() => setSearchEnabled(true)}
+          />
 
           {search.data?.notice ? (
             <p role="status" className="mt-2 text-micro text-muted">
@@ -367,7 +547,7 @@ export function FoodLog() {
                   <button
                     type="button"
                     className="flex w-full items-center justify-between gap-4 py-3 text-left"
-                    onClick={() => setPending(item)}
+                    onClick={() => choose(item)}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-base text-ink">{item.name}</span>
@@ -383,6 +563,35 @@ export function FoodLog() {
             </ul>
           ) : null}
         </section>
+
+        {/*
+          The four ways into this screen, in one row (D135).
+
+          Scanning, typing an estimate, describing a meal and asking for a
+          recipe are all **doors to another surface**, not actions. Three of
+          them were full-width outlined buttons stacked down the page, which
+          said "press me" three times for things that only open a sheet, and
+          the fourth was a circle beside the search box. They are one shape now,
+          the one the profile already gives this job: a Dis circle, a Snö icon
+          and a label underneath (page 6, Snabbåtgärder).
+
+          The row carries two, three or four items. The two model-backed ones
+          are absent rather than disabled when the box is off, which is the same
+          rule as everywhere else: an absent feature leaves no trace. `gap-x-4`
+          at 360 px is what lets four 64 px items and their gaps fit inside the
+          320 px the padding leaves, and it wraps rather than overflowing if a
+          translation makes a label taller.
+        */}
+        <nav aria-label={t("food.ways")} className="mb-8">
+          <ul className="flex flex-wrap items-start justify-center gap-x-4 gap-y-4 sm:gap-x-8">
+            {waysIn.map((action) => (
+              <li key={action.key}>
+                <ActionButton action={action} />
+              </li>
+            ))}
+          </ul>
+        </nav>
+
 
         {/*
           The two fast paths, **not folded**.
@@ -504,45 +713,16 @@ export function FoodLog() {
           which is the same rule as before: no error banner, no disabled
           control, no trace.
         */}
-        {/*
-          Typing an estimate needs no model, so that control is always here; the
-          two model-backed tools are not rendered at all when the box is off.
-        */}
-        <div className="mb-8">
-          <button
-            type="button"
-            data-testid="open-estimate"
-            className="min-h-11 w-full rounded-lg border border-edge px-4 text-note text-ink"
-            onClick={() => setTool("estimate")}
-          >
-            {t("estimate.open")}
-          </button>
-          <p className="mt-1 text-center text-micro text-muted">{t("estimate.openHint")}</p>
-        </div>
-
-        {llm.data?.reachable ? (
-          <div className="mb-8 flex flex-wrap gap-3">
-            <button
-              type="button"
-              data-testid="open-text-entry"
-              className="min-h-11 flex-1 rounded-lg border border-edge px-4 text-note text-ink"
-              onClick={() => setTool("text")}
-            >
-              {t("llm.title")}
-            </button>
-            <button
-              type="button"
-              data-testid="open-recipe"
-              className="min-h-11 flex-1 rounded-lg border border-edge px-4 text-note text-ink"
-              onClick={() => setTool("recipe")}
-            >
-              {t("recipe.title")}
-            </button>
-          </div>
-        ) : null}
 
         {todayEntries.data && todayEntries.data.length > 0 ? (
-          <TodaySection entries={todayEntries.data} onSaved={announce} today={today} />
+          <TodaySection
+            entries={todayEntries.data}
+            onSaved={announce}
+            today={today}
+            onCopyToToday={isToday ? undefined : copyToToday}
+            onCopyDay={isToday ? undefined : copyDayToToday}
+            copyingDay={copyingDay}
+          />
         ) : null}
       </main>
 
@@ -553,6 +733,21 @@ export function FoodLog() {
         testId="text-entry-sheet"
       >
         <FoodTextEntry
+          localDate={today}
+          onLogged={(message) => {
+            announce(message);
+            setTool(null);
+          }}
+        />
+      </Sheet>
+
+      <Sheet
+        open={tool === "photo"}
+        onClose={() => setTool(null)}
+        title={t("photo.take")}
+        testId="photo-entry-sheet"
+      >
+        <FoodPhotoEntry
           localDate={today}
           onLogged={(message) => {
             announce(message);
@@ -646,7 +841,7 @@ function SearchBox({
       <button
         type="submit"
         data-testid="search-submit"
-        className="rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+        className="btn w-auto disabled:opacity-50"
         // Search runs on submit, never on keystrokes: the upstream budget is
         // ten searches a minute for the whole server (D30).
         disabled={query.trim().length < MIN_SEARCH_LENGTH}
@@ -670,13 +865,34 @@ function TodaySection({
   entries,
   today,
   onSaved,
+  onCopyToToday,
+  onCopyDay,
+  copyingDay = false,
 }: {
   entries: FoodEntry[];
   today: string;
   onSaved: (message: string) => void;
+  /**
+   * Copies one row onto the device's own today. **Undefined while viewing
+   * today**, which is what hides the action rather than a flag: offering to
+   * copy today's lunch to today is an action with no effect, and a control
+   * that does nothing is worse than one that is absent (D124).
+   */
+  onCopyToToday?: (entry: FoodEntry) => Promise<void>;
+  onCopyDay?: (entries: FoodEntry[]) => Promise<void>;
+  copyingDay?: boolean;
 }) {
   const createTemplate = useCreateTemplate();
   const deleteEntry = useDeleteFoodEntry();
+
+  /**
+   * One row open at a time (D125).
+   *
+   * Held here rather than in each row, because "one at a time" is a fact about
+   * the list and a row cannot know what its neighbours are doing. Opening the
+   * second closes the first without either row being told.
+   */
+  const [openId, setOpenId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -719,11 +935,32 @@ function TodaySection({
     <section aria-label={t("food.today")} className="border-t border-edge pt-6">
       <h2 className="mb-2 text-note text-muted">{t("food.today")}</h2>
 
+      {/*
+        The whole day at once, for somebody who ate the same as yesterday
+        (D124). Secondary, not primary: the screen's primary action is logging
+        something new, and this is a shortcut past that rather than the thing
+        the page is for.
+      */}
+      {onCopyDay && entries.length > 0 ? (
+        <button
+          type="button"
+          data-testid="copy-day-to-today"
+          className="btn-small mb-3"
+          disabled={copyingDay}
+          onClick={() => void onCopyDay(entries)}
+        >
+          {copyingDay ? t("food.copyingDay") : t("food.copyDayToToday")}
+        </button>
+      ) : null}
+
       <ul className="divide-y divide-edge border-y border-edge">
         {entries.map((entry) => (
           <EntryRow
             key={entry.id}
             entry={entry}
+            onCopyToToday={onCopyToToday}
+            open={openId === entry.id}
+            onToggleOpen={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
             selectable={saving}
             selected={selected.has(entry.id)}
             onToggle={() =>
@@ -792,6 +1029,9 @@ function EntryRow({
   selected,
   onToggle,
   onDelete,
+  onCopyToToday,
+  open,
+  onToggleOpen,
 }: {
   entry: FoodEntry;
   /** True while a meal is being assembled, when the row is a choice. */
@@ -799,7 +1039,13 @@ function EntryRow({
   selected: boolean;
   onToggle: () => void;
   onDelete: () => Promise<unknown>;
+  /** Present only on a past day. See `TodaySection` (D124). */
+  onCopyToToday?: (entry: FoodEntry) => Promise<void>;
+  /** Whether this row is the open one. The list owns that (D125). */
+  open: boolean;
+  onToggleOpen: () => void;
 }) {
+  const [copying, setCopying] = useState(false);
   const update = useUpdateFoodEntry();
   const [editing, setEditing] = useState(false);
   const [grams, setGrams] = useState(() => formatDecimal(entry.grams, { decimals: 0 }));
@@ -821,6 +1067,23 @@ function EntryRow({
     }
   }
 
+  /**
+   * An estimate, judged from `confidence` (D125).
+   *
+   * The entry carries no `isEstimate` of its own — that lives on the food item
+   * — but it does carry the confidence the figure was logged with, and the
+   * schema is explicit that anything below 1 marks a figure somebody estimated
+   * rather than looked up. Reading it here keeps one definition of "estimated"
+   * rather than inventing a second.
+   */
+  const estimated = entry.confidence < 1;
+
+  /** Where the numbers came from: a database row, or something typed. */
+  const source = entry.foodItemId === null ? t("food.sourceTyped") : t("food.sourceDatabase");
+
+  const macro = (grams: number | null) =>
+    grams === null ? t("stat.notYet") : `${formatDecimal(grams, { decimals: 0 })} g`;
+
   return (
     <li className="py-2.5">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-baseline gap-x-3">
@@ -837,57 +1100,153 @@ function EntryRow({
           <span />
         )}
 
-        <span className="min-w-0 truncate text-note text-ink">{entry.name}</span>
+        {/*
+          The name is the disclosure (D125). A whole row that expands would
+          fight the checkbox beside it while a meal is being assembled, so
+          while `selectable` the row keeps its one meaning and does not expand:
+          one tap, one thing, and the thing changes with the mode.
+        */}
+        {selectable ? (
+          <span className="min-w-0 truncate text-note text-ink">{entry.name}</span>
+        ) : (
+          <button
+            type="button"
+            data-testid={`expand-entry-${entry.id}`}
+            aria-expanded={open}
+            className="min-w-0 truncate text-left text-note text-ink"
+            onClick={onToggleOpen}
+          >
+            {entry.name}
+            {estimated ? <EstimateTag /> : null}
+          </button>
+        )}
 
         <span className="num shrink-0 whitespace-nowrap text-right text-micro text-muted">
           {formatDecimal(entry.grams, { decimals: 0 })} g · {formatKcal(entry.kcal)} kcal
         </span>
 
+        {/*
+          A chevron rather than the three controls that used to sit here. The
+          actions moved inside the disclosure, which is what stops a row of
+          four rows carrying twelve controls a thumb has to aim between.
+        */}
         <span className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            data-testid={`edit-entry-${entry.id}`}
-            className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
-            onClick={() => setEditing((was) => !was)}
-          >
-            {editing ? t("common.cancel") : t("common.edit")}
-          </button>
-          {/* On the screen where the entry is displayed, not in a settings page. */}
-          <DeleteButton
-            testId={`delete-entry-${entry.id}`}
-            label={`${entry.name}, ${formatKcal(entry.kcal)} kcal`}
-            onDelete={onDelete}
-          />
+          {selectable ? null : (
+            <span
+              aria-hidden="true"
+              className={`text-micro text-muted transition-transform ${open ? "rotate-180" : ""}`}
+            >
+              ▾
+            </span>
+          )}
         </span>
       </div>
 
-      {editing ? (
-        <form onSubmit={submit} className="mt-2 flex items-start gap-2">
-          <div className="relative w-32">
-            <input
-              className="field num pr-8"
-              type="text"
-              inputMode="decimal"
-              aria-label={t("food.grams")}
-              value={grams}
-              onChange={(event) => setGrams(event.target.value)}
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-note text-muted"
+      {open && !selectable ? (
+        <div data-testid={`entry-detail-${entry.id}`} className="mt-3 pl-1">
+          {/*
+            What is in the entry, which the collapsed line cannot carry and
+            which the reader otherwise has to take on trust. A macro the entry
+            does not have says "Inte än" rather than 0: absent is not zero
+            (D44), and a fibre figure nobody recorded is not a fibre figure of
+            zero.
+          */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-micro text-muted sm:grid-cols-4">
+            <div>
+              <dt>{t("macro.protein")}</dt>
+              <dd className="num text-ink">{macro(entry.proteinG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.carbs")}</dt>
+              <dd className="num text-ink">{macro(entry.carbsG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.fat")}</dt>
+              <dd className="num text-ink">{macro(entry.fatG)}</dd>
+            </div>
+            <div>
+              <dt>{t("macro.fiber")}</dt>
+              <dd className="num text-ink">{macro(entry.fiberG)}</dd>
+            </div>
+          </dl>
+
+          <p className="mt-2 text-micro text-muted">
+            {t("food.entryAmount", {
+              grams: formatDecimal(entry.grams, { decimals: 0 }),
+              kcal: formatKcal(entry.kcal),
+            })}
+            {" · "}
+            {source}
+            {entry.brand ? ` · ${entry.brand}` : ""}
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1">
+            {/*
+              The copy-forward action lives here too on a past day (D124), so
+              every action for this entry is in one place rather than split
+              between the line and the panel.
+            */}
+            {onCopyToToday ? (
+              <button
+                type="button"
+                data-testid={`copy-entry-${entry.id}`}
+                className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+                disabled={copying}
+                onClick={() => {
+                  setCopying(true);
+                  void onCopyToToday(entry).finally(() => setCopying(false));
+                }}
+              >
+                {t("food.copyToToday")}
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              data-testid={`edit-entry-${entry.id}`}
+              className="min-h-11 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
+              onClick={() => setEditing((was) => !was)}
             >
-              g
-            </span>
+              {editing ? t("common.cancel") : t("common.edit")}
+            </button>
+
+            {/* On the screen where the entry is displayed, not in a settings page. */}
+            <DeleteButton
+              testId={`delete-entry-${entry.id}`}
+              label={`${entry.name}, ${formatKcal(entry.kcal)} kcal`}
+              onDelete={onDelete}
+            />
           </div>
-          <button
-            type="submit"
-            data-testid={`save-entry-${entry.id}`}
-            className="btn-secondary w-auto px-4"
-            disabled={update.isPending}
-          >
-            {t("profile.save")}
-          </button>
-        </form>
+
+          {editing ? (
+            <form onSubmit={submit} className="mt-2 flex items-start gap-2">
+              <div className="relative w-32">
+                <input
+                  className="field num pr-8"
+                  type="text"
+                  inputMode="decimal"
+                  aria-label={t("food.grams")}
+                  value={grams}
+                  onChange={(event) => setGrams(event.target.value)}
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-note text-muted"
+                >
+                  g
+                </span>
+              </div>
+              <button
+                type="submit"
+                data-testid={`save-entry-${entry.id}`}
+                className="btn w-auto px-4"
+                disabled={update.isPending}
+              >
+                {t("profile.save")}
+              </button>
+            </form>
+          ) : null}
+        </div>
       ) : null}
 
       {error ? (
@@ -997,7 +1356,7 @@ function PortionSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-ink/40" aria-label={t("quick.cancel")} onClick={onClose} />
+      <button type="button" className="scrim absolute" aria-label={t("quick.cancel")} onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
@@ -1071,7 +1430,13 @@ function PortionSheet({
                   key={unit.unit}
                   type="button"
                   data-testid={`unit-${unit.unit}`}
-                  className="min-h-11 rounded-lg border border-edge px-3 text-note text-ink"
+                  /**
+                   * A choice in a set, not a button (D135). It says which
+                   * portion is currently in the grams field, so the colour is
+                   * never the only thing carrying that.
+                   */
+                  aria-pressed={grams === formatDecimal(unit.grams, { decimals: 0 })}
+                  className="chip"
                   onClick={() => setGrams(formatDecimal(unit.grams, { decimals: 0 }))}
                 >
                   {t("portion.oneIs", {
@@ -1115,7 +1480,7 @@ function PortionSheet({
               <button
                 type="button"
                 data-testid="save-portion"
-                className="min-h-11 shrink-0 rounded-lg border border-edge px-3 text-note text-ink disabled:opacity-50"
+                className="btn w-auto shrink-0 px-3"
                 disabled={unitName.trim().length === 0 || savePortion.isPending}
                 onClick={() => {
                   const parsed = readRequiredNumber(grams);
@@ -1256,7 +1621,7 @@ function TemplateRow({
           <button
             type="submit"
             data-testid={`save-template-${template.id}`}
-            className="btn-secondary w-auto px-4"
+            className="btn w-auto px-4"
             disabled={update.isPending}
           >
             {t("profile.save")}

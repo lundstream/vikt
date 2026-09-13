@@ -8,7 +8,7 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest",
     "invite": "tsx src/scripts/invite.ts",
     "db:generate": "drizzle-kit generate",
@@ -18,10 +18,13 @@
     "contract:food": "tsx src/scripts/contract-check.ts",
     "import:livsmedelsverket": "tsx src/scripts/import-livsmedelsverket.ts",
     "admin": "tsx src/scripts/make-admin.ts",
+    "vapid": "tsx src/scripts/vapid.ts",
+    "probe:vision": "tsx src/scripts/probe-vision.ts",
     "mail:worker": "tsx src/scripts/mail-worker.ts",
     "mail:samples": "tsx src/scripts/send-samples.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1130.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/helmet": "^13.0.1",
     "@fastify/proxy-addr": "^5.1.0",
@@ -34,11 +37,13 @@
     "nodemailer": "^10.0.0",
     "postgres": "^3.4.5",
     "shared": "workspace:*",
+    "web-push": "^3.6.7",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/nodemailer": "^8.0.1",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.30.1",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",

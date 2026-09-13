@@ -6,8 +6,11 @@ import {
   errorResponseSchema,
   foodEntryListSchema,
   llmHealthSchema,
+  parseFoodPhotoRequestSchema,
   parseFoodRequestSchema,
   parseFoodResponseSchema,
+  parsePhotoResponseSchema,
+  PHOTO_MAX_BASE64,
   recipeRequestSchema,
   recipeResponseSchema,
 } from "shared";
@@ -15,6 +18,7 @@ import {
   estimateDish,
   generateRecipe,
   llmHealth,
+  parseFoodPhoto,
   parseFoodText,
 } from "../services/llm.service.js";
 import { saveFoodEntry } from "../services/food.service.js";
@@ -42,7 +46,7 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
       preHandler: app.requireAuth,
       schema: { response: { 200: llmHealthSchema, 401: errorResponseSchema } },
     },
-    async () => llmHealth(app.config, app.llm),
+    async () => llmHealth(app.config, app.llm, app.db),
   );
 
   /**
@@ -65,6 +69,48 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) =>
       parseFoodText(request.userId!, app.db, app.config, app.llm, request.body.text),
+  );
+
+  /**
+   * A photograph of a plate, through the same path a sentence takes (D143).
+   *
+   * **The image is read and dropped.** Nothing on this path writes it: not to
+   * disk, not to a table, not to a log line, and the client does not put it in
+   * the offline queue. That is the condition under which photographing a meal
+   * is an acceptable thing to ask of somebody, and it is asserted by
+   * `photo-transport.test.ts` rather than left as an intention in a comment.
+   *
+   * Its own `bodyLimit`, because the server's default is one megabyte and a two
+   * megabyte image is nearly three megabytes of base64. The limit is set from
+   * the schema's own ceiling plus room for the envelope, so raising the ceiling
+   * cannot leave a body limit behind that silently refuses the images the
+   * schema now allows.
+   */
+  app.post(
+    "/llm/parse-photo",
+    {
+      preHandler: app.requireAuth,
+      bodyLimit: PHOTO_MAX_BASE64 + 4096,
+      schema: {
+        body: parseFoodPhotoRequestSchema,
+        response: { 200: parsePhotoResponseSchema, 401: errorResponseSchema },
+      },
+    },
+    async (request) =>
+      parseFoodPhoto(
+        request.userId!,
+        app.db,
+        app.config,
+        app.llm,
+        request.body,
+        /**
+         * The route's logger, not the request's. `request.log` carries the
+         * request context, which is the right default everywhere else and is
+         * beside the point here: what is wanted is one line saying a photo was
+         * parsed and how long it took.
+         */
+        app.log,
+      ),
   );
 
   /**
@@ -130,9 +176,14 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
    *
    * Ordinary food entries, through the ordinary service: same upsert, same
    * `client_uuid` idempotency, same macro snapshot. Nothing about an entry
-   * records that a model suggested it, because by this point a person has read
+   * records *which* path suggested it, because by this point a person has read
    * every row and changed the ones that were wrong — which makes it their
    * entry, not the model's.
+   *
+   * The one thing that does travel is `confidence`, and only downwards. A batch
+   * from a photograph is an estimate in D55's sense however carefully it was
+   * read, so it says so on the row rather than being indistinguishable from a
+   * weighed one (D143).
    */
   app.post(
     "/llm/parse-food/confirm",
@@ -149,7 +200,7 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const { localDate, mealSlot, items } = request.body;
+      const { localDate, mealSlot, items, confidence } = request.body;
 
       /**
        * An unmatched row must arrive with a value (D74).
@@ -190,7 +241,12 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
              * they deliberately kept as a note.
              */
             ...(item.foodItemId ? {} : { kcal: item.kcal ?? 0 }),
-            confidence: 1,
+            /**
+             * The batch's figure, which is 1 for everything but a photograph
+             * (D143). Lowered rather than excluded, per D55: the row is real,
+             * the database priced it, and what is less certain is the naming.
+             */
+            confidence,
             confirmed: true,
           }),
         );

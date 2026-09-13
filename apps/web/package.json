@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "check:placeholders": "node scripts/check-placeholders.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest"
   },
   "dependencies": {

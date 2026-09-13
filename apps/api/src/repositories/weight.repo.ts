@@ -112,6 +112,43 @@ export async function findWeightForDay(
   return row ?? null;
 }
 
+/** One reading by its own id, scoped by user like everything else (§3). */
+export async function findWeightById(
+  userId: string,
+  db: Db,
+  id: string,
+): Promise<WeightRow | null> {
+  const [row] = await db
+    .select()
+    .from(weightLog)
+    .where(and(eq(weightLog.userId, userId), eq(weightLog.id, id)))
+    .limit(1);
+
+  return row ?? null;
+}
+
+/** Changes a row in place, by id. Returns the row as it now stands. */
+export async function updateWeightRow(
+  userId: string,
+  db: Db,
+  id: string,
+  values: {
+    localDate: string;
+    weightKg: string;
+    bodyFatPct: string | null;
+    note: string | null;
+    loggedAt: Date;
+  },
+): Promise<WeightRow | null> {
+  const [row] = await db
+    .update(weightLog)
+    .set(values)
+    .where(and(eq(weightLog.userId, userId), eq(weightLog.id, id)))
+    .returning();
+
+  return row ?? null;
+}
+
 export async function listWeightEntries(
   userId: string,
   db: Db,

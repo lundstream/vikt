@@ -1,11 +1,8 @@
 import { useState, type FormEvent } from "react";
 import type { FoodMatch } from "shared";
-import { formatDecimal, formatKcal, formatPortion } from "shared";
-import { fieldAria } from "./Field.js";
 import { useConfirmParsedFood, useLlmHealth, useParseFood } from "../lib/food.js";
-import { clientUuid } from "../lib/uuid.js";
-import { readRequiredNumber } from "../lib/form-number.js";
 import { EstimateEntry } from "./EstimateEntry.js";
+import { ParsedProposal } from "./ParsedProposal.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -63,10 +60,6 @@ export function FoodTextEntry({
 
   const [text, setText] = useState("");
   const [proposal, setProposal] = useState<FoodMatch[] | null>(null);
-  const [grams, setGrams] = useState<Record<number, string>>({});
-  const [keep, setKeep] = useState<Set<number>>(new Set());
-  /** What the user says an unmatched row is worth, by row (D74). */
-  const [kcals, setKcals] = useState<Record<number, string>>({});
   const [note, setNote] = useState<string | null>(null);
   /**
    * What the app tried before giving up, which is what licenses an estimate.
@@ -112,66 +105,11 @@ export function FoodTextEntry({
     }
 
     setProposal(result.items);
-    setGrams(
-      Object.fromEntries(
-        result.items.map((item, index) => [
-          index,
-          formatDecimal(item.estimatedGrams, { decimals: 0 }),
-        ]),
-      ),
-    );
-    setKeep(new Set(result.items.map((_, index) => index)));
-    setKcals({});
-  }
-
-  async function save() {
-    if (!proposal) return;
-
-    const items = [];
-    for (const [index, item] of proposal.entries()) {
-      if (!keep.has(index)) continue;
-      const amount = readRequiredNumber(grams[index] ?? "");
-      if (!amount.ok) {
-        setNote(amount.message);
-        return;
-      }
-      /**
-       * An unmatched row cannot be saved without a value (D74). It used to be
-       * written as a zero, which made the day's intake silently low.
-       */
-      let kcal: number | null = null;
-      if (item.match === null) {
-        const typed = kcals[index] ?? "";
-        const value = readRequiredNumber(typed);
-        if (!value.ok) {
-          setNote(t("llm.needsValue", { name: item.name }));
-          return;
-        }
-        kcal = value.value;
-      }
-
-      items.push({
-        clientUuid: clientUuid(),
-        foodItemId: item.match?.foodItemId ?? null,
-        name: item.match?.name ?? item.name,
-        grams: amount.value,
-        ...(kcal === null ? {} : { kcal }),
-      });
-    }
-
-    if (items.length === 0) return;
-
-    await confirm.mutateAsync({ localDate, mealSlot: "snack", items });
-    reset();
-    onLogged(t("llm.logged", { count: items.length }));
   }
 
   function reset() {
     setText("");
     setProposal(null);
-    setGrams({});
-    setKeep(new Set());
-    setKcals({});
     setNote(null);
     setExhausted(null);
   }
@@ -191,7 +129,7 @@ export function FoodTextEntry({
         <button
           type="submit"
           data-testid="parse-food"
-          className="shrink-0 rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+          className="btn w-auto  disabled:opacity-50"
           disabled={text.trim().length < 2 || parse.isPending}
         >
           {parse.isPending ? t("llm.reading") : t("llm.read")}
@@ -205,147 +143,22 @@ export function FoodTextEntry({
       ) : null}
 
       {proposal ? (
-        <div className="panel mt-4" data-testid="parse-proposal">
-          <p className="max-w-prose text-micro text-muted">{t("llm.checkBeforeSaving")}</p>
-
-          <ul className="mt-3 space-y-3">
-            {proposal.map((item, index) => (
-              <li
-                key={`${item.name}-${index}`}
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3"
-              >
-                <input
-                  type="checkbox"
-                  className="check"
-                  checked={keep.has(index)}
-                  onChange={() =>
-                    setKeep((current) => {
-                      const next = new Set(current);
-                      if (next.has(index)) next.delete(index);
-                      else next.add(index);
-                      return next;
-                    })
-                  }
-                  aria-label={t("llm.include", { name: item.match?.name ?? item.name })}
-                />
-
-                <span className="min-w-0">
-                  <span className="block truncate text-note text-ink">
-                    {item.match?.name ?? item.name}
-                  </span>
-                  {/*
-                    Where both numbers came from. The portion is what the user
-                    said and is never a claim about mass; the grams beside it
-                    came from a hint or from a guess, and which one is stated
-                    rather than left to be inferred from confidence.
-                  */}
-                  <span className="num block text-micro text-muted">
-                    {item.portion ? `${formatPortion(item.portion)} · ` : ""}
-                    {item.portionSource === "estimate"
-                      ? t("portion.estimated")
-                      : t("portion.fromHint")}
-                  </span>
-                  <span className="num block text-micro text-muted">
-                    {item.match
-                      ? t("llm.matched", { kcal: formatKcal(item.match.kcal) })
-                      : t("llm.noMatch")}
-                  </span>
-                </span>
-
-                <span className="relative w-24">
-                  <input
-                    className="field num pr-7 text-right"
-                    type="text"
-                    inputMode="decimal"
-                    aria-label={t("food.grams")}
-                    value={grams[index] ?? ""}
-                    onChange={(event) =>
-                      setGrams((current) => ({ ...current, [index]: event.target.value }))
-                    }
-                    {...fieldAria(`llm-grams-${index}`, undefined)}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-micro text-muted"
-                  >
-                    g
-                  </span>
-                </span>
-
-                {/*
-                  A row the database could not price cannot be saved until it
-                  has a figure (D74). Two ways to give it one, because both are
-                  real answers: type what it was worth, or say it was nothing,
-                  which is what a pinch of salt actually is.
-                */}
-                {item.match === null && keep.has(index) ? (
-                  <span className="col-span-3 flex items-center gap-2 pl-8">
-                    <span className="relative w-28">
-                      <input
-                        className="field num pr-10 text-right"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0"
-                        aria-label={t("llm.valueFor", { name: item.name })}
-                        value={kcals[index] ?? ""}
-                        onChange={(event) =>
-                          setKcals((current) => ({ ...current, [index]: event.target.value }))
-                        }
-                        {...fieldAria(`llm-kcal-${index}`, undefined)}
-                      />
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-micro text-muted"
-                      >
-                        kcal
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      data-testid={`negligible-${index}`}
-                      className="min-h-11 px-1 text-micro text-muted underline underline-offset-4"
-                      onClick={() => setKcals((current) => ({ ...current, [index]: "0" }))}
-                    >
-                      {t("llm.negligible")}
-                    </button>
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              data-testid="confirm-parsed"
-              className="btn-secondary w-auto px-4"
-              onClick={() => void save()}
-              disabled={confirm.isPending || keep.size === 0}
-            >
-              {t("llm.saveRows", { count: keep.size })}
-            </button>
-            <button
-              type="button"
-              data-testid="reject-parse"
-              className="min-h-11 px-1 text-note text-muted underline underline-offset-4"
-              onClick={() => {
-                // Looking at the decomposition and saying no is D81's other
-                // condition. Recorded here, where it actually happened.
-                setProposal(null);
-                setExhausted("decomposed_rejected");
-              }}
-            >
-              {t("llm.notRight")}
-            </button>
-            <button
-              type="button"
-              className="min-h-11 px-1 text-note text-muted underline underline-offset-4"
-              onClick={reset}
-            >
-              {t("common.cancel")}
-            </button>
-          </div>
-        </div>
+        <ParsedProposal
+          items={proposal}
+          intro={t("llm.checkBeforeSaving")}
+          saving={confirm.isPending}
+          onConfirm={async (rows) => {
+            await confirm.mutateAsync({ localDate, mealSlot: "snack", items: rows });
+            onLogged(t("llm.logged", { count: rows.length }));
+          }}
+          onCancel={reset}
+          onReject={() => {
+            // Looking at the decomposition and saying no is D81's other
+            // condition. Recorded here, where it actually happened.
+            setProposal(null);
+            setExhausted("decomposed_rejected");
+          }}
+        />
       ) : null}
 
       {/*

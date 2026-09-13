@@ -148,6 +148,69 @@
       "when": 1788310150000,
       "tag": "0020_profile_theme",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788310160000,
+      "tag": "0021_request_mail",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788310170000,
+      "tag": "0022_backup_smb",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788310180000,
+      "tag": "0023_backup_s3",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788310190000,
+      "tag": "0024_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788310200000,
+      "tag": "0025_reminder_weekend",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788310201000,
+      "tag": "0026_habits",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788310202000,
+      "tag": "0027_coach",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788310203000,
+      "tag": "0028_coach_tone",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788310204000,
+      "tag": "0029_app_settings",
+      "breakpoints": true
     }
   ]
 }

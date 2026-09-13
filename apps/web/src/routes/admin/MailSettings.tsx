@@ -303,7 +303,7 @@ export function MailSettings() {
           <button
             type="submit"
             data-testid="save-mail-settings"
-            className="btn w-auto px-6"
+            className="btn-impact w-auto px-6"
             disabled={save.isPending}
           >
             {t("profile.save")}
@@ -317,7 +317,7 @@ export function MailSettings() {
           <button
             type="button"
             data-testid="send-test-mail"
-            className="btn-secondary w-auto px-6"
+            className="btn w-auto px-6"
             disabled={test.isPending || !settings}
             onClick={() => test.mutate()}
           >

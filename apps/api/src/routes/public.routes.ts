@@ -54,18 +54,22 @@ const acceptedSchema = z.object({ accepted: z.literal(true) });
 
 export const publicRoutes: FastifyPluginAsyncZod = async (app) => {
   /**
-   * The invite endpoint exists only where the landing page does (D94).
+   * The invite endpoint exists only where requests are accepted (D94, D127).
    *
    * Not registered rather than registered-and-refusing: an endpoint that
    * answers 403 is still an endpoint, still reachable, still something to
-   * rate-limit and reason about. A private install should not have a public
-   * write path at all, and the cleanest way to say that is for the route not
-   * to be there.
+   * rate-limit and reason about. An installation that does not take requests
+   * should not have a public write path at all, and the cleanest way to say
+   * that is for the route not to be there.
+   *
+   * It used to hang off `LANDING_ENABLED`. It hangs off `REQUEST_ENABLED` now,
+   * because serving a page to read and accepting a stranger's name and address
+   * are different decisions with different consequences (D127).
    *
    * Password reset is not gated: it is for people who already have accounts,
    * and it degrades on its own when mail is unconfigured.
    */
-  const landing = app.config.LANDING_ENABLED;
+  const requests = app.config.REQUEST_ENABLED;
 
   /**
    * "Send me a reset link."
@@ -151,7 +155,7 @@ export const publicRoutes: FastifyPluginAsyncZod = async (app) => {
    * work is on the side asking for something. Limited on its own counter, so
    * one honest attempt does not spend two of the five submissions an hour.
    */
-  if (landing) app.get(
+  if (requests) app.get(
     "/invite-requests/challenge",
     {
       schema: {
@@ -174,7 +178,7 @@ export const publicRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  if (landing) app.post(
+  if (requests) app.post(
     "/invite-requests",
     {
       schema: {
@@ -233,6 +237,7 @@ export const publicRoutes: FastifyPluginAsyncZod = async (app) => {
 
       await requestInvite(
         app.db,
+        app.config,
         request.body.email,
         request.body.name.trim(),
         request.body.reason?.trim() || null,

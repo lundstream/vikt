@@ -3,6 +3,11 @@ import { assertProdSecrets, describeModes, loadEnv } from "./env.js";
 import { buildApp } from "./app.js";
 import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
+import { startReminderScheduler } from "./lib/reminder-scheduler.js";
+import { startReviewScheduler } from "./lib/review-scheduler.js";
+import { checkVapidKey } from "./lib/vapid-watch.js";
+import { startVisionWatch } from "./lib/vision-watch.js";
+import { installBackupCrashGuard } from "./lib/backup-crash-guard.js";
 import { startMailDrainer } from "./mail/drainer.js";
 
 /**
@@ -43,10 +48,77 @@ if (imported === "imported") {
 await app.mailer.refresh();
 
 /**
+ * A backup destination must never take the API down (D132).
+ *
+ * Installed before the scheduler, because the scheduler is one of the two
+ * things that can reach a socket client that throws outside a promise chain.
+ * The other is the admin's "test connection" button, which is how this was
+ * found: it exited the process.
+ */
+installBackupCrashGuard(app);
+
+/**
  * The backup schedule (D103), which D96 wrote as a cron line and nobody ever
  * installed. In the process, so it starts when the process does.
  */
 startBackupScheduler(app);
+
+/**
+ * The reminder tick (D136), which does not start without VAPID keys and says
+ * so once when it does not. Same single-instance limit as the mail drainer:
+ * two API processes would sweep twice, though the unique index on
+ * `reminder_sends` means they still could not send twice.
+ */
+startReminderScheduler(app);
+startReviewScheduler(app);
+
+/**
+ * Whether the VAPID pair is the one this installation's subscriptions were made
+ * with (D136, amended).
+ *
+ * Not awaited and never fatal: it is a line in the log, and a database that is
+ * slow to answer at boot must not hold up the server that is about to serve
+ * from it. A failure here is logged and forgotten, because the alternative —
+ * refusing to boot over a diagnostic — is worse than the diagnostic missing.
+ */
+void checkVapidKey(app.db, env)
+  .then((check) => {
+    if (check.status === "first") {
+      app.log.info("noted this installation's VAPID public key");
+      return;
+    }
+
+    if (check.status !== "changed") return;
+
+    if (check.subscriptions === 0) {
+      app.log.info("the VAPID public key changed; no subscriptions existed to be affected");
+      return;
+    }
+
+    app.log.warn(
+      { subscriptions: check.subscriptions },
+      "the VAPID public key changed since the last boot. Every existing push " +
+        "subscription is bound to the previous pair and will answer 403 until its " +
+        "owner turns reminders off and on again. Nothing has been deleted",
+    );
+  })
+  .catch((error: unknown) => {
+    app.log.error({ err: error }, "could not check the VAPID key");
+  });
+
+/**
+ * Whether the configured vision model actually looks at images (D143).
+ *
+ * Same shape as the VAPID check above and for the same reasons: not awaited,
+ * never fatal, and a line in the log rather than a refusal. What it decides is
+ * whether the photo quick action exists at all, so the failure mode of getting
+ * no answer is a feature that is absent rather than one that is broken.
+ *
+ * While the workstation is unreachable it asks again every hour, silently. That
+ * is the ordinary state of this installation — the box is somebody's desktop —
+ * and an hourly log line about it would be noise about nothing.
+ */
+startVisionWatch(app.db, env, app.llm, app.log);
 
 /**
  * The mail drainer (D104), which D88 made a separate process and nothing ever

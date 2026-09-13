@@ -14,7 +14,20 @@ import { useTestApp } from "./harness.js";
  */
 
 function stubLlm(reply: ChatResult): LlmClient {
-  return { enabled: true, chat: async () => reply, reachable: async () => true };
+  return {
+    enabled: true,
+    chat: async () => reply,
+    /**
+     * The coach's path (D139). These suites do not use it; it answers with the
+     * same reply in one chunk so the stub stays a complete `LlmClient`.
+     */
+    chatStream: async (_options, onDelta) => {
+      const result = reply;
+      if (result.ok) onDelta(result.content);
+      return result;
+    },
+    reachable: async () => true,
+  };
 }
 
 const says = (body: unknown): ChatResult => ({

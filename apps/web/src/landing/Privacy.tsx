@@ -31,11 +31,11 @@ import { operatorName, siteConfig } from "../lib/site-config.js";
 
 
 export function Privacy() {
-  const { contact } = siteConfig();
+  const { contact, repo } = siteConfig();
   const operator = operatorName();
 
   return (
-    <PageShell title="Integritet" updated="6 september 2026">
+    <PageShell title="Integritet" updated="11 september 2026">
       <Section title="Vem som ansvarar">
         <P>
           Den här installationen drivs av {operator}.{" "}
@@ -44,8 +44,35 @@ export function Privacy() {
           supportavdelning, så svaret kommer när det kommer, men det kommer.
         </P>
         <P>
-          Kör du din egen installation ansvarar du för den. Källkoden är öppen, och en självhostad Vikt skickar ingenting till den
+          Kör du din egen installation ansvarar du för den. En självhostad Vikt skickar ingenting till den
           som skrev den eller till någon annan.
+        </P>
+        <P>
+          Källkoden är öppen och finns att hämta. Vikt är licensierad under{" "}
+          <a
+            className="underline underline-offset-4 hover:text-ink"
+            href="https://www.gnu.org/licenses/agpl-3.0.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            AGPL-3.0
+          </a>
+          , som ger dig rätt att läsa, ändra och köra din egen kopia.{" "}
+          {repo === "" ? null : (
+            <>
+              Koden till den här installationen finns på{" "}
+              <a
+                className="underline underline-offset-4 hover:text-ink"
+                href={repo}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {repo.replace(/^https?:\/\//, "")}
+              </a>
+              .{" "}
+            </>
+          )}
+          Versionen som körs står längst ner under Inställningar, inne i appen.
         </P>
       </Section>
 
@@ -61,9 +88,17 @@ export function Privacy() {
           några.
         </P>
         <P>
-          Sådant som hör till driften. Inloggningar med tidpunkt, kön av utgående mejl, och din förfrågan om en
-          inbjudningskod tills den är besvarad. Förfrågan innehåller namnet och adressen du
-          skrev och raden om varför, om du skrev en.
+          Sådant som hör till driften. Inloggningar med tidpunkt, kön av utgående mejl, och en
+          förfrågan om en inbjudningskod tills den är besvarad. Förfrågan
+          innehåller namnet och adressen som skrevs och raden om varför, om det
+          skrevs en.
+        </P>
+        <P>
+          Om den här installationen tar emot förfrågningar alls. Formuläret ligger
+          på en egen adress som inget länkar till, och den kan vara avstängd. Är den
+          avstängd finns varken sidan eller det den skickar till, och då lagras
+          ingen förfrågan här över huvud taget. Registrering sker med kod hur som
+          helst.
         </P>
         <P>
           Aviseringar. Vilka meddelanden i appen du har läst, och om du vill ha nyhetsmejl.
@@ -71,8 +106,37 @@ export function Privacy() {
           använder.
         </P>
         <P>
-          Om coachen slås på. Då sparas också dina samtal med den, per konto. Den funktionen finns inte
-          än, och den här sidan skrivs om när den kommer.
+          Dina vanor, om du skriver några. Checklistan på Dagen är dina egna ord, och de kan
+          beskriva hälsa: "ta tabletten" är ett läkemedelsschema. De lagras som allt annat
+          här, de visas aldrig för någon annan och de följer med i exporten. Du kan ta bort
+          en vana och behålla dagarna du bockat av, eller ta bort båda, och allt försvinner
+          om du raderar kontot.
+        </P>
+        <P>
+          Påminnelser, om du slår på dem. Då sparas en prenumeration per enhet: adressen
+          till din webbläsares push-tjänst och två nycklar som notisen krypteras med. Du
+          ser dina enheter under Inställningar och kan ta bort vilken som helst därifrån,
+          även en telefon du inte har kvar.
+        </P>
+        <P>
+          Vad push-tjänsten ser. Notisen går via din webbläsares egen tjänst, alltså
+          Google för Chrome och Apple för Safari. Den ser att ett meddelande skickades till
+          din enhet och när. Innehållet är krypterat till nycklar bara din webbläsare har,
+          så vad påminnelsen säger går inte att läsa där.
+        </P>
+        <P>
+          Dina samtal med coachen, om AI-lagret är på. Varje fråga du ställer och varje svar sparas på ditt konto, med
+          tidpunkt. De visas bara för dig, de används inte för att träna någon modell,
+          de är inte underlag till någon uträkning i appen och de läses inte av
+          veckosammanfattningen. Du kan ta bort ett samtal i taget eller allihop på en
+          gång, under Coach, och de följer med i exporten.
+        </P>
+        <P>
+          Vad coachen får se om dig. Inte dina rader. Den får en sammanställning av sådant appen redan räknat
+          fram: trendvikt, underhållsnivå, planens mål och spärrar, hur många dagar du
+          loggat, makromål mot veckosnitt, aktiva milstolpar, streck och vad som står
+          på vanelistan. Ingen enskild måltid, ingen enskild vägning och ingen
+          anteckning skickas dit.
         </P>
       </Section>
 
@@ -89,7 +153,7 @@ export function Privacy() {
         </P>
         <P>
           Ingen profilering, ingen försäljning, ingen annonsering. Din data jämförs aldrig med någon annans. Gruppfunktioner visar bara om
-          någon har loggat, aldrig vad.
+          någon har loggat, aldrig vad, och aldrig vilka vanor du har på din lista.
         </P>
       </Section>
 
@@ -107,7 +171,17 @@ export function Privacy() {
         </P>
         <P>
           Slår du på AI-lagret kör det där du pekar det. Det är avstängt som standard, och när det är på går texten till den
-          maskin du själv anger, inte till någon molntjänst.
+          maskin du själv anger, inte till någon molntjänst. Det gäller både maten du
+          skriver in i fritext och frågorna du ställer till coachen.
+        </P>
+        <P>
+          Fotograferar du maten behandlas bilden, men sparas inte. Den förminskas i telefonen, som samtidigt tar bort
+          platsen, tidpunkten och telefonmodellen som kameran lagt i filen. Sedan
+          skickas den till samma maskin som resten av AI-lagret, läses en gång och
+          kastas. Den skrivs inte till disk, inte till databasen, inte till loggen och
+          inte till kön för sådant som väntar på nätverk. Går det inte att skicka är
+          bilden borta och du får ta en ny. Det som kan sparas är raderna du själv
+          godkänner, alltså livsmedlets namn och mängden.
         </P>
         <P>
           Kontrollen på formuläret är ingen tredje part. Den ber din webbläsare räkna ut ett tal, och svaret
@@ -127,7 +201,7 @@ export function Privacy() {
           krypterade.
         </P>
         <P>
-          Nekas din förfrågan om kod raderas raden. Ingen kopia sparas, och inget mejl skickas. Det gäller namnet lika mycket som adressen.
+          Nekas en förfrågan om kod raderas raden. Ingen kopia sparas, och inget mejl skickas. Det gäller namnet lika mycket som adressen.
         </P>
       </Section>
 

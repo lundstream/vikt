@@ -28,7 +28,20 @@
 
 import type { Env } from "../env.js";
 
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+  /**
+   * Base64 images, which Ollama's native endpoint takes **on the message**
+   * rather than as a request option (D143).
+   *
+   * Optional and unset everywhere but the photo path. It is worth knowing that
+   * this field passing validation proves nothing: four models on this host
+   * advertise a `vision` capability, and one of them accepts the field and
+   * answers that no image was attached. See `docs/measurements.md`.
+   */
+  images?: string[];
+};
 
 export type ChatOk = { ok: true; content: string; model: string; ms: number };
 
@@ -60,6 +73,16 @@ export type ChatOptions = {
 export type LlmClient = {
   enabled: boolean;
   chat(options: ChatOptions): Promise<ChatResult>;
+  /**
+   * The same call, delivered as it is generated (D139).
+   *
+   * Only the coach uses this. Everything else in this layer parses what comes
+   * back, and half a JSON object is not a parseable thing; a conversation is
+   * the one surface where the first sentence is worth having before the last
+   * one exists. `onDelta` is called with each chunk of text, and the promise
+   * still resolves with the whole reply, so a caller that needs both gets both.
+   */
+  chatStream(options: ChatOptions, onDelta: (text: string) => void): Promise<ChatResult>;
   /** Whether the host answered recently. Cached; see `health.ts`. */
   reachable(): Promise<boolean>;
 };
@@ -153,7 +176,129 @@ export function createLlmClient(env: Env, fetchImpl: typeof fetch = fetch): LlmC
         return { ok: false, reason: "failed", detail: body.error.slice(0, 300) };
       }
 
-      const content = body.message?.content ?? "";
+      /**
+       * The answer, wherever Ollama decided to put it (D143).
+       *
+       * `qwen3-vl:8b` with a `format` constraint returns an **empty `content`
+       * and the whole JSON object in `thinking`** — reproducibly, for every
+       * photograph tried, with `think: false` set and honoured (27 eval tokens,
+       * no reasoning prose, 300 to 1100 ms). Drop the constraint and it behaves
+       * normally and reasons for 18 seconds instead.
+       *
+       * So this is not a model that reasons in secret; it is Ollama labelling
+       * one field as the other for this build, which is the same shape as D71's
+       * finding about `/v1/` ignoring `think`. The fallback costs nothing —
+       * `content` is only empty when the call had already failed — and it is a
+       * fallback rather than a preference, so a model that answers properly is
+       * unaffected.
+       */
+      const content = body.message?.content?.trim()
+        ? body.message.content
+        : (body.message?.thinking ?? "");
+
+      if (content.trim() === "") {
+        return { ok: false, reason: "failed", detail: "empty response" };
+      }
+
+      return { ok: true, content, model: options.model, ms: Date.now() - started };
+    },
+
+    /**
+     * Streaming, over the same native endpoint.
+     *
+     * Ollama answers `stream: true` with newline-delimited JSON, one object per
+     * chunk, and the last one carries `done`. Parsed line by line off the body
+     * rather than buffered, which is the entire point: a reply that takes eight
+     * seconds should start arriving after one.
+     *
+     * Failures are the same discriminated union as `chat`, because the caller's
+     * handling of "the box is off" must not depend on which method it used.
+     */
+    async chatStream(
+      options: ChatOptions,
+      onDelta: (text: string) => void,
+    ): Promise<ChatResult> {
+      if (!enabled) return { ok: false, reason: "disabled" };
+
+      const started = Date.now();
+      const signal = AbortSignal.timeout(options.timeoutMs);
+
+      let response: Response;
+      try {
+        response = await fetchImpl(`${base}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: options.model,
+            messages: options.messages,
+            stream: true,
+            think: false,
+            options: { temperature: options.temperature ?? 0 },
+          }),
+          signal,
+        });
+      } catch (error) {
+        const name = (error as Error).name;
+        if (name === "TimeoutError" || name === "AbortError") {
+          return { ok: false, reason: "timeout" };
+        }
+        return { ok: false, reason: "unreachable", detail: (error as Error).message.slice(0, 200) };
+      }
+
+      if (!response.ok || response.body === null) {
+        return {
+          ok: false,
+          reason: "failed",
+          detail: `${response.status} ${await response.text().catch(() => "")}`.slice(0, 300),
+        };
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffered = "";
+      let content = "";
+
+      const consume = (line: string) => {
+        const trimmed = line.trim();
+        if (trimmed === "") return;
+
+        let parsed: OllamaChatResponse & { done?: boolean };
+        try {
+          parsed = JSON.parse(trimmed) as OllamaChatResponse & { done?: boolean };
+        } catch {
+          // A half-written line from a chunk boundary. It arrives complete on
+          // the next read, so dropping it here would lose text; it cannot,
+          // because only whole lines are passed to this function.
+          return;
+        }
+
+        const delta = parsed.message?.content ?? "";
+        if (delta === "") return;
+        content += delta;
+        onDelta(delta);
+      };
+
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffered += decoder.decode(value, { stream: true });
+          const lines = buffered.split(String.fromCharCode(10));
+          // The last element is whatever came after the final newline, which is
+          // either empty or the start of the next object.
+          buffered = lines.pop() ?? "";
+          for (const line of lines) consume(line);
+        }
+        consume(buffered);
+      } catch (error) {
+        const name = (error as Error).name;
+        if (name === "TimeoutError" || name === "AbortError") {
+          return { ok: false, reason: "timeout" };
+        }
+        return { ok: false, reason: "unreachable", detail: (error as Error).message.slice(0, 200) };
+      }
+
       if (content.trim() === "") {
         return { ok: false, reason: "failed", detail: "empty response" };
       }

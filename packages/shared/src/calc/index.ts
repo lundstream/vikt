@@ -13,6 +13,7 @@
  *   correlate.ts      pairing for the scatter view, no statistic (D34)
  *   savings.ts  §4.5  pot balance, accrued on read         — done, phase 5
  *   streak.ts   §4.6  logging streaks, days since a drink  — done, phase 5
+ *   habit-streak.ts   one habit's chain, ticked/missed/unknown (D137)
  *   milestone.ts      detection on the trend, never raw    — done, phase 5
  *   macros.ts         macro targets from NNR 2023, derived (D52)
  *   bmi.ts            BMI from the trend weight, never a raw reading
@@ -28,6 +29,7 @@ export * from "./activity.js";
 export * from "./correlate.js";
 export * from "./savings.js";
 export * from "./streak.js";
+export * from "./habit-streak.js";
 export * from "./milestone.js";
 export * from "./macros.js";
 export * from "./bmi.js";

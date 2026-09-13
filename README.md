@@ -99,6 +99,25 @@ Optional:
   and approving an invite shows you the code to pass on by hand.
 - `OLLAMA_URL` enables the LLM layer. Empty means off, and the controls that
   depend on it are simply not rendered.
+- `LLM_VISION_MODEL` names the model that gets sent photographs of food (D143).
+  Empty means the photo quick action does not exist. **There is no default and
+  you should not guess one**: Ollama reports a `vision` capability for models
+  that accept an image and then answer as though nothing was attached, which is
+  a failure nothing in the app can detect from the flag. Find a tag that works
+  first:
+
+  ```sh
+  pnpm --filter api probe:vision --selftest              # does any model look?
+  pnpm --filter api probe:vision plate.jpg qwen3-vl:8b   # what does it see?
+  ```
+
+  The self-test sends a generated picture with known contents and prints SEES or
+  DOES NOT SEE; the second form sends a real photograph and prints the answer
+  with the time it took. Both print what Ollama had resident before and after,
+  which is how `docs/measurements.md` knows that a photograph evicts the coach
+  model on this box and not the text one. The API runs the same self-test at
+  boot and hides the surface when it fails, so the probe is for choosing a tag
+  before you configure it.
 
 ## Checks
 
@@ -107,6 +126,7 @@ pnpm typecheck
 pnpm lint          # includes the multi-user isolation rule, see D15
 pnpm test
 pnpm --filter api contract:food   # hits the live food APIs; needs the network
+pnpm --filter api probe:vision --selftest   # can a model on OLLAMA_URL see?
 ```
 
 The first two also run as a pre-commit hook, installed by `pnpm install`. All of
@@ -143,10 +163,33 @@ Two routes, same three containers:
   stack environment variable, because that is the form a container-management UI
   gives you.
 
-`CONTACT_EMAIL` is required wherever `LANDING_ENABLED` is true: `/integritet`
-has to name somebody the reader can write to about their own data, and the API
-refuses to boot without it. Whoever deploys Vikt is the controller under the
-GDPR, not whoever wrote it, so that address cannot live in this repository.
+### Deployment modes
+
+Each is off by default, each is an environment variable, and none of them can be
+changed from the admin UI: a toggle in a web interface that exposes a public
+endpoint is an attack surface, and a self-hoster edits the file once.
+
+| Mode | On means | Off means |
+|---|---|---|
+| `LANDING_ENABLED` | The public landing page is served at `/`. | `/` redirects to `/app` and the landing bundle is never served. |
+| `REQUEST_ENABLED` | The request form is served at `/kod` and the endpoint it posts to is registered. | Both are 404: the path does not exist and neither does the route. |
+| `LLM_ENABLED` | The phase 8 surfaces exist. Needs `OLLAMA_URL`. | They are absent, not greyed out. |
+| `LLM_VISION_MODEL` | Photographing a meal is offered, once the boot check has seen that tag describe a picture. | The photo quick action is absent. So is it when the check has not run, could not reach the box, or found a model that does not look. |
+
+**`REQUEST_ENABLED` is separate from `LANDING_ENABLED` on purpose** (D127). A
+landing page is something to read. A request form takes a stranger's name and
+address, and every code you approve makes you responsible for that person's
+weight, meals and address, under your own name on `/integritet`. Those are two
+different decisions and the common answer is yes to the first and no to the
+second. Nothing links to `/kod` even when it is on: turning it on means handing
+the address to somebody, not publishing it. The form keeps its human check, its
+honeypot and its rate limit either way.
+
+`CONTACT_EMAIL` is required wherever either of those first two is true:
+`/integritet` has to name somebody the reader can write to about their own data,
+and the API refuses to boot without it. Whoever deploys Vikt is the controller
+under the GDPR, not whoever wrote it, so that address cannot live in this
+repository.
 
 `.github/workflows/release.yml` builds and pushes both images on every push to
 `main` that touches code.
@@ -181,6 +224,38 @@ Back up nightly, and check that the backups restore:
 infra/backup.sh                                    # from cron
 infra/restore-check.sh /var/backups/vikt/<file>    # safe on the live host
 ```
+
+The app also runs its own scheduled backup, configured under Administration,
+Backup. It writes either to a **directory** or to an **S3-compatible bucket**
+— AWS, Backblaze B2, MinIO, or the S3 endpoint most NAS boxes now ship — with
+the access key and secret stored encrypted under `SECRET_KEY`. The dump is
+encrypted before it leaves the process either way, so what reaches the
+destination cannot be read without that key.
+
+**To back up to a Windows share, mount it on the host and use a directory
+destination.** Writing SMB directly is not supported: both Node SMB clients
+authenticate with NTLMv1, which current Samba and Windows refuse by default, and
+hand-writing NTLMv2 is authentication code whose errors are silent (D132, D133).
+Mounting inside the container is not the answer either, because `mount -t cifs`
+needs `CAP_SYS_ADMIN`, which is most of the way to root on the host.
+
+Mount it on the host, then bind-mount the directory into the API container:
+
+```sh
+# /etc/fstab on the Docker host
+//nas.local/backup  /mnt/vikt-backup  cifs  credentials=/root/.smb-vikt,uid=1000,gid=1000,_netdev  0  0
+```
+
+```yaml
+# infra/docker-compose.yml, the api service
+    volumes:
+      - /mnt/vikt-backup:/backups
+```
+
+Then set the destination to `/backups` under Administration, Backup, and press
+**Testa anslutningen**: it writes a small file and deletes it again, which is
+the only way to find out that the path is writable by the container's user
+before the first scheduled run.
 
 See [docs/backup.md](docs/backup.md) for where they go, how long they are kept,
 and the step-by-step restore. A backup that has never been restored is a hope.

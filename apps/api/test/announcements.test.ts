@@ -302,3 +302,109 @@ describe("the admin endpoints", () => {
     expect(actions).toContain("announcement.delete");
   });
 });
+
+/**
+ * A formatted announcement, in the mail (D128).
+ *
+ * Both parts, from one body. D88's rule that the plain-text part is the message
+ * survives the formatting: the text part is still written first and still says
+ * everything the HTML does, including where the links go.
+ */
+describe("mailing a formatted announcement", () => {
+  const ctx = useTestApp();
+
+  const BODY = [
+    "## Vad som är nytt",
+    "",
+    "Första stycket.",
+    "",
+    "Andra stycket med **fetstil** och [en länk](https://example.test).",
+    "",
+    "- ett",
+    "- två",
+  ].join("\n");
+
+  async function mailed() {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, user.userId));
+    const actor = { id: user.userId, email: user.email };
+
+    const created = await createAnnouncement(db, actor, {
+      kind: "news",
+      startsAt: null,
+      endsAt: null,
+      leadMinutes: 0,
+      title: "Ny skärm",
+      body: BODY,
+      published: true,
+      sendMail: true,
+    });
+
+    await mailAnnouncement(db, created.id);
+    const [row] = await db.select().from(outboundEmail);
+    return row!;
+  }
+
+  it("renders two paragraphs as two paragraphs in the HTML part", async () => {
+    const { bodyHtml } = await mailed();
+
+    expect(bodyHtml!.match(/<p /g)).toHaveLength(2);
+    expect(bodyHtml).toContain("<h2 ");
+    expect(bodyHtml!.match(/<li>/g)).toHaveLength(2);
+    expect(bodyHtml).toContain("<strong>fetstil</strong>");
+
+    // The title is a heading rather than the first paragraph of the body.
+    expect(bodyHtml).toContain(">Ny skärm</h1>");
+
+    // And the chrome is still the light template: wordmark, rule, footer.
+    expect(bodyHtml).toContain("Vikt</span>");
+    expect(bodyHtml).toContain("inga bilder eller spårning");
+  });
+
+  it("renders two paragraphs as two paragraphs in the text part", async () => {
+    const { bodyText } = await mailed();
+    const paragraphs = bodyText.trim().split("\n\n");
+
+    // Title, heading, paragraph, paragraph, list.
+    expect(paragraphs).toHaveLength(5);
+    expect(paragraphs[0]).toBe("Ny skärm");
+    expect(paragraphs[1]).toBe("Vad som är nytt");
+    expect(paragraphs[4]).toBe("- ett\n- två");
+
+    // A text part that says "en länk" with nowhere to go is worse than a URL.
+    expect(bodyText).toContain("en länk (https://example.test)");
+
+    // No marks left in it. A text part full of asterisks is a formatter
+    // leaking into the one rendering that has no formatting.
+    expect(bodyText).not.toContain("**");
+    expect(bodyText).not.toContain("## ");
+  });
+
+  /** Markup an admin typed is characters in both parts, never elements. */
+  it("carries no markup out of the body", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, user.userId));
+    const actor = { id: user.userId, email: user.email };
+
+    const created = await createAnnouncement(db, actor, {
+      kind: "news",
+      startsAt: null,
+      endsAt: null,
+      leadMinutes: 0,
+      title: "Hej <b>du</b>",
+      body: "Hej <script>alert(1)</script>.",
+      published: true,
+      sendMail: true,
+    });
+
+    await mailAnnouncement(db, created.id);
+    const [row] = await db.select().from(outboundEmail);
+
+    expect(row!.bodyHtml).not.toContain("<script>");
+    expect(row!.bodyHtml).toContain("&lt;script&gt;");
+    // The title too: it is an admin field like any other.
+    expect(row!.bodyHtml).toContain("&lt;b&gt;du&lt;/b&gt;");
+  });
+});

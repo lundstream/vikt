@@ -70,7 +70,7 @@ async function post(app: FastifyInstance, altcha: string, email = "hopeful@examp
 }
 
 describe("the invite form's human check", () => {
-  const ctx = useTestApp({ LANDING_ENABLED: true });
+  const ctx = useTestApp({ REQUEST_ENABLED: true });
 
   it("issues a challenge a browser can actually solve", async () => {
     const { app } = ctx();

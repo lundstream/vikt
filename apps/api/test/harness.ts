@@ -49,6 +49,14 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     // Modes off by default in tests, so a test that forgets to turn one on
     // exercises the degraded path a fresh self-hosted install actually has.
     LANDING_ENABLED: false,
+    REQUEST_ENABLED: false,
+    /**
+     * Push off by default, like every other mode: a test that forgets to turn
+     * it on exercises the absent path a fresh install actually has (D136).
+     */
+    VAPID_PUBLIC_KEY: "",
+    VAPID_PRIVATE_KEY: "",
+    VAPID_SUBJECT: "",
     // The drainer is not started in tests: a background timer writing to a
     // rolled-back transaction is a race with no upside (D104).
     MAIL_WORKER_IN_PROCESS: false,
@@ -76,7 +84,13 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     OLLAMA_URL: "",
     OLLAMA_MODEL_SMALL: "gemma4:e4b",
     OLLAMA_MODEL_LARGE: "qwen3.6:27b",
+    /**
+     * Empty, like every other mode, so a test that forgets to name a vision
+     * model exercises the absent path a fresh install actually has (D143).
+     */
+    LLM_VISION_MODEL: "",
     OLLAMA_TIMEOUT_MS: 20000,
+    OLLAMA_VISION_TIMEOUT_MS: 60000,
     OLLAMA_JOB_TIMEOUT_MS: 180000,
     LOG_LEVEL: "silent" as Env["LOG_LEVEL"],
     corsOrigins: [],

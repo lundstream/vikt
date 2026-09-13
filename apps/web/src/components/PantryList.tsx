@@ -91,7 +91,7 @@ export function PantryList() {
         <button
           type="submit"
           data-testid="add-staple"
-          className="shrink-0 rounded-lg border border-edge px-4 text-note text-ink disabled:opacity-50"
+          className="btn w-auto  disabled:opacity-50"
           disabled={name.trim().length === 0 || add.isPending}
         >
           {t("pantry.add")}

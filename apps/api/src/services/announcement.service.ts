@@ -2,7 +2,8 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { adminLog, announcementSeen, announcements, profiles, users } from "../db/schema.js";
 import { queueMail } from "../mail/queue.js";
-import { wrap } from "../mail/templates.js";
+import { markdownToHtml, markdownToText } from "shared";
+import { ANNOUNCEMENT_STYLE, escapeHtml, shell } from "../mail/templates.js";
 
 /**
  * Announcements (D108).
@@ -164,7 +165,17 @@ export async function mailAnnouncement(
     );
 
   const subject = row.title;
-  const text = `${row.title}\n\n${bodyFor(row)}\n`;
+
+  /**
+   * Three renderings of one body (D128).
+   *
+   * The plain-text part is still the message and is still written first: D88's
+   * rule survives the formatting. What changed is that the body is a small
+   * Markdown subset now, so the text part flattens it and the HTML part lays it
+   * out, from the same parse. Neither renders the other's output.
+   */
+  const body = bodyFor(row);
+  const text = `${row.title}\n\n${markdownToText(body)}\n`;
 
   for (const recipient of recipients) {
     await queueMail(db, recipient.email, {
@@ -173,7 +184,7 @@ export async function mailAnnouncement(
       text,
       // Plain text only. An announcement is a sentence, and D88's rule about no
       // images and no tracking applies here more than anywhere.
-      html: htmlFor(text),
+      html: htmlFor(row.title, body),
     });
   }
 
@@ -286,9 +297,20 @@ export function defaultMaintenanceBody(parts: {
   );
 }
 
-/** Wraps the plain text, the same way every other template does. */
-function htmlFor(text: string): string {
-  return wrap(text);
+/**
+ * The title as a heading, then the body's blocks, inside the shared chrome.
+ *
+ * The title used to arrive as the first paragraph of the text, which made it
+ * indistinguishable from the sentence under it. It is a heading, so it is set
+ * as one, and `escapeHtml` runs over it for the same reason it runs over
+ * everything else: an announcement title is an admin field.
+ */
+function htmlFor(title: string, body: string): string {
+  const heading =
+    `<h1 style="${ANNOUNCEMENT_STYLE.heading};margin-top:0;font-size:19px">` +
+    `${escapeHtml(title)}</h1>`;
+
+  return shell(heading + markdownToHtml(body, ANNOUNCEMENT_STYLE));
 }
 
 /** The stored body, or nothing. The default is rendered client-side, in the reader's zone. */

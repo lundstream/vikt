@@ -245,14 +245,96 @@
   }
 
   /**
-   * The quieter sibling, for a second action on a screen that already has a
-   * primary one: "add an activity" beside "save the day". Same height, so the
-   * two line up and both clear a thumb.
+   * A small filled button, for an action inside a row (D134).
+   *
+   * Same colour and same shape as `.btn`, at the size a row can hold. "Köpte
+   * ändå" on a savings offset, "logga i dag" on a past entry: these are
+   * actions, they change data, and the outline style used to be how they were
+   * made quiet enough to sit in a list. Quiet is what a **link** is for; an
+   * action that writes something is filled, and if it needs to be smaller then
+   * it is smaller.
+   *
+   * `w-auto` rather than `w-full`, because a row action sits beside its row
+   * rather than under it.
    */
-  .btn-secondary {
-    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg border
-           border-edge bg-transparent px-4 py-2.5 text-body font-medium text-ink
-           transition-colors hover:border-muted
+  .btn-small {
+    @apply inline-flex min-h-9 w-auto items-center justify-center rounded-md bg-ink
+           px-3 py-1.5 text-micro font-medium text-paper transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
+   * One option in a set: a portion unit, a scale step (D135).
+   *
+   * Not a button in the sense the three tiers mean. The profile keeps this
+   * shape deliberately — "vald skalknapp är Gran, eftersom valt betyder
+   * loggat" (page 6) — and it is bordered rather than filled because a row of
+   * five filled blocks would shout five times where one choice is being made.
+   *
+   * `aria-pressed` carries the state, so the colour is never the only thing
+   * saying which is chosen (§5).
+   */
+  .chip {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border
+           border-edge px-3 text-note text-muted transition-colors
+           hover:border-muted aria-pressed:border-transparent
+           aria-pressed:bg-logged aria-pressed:text-paper;
+  }
+
+  /**
+   * Not an action: cancel, back, dismiss (D134).
+   *
+   * The outline `.btn-secondary` is gone. It existed to make a second action
+   * quieter than the first, and it spent a whole visual tier on the distinction
+   * between "the button you probably want" and "the other button" — a
+   * distinction the reader does not need and the app was not consistent about.
+   * Worse, it looked like a button, so "avbryt" and "spara" were two equally
+   * button-shaped things and only their position said which was which.
+   *
+   * The replacement is what the app already used for "Tillbaka" and "Ta bort":
+   * a text link. It reads as "this takes you out of here" rather than "this
+   * does something", which is exactly what cancel is.
+   *
+   * Still 44 px tall. A link is not a smaller target, it is a quieter one, and
+   * a thumb needs the same room either way.
+   */
+  .btn-link {
+    @apply inline-flex min-h-11 w-auto items-center justify-center rounded-md px-2
+           text-body text-muted underline underline-offset-4 transition-colors
+           hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /**
+   * High impact: Honung with Natt text, in both themes (D123).
+   *
+   * ## Why the same colour as the pot
+   *
+   * The profile gives Honung to "belöning" — the pot, milestone markers, "ta
+   * ut" — and putting it on "radera kontot" looks at first like the palette
+   * colliding with itself. It is not a collision, and the amendment is worth
+   * stating: **Honung marks a thing that has a cost.** Taking money out of the
+   * pot spends something. So does deleting an account. The reward reading was
+   * the narrower one, and the two share a colour because they share the
+   * property that matters at the moment of pressing: this one is not free.
+   *
+   * That also keeps §5's rule intact. An accent still names an *area* rather
+   * than a feeling, and it is emphatically not a warning colour: there is no
+   * red here, nothing turns red on a bad day, and §3's "no failure state"
+   * holds. Honung on a delete is not the app being alarmed, it is the app
+   * saying what kind of action this is.
+   *
+   * ## Natt text in both themes
+   *
+   * The one place a colour pair does not flip with the theme. Honung is a mid
+   * tone: dark text on it clears AA in both themes, light text clears neither,
+   * so a pair that flipped would be unreadable in one of them. Stated here
+   * rather than discovered by a contrast audit later.
+   *
+   * `class-names.test.ts` holds the list of actions allowed to use this.
+   */
+  .btn-impact {
+    @apply inline-flex min-h-11 w-full items-center justify-center rounded-lg
+           bg-reward px-4 py-2.5 text-body font-medium text-on-reward transition-colors
            disabled:cursor-not-allowed disabled:opacity-50;
   }
 
@@ -290,6 +372,42 @@
   .scale-option[aria-pressed="true"],
   .scale-option[data-selected="true"] {
     @apply border-logged bg-logged/15 text-ink;
+  }
+
+  /**
+   * The dimmed page behind every sheet and dialog (D152).
+   *
+   * One class, no per-component values. Four components each carried their own
+   * `bg-ink/40` or `bg-ink/70`, which is four places for a number to drift and
+   * four chances for one of them to be wrong — and one of them **was**: the
+   * celebration dialog once shipped a fully transparent backdrop because
+   * `bg-[var(--ink)]/70` emitted no rule at all, and nothing said so.
+   *
+   * `--scrim` is the dark Natt in both themes. Dimming means darkening, and a
+   * light-theme scrim built from the re-pointed `--natt` would have brightened
+   * the page.
+   */
+  .scrim {
+    /* Paint only. Whether it is `absolute` inside a fixed wrapper or `fixed`
+       itself is layout and belongs to the component; mixing the two here means
+       one of them silently loses to a utility. */
+    @apply inset-0;
+    background-color: var(--scrim);
+    -webkit-backdrop-filter: blur(var(--scrim-blur));
+    backdrop-filter: blur(var(--scrim-blur));
+  }
+
+  /**
+   * Somebody who has asked for less transparency gets the separation from
+   * opacity alone (§5's quality floor). The blur goes entirely rather than
+   * being reduced: a small blur is the same effect asking to be noticed less.
+   */
+  @media (prefers-reduced-transparency: reduce) {
+    .scrim {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background-color: var(--scrim-flat);
+    }
   }
 
   /**

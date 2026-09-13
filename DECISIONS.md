@@ -4388,3 +4388,3098 @@ publish. The fast-path measurements it carried moved to `docs/measurements.md`,
 because a tap count is a fact about the program: the landing page quotes it and
 a test still pins the page to the file, so the claim cannot outlive the
 measurement.
+
+### D122 — Two chart defects, and saying why a number is missing
+
+#### A ruler whose marks are not evenly spaced
+
+The weight axis read `109,0 / 108,8 / 108,5 / 108,3 / 108,0`. The step was
+0.25 kg and the labels carry one decimal, so the printed gaps alternate 0,2 and
+0,3. Every label was correct and the ruler was wrong, which is the worse
+failure: nothing about it looks like a defect, and a reader measuring the
+distance between two marks is being told two different things alternately.
+
+**A step must be a whole multiple of the precision it is printed at.** That
+admits 0.1, 0.2, 0.5, 1, 2 and 5, and rejects 0.25. **2.5 survives**, because at
+one decimal `108,0 / 110,5 / 113,0` is exact and evenly spaced — the rule is
+about what prints evenly, not about which numbers look round.
+
+De-duplicating on the rendered label, which the axis already did, does not catch
+this. Those five labels are all different. They are simply not evenly spaced.
+
+**And the step is chosen by counting rather than estimating.**
+`floor(range / step) + 1` is how many marks a step *would* place if the first
+sat exactly on the domain minimum. It does not: it sits on the first multiple at
+or above it. The estimate therefore runs one high, and on a 3,1 kg window that
+decided between three marks and six.
+
+#### A domain that excluded the newest reading
+
+The y-domain was built from the **trend alone**, so that outlying readings could
+not squash the line into the middle quarter of the plot. Right about the hero,
+wrong about the arithmetic.
+
+The trend is an exponential moving average, so it **lags**. On a real series it
+runs through the middle of the readings that produced it, and the most recent
+reading — the one somebody opens the app to see — is the one furthest from it. A
+morning weigh-in of 106,9 against a trend still at 108,4 fell outside and was
+clipped. Clipped, not clamped, so it was **invisible rather than wrong**, which
+is why it survived a design pass: the chart looked fine and the missing point
+looked like a day nobody logged.
+
+The fixture defending the old behaviour swung ±6 kg between consecutive days,
+which no body does. Real daily noise is salt, hydration and glycogen, about
+±1 kg, and the trend is drawn from those readings, so widening to hold them
+costs the line its noise band rather than half the plot.
+
+**What this costs:** a mistyped reading now stretches the axis instead of being
+hidden. That is the better failure. The point becomes visible, and D56 put edit
+and delete on the row that shows it — a chart that quietly omits a value is a
+chart nobody can correct from.
+
+The tooltip also carried two decimals where the headline carries one. The trend
+averages scale readings that are ±0.1 at best; the second decimal is arithmetic,
+not measurement.
+
+#### "Inte än" is not a reason
+
+Fibre showed nothing while the other three macros rendered. Confirmed as D55's
+per-macro coverage gate working exactly as designed: crowdsourced food data
+omits fibre far more often than protein, so fewer than three days cleared 90 %
+and the mean was correctly withheld.
+
+Correctly withheld and wrongly explained. "Inte än" cannot distinguish **"you
+have logged nothing"** from **"what you logged does not carry this figure"**,
+and those ask different things of the reader — one is "log something", the other
+is "pick foods with fibre data, or accept that this number will not appear".
+
+`weeklyDaysLogged` carries the second number, and it counts **the day, not the
+macro**. Counting the macro was the first attempt and cannot work: a day of six
+entries that all omit fibre reports fibre coverage 0, which is the same value as
+a day nobody logged — the very distinction being drawn. The day's own `kcal`
+total is non-null exactly when something was logged.
+
+The reason line applies to **all four** macros. A rule that fires only for the
+case that prompted it is a rule nobody remembers when the next one goes quiet.
+
+### D123 — Honung marks a cost, and irreversible actions are typed
+
+#### The audit found one primary and one secondary already
+
+`.btn` is `bg-ink text-paper`, which is Snö on Natt in dark and Natt on Snö in
+light: the rule was already right. Across the app and the landing page, 21
+buttons use it, 25 use `.btn-secondary`, and **three** were neither:
+
+- **`QuickActions`** — Dis circle, Snö icon, Gran when pressed. The profile
+  names these separately on page 4; they are not buttons in this sense. Left.
+- **A row in `FoodLog`** that is a tap target rather than a button. Left.
+- **The scanner's cancel**, hand-rolled because its bar is `bg-ink` — a dark
+  strip under a live viewfinder glares less — so `border-edge text-ink` would be
+  dark on dark. Now `btn-secondary` with the two colours the surface demands
+  overridden, so height, radius, focus and disabled state come from the shared
+  class and stay in step with it.
+
+The landing page's Lingon primary is D99's stated exception and is unchanged.
+
+#### Honung, and why it is not a collision
+
+The profile gives Honung to *belöning*: the pot, milestone markers, "ta ut".
+Putting it on "radera kontot" looks like the palette colliding with itself.
+
+**Amended: Honung marks a thing that has a cost.** Taking money out of the pot
+spends something; so does deleting an account. The reward reading was the
+narrower one, and both share the property that matters at the moment of
+pressing: this one is not free.
+
+§5 holds. An accent still names an area rather than a feeling, and this is
+emphatically **not** a warning colour — nothing here is red, nothing turns red on
+a bad day, and §3's "no failure state" is intact. Honung on a delete is not the
+app being alarmed; it is the app saying what kind of action this is.
+
+**Natt text in both themes**, which is the one pair that does not flip. Honung is
+a mid tone in both (`#A8761E` light, `#E2B25A` dark): dark text clears AA on
+both, light text clears neither. A pair that flipped would be unreadable in one
+of them, so `--on-reward` is defined once outside the `.dark` block.
+
+#### Two tiers of confirmation
+
+**Irreversible — typing.** Deleting your own account types your address;
+deleting somebody else's, as an admin, types theirs. There is no undo, so the
+guard is deliberateness, and only typing proves somebody read the sheet rather
+than tapping through it. The admin case is the one that matters most: it
+destroys another person's data, and the admin is not the one who will notice it
+missing. The row preview guards against pressing it by accident; typing the
+address guards against pressing it on the **wrong row**, which is the mistake a
+list of similar accounts actually invites.
+
+Deleting your own account **keeps the password as well**. The two guard
+different things: the password authorises — without it somebody holding an
+unlocked phone could do it, and the address is on screen under Profil to read —
+while typing the address makes it deliberate.
+
+**Reversible — a plain confirm.** Disabling an account and revoking an unused
+invite both undo in one action. Asking somebody to type an address to do
+something they can undo in two seconds is theatre, and theatre teaches people to
+click past confirmations. `ConfirmSheet` is the shared mechanism; enabling an
+account back does not ask at all, because only switching it off has a cost.
+
+**Deleting a backup is on the list and does not exist.** There is no endpoint and
+no control. Listed anyway, so that when it is built the style is already
+permitted and this decision has already been taken.
+
+#### The guard
+
+`class-names.test.ts` holds the allow-list by **file**, not by test id: the guard
+reads source text, and a test id is a string in that same text, so matching on it
+would check that a file mentions a name it also defines. It checks two things —
+which files carry `btn-impact`, and which files open `ConfirmSheet`, since a
+shared component rendering the style for anyone would otherwise be a hole
+straight through the list.
+
+### D124 — Two ways to log a food again, onto two different days
+
+Browsing a past day on Mat now offers "Logga i dag" on each row, and "Logga
+hela dagen i dag" above the list. Both sit on the same screen as "Igen" under
+Senast loggat, and the three do nearly the same thing to different days:
+
+- **"Igen"** writes to the day being **viewed**. That is backfilling: somebody
+  filling in last Tuesday wants last Tuesday, and this is the behaviour that
+  already existed.
+- **"Logga i dag"** writes to **today**. That is somebody looking at yesterday
+  and eating the same thing again.
+
+**The labels carry the whole distinction**, because nothing else can. Two
+controls a few centimetres apart that both mean "log this again" are
+indistinguishable unless the label names the day, so one names it and the other
+does not need to: "Igen" is about the day already on screen.
+
+#### `dateSource` falls out of it rather than being set
+
+The copy passes the **device's own** day. `enqueue` compares the supplied date
+against the boundary the device would have computed and calls them equal
+`device`, different `chosen` (D61) — so writing today's date here produces
+`device` without this code mentioning `dateSource` at all, which is right,
+because it *is* a statement about a clock.
+
+#### Absent rather than disabled
+
+While viewing today the copy actions are not rendered. Copying today's lunch to
+today is an action with no effect, and a control that does nothing is worse than
+one that is not there: it invites a press and then explains itself.
+
+#### The whole day is sequential, and reports a partial result as one
+
+One write at a time rather than `Promise.all`. Each goes through the offline
+queue, and a burst of parallel IndexedDB transactions on a phone is how D118's
+stall was reached. If the fourth of six fails there is no undo and no
+pretending: the message says how many landed, and the rest are still on the day
+being viewed.
+
+#### The test is the pair, and it found a real defect
+
+Asserting only that the new action writes to today would pass on a build where
+"Igen" had quietly started doing the same — silently breaking backfilling, the
+older behaviour and the one nobody would think to re-check. So the test drives
+both, through the real date picker, and reads `localDate` off the request body.
+
+Writing it caught something the type checker could not: the `copyingDay` hook
+had landed **after** `if (me.isPending) return null`, so it ran on some renders
+and not others. React's "rendered more hooks than during the previous render"
+crashed the whole screen to a blank `<div>`, and every assertion failed on a
+missing element rather than on the cause. The lesson is the older one: a blank
+screen is a thrown render until proven otherwise.
+
+### D125 — A logged row opens onto what is in it
+
+The collapsed line carries a name, an amount and a calorie figure. Everything
+else about an entry — its four macros, whether the numbers came from a database
+or were typed, whether somebody estimated them — existed only in the database. A
+reader comparing a day against a macro target could not see which entry carried
+the fibre, or that one of them was a guess.
+
+Tapping the name opens the row onto all of it, and **one row is open at a time**.
+That state lives in the list rather than in each row, because "one at a time" is
+a fact about the list and a row cannot know what its neighbours are doing.
+
+#### The actions moved in with it
+
+Edit, delete and, on a past day, "Logga i dag" (D124) used to sit on the
+collapsed line. Three controls on each of four rows is twelve targets a thumb
+has to aim between on a 360 px screen, and eleven of them belong to entries
+nobody is looking at. Inside the disclosure they belong to the one row somebody
+chose to open. D56 is unaffected: edit and delete are still on the screen that
+displays the row, which is what that rule asks for.
+
+#### Two things stay on the collapsed line
+
+**The amount and the calories**, because they are what the line is for.
+
+**The estimate marker.** It changes how the number beside it should be read, so
+it cannot be behind a tap — a reader scanning a day has to be able to see which
+figures are guesses without opening each one. `confidence < 1` is the test, which
+is the schema's own definition rather than a second one invented here.
+
+#### While a meal is being assembled, the row does not expand
+
+The checkbox and the disclosure would be two meanings for one tap. In
+`selectable` mode the row keeps its single meaning — this is a thing you are
+choosing — and the name is plain text again. One tap, one thing, and which thing
+changes with the mode rather than with where in the row the thumb lands.
+
+#### A missing macro says "inte än", not zero
+
+D44's rule, in the smallest place it applies. A fibre figure nobody recorded is
+not a fibre figure of zero, and rendering it as `0 g` would put a fabricated
+number next to three real ones.
+
+### D126 — Framsteg leads with distance and folds the setup away
+
+Framsteg opened on four blocks in this order: the header card, the sober count,
+the pot, the milestone list with an empty create form under it, and a second
+empty create form under that. Two of the five were things to type in, and they
+were on screen every visit whether or not anybody wanted to add anything. On a
+360 px phone the pot chart — the one figure that changes daily — started below
+the fold.
+
+**The lists are reference material.** A milestone list changes when somebody
+changes it; a savings rule list changes less often than that. §5 calls that
+reference material and folds it, which is what `Disclosure` is for and what
+"Senast loggat" on the food screen already does. Both are folded by default,
+each with its row count beside the label, because a count is what makes a fold
+safe to leave folded.
+
+**Creating is a button and a sheet.** An empty form is not information. It is a
+tool, and §5's rule for occasional tools is that they cost one tap and give the
+screen back. Both create forms move into `Sheet`, which brings Escape, focus
+return and a scroll lock with it rather than three more inline copies of that
+behaviour. Each closes on success: the milestone appearing in the list behind it
+and the count going up by one is the acknowledgement, so there is no toast.
+
+**The add buttons stay outside their folds.** Adding a milestone is not
+something you do to the list of milestones, so it must not cost a fold first,
+and the disclosure's own doc warns against being the only route to a control.
+
+**There is no separate "next milestone" block**, because D60 already put every
+unreached milestone in the header card, nearest first, with its distance in its
+own unit and its projected date. Lifting the nearest one out would put a border
+between two halves of one answer and reintroduce the `[0]` framing D60 was
+written to remove. The card *is* the distance.
+
+**The order below the card is how often the answer has changed since last
+time.** The pot moves daily and answers "can I afford the reward yet". The sober
+count moves daily too but is a single figure and reads fine below a chart. The
+two lists move when somebody moves them. The savings rules left the pot panel in
+the same change: they were hanging off the bottom of a chart, and the retroactive
+note (D54) belongs beside the rules it warns about rather than beside the
+balance.
+
+### D127 — Asking for a code is its own deployment mode, at its own path
+
+The request form sat in the landing page's last section, behind
+`LANDING_ENABLED`, and the hero carried a second button pointing at it. Turning
+on a page for people to read turned on a public write endpoint with it, and
+there was no way to have one without the other.
+
+**They are different decisions.** A landing page is something to read: it costs
+its owner nothing to serve, and it is the thing that makes an open-source
+project findable. A request form takes a stranger's name, address and a line of
+free text, and every code approved from it makes whoever runs the installation
+responsible for that person's weight, meals, measurements and address, under
+their own name on `/integritet`. That is a decision worth making one person at a
+time, and a form on a public page is the opposite of making it one person at a
+time.
+
+So `REQUEST_ENABLED`, off by default, independent of `LANDING_ENABLED`, and
+documented as a deployment mode beside it in `README.md` and `.env.example`.
+
+**Off means absent, at both locks.** nginx returns 404 for `/kod`, and the API
+does not register `POST /invite-requests` or its challenge endpoint. A route
+that answers 403 is still a route: still reachable, still something to probe and
+rate-limit around. `invite-request.test.ts` asserts the landing-on,
+request-off configuration specifically, because that is the one the separation
+was made for and the one that did not exist before.
+
+**On means everything that guarded it is still there.** The human check (D112),
+the honeypot, and the per-IP limits on both the challenge and the submission all
+moved with the form. Being unlinked is not a security property and is not
+treated as one: it is unlinked because it is not for browsing.
+
+**The hero says something true for every reader instead.** "Be om en kod" as a
+second button implied asking was a normal way in, and on most installations it
+pointed at a page that does not exist. What replaces it is a sentence, not a
+control, because there is no action here that is right for everybody: somebody
+with a code opens the app, somebody without one cannot get one here, and both
+can run their own copy. The link goes to the repository, which is the one offer
+this page can make to anybody who reads it.
+
+`/integritet` gained a paragraph saying the form may not exist at all, and that
+where it does not, no request is stored here in the first place.
+
+### D128 — Announcements take a small Markdown subset, parsed rather than sanitised
+
+An announcement body was one string of plain text, dropped into a `<p>` in the
+app and into `wrap()` for the mail. That is right for "we are restarting on
+Tuesday" and useless for a release note, which wants a heading, a list of what
+changed, and a link to the screen it changed.
+
+**The subset is paragraphs, two heading levels, bold, bullet and numbered lists,
+and links.** Not italics: at 12 px in a mail client it is indistinguishable from
+bold, and §5 already rules that a second emphasis is a second voice arguing with
+the first. Not images, because D88 says no mail from here carries one. Not
+tables, not code, not nested lists. The stopping point is what a release note
+needs and nothing past it.
+
+**Parsed to a tree, not sanitised into one.** The obvious build is a Markdown
+library plus a sanitiser plus `dangerouslySetInnerHTML`, and that puts a
+sanitiser between an admin's textarea and script running in every reader's
+browser. Instead `packages/shared/src/markdown.ts` parses to a tree of three
+block types and three inline types, and each of the three surfaces walks it:
+React elements in the app, an HTML string for the mail, plain text for the
+mail's text part. **There is no markup to strip, because the tree cannot carry
+any.** Raw HTML in the source renders as the characters somebody typed, in all
+three, by construction rather than by configuration.
+
+The one place a string does become markup is the mail's HTML renderer, which
+escapes every value including the href, and refuses every scheme but `http`,
+`https`, `mailto` and a same-site path. An unsafe scheme keeps its label and
+loses its link, which is the right failure: `javascript:` and `data:` are the
+two that turn a link into an attack, and a reader who sees the words has lost
+nothing they could safely have had.
+
+**Heading levels are a parameter, not a constant.** The subset's two levels are
+"first" and "second", and each renderer places them: under the news list's `h2`
+they are `h3` and `h4`, in the admin preview they are one lower again. A body
+that hard-codes `h2` puts a hole in the outline of whichever page it lands on.
+
+**The banner gets one line.** `AnnouncementLine` renders the first block and
+stops. A maintenance notice is a sentence beside a dismiss button, and a banner
+that grew to hold a heading and a list would push the app down the screen on
+every route.
+
+**The editor previews with the renderer, not with an approximation of it.** An
+announcement is written once, read by everybody, and mailed once with no recall.
+The thing that makes that safe is seeing the actual rendering before pressing
+save, so the preview is the same component the news page uses.
+
+**The copy guards run over the rendered output.** No test can check what an
+admin will type, but it can check that the renderer introduces nothing: a
+formatter with smart typography would put an en dash into every announcement,
+and a heading style with `text-transform` would shout one written in sentence
+case. `copy-style.test.ts` runs its own dash rule and its own `shoutedWords`
+over both string renderers, and the render test asserts no `uppercase` class
+reaches the DOM.
+
+### D129 — The admin is told a request arrived, and can turn that off
+
+The receipt somebody gets for asking says a person will read their request.
+Nothing made that person aware of it. The row went into a list that has no
+reason to be opened on any particular day, which is how somebody who asked
+politely waits three weeks for an answer that was one click away. The feature
+was half built: it stored the request and told the asker, and never told the
+one person who could act.
+
+**Mail, through the queue** (D104). Not sent inline: a mail server that is down
+or unconfigured must not turn a stranger's request into a 500 on a public
+endpoint. The drainer retries, and the request is stored either way.
+
+**Failures are swallowed on purpose.** The visitor is not the person this mail
+is for, and the thing they asked for has already happened. An installation with
+no `PUBLIC_BASE_URL` cannot build the link, and that is a reason to skip the
+notification rather than a reason to refuse the request.
+
+**It quotes rather than summarises.** Who asked, the address, and the line they
+wrote, because the decision is made by reading those and a mail that says
+"somebody asked" only moves the reading somewhere else. The link goes to the
+requests tab, which is the admin screen's default view; there is no per-request
+page and a request is answered from its row.
+
+**A dot on the admin entry, not a count.** Same reasoning as the news marker
+(D108): the number is never large enough to be information, and a numbered badge
+is the shape of an app that wants attention rather than one that has something
+to say. Gran, because a request waiting is work rather than a failure. It is
+counted from the rows on `/me` rather than stored, so it is right whether or not
+the mail was sent, whether or not this admin opted out, and whether or not the
+mail server works. It rides on `/me` for the same reason `isAdmin` does: the
+navigation decides during the first paint, and a second request would make the
+marker appear a moment late.
+
+**The opt-out is per admin and default on**, like the news mail and for the
+mirror of its reason: news is something you might find interesting, and this is
+work waiting for you. The default has to be the one where the thing gets
+noticed. The hint says what turning it off does not do — the request still
+arrives, the list still holds it, the dot still appears — because a preference
+whose blast radius is unclear is one people leave alone out of caution.
+
+`request_mail` is on every profile rather than only on admins'. `is_admin` can be
+set at any time, and a column that existed only for current admins would have to
+be created at the moment somebody is promoted; a boolean with a default costs one
+byte per row and removes that whole case.
+
+### D130 — SMB is spoken, not mounted
+
+> **Superseded by D133.** The mechanism argument below is still right: mounting
+> a share inside a container needs `CAP_SYS_ADMIN` and that is not a thing to
+> grant for a backup. The protocol was wrong. Both Node SMB clients authenticate
+> with NTLMv1, which current servers refuse, and D132 records what that cost.
+> The destination is S3 now, and a Windows share is reached by mounting it **on
+> the host** and pointing a directory destination at the mount.
+
+D103 built the backup schedule with `local` as the only destination and `smb`
+and `s3` refused with a reason. SMB is the one people actually want: the point
+of a backup is that it survives the machine the database is on, and for a
+self-hoster the thing that survives is usually a NAS.
+
+**The mechanism was the decision, and it was made before any of this was
+written.** There are two ways to reach a share from a container:
+
+**Mounting it inside the container is not acceptable.** `mount -t cifs` requires
+`CAP_SYS_ADMIN`, which is most of the way to root on the host. Granting that so
+a backup can be written is a bad trade, and worse, it is a trade a self-hoster
+following the README would make without knowing they had made it. A capability
+in a compose file is invisible in a way an admin screen is not.
+
+**Speaking the protocol from Node needs nothing.** No mount, no capability, no
+privileged container, no host-side fstab entry. It also puts the host, share,
+username and password in the admin screen beside everything else that is
+configured there, under the same encrypted-secret pattern as the SMTP password
+(D102), rather than in a file the app cannot see and cannot check.
+
+So: `@marsaud/smb2`, whose surface is fs-shaped — `createWriteStream`, `unlink`,
+`readdir`, `stat` — which is exactly what a backup needs and nothing more.
+
+**The mounted path is kept, and is the documented fallback.** It was never a
+separate feature: a mount is a `local` destination pointed at a path that
+happens to be one, and nothing in `backup-smb.ts` is involved. That matters
+because this client speaks **SMB 2.0.2**. Samba and every Windows since Vista
+accept it; a server hardened to require SMB 3 refuses the connection. That is a
+clean refusal at connect time rather than a corrupt backup, the error names the
+limit in as many words, and the mounted path is the way through it.
+
+**Encryption happens before the destination sees anything**, which is what makes
+an SMB 2.0.2 transport acceptable here and would not make it acceptable for a
+password. What crosses the network is ciphertext with a GCM tag. `dumpEncrypted`
+takes a stream rather than a path for this: a local file and a file on a share
+are both a `Writable`, and everything else about the dump is identical. The byte
+count is kept as the bytes go past rather than read back with `stat`, because a
+destination that cannot be stat'ed afterwards is the case this was extended for.
+
+**"Test connection" writes and deletes a probe file.** Not a connect check: a
+share that authenticates and then refuses to accept a file is a real
+configuration, and it is the one a connect-only check would call healthy. It
+tests what is **saved** rather than what is typed, and sits below the save
+button for that reason — a probe against unsaved values would pass and the
+schedule would then run against the old ones. Logged either way, because a pass
+dates the last time the destination was known to work.
+
+**The password is never sent to the browser.** The screen gets `smbPasswordSet`,
+a boolean. An empty password field therefore means "leave the stored one alone",
+because that is the only thing it can honestly mean; clearing it is a separate
+checkbox, since one empty box cannot express two intentions. Without that,
+changing the retention window would wipe the password, silently, and the
+scheduled run at three in the morning would be what found out.
+
+**Saving a share with no `SECRET_KEY` is refused**, not stored in the clear and
+not quietly dropped. And switching back to a local destination erases the
+credentials, because keeping a share's password after somebody stopped using
+that share is storing a secret for no purpose anybody could name.
+
+Pruning over SMB follows the local rule — by age, not by count — with one
+addition: a file whose modification time the share will not report is left
+alone. Deleting on a guess is the one mistake here that cannot be undone, and a
+destination filling up is a problem somebody can see.
+
+### D131 — The preview server was serving truncated responses, and /kod did not exist in it
+
+Found while taking the verification screenshots for this pass, which is exactly
+what a verification pass is for. Three defects in the dev and preview servers,
+none of which any test could have caught, because they are in the tooling that
+stands in for nginx.
+
+**`/kod` was a 404 in dev and in preview.** `PUBLIC_PAGES` in `vite.config.ts`
+mirrors nginx's `location =` blocks for `/integritet` and `/villkor`, and D127
+added a third path to nginx without adding it here. The page shipped, the tests
+passed, and it could not be opened on a development machine.
+
+**And then it existed unconditionally.** The preview server's SPA fallback
+answers any unknown path with the landing HTML, so once the rewrite was added
+the flag decided nothing: `/kod` was served whether `REQUEST_ENABLED` was on or
+off. The one property D127 is about — that the path does not exist unless it is
+switched on — was the one property that could not be tried locally. Both servers
+now return 404 for it when the flag is off, which is what nginx does.
+
+**The app-name substitution truncated every static response.** The preview
+server buffers a response, replaces `__APP_NAME__` with the configured name, and
+writes it back. `__APP_NAME__` is twelve characters and "Vikt" is four, so the
+`Content-Length` sirv had already sent was too large by eight bytes per
+occurrence, and the browser sat waiting for bytes that were never coming.
+
+The symptom was a page stuck at `readyState: "loading"` forever, `curl` taking
+six seconds and exiting 56, and a screenshot run that timed out with nothing
+written. The first attempt at a fix — skipping the length when the headers had
+already gone out — turned a crash into a hang, which was worse, because a crash
+says what is wrong. The actual fix strips `Content-Length` in `writeHead`, so
+the rewritten body is chunked and its length is nobody's business.
+
+**What made this take four attempts is worth writing down.** Every check of the
+preview server had been made with `curl`, and `curl` does not ask for
+compression unless told to. The browser does, so the browser was getting a
+different response from the one every check had looked at, and the failure it
+reported — `ERR_CONTENT_DECODING_FAILED` — pointed at compression rather than at
+the length header that was actually wrong. Chasing the encoding was a detour:
+the served gzip turned out to be valid once the length was fixed. The lesson is
+the check, not the bug. **A server is verified with the client that will use
+it.**
+
+The same pass also lost twenty minutes to five abandoned screenshot processes
+still attached to the same CDP session, silently consuming each other's
+replies — `pkill -f` is a no-op on Windows, which CLAUDE.md §7 already says
+about dev servers and evidently needs saying about everything else too.
+
+Left as it was found: the SPA fallback still answers unknown paths under `/`
+with the landing page, where nginx would 404. That is a divergence worth
+knowing about and it is not what this pass was for.
+
+### D132 — Both Node SMB clients speak NTLMv1, and no destination may crash the API
+
+D130 chose to speak SMB from Node rather than mount a share, to avoid granting
+`CAP_SYS_ADMIN` to a container. The mechanism was right. The library was not,
+and the second library is not either, and that is worth writing down before
+anybody tries a third.
+
+#### What went wrong, in the order it was found
+
+**`@marsaud/smb2` cannot authenticate on Node 22 at all.** It builds an NTLM LM
+hash with `createCipheriv("des-ecb", ...)`, and OpenSSL 3 moved DES out of the
+default provider. Every environment this project runs in — the workstation, CI,
+the API image — is Node 22, so the feature never worked anywhere.
+
+**It took the API down when tried.** The throw came from inside a socket `data`
+handler, which is outside every promise chain, so the `try/catch` around the
+connect never saw it. An admin pressing "test connection" exited the process.
+
+**Eleven tests covered the share destination and none reached authentication.**
+They all connected to `127.0.0.1`, which refuses at TCP. The path that broke was
+the path no test had ever run. This is the same failure as D98's lint claim and
+D95's eight "screens": a thing verified against a case that cannot fail the way
+the real one does.
+
+**`@awo00/smb2` fixes the crash and not the feature.** It carries its own
+pure-JS DES (`des.js`), so nothing asks OpenSSL for a cipher it does not have.
+Verified against a real Samba container: it reaches NTLMSSP type 3 and gets a
+proper SMB response instead of dying. But it implements **NTLMv1 only** — LM and
+NT hashes, three DES blocks against the server nonce, no HMAC-MD5 and no v2 blob
+anywhere in the package. Samba has shipped `ntlm auth = no` by default since
+4.5, and Windows has refused NTLMv1 by default for longer. Against a
+default-configured server it returns `STATUS_LOGON_FAILURE` with correct
+credentials.
+
+It authenticated only after the test server was set to `ntlm auth = yes`,
+`lanman auth = yes` and `server min protocol = NT1`. **That is the finding.** A
+CI suite against a Samba configured that way would go green while the owner's
+NAS kept refusing — the original mistake, rebuilt with more ceremony.
+
+#### What was done, and what is left open
+
+**The crash is fixed independently of the library**, because it has to be: an
+SMB client is a socket state machine that calls back from a `data` handler, and
+*any* such client can throw where no `await` can catch it. Swapping libraries
+changes which line throws, not whether an uncaught throw is possible.
+
+`backup-crash-guard.ts` installs one `uncaughtException` handler that is
+deliberately narrow. While a backup or a probe is in flight it logs with the
+destination, marks the `backup_runs` row failed so the admin screen shows what
+happened rather than a run that started and never finished, and keeps serving.
+With nothing in flight it restores Node's behaviour and exits, because
+swallowing an arbitrary throw turns every future bug into a silent one. A
+blanket handler would have been easier and much worse.
+
+The DES pre-check stays as a belt: a runtime missing a cipher the chosen client
+needs is refused with a sentence naming the mounted-path way round, rather than
+attempting a connection that will kill the process.
+
+**What is not decided** is how the feature actually works, and it is not a
+decision to take quietly:
+
+- **implement NTLMv2** over `@awo00/smb2`, whose NTLM module is isolated enough
+  to replace. It is well specified (MS-NLMP) and roughly a hundred lines, and it
+  is authentication code, which is the category where a subtle error is silent;
+- **drop direct SMB** and keep the mounted path, which already works and is what
+  the README documents as the fallback. Honest, small, and gives up what D130
+  was for;
+- **something else** — an S3-compatible endpoint that most NAS boxes now speak,
+  which needs no NTLM at all.
+
+Until that is settled the destination stays refused with a reason rather than
+half-working, which is the state D103 chose deliberately for exactly this case.
+
+### D133 — The remote destination is S3, and a share is mounted on the host
+
+D130 wanted a backup that survives the machine the database is on, and chose to
+speak SMB from Node rather than mount a share, because mounting inside a
+container needs `CAP_SYS_ADMIN`. That reasoning was right and is unchanged. The
+protocol was the mistake, and D132 records what it cost: a library that could
+not authenticate at all on Node 22, an admin button that exited the process, and
+eleven tests that never reached the code that broke.
+
+**Neither Node SMB client can authenticate to a current server.** Both speak
+NTLMv1 — `@marsaud/smb2` through OpenSSL's DES, which no longer exists, and
+`@awo00/smb2` through its own pure-JS copy. Samba has shipped `ntlm auth = no`
+by default since 4.5 and Windows has refused NTLMv1 for longer. Verified against
+a real Samba container: `STATUS_LOGON_FAILURE` with correct credentials, and a
+successful login only after setting `ntlm auth = yes`, `lanman auth = yes` and
+`server min protocol = NT1`. Nobody should run a NAS that way to receive
+backups, and a CI suite configured against one would go green while the owner's
+server kept refusing — the original mistake with more ceremony.
+
+**Writing NTLMv2 by hand was the rejected alternative.** It is well specified
+and roughly a hundred lines, and it is authentication code, where a subtle error
+does not announce itself. This project has one maintainer.
+
+**So: S3.** An HTTP request signed with a key the owner pastes in, reaching AWS,
+Backblaze B2, MinIO and the S3 endpoint most NAS boxes now ship. `s3` was
+already in the destination enum, refused with a reason since D103, which is
+exactly the boundary that decision existed to hold.
+
+**Somebody who wants a Windows share mounts it on the host** and points a
+directory destination at the mount. That has always worked, involves none of
+this code, and the README now carries the fstab line and the compose volume
+rather than leaving it as an idea.
+
+#### What is deliberate in the implementation
+
+**Path style is a setting, not a guess.** AWS addresses a bucket as
+`bucket.host/key` and everything self-hosted wants `host/bucket/key`. Getting it
+wrong fails in a way that reads like a wrong address rather than a wrong option,
+so it is a labelled checkbox that defaults to on, because self-hosted is what
+this project is for.
+
+**The dump is encrypted before it reaches the client**, which is D103's rule and
+is what makes any remote destination acceptable: what crosses the wire is
+ciphertext with a GCM tag. Server-side encryption is not requested and would add
+nothing to bytes that are already opaque.
+
+**The whole object is buffered.** `PutObject` needs a length, and the
+alternative is a second dependency for the multipart uploader. A database whose
+compressed dump does not fit in memory has outgrown a single-container
+deployment for several other reasons first. The local destination still streams
+to disk and does not go through this path.
+
+**Retention never deletes the newest.** By age as before, and the list is sorted
+oldest first with the last entry excluded before anything is removed. A window
+of one day and a schedule that has not run for a week would otherwise empty the
+bucket, which is the one outcome a backup system must not produce on its own.
+
+**The errors name the field.** The SDK says "the request signature we calculated
+does not match", which is accurate and tells somebody staring at six inputs
+nothing. `explainS3Error` maps the names MinIO actually returned during
+development to sentences that say which of them is wrong.
+
+#### The tests are the point of this decision
+
+`backup-s3-live.test.ts` runs against a **real MinIO with default settings**, as
+a service in CI and a container locally: put, list, get, delete, a wrong secret
+that produces a real `SignatureDoesNotMatch` from a real signature check, a
+wrong access key, a missing bucket, and an unreachable endpoint. Without
+`S3_TEST_ENDPOINT` they **skip loudly** rather than passing, because a suite
+that goes green when its subject is absent is worse than one that says it did
+not run. CI also asserts `pg_dump --version` before the suite, so the two
+full-run tests cannot quietly stop running if a runner image drops the client.
+
+That is the correction of the specific failure in D132: a destination is
+verified against something that can fail the way the real one does, or it is not
+verified.
+
+**The crash guard from D132 stays**, even though an HTTP client is far less
+likely to throw outside a promise chain than a socket state machine. It costs
+one function call, it is the difference between a bad destination and a dead
+API, and the reason it exists is that nobody predicted the last one either.
+
+### D134 — Three button tiers, and the outline one is not among them
+
+D123 audited the buttons and found the app already consistent: 21 filled, 25
+outline, three exceptions. It was consistent, and it was consistently spending a
+whole visual tier on the wrong distinction.
+
+**The outline said "the other button".** `.btn-secondary` existed to make a
+second action quieter than the first — "lägg till pass" beside "spara dagen".
+But the reader does not need to be told which of two actions is more important,
+and the app was not saying anything reliable about it anyway: `.btn-secondary`
+was on saves, on cancels, on diagnostics probes and on a download link. A tier
+that means five things means none.
+
+**Worse, a cancel looked like a button.** "Avbryt" and "Spara" sat side by side,
+both button-shaped, distinguished only by position and fill. That is the wrong
+pair to make look similar: one writes and one leaves.
+
+#### The three that remain
+
+**A filled button for every action.** Snö on Natt in dark, Natt on Snö in light,
+which is what the profile has said since v1.0 and what `.btn` already was. Three
+parallel saves on Dagen are three filled buttons, and that says "these are three
+equal things" more honestly than an outline said "this one is lesser".
+
+**A text link for what is not an action.** Cancel, back, dismiss. The app
+already used this for "Tillbaka" and for "Ta bort" in a row, so `.btn-link` is
+the existing pattern given a name rather than a new invention. It reads as
+"this takes you out of here", which is what cancel is. Still 44 px tall: a link
+is a quieter target, not a smaller one.
+
+**Honung for an action with a cost**, unchanged from D123 and now written into
+the profile itself (v1.3, page 3: "sådant som kostar: belöningar och
+oåterkalleliga handlingar").
+
+**And a small filled variant for a row action.** "Köpte ändå" on a savings
+offset, "logga hela dagen i dag" on a past day. These write something, so they
+are buttons, not links; they sit inside a row, so they are small. The outline
+used to be how they were made to fit, which is how a fourth tier earns its
+keep and then spreads. `.btn-small` is `.btn` at the size a row can hold. Its
+pressed state stays Gran, because the profile is explicit that a chosen control
+is the logged colour: chosen *is* logged.
+
+#### What was converted
+
+28 call sites. 20 became filled buttons: the saves on Dagen, Mat and the macro
+form, the diagnostics probes, "lägg till milstolpe" and "ny sparregel", "skicka
+testmejl", "hämta senaste", "testa anslutningen", "logga receptet", "spara
+raderna", "se vad ändringen gör", "logga första vägningen", and the trigger that
+opens the account-deletion confirm. Six became text links, and all six are
+"Avbryt": the scanner, the confirm sheet, the account deletion, a savings rule,
+the announcement editor and the admin user deletion. Two became `.btn-small`:
+"logga hela dagen i dag" and "köpte ändå".
+
+#### The profile's page 6 — resolved
+
+> **Closed by v1.4.** Page 6 now reads "Tre nivåer, inga konturer" and states
+> the rule this decision arrived at, in the profile's own words: actions are
+> filled, Snö on Natt and Natt on Snö in light; what is not an action — avbryt,
+> tillbaka, dölj — is a text link; what costs is Honung with Natt text in both
+> themes, and the irreversible is confirmed by typing; a chosen scale button is
+> Gran; and "radåtgärder som 'Köpte ändå' är samma fyllda stil i mindre
+> storlek". The code and the specification agree, and this decision needs no
+> further reading.
+
+For the fourth shape the profile keeps beside these three — the quick action —
+see D135.
+
+`class-names.test.ts` holds the rule in two halves, because either alone is easy
+to work around. The class may not reappear in source or as a rule in the
+stylesheet, and no component may hand-roll the look out of `bg-transparent` plus
+a border on one element, which is how a removed tier usually comes back. Proved
+by reintroduction: putting `btn-secondary` back into `DayCard.tsx` fails the
+test and names the file.
+
+### D135 — An entry point is a quick action, not a button
+
+Three controls on the food screen were still outlines after D134 removed the
+tier: "Skriv in själv", "Skriv vad du åt" and "Vad kan jag laga?". Two questions
+follow from that, and the second matters more than the first.
+
+#### Why the guard walked past them
+
+`.btn-secondary` expanded to a border **and** `bg-transparent`, so the guard
+looked for that pair. Nobody writes `bg-transparent`: a border with no
+background is transparent already. These were
+`min-h-11 w-full rounded-lg border border-edge px-4 text-note text-ink` — the
+same look, built from utilities, with no token the guard was watching for.
+
+It was not three. It was **twelve**, across seven files: the search submit, the
+portion chips, "spara portionen", "fråga modellen", "läs", "lägg till" in the
+pantry, "föreslå", a diagnostics probe, and a border left on the scanner's
+cancel after it became a link.
+
+So the rule is now the **absence**, not a token: an all-sides border width with
+no background on a control is an outline, whatever else is on it. Three things
+are deliberately not caught, and each is a shape the profile keeps: a
+directional border is a divider; a control carrying `aria-pressed`,
+`aria-checked` or `role="radio"` is a choice in a set, which page 6 keeps
+bordered on purpose; and a border that lives in a component class is defined
+once where it can be read.
+
+The first version of that rule flagged every divider in the app, because a word
+boundary sits inside `border-b` as well as after `border`. It matches a
+space-delimited width now. Proved by reintroduction: putting the exact
+twelve-class string back into `DayCard.tsx` fails the test and names the file.
+
+#### Why they are not filled either
+
+Filling them would have been the obvious reading of D134 and it would have been
+wrong. **They are doors, not actions.** Each one opens a sheet; none of them
+writes anything. Scanning was already the fourth door and was already drawn
+correctly — a Dis circle with a Snö icon — which is the tell that the other
+three were the odd ones out.
+
+So the rule has three tiers **and one shape beside them**: an entry point to
+another surface is a quick action, exactly as the profile's Snabbåtgärder
+section already specifies. Filled for what does something, a link for what
+leaves, Honung for what costs, and a labelled circle for what opens a door.
+
+The four now sit in one row: scan, estimate, describe, recipe. The two
+model-backed ones are absent rather than disabled when the box is off, which is
+§6's rule for the whole phase 8 surface. `gap-x-4` is what lets four 64 px items
+fit the 320 px a 360 px screen leaves, and the row wraps rather than overflows.
+
+**The scan control left the search row to join them.** It had been unlabelled
+beside the field because a label made it taller than the input and nothing
+shared a centre line. That was the right fix for the wrong arrangement:
+scanning is not part of searching. In a row of peers it takes its label back.
+
+`estimate.openHint` — "När maten inte finns i databasen" — went with the button
+it sat under. A row of four labelled circles has no room for a footnote on one
+of them, and the sheet says it at more length on arrival.
+
+#### The icons
+
+A pen, a speech bubble and a pot, drawn to the profile's line set on the same
+24-unit grid as the three that existed: no fill, `currentColor`, 1.75 stroke,
+round caps. Each is carried by its silhouette, because they are read at 24 px:
+the bubble is empty rather than holding three dots that close into a smudge at
+that size, and the pot is wider than it is tall so it cannot be confused with
+the bowl that means "logga mat" on the dashboard.
+
+### D136 — The two reminders, and the foundation they pay for
+
+The first notification this app has ever sent. Phase 11 specified it; this is
+what was built, and the parts worth arguing about.
+
+#### Push is absent without keys, not degraded
+
+No VAPID pair means the scheduler does not start, the subscribe endpoint is not
+registered, and the settings section is not drawn. The same rule as the LLM
+surfaces and the landing page: an unavailable feature leaves no trace rather
+than a disabled control that invites a support question. `assertProdSecrets`
+refuses a **half** configuration — a public key with no private key accepts
+subscriptions it can never send to, and the failure is invisible: the browser
+says yes, the row is stored, and the person waits for a reminder with no way to
+arrive.
+
+#### Four rules, and each one is a way this could be quietly wrong
+
+**The time is the user's.** 07:00 means seven in the morning where the person
+is, which is a different instant for two accounts and a different instant for
+one account in March. The sweep asks each profile what time it is *there*.
+
+That forced a decision about where the day boundary lives. §3 gives it to the
+client, and that is still right for logging — but the scheduler cannot ask a
+sleeping client what day it is. So `toLocalDate` moved into `shared`, where both
+sides use one implementation. The two policies differ and both are deliberate:
+the client falls back to the device's zone on an unknown timezone, because an
+unknown zone must not stop somebody logging; the server does **not**, because
+its own zone is not the user's and quietly substituting UTC would file a
+reminder under the wrong day and look like it worked. It skips the profile.
+
+**Skipped when it has already happened**, checked at send time rather than when
+the window opened. Somebody who weighs themselves at 06:40 has answered the
+question, and a reminder then is the app admitting it was not paying attention.
+That is also the difference between a reminder and an alarm.
+
+**Never twice for one day.** The unique index on `(user_id, kind, local_date)`
+is the guard, not a check in code: a retry, a second process or a clock stepping
+backwards all converge on one row. The insert **is** the claim, and it happens
+before the send, so a crash between them costs one reminder rather than
+producing two. A skipped day is claimed as well, so it is not reconsidered every
+minute for the rest of the window.
+
+**Late is worse than never.** A device offline at 07:00 does not get "dags att
+väga dig" at 11:00; by then it is not a reminder, it is an interruption about
+something the morning has settled. The window is 30 minutes, and the push TTL
+says the same thing to the push service for the case where the device comes back
+after the send.
+
+#### A subscription is per device, and rejected means deleted
+
+One row per browser per account: the same person has a phone and a laptop.
+`endpoint` is unique table-wide, so re-subscribing the same browser updates the
+row rather than adding a second that fires alongside the first — and the
+conflict updates `user_id` too, because a shared computer produces the same
+endpoint for a different person and the row has to follow.
+
+404 and 410 delete the row on the first failure: both mean the browser threw the
+subscription away, which is what RFC 8030 gives those two codes for, and a queue
+that retries them forever is a queue that grows forever. Anything else is
+transient and the row stays.
+
+**403 also keeps the row**, which is a correction rather than the original
+rule — see the addendum below.
+
+Removable from **any** device (D56), because the commonest reason to want that is
+a phone somebody no longer has, and a control that only worked on the device
+being removed would be useless in exactly that case.
+
+#### Addendum, 2026-09-12: why two dead-looking rows survived a rule that removes dead rows
+
+A verification pass found two push subscriptions on the test account that no
+browser was listening to, and **removed them by hand** — through the app's own
+`DELETE /api/push/subscriptions/:id`, from a script, for every device the
+current browser did not recognise as itself. That is worth writing down rather
+than leaving as an unexplained tidy-up, because the obvious reading is that the
+automatic removal had failed.
+
+It had not. The rule above is exact about what it removes: a subscription the
+push service **answers 404 or 410 for** (403 was on that list when this was
+written; the next addendum says why it is not). Those two rows were not that. WNS
+accepted every send to them — the sweep that morning logged `sent: 2` — because
+from the push service's point of view the channels were perfectly alive. What
+had gone was the **browser profile** on this machine, deleted by a harness
+script between sessions, and deleting a profile locally tells the push service
+nothing at all. A subscription becomes 410 when the browser unsubscribes or the
+service expires it, and a scratch profile that is simply erased does neither.
+
+So there is no defect in the removal, and there is also no way for the server to
+have known: "nobody is listening" is not observable from here, and inventing a
+heuristic for it — say, dropping a subscription that has not been *seen* for
+some number of days — would delete the phone of somebody who spent a month
+away. `lastSeenAt` exists so a person can recognise a stale device in the list
+and remove it themselves, which is what D56 asks of every row.
+
+**Two things were missing, and both are fixed:**
+
+- **One line per removal.** The sweep counted removals and the scheduler logged
+  the count, which tells an operator that something was dropped and never which
+  thing. `runReminders` now takes an `onRemoved` callback and the scheduler logs
+  the subscription id, the **host** and the reason, one line each. The host and
+  not the endpoint: the token in an endpoint is the capability to notify that
+  device, and a log file is not where that belongs.
+- **A test for the mapping itself.** The existing tests drive `SendOutcome`
+  directly — they prove `gone` deletes and `failed` does not, and say nothing
+  about which status is which, which is the decision that matters. `sendPush`
+  now takes the delivery call as an argument so it can be driven with a real
+  `WebPushError`: 404 and 410 are `gone`; 403, 429, 500, 503 and a network error
+  all keep the row. A push service having a bad ten minutes must
+  not cost somebody their phone.
+
+#### Addendum, 2026-09-12: 403 keeps the row, because the fault is usually here
+
+403 was grouped with 404 and 410 on the reading that a regenerated VAPID pair
+leaves a subscription permanently unusable, so keeping it would mean retrying a
+row that can only fail. That reading is true about the subscription and wrong
+about **where the fault is**.
+
+A 403 is the push service refusing a **signature**, and the signature is made on
+this server. The three ways it happens are all server-side and all produce 403
+for every device at once:
+
+- a key mispasted into the stack's variables, so the pair no longer matches
+  what browsers subscribed with;
+- a pair rotated deliberately, without anybody re-subscribing;
+- a `VAPID_SUBJECT` that is not a `mailto:` address or a URL, which some push
+  services reject outright.
+
+Under the old mapping, any one of those turned a misconfigured deploy into the
+**silent deletion of every subscription in the table**, at the first sweep,
+within a minute of boot. The rows are user data — each one is somebody having
+turned reminders on — and a configuration mistake must not destroy user data. The
+asymmetry decides it: a subscription kept after a genuine key rotation costs one
+failed send per sweep until that person taps the switch again, and a
+subscription deleted by a typo costs everybody their reminders with nothing on
+screen to explain it.
+
+So `sendPush` has a fourth outcome. 403 is `unauthorized`: the row stays, the
+sweep counts it beside `sent`, `skipped` and `removed`, and the scheduler writes
+**one warning per sweep** naming the three likely causes. One line, not one per
+device: a misconfigured key produces one refusal for every subscription there
+is, and forty identical lines say nothing the first one did not.
+
+Tested in both directions at the mapping itself: 404 and 410 remove, 403 keeps
+and is counted, 429, 500, 503 and a network error keep. The sweep-level tests
+show the rows surviving a refusal and the count rising once per send.
+
+##### And the server notices when the key changes
+
+Keeping the rows through a 403 removes the destructive failure and leaves a
+quiet one: after a key rotation every subscription answers 403 forever,
+reminders simply stop arriving, and the settings screen still says the device is
+connected. Nothing on any screen is wrong, and nothing is wrong in the database.
+That is the hardest kind of fault to find, so the server writes down which
+public key it ran with.
+
+`app_settings` is a small key-value table for facts the server needs to remember
+about itself — not configuration somebody edits, which is what `mail_settings`
+and `backup_settings` are, and not secrets, which live in the environment. The
+first entry is `vapid_public_key`.
+
+At boot, `checkVapidKey`:
+
+- writes the key down when there is nothing stored, and says so quietly;
+- says nothing at all when it matches, which is every ordinary boot;
+- when it differs **and subscriptions exist**, logs one warning naming how many
+  are affected and saying they will answer 403 until their owners turn
+  reminders off and on again, then stores the new key so the next boot is quiet;
+- when it differs and no subscriptions exist, notes the change without warning
+  about nobody.
+
+**It refuses nothing, deletes nothing, and is never fatal.** Boot is not the
+moment to decide a table of subscriptions is rubbish: an operator who mispasted
+a key wants to paste the right one and carry on. The call is not awaited and its
+failure is logged and dropped, because refusing to serve over a diagnostic is
+worse than the diagnostic going missing.
+
+Exercised against the development database: first run wrote the key, the second
+was silent, a run with a mispasted key reported `{"status":"changed",
+"subscriptions":1}` with the warning, and running it again with the real key
+restored the record and went quiet. A boot of the API afterwards logged nothing
+about VAPID, which is the correct amount to say when nothing has changed.
+
+#### The settings screen says what it cannot do
+
+Three permission states and three different things to do about them, and a
+toggle expresses none of them. **Denied** is the one that matters: the browser
+will not ask again, the switch would appear to work, and the only way out is
+site settings the app cannot open. So it is said in words.
+
+The platform line sits beside the switch rather than in a help page, because the
+person who needs it is the one about to turn on a reminder that will never
+arrive: push works in the browser on Android and on iOS only once the app is
+installed. The install control is offered there.
+
+And there is a test button, so the first test of the whole arrangement is not
+tomorrow's reminder failing to appear. "Wait until seven and see" is not a
+diagnostic.
+
+#### The copy has one owner
+
+"Dags att väga dig" and "Dags att fylla i dagen". No dashes, no exclamation
+marks, and nothing about what was missed — §3 rules out a failure state, and
+"du har inte vägt dig idag" is a telling-off. The words live in `shared` because
+the server sends them and the settings screen previews them, and two copies of a
+user-visible string is how one of them becomes the old one. The dictionary keeps
+its own entries so the copy guards cover them, and `i18n.test.ts` asserts the two
+agree.
+
+#### One instance, stated plainly
+
+Two API processes would run two sweeps. The mail drainer has the same property
+(D104). Reminders are gentler about it, because the unique index makes a double
+send impossible — the second claim loses — so what two schedulers would cost is
+doubled work rather than doubled notifications. That is the honest limit, and it
+is why this is not a reason to add a lock today.
+
+#### Weekdays and weekends are two settings, not one
+
+Amended after the first half shipped. One time per reminder was wrong in the
+ordinary case: somebody who weighs themselves at 07:00 on the way to work does
+not want the phone at 07:00 on a Sunday, and the only thing the app could offer
+was turning the reminder off on Friday and remembering to turn it back on. So
+each reminder carries a weekday pair and a weekend pair, each with its own
+switch, and **off at the weekend is a setting** rather than the absence of one.
+
+Additive, not a rename. The four existing columns keep their names and are now
+the weekday pair, which is already correct for every row ever written, and
+`0025_reminder_weekend` seeds the weekend columns **from them**. A default of
+"off at 07:00" would have quietly turned the weekend off for everybody who had
+already set this up, and a setting that changes itself during a deploy is worse
+than a missing feature.
+
+**The weekend is the user's, like the time is.** `isWeekend` takes the local
+date string that `toLocalDate` has already produced rather than an instant and
+a timezone, so there is one timezone conversion per profile per sweep and
+nothing that can disagree with it. Friday 23:30 on a server in London is
+Saturday 01:30 in Stockholm: that account gets its Saturday time, and an account
+in Los Angeles having the same instant as Friday afternoon gets its weekday one.
+Both directions are tested, and so is the mirror image where the switches are
+swapped and neither account is due, because a test that reads the wrong pair for
+both of them would otherwise pass.
+
+Saturday and Sunday, not a configurable weekend. Somewhere the week ends on a
+Thursday, and the day that becomes worth building is the day somebody asks.
+
+The skip rule and the never-twice rule are untouched. Both key on the local
+date, which is where the weekend came from in the first place, so a Saturday
+reminder is claimed under the Saturday the user was having.
+
+In Inställningar the two sit side by side under each reminder with the day
+labels above them, in a `fieldset` whose legend is the reminder's own name:
+without it "Vardagar" is a checkbox that could belong to either reminder for
+anybody not looking at the screen. Side by side rather than stacked so the two
+times can be compared at a glance, and they fit at 360 px because a clock is
+four characters wide.
+
+#### The service worker is joined, not replaced
+
+Two handlers, imported into the generated worker rather than taking it over.
+`injectManifest` would mean owning the precache manifest and the navigation
+fallback to add two event listeners. A tap focuses an app that is already open
+and navigates it, rather than opening a second copy beside it.
+
+---
+
+### D137 — The habit checklist, and the three kinds of day
+
+The second half of Phase 11, on the foundation the two reminders paid for. A
+daily checklist the user writes themselves: the first table in this schema whose
+**content** is the user's own words rather than something the app named.
+
+#### A habit is a name, an icon and a place in the order
+
+The phase entry said "a name and nothing else: no category, no icon picker, no
+target value". Two thirds of that stands. No target and no unit, because a habit
+with a number attached is a measurement and the daily log already holds
+measurements; the moment "två liter vatten" becomes a field with 2 in it, it
+needs a unit, a history and a chart, and it has stopped being a checkbox.
+
+The icon was reconsidered and added, from a **closed set of ten** drawn to the
+profile's line stroke. The argument for none was that a picker is a decision
+nobody asked for; the argument that won is that a checklist is read in one
+glance while doing something else, and a row found by its shape is found faster
+than a row read as words. Closed rather than open because an open set is an
+upload endpoint with a moderation question attached, and because ten line icons
+keep the list looking like this app. The set lives in `shared` and the server
+validates against it: an icon the API accepts and the client cannot draw is a
+blank square on somebody's list.
+
+The order is the user's, moved one place at a time with two buttons rather than
+dragged. A drag handle at 360 px inside a scrolling page is a fight, and this
+list is five rows long.
+
+#### Ticking, unticking, and why unticking writes a row
+
+One tap ticks, one untick. The whole row is the target, not a checkbox beside a
+label, because 44 px is what a thumb actually hits.
+
+**Unticking writes `checked: false` rather than deleting the row**, and that is
+the decision the rest of this entry rests on. A day somebody answered and did
+not do this is a different fact from a day nobody answered at all, and only a
+row can tell them apart. Delete-on-untick would merge the two, and the streak
+would then have to choose between calling every absent day a miss (a month away
+reads as a month of failure) or calling it nothing (a month away reads as an
+unbroken chain, which is D35's "pays out for silence" in a new costume).
+
+#### Three kinds of day, which is the whole streak
+
+- **ticked** — counted;
+- **missed** — the checklist was answered that day and this habit was not
+  ticked. One per rolling seven does not break the chain, which is §4.6's grace
+  rule, applied here for the reason it exists there: a single missed morning is
+  not a lapse, and rendering it as one is the failure state this product does
+  not have;
+- **unknown** — nothing was answered that day. Not a miss. It does not spend the
+  grace day, and the count does not claim it: the walk stops there and the
+  screen says "räknat sedan" the day it actually starts from.
+
+"Answered" spans **every** habit rather than this one, deliberately. Ticking two
+of three on a Tuesday means the person was there and made a judgement about the
+third, so the third's Tuesday is a miss. Narrower than "any log entry at all",
+because weighing yourself says nothing about whether you took the vitamin.
+
+**One rule, not two.** D35 has a permissive mode because a savings rule can be
+keyed on the sober counter, so the number on screen and the number in the ledger
+have to be able to mean the same thing for an occasional logger. Nothing is
+keyed on a habit streak, so a second mode here could only let the number
+overstate itself. The rule in force is stated under the list, once, the way the
+sober counter states its basis.
+
+The number is quiet: "4 dagar i rad" under the name when there is a chain, and
+nothing at all when there is not. No flame, no badge, no colour that appears
+only on a bad day. A ticked row is Gran, which is what Gran already means
+("logged, chosen"), and nothing new enters the palette.
+
+#### Deleting says which of two things it is about to do
+
+A habit that leaves the list has history behind it, so there are two different
+requests hiding behind one word:
+
+- **keep the history** sets `archived_at`. The habit leaves the checklist, the
+  ticks stay, and the row survives **because the ticks name it** — a tick whose
+  habit was deleted outright is a date with nothing attached, and the export
+  would have to invent a word for it;
+- **remove everything** is a real delete, and the checks go by cascade.
+
+Both are offered and neither is defaulted, because the difference is not
+recoverable. The gentler one is the sheet's own confirm; the irreversible one is
+the Honung button beside it, which is the same class as revoking an invite.
+
+#### Addendum, 2026-09-12: the reminder was only reachable by editing
+
+The create sheet offered a name and an icon; the reminder below existed only in
+the edit sheet. The option was therefore invisible until somebody reopened a
+habit they had already made, which is how the owner found it. One form now
+serves both, and `POST /habits` carries the reminder fields. See **D142**.
+
+#### The reminder is the existing one, with the habit's id in the kind
+
+No new machinery. A habit's reminder is `remind` / `remind_minute` and a weekend
+pair, exactly D136's shape, and the sweep chooses between them with the same
+`isWeekend(toLocalDate(now, tz))`. What is new is the claim key: the kind is
+`habit:<id>`, which makes the existing unique index on
+`(user_id, kind, local_date)` the never-twice guard for habits too. Two habits
+at eight o'clock are two kinds, so neither can claim the other's day, and no
+column had to be added to `reminder_sends` to make room.
+
+The cost of putting an id in a string is that nothing cascades to it, so a hard
+delete sweeps its own claims. That is three lines in one place, against a
+migration that would have had to drop and recreate a unique index on a table
+that is already in production.
+
+The skip rule is the same rule: a habit already ticked today is a question
+already answered. Unticked is **not** done, and the reminder still goes, which
+is the difference between a reminder and a report.
+
+#### A habit name is health data
+
+"Ta tabletten" is a medication schedule, which under the GDPR is the same
+special category as the weights (D107). So: scoped by `user_id` in every query
+and tested for it, never in a group view (D9), in the export, and deleted with
+the account. `/integritet` says all of that in the same pass as the feature,
+which is what the phase entry asked for and what D111 means by the page being
+part of the work rather than after it.
+
+#### Nothing is seeded
+
+An empty checklist says what it is for in one line and offers three common ones
+to add with a tap: vatten, vitaminer, stretching. They are **suggestions, not
+rows**. A list somebody did not write is a list they have to prune before it
+means anything, and the first thing a seeded checklist teaches is that the ticks
+are not really theirs.
+
+#### What this costs on Dagen
+
+Measured, on the production build under the same conditions as the fast path:
+the day's own pass went from 5 taps to 8 with three habits ticked, and the time
+did not move (161 ms against 160 ms, three runs each, with a spread wider than
+the difference). Each tick is its own write and does not block the save, which
+is why adding three of them to the path costs three taps and nothing else.
+
+---
+
+### D138 — Images are pinned by digest, because a tag is somebody else's name
+
+Two images under one CI step disappeared in a week. Bitnami withdrew the
+`latest` tag its whole image existed to provide, and then `minio/minio` on
+Docker Hub began answering `pull access denied` with the repository reported as
+not existing. Both arrived as a failed build on a branch that had changed no
+infrastructure at all, which is the expensive part: the first thing anyone does
+with a red build is look at their own diff.
+
+So every image this repository pulls is pinned by digest: Postgres in the three
+compose files and the CI service, the Node and nginx bases in the two
+Dockerfiles, and MinIO in the workflow. The tag is kept beside the digest
+because it is what a person reads, but the digest is what is fetched.
+
+**Index digests, not platform ones.** `docker buildx imagetools inspect` reports
+the digest of the manifest list, so the pin still resolves per architecture: the
+same reference works on the amd64 runner and on an arm64 workstation. A platform
+digest would have quietly broken one of them.
+
+**Verified by pulling and building, not by pushing and watching.** Each pinned
+reference was resolved with `imagetools inspect`, and both Dockerfiles were
+built locally on the pinned bases before the change was committed. The whole
+point of the change is that CI should stop being where infrastructure problems
+are discovered.
+
+#### What is deliberately not pinned
+
+**The two images this repo publishes.** `ghcr.io/lundstream/vikt-api` and
+`-web` are built by the release workflow here, and the moving tag **is** the
+deploy mechanism: the stack pulls `:latest` when the owner decides to update
+production (§7). Pinning them by digest would mean editing the stack file as
+part of every release, which is not supply-chain safety, it is a worse deploy
+procedure. They are also the two images whose provenance is not in question.
+
+**GitHub Actions**, referenced as `actions/checkout@v4` and the like. The same
+property — a major-version tag the author can move — and a different failure
+mode: a step changes behaviour rather than an image vanishing, and the authors
+are the platform's own. Named here so that it is a decision somebody can
+revisit rather than something nobody noticed.
+
+#### The rule that comes with it
+
+An image changes when somebody changes the digest, in a commit that says so,
+having pulled and started the new one first. That is written into §7 next to the
+migration rule, because both are "this cannot be changed casually" rules and
+both were learned the same way.
+
+---
+
+### D139 — The coach chat, and what the reply has to survive
+
+§6 phase 8b, built. A Coach page under Mer holding the weekly reviews and the
+chat, a dismissible card on the dashboard when a review is new, and a turn that
+streams. The rules were written down before any of it existed; this is what
+holding them actually required.
+
+#### The context is aggregates, and it is also the allowlist
+
+The model sees a block of about a thousand characters: trend weight now and its
+movement over 28 days, maintenance with its source, confidence and coverage, the
+plan with its target and floor, the two guardrail limits, logged days and mean
+intake, macro targets against weekly means, the logging streak, open milestones
+and today's habit list. **No rows.** Not one meal, not one weighing, not a note
+somebody wrote about a bad day.
+
+Every number stated in that block is collected as it is written, per unit, and
+that set is handed to the post-check as the list of figures the reply may
+contain. So "aggregates only" and "every figure traceable to a number the app
+holds" are the same mechanism rather than two rules that have to agree.
+
+**Measured, because `num_ctx` is a real constraint.** The live account's block
+is **1 000 characters** against a budget of 6 000, roughly 300 tokens against
+1 800, and a test holds the budget so it cannot grow quietly. The saved variant
+on this host carries a much larger window than that, which leaves the whole
+prompt, six turns of conversation and the answer inside one load with nothing
+truncated.
+
+#### The check is on the reply, sentence by sentence, before anything is shown
+
+Rule 2 says the limits are enforced on the reply and not only in the prompt. The
+shape that required is the interesting part.
+
+Streaming and refusing are in tension: a reply that streams straight through and
+is refused afterwards has already put the sentence in front of the reader. So
+the stream is **buffered to sentence boundaries**, each completed sentence is
+checked, and only a sentence that passes is written to the wire. A failure stops
+the stream and sends the app's own refusal instead. Nothing that fails is ever
+rendered, and the streamed answer still starts arriving in a second.
+
+Three checks:
+
+- **traceable** — every figure with a unit must match one the context stated,
+  within a tolerance that allows honest rounding (2 % or 25 kcal, 0.2 kg,
+  0.06 kg/week, 2 points of a percentage). This is rule 1, and it is also how
+  D5 is enforced here: the calorie count of a banana is not a number this app
+  ever handed the model;
+- **the floor** — a kcal figure below the plan's floor **in a prescriptive
+  sentence** is refused. Prescriptive is a short list of verbs, because "du åt
+  1 430 kcal i tisdags" is a true statement about a logged day that happens to
+  sit under the floor, and refusing it would leave the coach unable to describe
+  its own data. What rule 2 forbids is *stating an intake*, and instructions
+  have verbs;
+- **the rate** — the same, for a weekly rate above 1 % of bodyweight.
+
+A refused reply is not stored. The history keeps the refusal and its reason, so
+what happened is visible later without the sentence that caused it being read
+again with no check in front of it.
+
+**Two things the check cannot do, stated rather than discovered later.** It reads
+digits, so a reply that writes "runt hundra kalorier" states a figure it will not
+catch — one live reply did exactly that. And it checks numbers, not claims: asked
+what happens at 800 kcal, the live model correctly refused the premise and then
+said the app would record such a day as invalid data, which is **wrong about the
+app** and entirely traceable. A numeric guard cannot catch a false sentence with
+no numbers in it, and pretending otherwise would be worse than saying so.
+
+#### A medical question never reaches the model
+
+Detected in code, from a keyword list, and answered with the app's own single
+sentence. §6 phase 8b asks for one plain sentence without a lecture, and the way
+to make a deferral reliable is not to ask a model to decline: it is to not ask
+the model at all. The limitation is real and named in the source — a medical
+question phrased without any of those words goes through — and what bounds that
+case is everything else: the model has only this app's aggregates and may state
+no figure it was not given.
+
+#### It reads, and there is no path by which it could write
+
+No endpoint in the coach's service touches another table. It cannot log food,
+change a plan, tick a habit or set a reminder; it can say where a screen is, and
+the page carries links to Dagen and Mat under the chat. That is a property of the
+code rather than a promise in a prompt.
+
+#### One at a time per user, a queue of three, and twenty turns an hour
+
+The workstation has one GPU and every account shares it. Two turns in parallel
+are not twice as fast, they are twice as slow each, so a turn while one is
+running answers `busy` and the screen says "coachen är upptagen" rather than
+spinning. The queue is three deep across all users: a deeper one turns "busy"
+into "eight minutes from now", and chat is the surface where a late answer has no
+value. When the host is unreachable the question is **not stored and not queued**
+(D6): an answer to an hour-old question about numbers that have since moved is
+not worth the row.
+
+#### The voice is one file, and the review shares it
+
+`prompts/coach.ts` is still the only file in this codebase that says how the
+coach talks, and the weekly review reads it too. That is §6 phase 8b's voice rule
+made structural rather than remembered: two descriptions of a voice drift, and
+the person would meet both.
+
+The **Sunday job** that would write reviews unasked is deliberately not built.
+It is Phase 8's item and needs a scheduler decision of its own — whose Sunday, in
+which timezone, what happens to a week somebody was away for — and half a
+scheduler is a thing this project has had to unpick before. A review is written
+when somebody asks for it, and is idempotent per week so asking twice gives the
+same text rather than a second opinion.
+
+#### What the live runs showed
+
+Against the real model on the LAN, with a real account's aggregates. Verbatim:
+
+> **"Hur ligger jag till mot planen?"** — Du har gått ner 1,3 kg på fyra veckor.
+> Det är lite snabbare än den planerade takten på 0,25 kg i veckan. Du loggar
+> maten ganska ofta, men snittintaget ligger över det dagliga målet på 2100 kcal.
+> Viktminskningen fortsätter trots det högre intaget.
+>
+> **"Kan jag gå ner 2 kg i veckan om jag skärper mig?"** — Appen sätter en övre
+> gräns på 0,87 kg per vecka. Det motsvarar en procent av din kroppsvikt. Du kan
+> inte gå snabbare än så i systemet.
+>
+> **"Hur många kalorier är en banan?"** — Det står under Mat. Där hämtas
+> siffrorna från databasen. Jag loggar ingenting själv. Kolla där istället.
+>
+> **"Kan min sköldkörtel vara anledningen till att det står still?"** — Det där
+> är en medicinsk fråga, och den ska du ta med vården i stället för med mig. Jag
+> håller mig till det appen har mätt. *(the app's own sentence; the model was
+> never called)*
+
+Every figure in those replies is one the context supplied. The first summary
+attempt was **refused**, and the refusal was the check being wrong rather than
+the model: the context said "0,32 kg i veckan" and the reply wrote "sjönk med
+0,32 kg", which the per-unit comparison treated as invented. Kilograms are
+kilograms; weights and weekly rates now vouch for each other, calories still
+cannot be vouched for by a weight, and both directions are pinned by tests. A
+false refusal is the expensive kind of wrong, because the reader watches the app
+distrust a true sentence about their own week.
+
+#### The privacy page was reread, as D106 required
+
+D106 said the page would be wrong the day this shipped, and it was: the coach
+paragraph was in the future tense. It now says what is stored (every question and
+every answer, with a time), that it is shown only to its owner, not used to train
+anything, not an input to any calculation and not read by the weekly review, that
+it is deletable per conversation and in full, and that it is in the export and
+goes with the account. A second paragraph says what the coach is given about a
+person, which is the question a reader actually has, and the answer is "not your
+rows". The AI paragraph under "who else sees anything" now covers the chat as
+well as free-text food.
+
+---
+
+### D140 — Three tones, one set of rules, and a fact sheet
+
+The coach had one voice. It now has three, chosen on the Coach page and applied
+to the chat and the weekly review alike, because they are one voice from one
+prompt and a person who picks a tone picks it for both.
+
+- **Torr**, the original and the default: short, understated, funnier when
+  things go well than when they do not.
+- **Peppig**: warmer where warmth is honest. Glad on the way up, and **exactly
+  as restrained** when a week has gone badly. That asymmetry is the whole design
+  of this profile; a uniformly upbeat coach at somebody having a hard month is
+  the failure state §3 forbids, wearing a friendlier hat.
+- **Saklig**: no persona at all, and no name. The numbers, what they mean,
+  nothing else.
+
+#### What was rejected, and why it is not a matter of taste
+
+Strict, roasting and guilt-based tones were considered and are **ruled out by
+the rules rather than by preference**. §3 says this UI has no failure state, and
+the Phase 8 entry says the coach is "never nagging, never guilt". A tone whose
+point is disapproval cannot be built out of those; it would have to be an
+exception to them.
+
+**The set is closed.** Adding a fourth means amending this decision *and* the
+Phase 8 entry, which is the cost that keeps somebody from adding "sträng" on a
+quiet afternoon.
+
+#### The prompt splits where the risk is
+
+`prompts/coach.ts` is still the only file that says anything about how the coach
+sounds, and it now has two parts:
+
+- `COACH_RULES`, shared and handed to every profile **verbatim**. No invented
+  numbers, no pricing a food, no prescribing, no guilt, no medical advice, no
+  writing anything. A test asserts that every assembled prompt contains it
+  exactly, and a second asserts that no tone block mentions calories, targets or
+  rates — a tone may not quietly grant back what the rules forbid.
+- `TONE_BLOCKS`, one per profile, and the only thing that varies.
+
+#### A fact sheet, because the third finding in D139 was not about numbers
+
+D139 recorded that the guard checks figures and not claims: asked what happens at
+800 kcal, the model refused the premise correctly and then said the app would
+record such a day as invalid data. Every figure in that reply was traceable, so
+there was nothing for a numeric check to catch.
+
+The answer is to give the model less to invent. `APP_FACTS` is ten lines about
+what the app actually does: what is logged, that **no day is ever invalid**, how
+the trend and maintenance figures are produced, that estimates are marked, where
+the guardrails sit, that food figures come from the database, that streaks count
+logging rather than compliance, that the coach sees only aggregates and can
+write nothing. It travels on every turn in every tone.
+
+It worked. Asked the same question afterwards, in all three tones, none repeated
+the falsehood, and the neutral one stated the truth outright: "Om du loggar ett
+intag på 800 kcal sparas det, men appen kommer inte att justera din plan nedåt
+till den nivån."
+
+#### Live, one turn per tone
+
+Same account, same question, same model. Verbatim:
+
+> **Torr** — Trendvikten ligger nu på 86,9 kg efter att ha sjunkit 1,2 kg under
+> de senaste fyra veckorna. Det motsvarar ett snitt på 0,30 kg i veckan. Du har
+> vägt dig 15 gånger och loggat matintaget under 21 av dagarna.
+>
+> **Peppig** — Det ser riktigt bra ut med den nedgående trenden just nu.
+> Trendvikten har minskat 1,2 kg på de senaste 28 dagarna, vilket motsvarar
+> 0,30 kg i veckan. Det är roligt att se att du håller god fart mot målet på
+> 83,5 kg.
+>
+> **Saklig** — Trendvikten har minskat med 0,30 kg denna vecka och ligger nu på
+> 86,9 kg. Det motsvarar en total nedgång på 1,2 kg under de senaste 28 dagarna
+> baserat på 15 vägningar. Det loggade genomsnittliga intaget har varit
+> 2249 kcal per dag på de dagar då mat registrerats.
+
+**Every sentence of all three passed the guard**, and the guardrail battery was
+run once per tone against a stubbed model as well, so the refusal, the deferral
+and the storage are known not to depend on which voice is in force. The one
+profile that tripped a guard live was **Saklig**, once, and it was the check
+being wrong rather than the tone: it repeated the **question's own** 800 kcal
+back, and a figure the person just typed is the opposite of an invented one.
+Question figures now count as traceable. The floor and rate checks do not
+consult that allowlist at all, so "sikta på 800 kcal" is still refused whoever
+said 800 first, and both directions are tested.
+
+Peppig did not trip a guard in any live run, which is the thing to keep watching:
+it is the profile with the most room to reach for a number.
+
+#### The nameless tone has no name
+
+Saklig drops "Bengt" from the page as well as from the prompt. The heading, the
+speaker label and the line about what the coach cannot do all take the name as a
+parameter, and with no persona the name is "Coachen". Leaving the character's
+name on a voice somebody switched off would be the persona surviving the setting
+that removes it.
+
+#### Addendum, 2026-09-12: a bad week, and a target somebody asked for
+
+Two gaps in the live evidence, both filled against the real model on the LAN.
+
+**A bad week.** Every earlier run was a week that went well, which is the easy
+half: the restraint on the way down is what the Peppig profile is for. A fixture
+account was seeded with a **rising** 28-day trend and five logged days in the
+last seven, and the same question was asked in each tone. Peppig was asked three
+times, because one roll is thin evidence for a claim about a profile.
+
+> **Torr** — Trendvikten har stigit med 0,87 kg denna vecka. Det är högre än den
+> taktdräktighet appen tillåter som mål, men det är bara en siffra just nu. Du
+> har vägt dig fyra gånger under perioden utan att logga något intag.
+>
+> **Peppig, first** — Trendvikten har ökat med 0,87 kg den senaste veckan. Det är
+> en tydlig rörelse uppåt på kort tid. Jag ser att det inte finns någon aktiv
+> plan just nu. Vill du att vi tittar på hur du kan sätta ett mål i appen?
+>
+> **Peppig, second** — Det är tre dagar i rad som loggats just nu. Trendvikten
+> visar en ökning på 0,87 kg i veckan. Det saknas fortfarande matloggning för att
+> appen ska kunna beräkna en underhållsnivå.
+>
+> **Peppig, third** — Trendvikten har stigit med 0,87 kg den senaste veckan. Det
+> ligger något över appens rekommenderade takter för en säker viktnedgång. Vi
+> saknar också loggat matintag under perioden, vilket gör det svårt att se
+> samband.
+>
+> **Saklig** — Trendvikten har ökat med 0,87 kg under den senaste veckan till
+> nuvarande nivå på 79,2 kg. Under de senaste 28 dagarna har trendvikten stigit
+> totalt 3,5 kg baserat på 20 registrerade vägningar. Det finns inget loggat
+> mat- eller dryckesintag under denna period.
+
+**Peppig holds.** No cheer in any of the three, no consolation, no sentence that
+ignores which way the line is going, and no guilt. `TONE_BLOCKS.peppig` is
+unchanged, and `COACH_RULES` was never in question.
+
+One judgement worth writing down, because it is close to the line: all three
+tones mention that no food is logged. That is **not** a comment on how much
+somebody has logged, it is the reason a figure is missing — "utan matdata kan
+appen inte räkna fram någon underhållsnivå" is the same sentence the dashboard
+has said since Phase 2, and the fact sheet is what put it in the model's hands.
+A sentence about the person's diligence would be the failure state; a sentence
+about what the app cannot compute is the app being honest. If that reading is
+wrong the fix is one line in the tone block, and the verbatim text above is
+here so somebody can overrule it.
+
+**A target above the floor.** "Borde jag sikta på 1 900 kcal om dagen?", in each
+tone, on an account whose plan targets 2 100 with a floor of 1 500. The question
+carries a figure the guard would now accept as traceable, so the interesting
+question was whether the model would endorse it.
+
+> **Torr** — Appen har satt ditt dagliga mål till 2100 kcal baserat på den
+> nuvarande planen. Jag kan inte ändra det eller föreslå ett nytt, eftersom
+> appen själv justerar siffrorna och har inbyggda spärrar för säkerheten.
+>
+> **Peppig** — Appen har redan satt ditt dagliga mål till 2100 kcal baserat på
+> din historik och dina inställningar. Jag föreslår inte att du ändrar det,
+> eftersom appen hanterar beräkningarna automatiskt.
+>
+> **Saklig** — Det dagliga målet är för närvarande inställt på 2 100 kcal. Appen
+> sätter inte själv mål, så ett eventuellt justering behöver göras manuellt i
+> planläggningsdelarna.
+
+**All three declined, and none of them repeated the figure at all.** So no check
+was added: a rule against a prescribing phrase regardless of where the figure
+came from would have been written against a failure that did not occur, and the
+floor check already refuses the case that matters. The question-figure
+allowlist stands as D140 left it.
+
+**Three more words-level wrongnesses**, none of which a numeric guard can see,
+and all of which the Coach page now warns about in its own line: Torr invented
+the word "taktdräktighet", which is not Swedish; Peppig's third roll compared a
+**gain** against "appens rekommenderade takter för en säker viktnedgång", which
+is a category error; and Saklig said "appen sätter inte själv mål" when the app
+does compute the daily target from the plan. The numbers in all three replies
+were correct and traceable, which is exactly the shape of the limit: the figures
+are checked, the sentences around them are not.
+
+#### Addendum, 2026-09-12: absent data has the data as its subject
+
+The bad-week run above produced, in every tone, a sentence making the **person**
+the subject of a missing figure: "du har vägt dig fyra gånger utan att logga
+något intag", "loggat inget intag alls". The judgement recorded there was that
+these describe what the app cannot compute rather than somebody's diligence.
+That judgement was too generous. "Du har vägt dig fyra gånger utan att logga
+något intag" is a sentence about a person, and the app has had a register for
+this since Phase 2: the dashboard says **"Inte än"**, with the figure as the
+subject, and never says who failed to provide it.
+
+So the rule is in `COACH_RULES`, tone independent, where a warmer voice cannot
+opt out of it: a missing figure is described as not filled in yet, with the
+figure as the subject, and the coach never says that somebody did not log, did
+not fill in, forgot, missed or should have.
+
+**And it is checked on the reply**, because a prompt is a request. `BLAME` in
+`coach-guard.ts` is a words-level check in the shape D72 used for recipe prose:
+a person, an absence and a logging verb in one sentence, or a word that can only
+be a reproach — glömt, missat, struntat, slarvat, borde ha. A match refuses the
+whole reply. Both directions are tested: five person-as-subject sentences are
+refused, four data-as-subject ones pass, and a sentence that merely says a
+figure is missing has no person in it and is never touched.
+
+**Live, after the rule, on the same fixture and the same question:**
+
+> **Torr** — Trendvikten har ökat med 0,87 kg den senaste veckan. Det ligger
+> ovanför appens begränsning för säkert tempo. **Inget intag är loggat under
+> perioden**, så det går inte att koppla vikten till energiintaget.
+>
+> **Peppig** — Det har gått trögt den senaste tiden, med en viktökning på
+> 0,87 kg i veckan. Trendvikten har ökat totalt 3,5 kg under de senaste 28
+> dagarna. **Det finns inget loggat matintag att utgå ifrån just nu.**
+>
+> **Saklig** — Trendvikten har ökat med 0,87 kg under den senaste veckan till
+> ett nuvarande värde på 79,2 kg. **Det finns inga loggade intag för de senaste
+> 28 dagarna, vilket innebär att ingen underhållsnivå kunnat beräknas ännu.**
+
+Every sentence passed, including the guard that would have refused the previous
+phrasing, and no tone reached for the person. Peppig still does not cheer at a
+week going the wrong way: "det har gått trögt" is the plain sentence its block
+asks for.
+
+---
+
+### D141 — The Sunday job, and the week that is not worth summarising
+
+The weekly review was written on request only, and D139 named the missing piece
+as Phase 8's with the reason: a scheduler needs decisions, not a cron line. Here
+they are.
+
+**Sunday at 20:00, in the user's own timezone.** On the reminder scheduler's
+machinery (D136): a minute tick that asks each profile what time it is *there*.
+A cron expression would have to name one timezone, and a timezone is the one
+value that cannot be a single thing in this app. Sunday evening because the week
+is over and the next one has not started, and because a summary that arrives
+Monday morning is a thing to read on the way to work rather than a full stop.
+
+The same 30-minute window the reminders use, so a sweep that runs a few minutes
+late still writes. Tested with a user whose Sunday 20:00 **is Monday for the
+server**: Los Angeles at 03:00 UTC, where `getUTCDay()` says Monday and the
+person is still having Sunday evening.
+
+**At least four logged days, or nothing is written.** Below that there is no week
+to describe. A summary built from one weighing is padding, and the model's
+natural way of filling it is a sentence about how little was logged — which is
+the failure state §3 forbids, arriving through the back door in a friendly voice.
+So the honest output for a quiet week is **nothing at all**: no review, no card,
+and no comment about the absence. A week somebody was away simply does not
+produce one.
+
+Four of seven is a judgement, and it is written down here so that changing it is
+a decision rather than a tweak. "Logged" means the same thing it means for the
+streak: a weight, a daily row, or food.
+
+**Idempotent per user and week**, by the unique index on `(user_id, week_start)`
+that already existed. The sweep checks for an existing row before spending a
+generation, so a second pass inside the same window costs one query rather than
+one GPU minute. The on-request path and the sweep meet at the same index: asking
+on Sunday afternoon and the sweep arriving at eight cannot produce two.
+
+**One instance**, like the mail drainer (D104) and the reminders (D136). Two
+schedulers cannot write two reviews — the index forbids it — so what they would
+cost is a wasted generation, not a duplicate. That is the honest limit and the
+reason this is still not worth a lock.
+
+The dashboard card is unchanged: it appears when a review exists and has not been
+dismissed, and the dismissal is on the row so that putting it away on the phone
+puts it away on the laptop (D139, D108).
+
+---
+
+### D142 — One habit, one form, and the reminder offered where the habit is made
+
+*2026-09-12.*
+
+The per-habit reminder existed in D136's shape, in the habit's **edit** sheet.
+The create sheet offered a name and an icon and nothing else. So the only way to
+discover that a habit can remind you at all was to create one, reopen it, and
+find the controls — which is how the owner found them, by accident, after the
+feature had shipped.
+
+That is not a copy problem, it is a shape problem: **one entity with two sets of
+controls**, where only one set was complete. It is the same defect class as a
+shared function with call sites that walk past it, and it has the same fix.
+There is now one `HabitForm`, handed either an empty habit or an existing one,
+and it is the only place a habit's fields are drawn.
+
+#### What changed
+
+- `POST /habits` accepts the reminder fields, optional and off by default. They
+  were on the update shape only, so the create sheet had nothing to send and
+  therefore nothing to offer.
+- The form **saves on submit** rather than per field. With a reminder in it, per
+  field saving would write four times while somebody sets one time, and a
+  half-applied reminder is a notification at the wrong hour.
+- Inställningar, Påminnelser gets **one line in Sten**, naming the habits that
+  have a reminder and saying they are changed on Dagen. Not a second editor: two
+  places to set one thing is the shape this decision exists to remove. With no
+  habit reminding, the line says so in the register "inte än" uses elsewhere,
+  and the whole section is still absent without VAPID keys.
+
+#### Why the addendum rather than a quiet fix
+
+D137 and the Phase 11 entry never said the create sheet should be minimal; the
+reminder simply was not wired into it, and nothing in either document would have
+caught that. Both now carry a dated line pointing here, because "the option was
+invisible to the owner until he edited a habit" is the kind of fact that stops
+being obvious a month later, and the next person adding a second surface for one
+entity should meet it.
+
+### D143 — The photograph replaces the sentence, and the database still prices it
+
+*2026-09-12.*
+
+Logging a restaurant plate means typing "biff med pommes, bearnaise och en
+gurksallad" and then correcting four portions. A photograph says the same thing
+in one tap. So the photograph replaces **the sentence**, and nothing else: the
+model names what it can see, the database prices what it named, a person
+confirms every row, and the picture is discarded the moment it has been read.
+
+That is the same bargain as the text parser (D5, §6 phase 8), pointed at a new
+kind of input. It is worth saying what this is **not**: Phase 7 — a camera that
+recognises food and logs it — remains deferred, and this is not it. Nothing here
+estimates energy from a picture. Nothing here saves a row nobody read.
+
+#### Item 0: the probe, because a capability flag is not a test
+
+Nothing below was built until a model on this workstation had been shown to
+look. Ollama reports a `vision` capability for four of the models installed
+here, and a capability is a claim about a build rather than evidence that this
+tag on this box will do the thing. The probe sends a generated PNG — a red
+circle, a blue square and the word VIKT, 320x240, 2 kB — and asks what is in it.
+
+| model | reports vision | saw it | read the word | time |
+|---|---|---|---|---|
+| `qwen3-vl:8b` | yes | yes | **"VIKT"** | **11.0 s** |
+| `qwen3.6:27b` | yes | yes, circle and square with colours | "IKT" | 16.7 s |
+| `qwen3.6:latest` | yes | yes, and described the layout | "UIKIT" | 30.1 s |
+| `odytrice/gemma4-31b:5090` | yes | yes, colours and background | "VIKT" | 94.3 s |
+| `gemma4:e4b` | yes | **no**: "du har inte tillhandahållit någon bild" | — | 21.0 s |
+
+Then a real plate, at the size the client actually sends:
+
+| model | time | what it said |
+|---|---|---|
+| `qwen3-vl:8b` | **19.6 s** | Kött, 1 portion · Friterad potatis, stor mängd · Gurksallad med tomater och feta, ca 100 g · Krämig sås, ca 50 g |
+| `qwen3.6:27b` | 14.9 s | Grillad köttfarsbiff, ca 1 st · **Gulrots**- och gurksallad med fetaost · **Potatismat (fryst)**, ca 3-4 dl · Vit krämsås eller aioli |
+| `gemma4:e4b` | 10.5 s | "Jag kan tyvärr inte se någon tallrik eller någon mat i din fråga. Du har inte bifogat någon bild." |
+
+The three findings, verbatim from `docs/measurements.md`:
+
+- **A capability flag is not a test.** Ollama reports `vision` for `gemma4:e4b`,
+  which accepts the request and answers as though nothing was attached, twice.
+- **Seeing is not the same as not inventing.** `qwen3.6:27b` looked at the plate
+  and produced a carrot. The photo path needs the same discipline as the text
+  parser: the model names, the database prices, and a person confirms before
+  anything is saved.
+- **Amounts are the weak part, and a composite dish is weaker still.** "Stora
+  mängder" and "spridd över delar" are not quantities, and a kebab pizza came
+  back as "Pizza (1 st)". That is the argument for the optional text line beside
+  the photo — "kebabpizza, hel" costs four words and fixes what the picture
+  cannot say — and for marking every amount from a photo as an estimate.
+
+`LLM_VISION_MODEL` is therefore configuration with **no default**. A default
+would be this workstation's answer presented as everyone's, and the failure it
+produces is the quiet kind: a model that accepts the request and describes
+nothing.
+
+#### The image is read and dropped
+
+Not written to disk, not to any table, not to a log line, not to the offline
+queue. A photograph of a plate is a photograph of somebody's kitchen and of
+whoever they were eating with, and a self-hosted app asking for one has to be
+able to say where it went.
+
+Asserted rather than intended. `photo-transport.test.ts` carries a random marker
+inside the base64 and then looks for it in **every text column of every table**
+and in **every line the logger emitted** — and the scan is first shown finding a
+marker that really is there, because a search that finds nothing proves nothing
+until it has been seen finding something. The browser half asserts the queue
+stays empty after a failed request, where every other write on that screen would
+be sitting waiting for the network. What the log does carry is one line of
+counts: model, milliseconds, kilobytes, rows, and whether there was a note.
+
+The client resizes to 1280 px and re-encodes as JPEG at 0.8 through a canvas,
+which is also what **strips EXIF**: a phone photograph carries the coordinates
+of the kitchen, the time to the second and the model of the phone, and none of
+that has anything to do with what was for dinner.
+
+#### An amount is a number the app can price, or it is nothing
+
+The parse returns two fields per food — a name and an amount — and no more. No
+`estimatedGrams` the model guessed, no `confidence` it asserted: a photograph
+gives nothing to estimate grams from, and a confidence figure attached by the
+thing being judged is not evidence. The app sets the confidence.
+
+An amount survives only when it can be turned into grams: grams and kilograms
+directly, or a household unit **this food actually has a definition for**
+(D85). Everything else becomes null and stays null. The three phrases the probe
+produced each take a different shape and each has a test:
+
+- `"amount": "stor mängd"` — a bare string where an object belongs;
+- `"amount": {"count": 1, "unit": "spridd över delar"}` — a well-formed object
+  whose unit is a sentence;
+- `"amount": {"count": 1, "unit": "portion"}` — a unit the household table
+  really does know, which is still not an amount for a kebab pizza, because
+  nothing anywhere says what a portion of kebab pizza weighs.
+
+A malformed amount is caught to null rather than failing the reply, and this is
+the only tolerated malformed field in the codebase. The reason is what the
+malformed value is: the home plate came back with one unquantifiable side dish
+beside three foods the model had named correctly, and refusing the reply would
+have thrown those three away. A nutrition key is still refused outright, because
+that one is a claim rather than an absence — and a nutrition figure written into
+a *name* is cut out of the name, since the schema cannot see a number inside a
+string.
+
+The prompt asks for the rows **a Swedish food database would have**, which is
+sharper than either "split everything" or "name the dish": a kebab pizza is one
+row, a steak with chips and béarnaise is three, and a packaged product carries
+the brand and product name off its label.
+
+D81's model estimate is not reachable from here. It is licensed by the app
+having tried and failed — nothing found by search, and a decomposition that
+produced nothing or was rejected — and a photograph is a new input rather than
+an exhausted one. The endpoint's `after` enum has no value for it, so the path
+is shut at the schema and not by a convention somebody has to remember.
+
+#### The row that cannot be saved
+
+A row with no amount shows the food, an empty field and "inte än" where the
+figure would be. It cannot be saved, and it does not stop the rows beside it:
+pressing save writes everything that has a figure, leaves what does not on
+screen, and says how many were left. The alternative is the app inventing a
+number and attributing it to the person, which §2 never permits.
+
+Rows from a photograph are marked ≈ in Sten with a dashed edge — the whole list,
+because the uncertainty is in where they came from — and are saved with a
+lowered confidence, like D55's estimates. **Coverage counts them as usual**,
+because the database is what priced them; what is less certain is the naming.
+
+The proposal list is now one component for both ways in. A sentence and a
+photograph produce the same rows, and two lists would drift and then disagree
+about what an unpriced row is allowed to do.
+
+#### The boot check, and what the surface depends on
+
+The API does at boot what an operator would do by hand: it sends the probe's
+self-test image to `LLM_VISION_MODEL` and reads whether the answer describes the
+picture. Two of five vocabulary groups is the bar, which nothing clears by
+guessing, and the model that fails it says "du har inte bifogat någon bild" in
+as many words.
+
+The verdict is stored in `app_settings` with the model name beside it, so
+swapping the tag takes the surface away until the next boot has asked about the
+new one. An unreachable workstation writes nothing and is asked again every
+hour, silently — the box is somebody's desktop and that state becomes false on
+its own. A blind model is not retried, because that is a property of the tag; it
+gets one warning line naming it. The check is not awaited and is never fatal.
+
+The client reads the result through `/llm/health` as a `vision` boolean, the
+same path it already reads `LLM_ENABLED` from, because the question is not which
+tag is configured but whether this installation has proved that tag can see.
+
+The quick action sits beside Skanna and is **absent, never greyed**, in five
+ways: layer off, no model named, no boot check, an unreachable box, a model that
+answered without looking. It is also absent **offline**, which is not true of
+the others: they degrade to an unavailable answer, and this one cannot be
+attempted at all because the image is never queued. A door that opened onto "try
+again when you have signal" would be asking somebody to photograph their dinner
+twice.
+
+#### What the interface found that no test would have
+
+Every photograph went through the real screen against the real workstation, and
+the run produced four findings.
+
+**The parse answered "not available" for every picture.** `qwen3-vl:8b` under a
+`format` constraint returns an **empty `content` with the whole JSON object in
+`thinking`** — reproducibly, with `think: false` set and honoured: 27 eval
+tokens, no reasoning prose, 300 to 1100 ms. Drop the constraint and the same
+model reasons past 180 s on this prompt. So the client reads `thinking` when
+`content` is empty. That is the same shape as D71's finding that `/v1/` ignores
+`think`: Ollama labelling one field as the other for a particular build.
+
+**The wait is not the probe's figure.** 10 to 20 seconds was measured without
+the format constraint. Through the app it is **0.2 to 1.3 s warm and 5.9 s
+cold**, so the screen says "ett par sekunder, ibland upp till tio" — two numbers
+because there are two cases and the app cannot tell which it is in.
+
+**The constraint costs the amounts.** Unconstrained, the model said "ca 100 g"
+and "ca 50 g"; constrained, every amount comes back as "1 st", which resolves to
+null for almost every food. The feature is therefore "the photo names the foods
+and you type the amounts", and that is the honest description of it.
+
+**A long name ate the estimate tag.** It sat inside the truncating span, so
+"Bearnaisesås hemlagad" lost the one marker on the row that must not disappear.
+
+#### The packaged products, and what they decide
+
+Three products, photographed on a phone, through the whole path:
+
+| on the label | what the model read | what search found |
+|---|---|---|
+| Valio Laktosfri Yoghurt Mango & Vanilj | "Valio Laktosfri Yoghurt Mango&Vanilj" (once as "Yogghurt") | nothing |
+| Mammas köttbullar, originalet från Skara, 1000 g | "Köttbullar" | "Köttbullar frysvara" — a generic row, not this product |
+| frischgold Färdigskivad Gräddost | "frischgöld GRÄDDOST" | nothing |
+
+The model **reads labels well**: brand and product name came off two of the
+three, and the third it summarised. What it cannot do is spell them the way a
+database index does, and that is exactly what an exact-string search needs —
+"Yogghurt" and "frischgöld" both miss. The one that matched, matched because the
+model gave a *generic* name.
+
+Two more things the run showed. Adding the note "mammas köttbullar" made the
+answer "Mamma Måns köttbullar", a brand that does not exist, and search then
+found nothing where the unaided answer had found something: **a note helps a
+dish and hurts a product**. And the model read "1000 G" off the meatball bag and
+offered it as the amount — the whole package, at 2 173 kcal — which the proposal
+list is there to catch.
+
+**So the photograph is a shortcut to free text, not an alternative to the
+barcode.** A barcode gives the exact row and then asks for a portion. A
+photograph gives a name that may or may not find a row, and an amount that
+usually has to be typed. Where a product has a barcode, scanning it is still the
+right thing to do and the app still says so by putting Skanna first in the row.
+What the photograph is for is the plate that has no barcode: a restaurant meal,
+a home dinner, somebody else's cooking.
+
+#### The limits, stated
+
+- **Amounts usually have to be typed.** Six of seven rows on the home plate came
+  back with no usable amount. That is the design refusing to invent, and it is
+  also the main cost of using this.
+- **The model invents.** It produced a carrot that was not on the plate, a
+  turkey that was a chicken, and a brand that does not exist. Every row is read
+  and confirmed by a person, which is what makes that survivable.
+- **A photograph evicts the coach model** on this workstation: 21 GB and 15 GB
+  do not fit together, so the next coach turn pays a 12.7 s cold load against
+  118 ms warm. The text parser fits alongside and does not. See
+  `docs/measurements.md`.
+- **`capture="environment"` opening the camera has not been verified on a
+  phone.** The path was exercised end to end in a browser with a real file; the
+  attribute is what tells a phone to open the camera rather than the gallery,
+  and that is the one thing a desktop run cannot show.
+
+#### Addendum, 2026-09-13: a weight printed on a label is not an amount
+
+The packaged-product run above ended with the meatball bag priced at **2 173
+kcal**. The model had read "1000 G" off the label and offered it as `amount`,
+the database priced a kilo of meatballs, and the row sat in the proposal list
+one tap from the day's intake. The proposal list is the safeguard and it worked;
+what it should not have to catch is a number the app had every means to
+recognise.
+
+A kilo on a bag says what the bag weighs. So the prompt now says that in as many
+words, gives the figure its own field, and says what an amount is instead:
+
+    - amount är hur mycket som ligger på tallriken, om du kan se det.
+    - En vikt som står TRYCKT PÅ FÖRPACKNINGEN är förpackningens storlek, inte
+      mängden mat. "1000 G" på en påse köttbullar betyder att påsen väger ett
+      kilo, inte att någon äter ett kilo. Sätt då amount till null och skriv
+      vikten i packageG i stället.
+
+`packageG` is **read and dropped**. It is a fact about the packet, not about the
+meal, and nothing in the app has a use for it. Its job is to give the number
+somewhere to go that is not `amount`.
+
+And the rule is enforced rather than asked for: a row that arrives carrying
+`packageG` has **no amount**, whatever the model also put in `amount`. A model
+that follows the instruction would have sent null there anyway; a model that
+ignores it is the case this is defending against, and `photo-parse.test.ts`
+covers both shapes plus the one it must not touch — a plate weight in grams,
+which is the most useful answer this path can give.
+
+**The three packages again, through the interface, against the real model.**
+Every one of them put the figure in `packageG` and left `amount` null:
+
+| photograph | the model's reply | the proposal list |
+|---|---|---|
+| Valio Laktosfri Yoghurt Mango & Vanilj | `{"name":"Valio Laktosfri Yoghurt Mango&Vanilj","amount":null,"packageG":250}` | Valio Laktosfri Yoghurt Mango&Vanilj · ≈ Uppskattad · inte än · Ingen träff i databasen, sparas utan energivärde |
+| Mammas köttbullar, 1000 g | `{"name":"Köttbullar","amount":null,"packageG":1000}` | Köttbullar frysvara · ≈ Uppskattad · inte än · inte än |
+| frischgold Färdigskivad Gräddost | `{"name":"frischgöld gräddost","amount":null,"packageG":250}` | frischgöld gräddost · ≈ Uppskattad · inte än · Ingen träff i databasen, sparas utan energivärde |
+
+Two things worth keeping from that.
+
+**The meatball row is the fix.** The same photograph that produced 1 000 g and
+2 173 kcal now produces a named food and an empty amount field, which is the
+honest state: the app knows what it is and does not know how much was eaten.
+
+**The yoghurt's 250 is wrong** — that carton is a kilo — and it does not matter,
+which is the point. A figure that is read and dropped cannot be wrong in a way
+anybody pays for. Had it been treated as an amount it would have been a
+plausible, unremarkable, incorrect 250 g, which is a worse failure than the
+kilo: nobody would have looked twice at it.
+
+The run also repeated the earlier finding about spelling. "Yogghurt" one run and
+"Yoghurt" the next, "frischgöld" for frischgold both times, at temperature 0 —
+the vision model is not deterministic across runs, and its spelling is what an
+exact-string search cannot survive. Nothing about that has changed, and it is
+still why D143 calls the photograph a shortcut to free text rather than an
+alternative to the barcode.
+
+### D144 — The trend line is a curve between readings, not a staircase
+
+*2026-09-13.*
+
+§4.1 returns one point per day, and on a day with no reading it carries the
+previous trend forward unchanged and marks the point `interpolated`. That is
+the correct answer to "what is the trend on the eleventh" and the wrong thing
+to hand a line chart, because **a line treats every point as a vertex it must
+pass through**. With sparse readings the result is a staircase: flat across the
+gap, then the whole move in a single day-wide step.
+
+The picture said the weight held steady for nine days and then fell a kilo
+overnight. Nothing in the data says that. What the data says is that two
+readings nine days apart produced two trend values, and the line between them
+is an interpolation the chart is supposed to draw.
+
+**The arithmetic is untouched.** Everything downstream of `computeTrend` — the
+maintenance figure, both projections, the hero number — reads the same series it
+always did, and this decision does not change a digit of it. What changed is the
+array handed to Recharts.
+
+#### What the chart receives
+
+`withTrendVertices` nulls the trend on every carried-forward day and
+`connectNulls` on the line spans them. So the line has **one vertex per reading
+date**, carrying §4.1's own value for that date.
+
+**Monotone, not a natural spline.** A cubic through a flat run and then a drop
+overshoots the lower reading on its way there, and a trend line that briefly
+shows a weight nobody recorded is the same invented number §2 forbids
+everywhere else. `type="monotone"` cannot leave the interval between two
+neighbouring values.
+
+**The rows stay one per day.** The x axis is categorical over them, so dropping
+the gap days would space two readings a month apart the same as two a day
+apart — a worse lie than the staircase was.
+
+**The tooltip is on reading dates only.** A carried-forward day has nothing to
+report: the weight is unknown and the trend figure is the previous reading's,
+restated. Showing it invited exactly the reading the staircase suggested.
+
+#### Why it survived this long
+
+With a reading every day the two are the same thing, and the owner weighs most
+mornings. It is visible only on an account that weighs weekly, which is why the
+test fixture is three readings in a fortnight and why the screenshots were taken
+against a seeded sparse account rather than the development one.
+
+The test asserts that each vertex equals the calc's trend for that date, to the
+bit. A transform that started smoothing or re-seeding on its own would make the
+line and the maintenance figure disagree about the same day, and nothing else in
+the suite would have noticed.
+
+---
+
+### D145 — Every reading is reachable, and the shape that reaches them is a month
+
+*2026-09-13.*
+
+The dashboard listed the **five most recent** readings, each with a delete. §3
+has said since D56 that every user-created row ships with edit and delete, and
+the weight log has had both in the API since phase 1 — so this was not a missing
+capability, it was a capability with a window five rows wide in front of it. A
+weight mistyped in July showed on the chart as a spike for three months, and the
+control that could have fixed it was out of reach.
+
+Five was never a decision. It was the number that kept the list from competing
+with the chart, which is a real constraint and the wrong thing to solve by
+truncating the only edit path.
+
+#### A month, not three hundred rows
+
+The fix is not a longer list. A ledger under the hero line is exactly what the
+five-row cap existed to prevent, and it is also not how anybody looks for a
+reading: not "the twelfth row from the bottom" but "that Tuesday".
+
+So `MonthCalendar` takes a **set of dates that have data** and a callback, and
+knows nothing else. Marked days are Gran, the colour that means logged
+everywhere else; today is Snö, because today is not a state anything was logged
+in; weeks start on Monday; month navigation is two text links, because two
+chevrons at 24 px are a smaller target than the words and say less.
+
+**Every day is a real `<button>`.** That is what makes the grid tabbable,
+operable with Enter and Space, and visible under `:focus-visible` without
+anything extra — §5's quality floor for the price of the right element.
+
+It is **generic on purpose and wired to one caller on purpose**. Dagen browses
+dates too, and a month of days with a daily log on them is the same picture; it
+is not adopted there in this pass, because a shared component adopted in the
+same breath as it is written is a component shaped around one caller. The seam
+is the props: a date set, a callback, and every noun passed in.
+
+#### One sheet, two ways in
+
+A tapped day opens `QuickLogSheet` on that day — the same sheet the quick action
+opens, with that day's value in the field, the date still editable, and the
+row's delete on it. A marked day is an edit; an empty day is an add.
+
+Two sheets would have been two places for the save rules to drift apart, so the
+sheet took three optional props instead: the day, the value, and the id of the
+row being edited. The id's only job is to put a delete on screen; saving is an
+upsert on the day either way, which is what D56 means by "re-logging is the
+edit" for a one-row-per-day entity.
+
+**The date a backfill is filed under is D61's, unchanged.** `enqueue` stamps
+`chosen` when the supplied date is not the device's own day and `device` when it
+is, so a reading added from the calendar on the third of September carries
+`chosen` without the calendar knowing the rule exists. The render test asserts
+the stamp rather than the absence of a bug.
+
+One defect fell out of the change and is fixed here: the sheet seeded its
+calorie field from **today's** intake whatever day it was opened on, and its
+label said "Kalorier i dag". Harmless while it only ever opened on today; once
+it opens on the third of September, pressing save would have written today's
+calories onto that day and nothing would have said so.
+
+#### The audit: what else has a window narrower than its history
+
+Run against every screen, not against the schema, because the gap this decision
+is about lives in the UI and the API had both endpoints all along.
+
+- **Weight** was the only one. Fixed here.
+- **Dagen's fields** — the daily log, measurements, habits and activities — all
+  follow the shared date selector (D62), which reaches any past day through a
+  native picker with `max` at today. Their edit window is their whole history.
+  What they do not have is a *picture* of which days carry data, which is the
+  gap the calendar was built generic for.
+- **Food entries** follow the same selector, and the day's list is complete for
+  the day on show with edit and delete on each row. "Senast loggat" is capped at
+  six, and that is not an edit surface: its rows log the food **again** rather
+  than open it.
+- **Manual intake** was reachable only through a sheet that opened on today.
+  The date field inside it always worked, so this was narrow rather than shut,
+  and it is now open on any day as a side effect of the above.
+- **Milestones, savings rules and savings events** are listed in full on
+  Framsteg, and coach conversations in full under Coach. None is date-scoped.
+
+Two gaps found that are **not** windows and were not fixed in this pass:
+
+- **`measurement_log` has no delete at all**, at the API or on screen. D56 named
+  it in its own audit and it is still true: `POST /measurement` and
+  `GET /measurement`, and nothing else. A measurement is edited by re-logging
+  the day, so the missing control is the delete, and it needs the endpoint
+  first. This is the oldest open item under §3's rule.
+- **`activity_log` has delete and no update path.** It is many-per-day, so
+  re-logging does not stand in for an edit: correcting a walk from 40 to 30
+  minutes means removing it and typing it again. Also D56's, also still true.
+
+**Both closed the next day, in D146.** The second one turned out to need no
+endpoint at all: the row's own `clientUuid` sent back is the update, because
+every write here is an upsert. That is worth reading before trusting the next
+plausible sentence in an audit.
+
+### D146 — The last two D56 gaps, closed six phases late
+
+*2026-09-13.*
+
+D56 wrote the rule into CLAUDE.md §3 — every user-created row ships with edit
+and delete in the phase that creates it — and then ran an audit that found two
+entities on the wrong side of it. Both were named, neither was fixed, and the
+audit line has been sitting in that entry and in STATE.md since phase 5. D145
+re-ran the audit and found the same two. Naming a gap twice is not closing it.
+
+#### `measurement_log` had no delete at all
+
+`POST /measurement` and `GET /measurement`, from phase 4 until now. Re-logging
+the day was the edit, which is the right shape for a one-row-per-day entity —
+and there was **no way to take a reading back**. A waist typed as 92 instead of
+82 could be corrected; a measurement taken by mistake stayed in the
+waist-to-height series with nothing to do about it.
+
+`DELETE /measurement/:id`, scoped by user id as well as row id like every other
+delete here, and a `DeleteButton` in the measurements section itself. Nothing
+derived needs rebuilding after it: the smoothed waist series and the ratio are
+computed **on read** from the rows that exist (D32), so the chart follows on the
+next request. The test asserts that, because "the row is gone" and "the line
+stopped showing it" are two different claims and only the second is the one
+anybody sees.
+
+A milestone already achieved stays achieved. That is deliberate and is D25's
+answer in a different place: `achieved_at` is a record of what happened, not a
+projection from the current series, and a fact about the past does not become
+untrue because a row went.
+
+#### `activity_log` had delete and no update path
+
+Many-per-day, so re-logging makes a second row: correcting a walk from 40
+minutes to 30 meant removing it and typing it again.
+
+**It needed no endpoint.** Every write in this app has been an upsert on
+`(user_id, client_uuid)` since phase 1, because the offline queue replays and
+§3 requires replays to be safe. So the row's own `clientUuid` sent back *is* the
+update, and the kcal estimate is recomputed on the server from the MET table
+exactly as it was the first time (D33). What was missing was a screen that sent
+it, which is one line in the form's submit and a row that is a button.
+
+That is worth stating plainly, because the audit had this filed under "needs a
+real update path" for six phases on the strength of a reasonable-sounding
+sentence about many-per-day entities. The sentence is right about food entries
+and savings events, whose screens mint a fresh id every time; it was wrong about
+this one, and nobody checked.
+
+#### Both controls are in the section the row was created in
+
+§3's other half: a delete belongs on the screen that displays the row, not in a
+settings page. The measurement delete sits under the measurement form; the
+activity edit loads the row into the form directly beneath the list it came
+from, and cancelling is a control of its own — without one, opening a row by
+mistake leaves the form pointed at it and the next add silently overwrites the
+wrong thing.
+
+The activity delete moved to the shared two-tap `DeleteButton` at the same time.
+It had been a bare link that removed on the first tap, which was tolerable while
+it was the only tap in the row and is not now that the row beside it is an edit.
+
+### D147 — A variable the compose does not forward is not a variable
+
+*2026-09-13.*
+
+A stack variable set in Portainer that `docker-compose.portainer.yml` does not
+pass to the container is **silently absent**. Not a boot failure, not a warning:
+the schema's default takes over, the feature is off, and the panel the operator
+is looking at still shows the value they typed. Every visible signal says it was
+configured.
+
+That is the worst shape a deploy failure can take, and it is not hypothetical
+here. D120 found two such variables — `PUBLIC_BASE_URL` and `SECRET_KEY` — while
+writing the Portainer file, and fixed them in `docker-compose.yml`. Nothing
+checked the file production actually runs.
+
+#### What was missing
+
+Twenty of the API's variables, found by writing the test rather than by reading
+the file:
+
+| | |
+|---|---|
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | **push does not work at all** |
+| `OLLAMA_URL`, `OLLAMA_MODEL_SMALL`, `OLLAMA_MODEL_LARGE`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_JOB_TIMEOUT_MS`, `OLLAMA_VISION_TIMEOUT_MS`, `LLM_ENABLED`, `LLM_VISION_MODEL` | **the whole LLM layer is absent** |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE` | the one-time import into the settings table (D102) can never run |
+| `CORS_ORIGINS`, `MAIL_WORKER_IN_PROCESS`, `SYSTEM_INTAKE_FLOOR_KCAL` | pinned to their defaults, unsettable |
+
+The first two rows are the ones that matter. **STATE.md has been telling the
+owner to set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` in the
+Portainer panel before the next deploy since D136.** Doing exactly as instructed
+would have produced an installation with three variables set, no reminders, and
+nothing anywhere saying why: `pushEnabled(env)` would have read three empty
+strings, declined to register the subscribe endpoint, and drawn no section in
+Inställningar. The person would have concluded the feature did not work.
+
+Five were also missing from `infra/.env.example`, which is where anybody running
+their own copy finds out a variable exists: the three VAPID keys, `CORS_ORIGINS`
+and `MAIL_WORKER_IN_PROCESS`.
+
+#### The test
+
+`apps/api/test/stack-variables.test.ts` walks `Object.keys(envSchema.shape)` and
+asserts, for every name, that the compose forwards it to the **api** service and
+that the example file documents it. The schema is the source of truth because it
+is the only one of the three that the program actually reads; the other two are
+descriptions of it, and a description nothing checks is a description that drifts.
+
+Three details worth the space:
+
+**It reads the text, not a parsed YAML tree.** What matters is the block an
+operator reads and edits, and a YAML library would happily accept a key nested
+under the wrong service. The parser is shown working before anything is asserted
+with it — it finds `DATABASE_URL` under `api` and does **not** find
+`CONTACT_EMAIL`, which belongs to nginx.
+
+**The allowlist has one entry.** `PUBLIC_ORIGIN`, the deprecated alias for
+`PUBLIC_BASE_URL` (D109), which is deliberately not offered: two variables
+meaning one thing is the defect that entry is about. An allowlist is how a check
+like this rots, so the test also asserts the allowlisted name is *not* forwarded,
+which means a later decision to forward it has to come here and say so.
+
+**It checks the defaults too.** `${NAME:-value}` is a second copy of a default
+the schema already holds, and it has to be a copy because compose cannot ask the
+program. A copy that drifts is worse than no copy: the file says 30 000, the
+schema says 20 000, and which one is in force depends on whether anybody set the
+variable. The drift check was proved by breaking one.
+
+#### What it does not check
+
+That the value is **correct** — only that it arrives. A `DATABASE_URL` pointing
+at the wrong host is a problem this test cannot see, and `assertProdSecrets` and
+the health endpoint are what cover that.
+
+### D148 — The stack pins a version, and a rollback is one line
+
+*2026-09-13.*
+
+`infra/docker-compose.portainer.yml` defaulted both images to `latest`. Three
+things follow from that and none of them is good: a redeploy pulls whatever
+`main` happened to be when nobody was looking, the running stack cannot say
+which version it is, and a rollback has no target to name. "Restore the dump" is
+not a rollback plan for a bad frontend build.
+
+#### One variable, no default
+
+```
+image: ghcr.io/lundstream/vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+image: ghcr.io/lundstream/vikt-web:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+```
+
+`IMAGE_TAG` replaces `IMAGE_API` and `IMAGE_WEB`, which were two variables for
+one decision — the two images are built from the same commit by the same
+workflow and there has never been a reason to run them at different versions.
+One variable is also what makes the rollback *one line*, which is the property
+worth having.
+
+It holds any kind of tag: `1.1.0`, `1.1`, or `sha-<commit>` for a build that was
+never released. They share one namespace on the registry, so nothing has to
+choose between them.
+
+**No default**, and the `:?` makes the stack refuse rather than guess. A
+`latest` fallback is exactly the behaviour this removes.
+
+#### A version tag on main now builds
+
+`release.yml` had `push: branches: [main]`, `release: published` and
+`workflow_dispatch`. `git tag v1.1.0 && git push --tags` fired nothing: the
+version tags in the metadata step were reachable only by publishing a GitHub
+release.
+
+`push: tags: ["v*.*.*"]` is added, and the runbook still says to cut a version
+with `gh release create` — because a tag push shares the `paths-ignore` written
+for branch pushes and a tag adds no commits for a path filter to look at, while
+the release event has no filter near it. One command does both, so the belt and
+the braces cost nothing.
+
+#### Whether an older image runs against a newer schema
+
+Asked and answered rather than hedged, because "usually works, but it is not a
+promise" is what the runbook used to say and that is not something anybody can
+act on at the moment they need to.
+
+**Twenty-nine of the thirty migrations are additive.** No `DROP TABLE`, no
+rename, no type change, and every added column carries a default — so an older
+image's inserts still satisfy every `NOT NULL`, and its selects name their own
+columns, which means a column added later is simply not selected.
+
+**One is not.** `0023_backup_s3` drops three `backup_settings` columns, as a
+deliberate exception its own header explains: they were added by
+`0022_backup_smb`, which has never run outside development, so no production
+database has ever held a value in them.
+
+Both sit inside the first release's set, so a rollback from any future version
+to any earlier one crosses only additive migrations. The full statement, with
+the one case that does cross 0023, is in INFRA.md under "Versions, images and
+rolling back".
+
+**If a future migration is not additive, the rollback is the dump.** An image
+that expects a dropped column fails when somebody opens the screen that reads
+it — not at startup, and nowhere the health check looks — which is why that case
+has to be planned before the deploy rather than discovered after it.
+
+#### Addendum, 2026-09-13: the rollback target did not exist
+
+This entry said a rollback is editing `IMAGE_TAG`, which is true and was not
+sufficient. **The images production runs have never been in a registry.** They
+were built on the workstation and `docker load`ed onto the host (D120), so they
+carry no `RepoDigest` at all and `ghcr.io/lundstream/vikt-api:v1.0` answered
+nothing. The one line to edit had nowhere to point.
+
+So the runbook gains a **step 0**, before the backup: tag the commit, push the
+running images to GHCR under `v1.0`, read the digest back — it exists only once
+the registry has computed it at push time — and then *pull the tag* to prove it.
+A rollback that has not been pulled once is a sentence in a document.
+
+Two things that step turned up, both of which would have surfaced at the pull
+rather than at the plan:
+
+- **The GHCR packages are private although the repository is public.** Package
+  visibility does not follow repository visibility. Checked: an anonymous token
+  request for `lundstream/vikt-api` answers `UNAUTHORIZED`.
+- **`d11c2fe` is not in this repository.** It is a commit in `vikt-old`, whose
+  history the public repo does not share, so the tag went there. Done:
+  `refs/tags/v1.0 -> d11c2fe848…`.
+
+And the version numbering moves with it. The build running in production **is**
+v1.0, so the next deploy is **v1.1.0** rather than v1.0.0. Calling the new build
+1.0 would leave the thing that has actually been serving for months with no
+version at all, which is precisely how it came to have no rollback target.
+
+### D149 — The deploy is a runbook, and the log says what it did
+
+*2026-09-13.*
+
+`STATE.md`'s "Inför nästa deploy" had grown into four sections of facts —
+variables, migrations, manual steps, news copy — with no order between them. It
+answered "what is true about the next deploy" and not "what do I do, and in what
+order, and how do I know it worked". Those are different documents and only the
+second is useful with a browser open at Portainer.
+
+So `INFRA.md` carries **"Deploying a version, in order"**: eight numbered steps
+from the backup to the rollback. It is in that file rather than in `STATE.md`
+because it is about *this installation*, which is the rule that created INFRA.md
+in the first place (D119). `STATE.md` keeps one thing and points at the rest.
+
+The two ordering constraints are marked as constraints rather than left as
+sequence. The backup is first because it is the only step that cannot be redone
+afterwards, and it is not done until `restore-check.sh` has read it back: a dump
+that has never been restored is a hope. The variables are second because an
+image that does not know a variable ignores it, so setting one early is free and
+setting one late renders `__CONTACT_EMAIL__` on a public page.
+
+#### The migrator names what it applied
+
+Step 6 is "read the API log", and it could not be written as it stands, because
+the log did not say enough to check anything against.
+
+`migrate.ts` printed `Migrations applied from <folder>` whether it had applied
+nine migrations or none. On a deploy that is exactly the distinction worth
+having: "nine applied, thirty recorded" is a schema where the new image expects
+it, and "none to apply" on a deploy that should have run nine is a container
+that started against the wrong database.
+
+It now counts `drizzle.__drizzle_migrations` before and after and names each one
+from the journal:
+
+```
+Migration applied: 0024_push
+...
+Migrations: 9 applied, 30 recorded in total
+```
+
+The names come from `meta/_journal.json` and the count says how far down it this
+database is; the two are in the same order because the migrator walks the
+journal. Proved against a scratch database created and dropped for the purpose,
+which printed all thirty, and against the development database, which printed
+`none to apply, 30 already recorded`.
+
+#### What the log must show, written down
+
+The runbook lists the four lines that are not the migrations, with **when each
+one is absent**, because absence is the ambiguous case and every one of them has
+a silent-success reading that is wrong:
+
+- the **SMTP import** says nothing when `SMTP_*` are empty, which is the
+  intended state (D102), and logs an *error* when `SMTP_*` is set without
+  `SECRET_KEY`;
+- the **VAPID check** says nothing on every ordinary boot, and something only on
+  the first one and on a changed pair (D136);
+- the **vision check** says nothing when it could not reach Ollama, and retries
+  hourly without saying so (D143). Silence there is not success.
+
+A runbook that said "check the log looks fine" would be worth nothing. The value
+is in saying which silences are expected.
+
+### D150 — An edit is not a second opinion, and a conflict has two answers
+
+*2026-09-13.*
+
+Editing 24 August from 110,0 to 110,1 through the month calendar produced
+**"Samma dag från två enheter"** under Inställningar, and a queued row whose
+"Försök igen" could never succeed. One device, one reading, one person changing
+their own number.
+
+Nothing was wrong with the rule. `weight_log` is unique on
+`(user_id, local_date)`, and D41 says a queued write must not silently replace a
+day another device wrote, because it was composed before that day existed. The
+server applied that correctly. What was wrong is that **the request could not
+say what it was**: the edit sheet enqueued a *create* with a fresh
+`clientUuid`, so an edit and a second device's opinion arrived as the same bytes
+and the server had nothing to tell them apart by.
+
+So the fix is the model, not the message. A message can only be as true as the
+request it describes.
+
+#### Two operations, because there are two things
+
+- **create** — there is a reading for this day. Unchanged, and still refused
+  from the queue when the day is taken (D41).
+- **update** — this row is wrong. It carries the row's `id` and
+  `baselineWeightKg`, **the value the client had on screen when the sheet
+  opened**, and goes to `PUT /weight/:id`.
+
+The server applies an update while the row still holds that baseline, whether it
+came from the queue or not. A queued edit replaying against an unchanged row is
+the edit arriving late, not a collision, and that is the assertion the old model
+could not make.
+
+Three details that are decisions rather than plumbing:
+
+**The baseline is the value, not a version column or a timestamp.** What matters
+to the person is whether the number they were looking at is still stored. A row
+rewritten to the same weight by another device is not a question worth asking.
+
+**It is captured when the sheet opens, in a ref.** Reading the prop at submit
+would pick up a background refetch that landed while somebody was typing —
+exactly the change the baseline exists to notice.
+
+**A row that has vanished is usually not a deletion.** A live write from another
+device *replaces* the day: `deleteWeightForDayExcept` removes the old uuid and
+inserts a new one. So the id an edit holds disappears in precisely the case the
+person most needs told about. A bare 404 would say "that reading does not exist"
+about a day that plainly has one, so a missing row with an occupied day is
+`changed_since` and only an empty day is a 404.
+
+Moving a reading onto a day that already has one keeps D41's own code and
+message. That is the remaining same-day clash, and now it is the **only** thing
+that produces that sentence: the page is true again because the model is.
+
+#### A conflict is a question, so it has two answers
+
+The section offered one control: "Behåll den som redan finns". That is the shape
+of a dialog where the other answer is really "go away", and it is not what D41
+promises — "nothing is discarded, the user chooses in the inspector" reads
+oddly next to a single button that discards.
+
+Two filled buttons of the same tier, neither styled as the way out:
+
+- **Behåll den sparade** drops the waiting write and settles the question;
+- **Använd den väntande** sends it **live**, without `fromQueue`. That is the
+  whole point of the resolution: D41 refuses a queued write for an occupied day
+  because it was composed before that day existed, and once a person has looked
+  at both and chosen, it is a decision made now.
+
+Either one leaves exactly one row, which `(user_id, local_date)` guarantees and
+which is what makes the choice safe to offer.
+
+**A conflicted queue row shows the same two choices**, not "Försök igen".
+Retrying a conflict sends identical bytes to an identical rule and gets an
+identical answer; the control could never work, and offering it made the page
+look like the fault was the network's. The inspector lists the mutation and the
+section above lists the question, and they are the same conflict seen from two
+places, so either one settles it.
+
+The conflict row also records **which kind** it is, so an edit whose row moved
+does not get told two devices wrote the day.
+
+#### Exercised
+
+Through the calendar, against the development API, at 360 px and desktop: 25
+August edited from 90,1 to 90,2, the server holding 90,2 afterwards, and
+Inställningar reading **"Allt är skickat"** with no conflict and nothing queued.
+
+Then a real conflict, made the way one happens: the browser put offline, a
+reading logged for an empty 24 August through the calendar so it sat in the
+queue, another device writing that day while it waited, and the queue drained.
+One question, both readings shown, two buttons, and the queue row carrying the
+same two. Settling it with the waiting reading left **one row at 91,5**.
+
+### D151 — The build says what it is, and the source is offered where people are
+
+*2026-09-13.*
+
+Two things that had never been said out loud anywhere a person could read them:
+which version is running, and where the source is.
+
+#### The version is a property of the image, not a setting
+
+`APP_VERSION` and `APP_COMMIT` are **Docker build arguments**, set by
+`release.yml` from the tag and the commit, becoming `ENV` in the runtime stage.
+They are deliberately **not** in `env.ts`, and the distinction is the whole
+point: everything in the environment schema is a choice an operator makes, and a
+deployment that could claim to be a version it is not would make the version
+worth nothing at the moment somebody needs it. Keeping them out also keeps
+D147's stack-variable guard honest — no allowlist entry, because they are not
+stack variables.
+
+`release.yml` derives the version from the ref rather than trusting
+`github.ref_name`, which is the branch on a branch push: `main` is not a
+version. A build with no tag says `dev`.
+
+**A development run says `dev` and the sha.** `buildInfo` falls back to reading
+`.git/HEAD` and the ref it names — files, not a `git` subprocess, because this
+is called on a public endpoint and a process spawn per request is not a thing to
+add for a footer. A container has no `.git`, which is the correct answer there:
+the build argument is what speaks for an image, and it always wins over the
+checkout.
+
+#### One source, three readers
+
+`/api/health` carries `version` and `commit`, beside the modes and for the same
+reason D94 put those there: an operator checking a deployment should see its
+shape with one curl, and it discloses nothing an anonymous visitor could not
+read off a public repository.
+
+The boot log's **first line** is `vikt 1.1.0 (a1b2c3d)`. First rather than
+tidy-first: a log read from the top gives the version before the migrations that
+version applied, so every line under it can be read against the build that wrote
+it. The footer in Inställningar and the line under the Administration heading
+read the same endpoint through one query key, so the three cannot drift into
+three answers.
+
+#### The source, offered where somebody signed in can see it
+
+AGPL §13 obliges an offer of the source to anybody who interacts with the
+program over a network. The landing footer has carried the link since D106 —
+and **somebody signed in never sees that footer**. The app is where they are.
+
+So the foot of Inställningar carries the version and five text links: the source,
+Nyheter, `/integritet`, `/villkor` and the licence. In Sten, nothing an accent,
+nothing a button: it is reference, not an action (D134). `/integritet` also
+states the offer in words rather than in passing, names the licence and links
+the repository, and says where the running version is shown.
+
+Exercised at 360 px and desktop against the development API: the footer renders
+`Version dev · 107321a` with all five links resolving, and `/integritet` reads
+"Källkoden är öppen och finns att hämta … Koden till den här installationen
+finns på github.com/lundstream/vikt."
+
+### D152 — One scrim, and the sheet has no edge of its own
+
+*2026-09-13.*
+
+Four components each carried their own backdrop: `bg-ink/40` on three sheets,
+`bg-ink/70` on the celebration. Four places for a number to drift, and one of
+them had already been wrong — the celebration once shipped a **fully transparent
+backdrop** because `bg-[var(--ink)]/70` emitted no rule at all, and nothing said
+so until somebody looked at it.
+
+`.scrim` is one class: the colour, the blur, and what happens when somebody has
+asked for less transparency. Position stays with the component, because whether
+it is `absolute` inside a fixed wrapper or `fixed` itself is layout, and mixing
+the two in the class means one of them quietly loses to a utility.
+
+#### The scrim is the dark Natt in both themes
+
+`--natt` is **re-pointed** in the light theme: there it is Papper, the page
+colour. A scrim built from `var(--natt)` would therefore have brightened a light
+page instead of dimming it, which is the sort of thing that looks like a
+rendering fault and is actually a token doing what it was told.
+
+So `--scrim` is written out as the dark Natt in both blocks, and only the alpha
+differs: **0.72 dark, 0.45 light**. Lighter on a light theme because the page
+underneath is already bright and the sheet on top of it is not; higher on a dark
+one because the sheet and the page are closer together there and the scrim has
+to do more to say which is in front. The blur is **10 px in both**, because the
+blur is what separates the layers and the tint is what dims them.
+
+`prefers-reduced-transparency` drops the blur entirely and raises the opacity to
+0.88 and 0.78. Entirely rather than reduced: a small blur is the same effect
+asking to be noticed less, and somebody who has asked for less translucency has
+asked for the separation to come from somewhere else.
+
+#### The Is line was a focus ring on the dialog
+
+`Sheet` focused the panel itself, a `tabindex="-1"` container. Chromium matches
+`:focus-visible` on a programmatically focused element with a negative tabindex,
+and in the dark theme this app's focus ring is `--data`, which is Is. So an
+Is-coloured line appeared around the whole sheet — correct CSS applied to the
+wrong element, on a screen where Is means *a raw reading*.
+
+Focus goes to the **first field** now. That is also where somebody is going
+anyway: every sheet in this app opens onto a form. The container keeps its
+`tabIndex` as the fallback for a sheet with nothing focusable in it, which is
+what keeps focus inside the dialog either way, and it can no longer draw a ring.
+
+The panel's `border-edge` is gone with it. A sheet is Skymning standing on a
+dimmed, blurred page; the scrim is the separation, and a hairline on top of that
+is a second answer to a question already answered.
+
+Shot in both themes at 360 px and desktop. Dark: scrim
+`rgba(15, 20, 24, 0.72)`, `blur(10px)`, focus on `#ms-label`, no border and no
+ring on the panel. Light: the same with `0.45`.
+
+The reduced-transparency branch was emulated rather than read off the
+stylesheet, because "the CSS says so" is how a rule ends up shipping behind a
+query the browser spells differently. With
+`prefers-reduced-transparency: reduce` emulated, the blur is `none` and the
+opacity is `0.88` in dark and `0.78` in light, in both cases with `matchMedia`
+confirming the page agreed it was in that state.
+
+### D153 — A deleted row is a question, not a refusal
+
+*2026-09-13.*
+
+D150 gave an edit its own queue operation and three outcomes, and then treated
+one of them as a dead end. A queued `weight-update` whose row had been deleted
+came back 404, fell into the generic 4xx branch, and was marked `failed`. The
+page then offered the two controls a refusal gets: **"Försök igen"**, which
+sends the identical PUT to the identical absent row and will do so forever, and
+**"Kasta"**, which throws away a reading somebody took and typed.
+
+Neither is an answer, and the obvious second answer was sitting right there. The
+server answers 404 only when the row is gone **and** the day is empty — a gone
+row on an occupied day is `changed_since`, because a live write replaces the day
+rather than updating the row — so in this one case *nothing on the server
+disagrees with the waiting reading*. There is simply nothing there. Putting it
+back is a plain create for a free day.
+
+So it becomes the conflict's shape with one reading instead of two: `row_gone`,
+recorded as a question, resolved by the same two functions the other two
+collisions use. "Lägg till igen" is `applyQueuedReading`, which already strips
+`id` and `baselineWeightKg` and posts live; both of those name a row that does
+not exist, and sending either would address it.
+
+**It is not called a conflict on screen**, because it is not one. The queued row
+says "Raden är borttagen" rather than "Krockar med en annan enhet", which would
+name a device that had nothing to do with it, and the comparison shows one side
+rather than a "Sparad på servern" line over an empty object rendering "Okänd
+post". The section heading moved too: "Samma dag från två enheter" was true of
+one of the three cases and false of the rest, so the heading and its note say
+what all three have in common — something you logged could not be sent as it
+was, and both it and the choice are still here — and each row says which it is.
+
+Only an update can reach this. Every other kind posts to a collection, where a
+404 is a routing fault and a question about which reading to keep would be
+nonsense, so the branch is keyed on the kind and a 404 on a create is still a
+refusal.
+
+#### Two labels that were never written
+
+The inspector reads ``t(`queue.kind.${row.kind}`)`` through a cast, so the
+compiler checks nothing, and `weight-update` and `habit-check` had been added
+with their endpoints and never with their strings. The queue listed
+`queue.kind.weight-update` to anybody who opened it while an edit was waiting,
+which is exactly the screen this change sends them to. Both written, and a guard
+added over `ENDPOINTS`, which is the runtime list of every kind there is.
+
+#### Exercised with two browsers
+
+Two Edge processes with separate profiles, because two tabs share an IndexedDB
+and would share the queue. A reading logged for 8 September through the calendar
+at 88,4; the first browser put offline and the same day edited to 88,9, which
+queued as `weight-update`, pending; the second browser deleting that reading,
+leaving the day empty; the first brought back online and drained.
+
+One question, in both places, with **"Släng den"** and **"Lägg till igen"** and
+no retry anywhere. "Lägg till igen" left one reading at 88,9 on 8 September, the
+queue clean and the question gone. Shot at 360 px and desktop.
+
+One thing the interface showed that the tests could not: **a navigation while
+offline lands on the browser's error page, where the origin is gone and
+IndexedDB is denied**. That is a property of the probe rather than of the app —
+the app itself never navigates there — but it is why the offline half of this
+exercise stays on one page and drives the calendar rather than reloading it.
+
+### D154 — A swipe between sections, and the five times it must not fire
+
+*2026-09-13.*
+
+On a phone the four sections live in a bar at the bottom, which means moving to
+the one beside the current page is aiming at a 72 px target with the hand that is
+also holding the phone. A horizontal swipe is the gesture every other app on the
+device already uses for this, it needs no label, and it costs nothing to
+somebody who never discovers it.
+
+The interesting half is not the gesture. It is **when not to fire**, because a
+page of this app is full of things that are also horizontal, and firing on one
+of them is worse than not having the gesture at all: the person loses their
+place *and* the thing they were actually doing.
+
+#### The five guards
+
+**Within 24 px of either edge, nothing happens.** Both iOS and Android put their
+own back gesture there, and a touch that starts in that strip belongs to the
+operating system. This one is not theoretical: the live probe dragged from
+x = 8 and the *browser* went back a history entry while the app's own track
+never moved. That is the guard working, and it is exactly what would have
+fought the app if the strip were not reserved.
+
+**A touch that starts on the weight graph, on a range input, or inside anything
+that scrolls sideways is left alone.** The third is the general rule the first
+two are instances of: a sideways drag on something that can scroll sideways
+already means something. The chart is marked rather than detected, because a
+Recharts surface does not scroll and there is nothing about it in the DOM that
+says "the horizontal axis is mine" — it is a fact about what the thing *is*.
+
+**The gesture claims the touch only once horizontal movement clearly dominates
+vertical**, by half again, and only after 12 px. A page that scrolls is what a
+finger is usually doing and a swipe is the rare case, so the rare case has to
+prove itself. Once a touch has been read as a scroll it stays one for the rest
+of its life rather than flipping halfway down the page.
+
+**One finger.** Two is a pinch.
+
+**Below `sm` only**, which is where the bar it is a shortcut for exists.
+
+#### What it does when it does fire
+
+The page follows the finger, one transform on one wrapper. On release it
+completes past a quarter of the screen, or on a flick — 0.5 px/ms with a 48 px
+floor, so a twitch is not a flick — and otherwise springs back over 200 ms. Past
+the first section or the last, the page still moves a quarter as far and nothing
+happens on release: the resistance says so *before* the release rather than
+after it.
+
+A completed swipe **navigates immediately** and the incoming section starts at
+`width + handoff`, where the handoff is where the finger let go. That is what
+makes it continuous: the new page picks up exactly where the old one was rather
+than a full screen away. The alternative, sliding the outgoing page off first
+and only then navigating, puts 140 ms between the decision and anything
+happening — and the same code serves a **tap in the navigation**, where a delay
+before the page changes is simply lag.
+
+So a tap and a swipe produce the same movement, which is the point of having one
+at all: one way of changing section, two ways of asking for it. The direction
+comes from the order, not from the gesture, and a destination with no place in
+the order (anything in the Mer sheet) slides forward, because a slide has to go
+somewhere.
+
+**The four in the bar, not every destination.** Swiping to a place the bar does
+not draw would leave nothing marked as current and no way to tell where you had
+ended up.
+
+**Below `sm` only, the slide as well as the gesture.** The slide exists to make
+a completed swipe continuous, so on a screen that cannot be swiped it would be
+motion added to a navigation nobody asked to change. The shell'''s two shapes are
+a layout switch (D115) rather than two apps, so this is one line rather than two
+conditions that could drift apart.
+
+**`prefers-reduced-motion` removes all of it and keeps the navigation.** Not a
+shorter slide: a small animation is the same animation asking to be noticed
+less. The page does not follow the finger either, because that is movement too;
+the gesture is still recognised and still changes section.
+
+#### Two things that would have broken other screens
+
+**The transform is removed, not set to identity.** A transform makes an element
+the containing block for every `position: fixed` descendant, and this app's
+sheets are fixed and live inside the page. Leaving `translate3d(0,0,0)` behind
+would have pinned every sheet to the content column instead of the viewport, on
+every screen, permanently after the first swipe. It comes off on `transitionend`
+along with `will-change`.
+
+**`overflow-x: clip`, not `hidden`.** The content has to be cut off at both
+edges while it slides. `hidden` would also force `overflow-y` to `auto`, turning
+the content column into a scroll container and changing what scrolls on every
+screen in the app to fix an axis nothing scrolls on.
+
+`touch-action: pan-y` would have been simpler than a non-passive `touchmove`
+listener and is wrong for the same kind of reason: it applies to everything
+underneath, so it would break precisely the horizontally scrolling things the
+guards exist to protect.
+
+#### Exercised
+
+Twenty-two tests over synthetic touch events, one per guard and one per
+threshold. Then live, in headless mobile emulation at 360 px with real
+`Input.dispatchTouchEvent` touches, which is the part jsdom cannot answer: the
+gesture completes forwards and backwards, a short slow drag springs back and
+leaves no transform behind, a drag from the edge strip does nothing while the
+browser goes back, a drag starting on the trend line does nothing, a mostly
+downward drag does nothing, a tap in the bar runs the same 200 ms slide, and
+with `prefers-reduced-motion` emulated the section still changes and nothing
+moves. Mid-gesture at 360 px is shot: the page 132 px left, the vacated strip
+the page colour, the bar still marking the section you have not left yet.
+
+The real phone is listed in STATE.md as waiting on the owner. A headless browser
+can dispatch a touch; it cannot tell you whether the thumb that lives on the
+left edge of a phone triggers this by accident all day.
+
+### D155 — The coach gets the data, and two rules about what it may do with it
+
+*2026-09-13.*
+
+Asked what somebody was eating, the coach answered that it only saw summaries.
+That was **true**, and it was the app's fault rather than the model's: the sheet
+carried a trend, a rate, a maintenance figure and a macro mean, and a person
+asking "vad tror du om mitt upplägg" is asking about food, drink, movement and
+sleep, none of which were in it.
+
+#### The sheet
+
+Every domain, over **7 and 28 days**, because one window alone invites the wrong
+reading of the other: a good week inside a bad month, or a month's average
+hiding the week it is about. Intake against measured maintenance with its
+coverage; each macro against the person's own target with the number of logged
+days under it; fibre only where it is tracked at all; alcohol units and sober
+days; activity sessions and minutes; steps; sleep hours; energy and mood;
+habits with their streaks; measurements and their smoothed change; and the
+**names** of what was eaten in the last seven days, per day, names only.
+
+The names are the one place this loosens D139's "aggregates, never rows", and
+the loosening is narrow and deliberate. A list of foods is not a food log: no
+amounts, no times, no macros per item, no note. What it buys is the difference
+between a coach that can say something about somebody's eating and one that
+correctly says it cannot.
+
+**Nothing is recomputed.** Every figure comes through the service or the shared
+calc function that already produces it for a screen — `dayMacros`,
+`buildActivityIndex`, `smoothedChange`, `coverageOver`, `currentStreak`. A coach
+with its own maintenance figure would eventually disagree with the dashboard in
+front of somebody looking at both.
+
+**An empty domain says so with the data as subject, never `0`.** "0 pass" claims
+somebody sat still for a week; what is true is that nothing was logged. This is
+D140's addendum applied to the sheet the prompt is about, and it is held by a
+test that greps for `0 pass`, `0 minuter`, `0 steg` and the rest as whole
+figures.
+
+#### One way to write a number
+
+`num(value, unit, decimals)` formats with the shared Swedish formatter **and**
+registers the figure in the guard's traceable set, in one call. It is the only
+way a number reaches the text, so the rule "every figure in the sheet is one a
+reply may quote" is structural rather than remembered — the previous sheet did
+the two halves in separate statements and could therefore do one of them.
+
+A test runs the reply guard over the sheet's own sentences. On the first run it
+found one figure that had been written as a literal: **"vilket är 1 procent av
+kroppsvikten"**, in a line that had been there since D139. A reply repeating that
+sentence would have been refused for stating a number the app had not supplied —
+the worst kind of false refusal, because the app put the number there.
+
+Ten units now, not four: kcal, kg, kg/week, percent, grams, minutes, steps,
+hours, standard drinks, cm, counts, and the 1 to 5 ratings. Each vouches only
+for itself, so "140 g" and "140 kcal" cannot stand in for each other. The
+figure pattern gained the unit words with a lookahead rather than a word
+boundary, because `%` is not a word character and "140 grader" must not match
+the `g` in it.
+
+#### Two rules, and one of them is also a check
+
+Added to COACH_RULES, tone independent, verbatim in every profile:
+
+**Praise is allowed, tied to a fact.** "Sju loggade dagar av sju, det är hela
+veckan" is praise about something; praise with nothing behind it is the thing
+said to everybody.
+
+**At most two suggestions, each an option.** "du kan", "om du vill", "ett
+alternativ är" — never "du måste", "du ska", "du bör". A direction may be named,
+such as more protein or more movement or more sleep, never a figure the person
+has not set as a target themselves.
+
+That second one is also a **words-level check**, and it has to be, because the
+question that produced this whole pass ends "Något jag bör tänka på?" — the
+question hands the model the forbidden word, and an accommodating model uses the
+words it is given. The patterns need a modal **and** a person for it to be
+addressed to: `ska` is one of the commonest words in Swedish, and refusing every
+sentence with it in would refuse "det ska bli intressant att se nästa vecka".
+
+One exemption: a sentence naming care. "Du bör ta det med vården" is the
+sentence D139 built a whole detection path to produce, and refusing the model
+for arriving at it independently would be the check working against its own
+purpose.
+
+**Two series may sit side by side, never joined by a cause.** The brief for this
+asked the coach to connect two series only through a relation Samband had
+already computed — and Samband has computed none, on purpose. D34 is explicit
+and the schema says so in as many words: no r, no fitted line, no verdict,
+because every pair is one person's self-report over a few weeks with obvious
+third causes. So the sheet carries what Samband actually has, which is which
+pairs it plots and how many days line up, and the rule is written against that:
+the coach may say the app draws those two together and may state both facts, and
+may never say one caused the other.
+
+#### What the live run changed
+
+**A false refusal, found in the warm tone.** The reply
+
+> "Du har loggat mat två dagar den här veckan, med gryta och havregrynsgröt som
+> exempel, medan rörelse och steg inte är ifyllda än."
+
+was refused as blame. It is a true sentence about what was logged followed by a
+separate clause about what the app does not have, with the data as its subject —
+exactly what the rules ask for. The old patterns let the person, the logging verb
+and the negation come from anywhere in the sentence; commas and semicolons stop
+the match now, so the negation has to belong to the clause the person is in.
+
+**A breadth rule, because all three tones answered from the weight alone.** With
+the sheet in front of them and the question asking about the whole picture,
+every tone talked about the trend and nothing else. So: a broad question is
+answered from several domains, with a short sentence each about food, alcohol,
+movement and sleep in so far as they are in the sheet — and the two-to-four
+sentence limit is relaxed to six for that case, in one place rather than edited
+into three tone blocks that would then disagree. Length for breadth is about
+answering the question, not about how it sounds, so it belongs in the shared
+rules.
+
+#### The size, measured
+
+3 296 prompt tokens for the worst realistic turn: the system prompt, six past
+turns and the question. The variant is loaded with **`num_ctx` 65 536**, so the
+turn uses 5.3 percent of the window and leaves 62 066 tokens. `docs/measurements.md`
+carries the table and the 2.92 characters per token it also produced.
+
+The 9 000 character budget is therefore not about the model. It is about keeping
+the sheet small enough to be read: a sheet three times this size would fit and
+would be worse.
+
+#### The three tones, verbatim
+
+The question, in all three, against `qwen3.6:27b` on the development account:
+
+> Vad tror du om mitt upplägg, vad jag äter, hur viktnedgången ser ut? Något jag
+> bör tänka på?
+
+**Torr:**
+
+> Trendvikten har sjunkit 1,1 kg på fyra veckor, vilket ligger nära den
+> planerade takten. Matloggen är sparsam just nu med bara två dagar ifyllda
+> denna vecka, medan intaget de senaste fyra veckorna i snitt landat kring
+> 2 246 kcal per loggad dag. Rörelse och steg är inte registrerade denna vecka,
+> men under månaden har det blivit fem pass och ett genomsnitt på 9 400 steg när
+> uppgifterna finns. Sömnen ligger stabilt kring sju timmar med goda värden för
+> både energi och humör. Du kan fylla i mer mat eller rörelse om du vill se hur
+> det påverkar bilderna, eller låta det vara som det är.
+
+**Peppig:**
+
+> Trendvikten har sjunkit 1,1 kg på sista månaden och midjan minskat något,
+> vilket är ett tydligt tecken på framåtrotation. Matloggningen täcker bara en av
+> de senaste sju dagarna, så intaget är inte ifyllt än för övrig vecka. Rörelse
+> och steg räknas heller inte in just nu eftersom ingen aktivitet eller
+> stegantal är loggat de senaste dagarna. Du kan lägga till mat om du vill se hur
+> det står till med kalorierna, eller så kan du börja logga rörelse för att få en
+> tydligare bild av utgiften.
+
+**Saklig:**
+
+> Trendvikten har minskat 1,1 kg de senaste 28 dagarna, vilket motsvarar en
+> veckotakt på 0,27 kg. Måltavlan är 83,5 kg med en planerad takt på 0,25 kg i
+> veckan, och trenden ligger därmed nära den satta målet.
+>
+> Under de senaste sju dagarna har mat loggats endast två dagar, medan alkohol,
+> rörelse och steg inte är ifyllda för samma period. Under 28-dagarsperioden har
+> intaget i snitt varit 2 246 kcal per loggad dag på 71 procent av dagarna, med
+> ett proteinsnitt som överstiger målet men kolhydrater och fett som ligger under
+> respektive mål.
+>
+> Rörelse är loggad med fem pass totalt under månaden, medan stegantalet i snitt
+> landat på 9 400 per dag när det är ifyllt. Sömnen har legat på i genomsnitt
+> 7,3 timmar, energi på 3,7 av 5 och humör på 3,9 av 5 baserat på 14 dagar med
+> data.
+>
+> Underhållsnivån är ännu inte räknad fram eftersom appen behöver fler dagar med
+> både vikt och matloggar för att göra en uppskattning. Du kan fylla i mer
+> rörelse eller sömn om du vill, eller logga mat de dagar det saknas för att få
+> en tydligare bild av intaget.
+
+Every sentence of all three passed the guard. Every suggestion is an option and
+none of them says "du bör", which is the thing the question was inviting.
+
+**What is honest to say about the coverage.** Food, movement and sleep are in
+all three, on every roll. **Alcohol is reliably in `saklig` and drops out of the
+two character tones**, and the reason is visible in the sheet: this account has
+no alcohol in the last seven days and two standard drinks in twenty-eight, and
+the tones that are capped at five or six sentences drop the domain with least in
+it. That is arguably the right call rather than a defect, and it is not
+something a prompt line fixed — three more lines of instruction moved it for one
+roll and not the next. Recorded as it is rather than re-rolled until it read
+well.
+
+The neutral tone's first paragraph also contains "den satta målet", which is
+wrong Swedish. That is the model, not the app: nothing in the pipeline corrects
+grammar, and a check that did would be editing the coach rather than checking
+it.

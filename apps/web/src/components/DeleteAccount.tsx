@@ -33,6 +33,12 @@ type Preview = {
 export function DeleteAccount() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [password, setPassword] = useState("");
+  const [typedEmail, setTypedEmail] = useState("");
+
+  /** Trimmed and case-insensitive: typing it is the point, not spelling it in caps. */
+  const emailMatches =
+    preview !== null &&
+    typedEmail.trim().toLowerCase() === preview.email.trim().toLowerCase();
   const [problem, setProblem] = useState<string | null>(null);
 
   const remove = useMutation({
@@ -95,7 +101,7 @@ export function DeleteAccount() {
       <button
         type="button"
         data-testid="start-delete"
-        className="btn-secondary mt-4 w-auto px-6"
+        className="btn mt-4 w-auto px-6"
         onClick={() => void start()}
       >
         {t("account.deleteStart")}
@@ -138,6 +144,35 @@ export function DeleteAccount() {
               {t("account.passwordWhy")}
             </p>
 
+            {/*
+              And the address typed out (D123).
+
+              The password and this guard different things, which is why both
+              stay. The password **authorises**: without it somebody holding an
+              unlocked phone could delete the account, and the address is on
+              screen under Profil for them to read. Typing the address makes it
+              **deliberate**: it is the step that cannot be completed by
+              tapping through a sheet without reading it.
+
+              Compared case-insensitively and trimmed. Somebody who capitalises
+              their own address differently has still typed it, and refusing
+              them on that would be a puzzle rather than a safeguard.
+            */}
+            <label className="mt-5 block text-micro text-muted">
+              {t("account.typeEmailToConfirm")}
+              <input
+                id="delete-email"
+                className="field mt-1 w-full"
+                type="text"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder={preview.email}
+                value={typedEmail}
+                onChange={(event) => setTypedEmail(event.target.value)}
+              />
+            </label>
+
             {problem ? (
               <p role="status" className="mt-3 text-note text-ink">
                 {problem}
@@ -148,15 +183,15 @@ export function DeleteAccount() {
               <button
                 type="button"
                 data-testid="confirm-delete-account"
-                className="btn w-auto px-6"
-                disabled={password === "" || remove.isPending}
+                className="btn-impact w-auto px-6"
+                disabled={password === "" || !emailMatches || remove.isPending}
                 onClick={() => remove.mutate()}
               >
                 {t("account.deleteConfirm")}
               </button>
               <button
                 type="button"
-                className="btn-secondary w-auto px-6"
+                className="btn-link w-auto"
                 onClick={() => setPreview(null)}
               >
                 {t("common.cancel")}

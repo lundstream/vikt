@@ -144,7 +144,8 @@ export function SeriesPanel({
       {present.length === 0 ? (
         <p className="mt-4 text-note text-muted">{t("data.noneInRange")}</p>
       ) : (
-        <div className="mt-3 h-40 w-full">
+        <div data-swipe-ignore className="mt-3 h-40 w-full">
+          {/* The same as the trend line: a drag across a series is reading it (D154). */}
           <ResponsiveContainer width="100%" height="100%">
             {asPoints ? (
               <ScatterChart

@@ -45,6 +45,17 @@ export const EXPORTED_TABLES = [
   "pantry_staples",
   "saved_recipes",
   "weekly_reviews",
+  /**
+   * The checklist and its ticks (D137). Both, and in this order, because a tick
+   * names a habit: the habit rows include archived ones, so a check whose habit
+   * was taken off the list still has a word attached to it.
+   *
+   * A habit name is the user's own words and can describe health, which is
+   * exactly why it is in here: what the app holds about somebody is theirs to
+   * take (D96, D107).
+   */
+  "habits",
+  "habit_checks",
 ] as const;
 
 export type ExportedTable = (typeof EXPORTED_TABLES)[number];

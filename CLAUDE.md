@@ -468,6 +468,10 @@ The workstation on the LAN, wherever `OLLAMA_URL` points, is not always on, so t
 > 3. Weekly review: a Sunday job that feeds the week's aggregates (not raw rows) to the larger model and stores a short written summary. It comments on patterns, it never sets targets or prescribes intake.
 >
 > 4. Coach persona: a named character with a consistent dry voice that delivers the weekly review and milestone messages. Personality lives in one prompt file, easy to rewrite. Never nagging, never guilt, funnier when things are going well than when they are not.
+>
+> **Amended when built (D140): three tones, not one.** Torr (this voice, the default), Peppig (warmer when things go well, equally restrained when they do not) and Saklig (no persona at all). The prompt file splits into rules that every tone gets verbatim and a tone block that is the only thing which varies. **The set is closed**: strict, roasting and guilt-based tones are ruled out by §3 and by this entry rather than by taste, and adding a fourth means amending D140 and this paragraph together.
+>
+> **The Sunday job (D141)**: the review is written at 20:00 on the user's own Sunday, on the reminder scheduler's machinery, and only for a week with at least four logged days. A quieter week produces no review, no card and no sentence about the absence.
 
 ---
 
@@ -570,15 +574,40 @@ A daily checklist the user writes themselves, and the first push notification th
 
 > **The checklist lives on Dagen**, beside the daily log rather than on a screen of its own. It is part of "what happened today", which is what Dagen already is, and a separate screen would make a habit a thing you go and do rather than a thing you tick while you are there anyway.
 >
-> **The habits are the user's words.** "D-vitamin", "två liter vatten", "stretcha rygg", "ta tabletten". A name and nothing else: no category, no icon picker, no target value. A habit with a number attached is a measurement and belongs in the daily log, which already exists. Edit and delete ship with the create, per §3 — this is exactly the entity class that has been shipped half-built four times.
+> **The habits are the user's words.** "D-vitamin", "två liter vatten", "stretcha rygg", "ta tabletten". No target value and no unit: a habit with a number attached is a measurement and belongs in the daily log, which already exists. **Amended when built (D137):** a habit also carries an optional icon from a closed set of ten and a place in the order. The icon was ruled out here and reconsidered there, because a checklist is read in one glance while doing something else and a row found by its shape is found faster than a row read as words; closed rather than open, because an open set is an upload endpoint. Edit and delete ship with the create, per §3 — this is exactly the entity class that has been shipped half-built four times.
 >
 > **One row per habit per day**, keyed `(user_id, habit_id, local_date)`, written as an upsert with `client_uuid` like everything else, so the offline queue replays it safely and re-ticking a day is the edit. `local_date` comes from the client, per §3.
 >
-> **A streak per habit, counting under the no-failure rule.** §3 is explicit: streaks count logging, not compliance, and a missed day renders as a gap, never as red and never as "you ruined it". So the number is "dagar i rad", it resets quietly, and there is no flame, no badge and no notification about a broken one. A habit somebody stopped doing is a habit they stopped doing.
+> **A streak per habit, counting under the no-failure rule.** §3 is explicit: streaks count logging, not compliance, and a missed day renders as a gap, never as red and never as "you ruined it". So the number is "dagar i rad", it resets quietly, and there is no flame, no badge and no notification about a broken one. A habit somebody stopped doing is a habit they stopped doing. **Built as three kinds of day (D137):** ticked, missed (the list was answered and this one was not, which §4.6's grace day covers), and unknown (nobody answered, which is not a miss and which stops the count rather than spending it).
 >
 > **Reminders are Web Push**, which works on Android and on iOS **only once the app has been installed to the home screen** — that is a platform rule, not a bug, and it is the reason D116's install control exists at all. VAPID keys are configuration, per-device subscriptions are rows, and a subscription that the push service rejects with 404 or 410 is deleted rather than retried.
 >
-> **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. One time of day, in the user's timezone, off by default.
+> **Build the morning weigh-in reminder first**, on its own, and let the rest reuse its machinery. It is the single most valuable notification this app can send — the whole trend line depends on a daily reading taken under the same conditions — and it is the one worth getting right before there are five kinds. Two times of day, in the user's timezone, off by default: see the two-time shape below.
+>
+> **A reminder for the checklist, if it gets one, inherits the shape.** A weekday pair and a weekend pair, each with its own switch, the same field names and the same helper, and no second notion of what a weekend is. A habit reminder that invented its own single time would be the one setting on the screen that behaves differently from the two beside it, and somebody would have to find out by being woken on a Sunday.
+>
+> **Amended 2026-09-12 (D142): it is offered where the habit is made.** The first build put the reminder in the habit's edit sheet only, so the option was invisible until somebody reopened a habit they had already created. One entity gets one form: creating and editing a habit now draw the same fields, including the reminder, and `POST /habits` carries them.
+
+#### The two reminders, and the foundation they pay for
+
+The habit checklist above is the second customer of this machinery, not the first. Two reminders ship with it, and they are the ones every account wants whether or not it ever writes a habit:
+
+> **"Väg dig", 07:00 by default.** **"Fyll i dagen", 22:00 by default.** Each has a configurable time and is **individually disableable** in Inställningar. Both are off until somebody turns them on: a notification nobody asked for is the fastest way to have notifications turned off for good.
+>
+> **Each is skipped when it has already happened.** The morning one does not fire if a weight is already logged for that day; the evening one does not fire if a daily log exists. Checked at send time, not at schedule time, because somebody who weighs themselves at 06:40 has answered the question and the reminder is then an interruption that makes the app look like it is not paying attention. This is also the difference between a reminder and an alarm, and it is the whole reason to prefer the first.
+>
+> **The foundation, built once for these two and reused by the checklist:**
+>
+> - **VAPID keys as configuration**, under `assertProdSecrets` like every other secret that must not be an example value. Push without them is not degraded, it is absent — the toggle does not appear.
+> - **A per-device subscription table.** One row per browser per account, not one per account: the same person has a phone and a laptop and they subscribe separately. **Edit and delete per D56**, which here means a device can be named and removed from any other device, because the commonest reason to want that is a phone somebody no longer has.
+> - **A scheduler firing in each user's timezone**, which is stored on the profile already. Not in UTC and not on the server's clock: 07:00 means seven in the morning where the person is, and that is a different instant for two accounts and a different instant for one account in March.
+> - **Two times per reminder, `vardagar` and `helg`, each with its own switch.** Saturday is not Tuesday, and the alternative was turning the reminder off on Friday and remembering to turn it back on. Which days are the weekend follows from the date the user is having, never the server's: `isWeekend(toLocalDate(now, tz))`, one helper in `shared`, and Friday 23:30 in London is already Saturday in Stockholm. Every reminder built after this uses these two pairs rather than a third arrangement.
+> - **A service worker handler that opens the right screen on tap.** The morning reminder opens the weight sheet; the evening one opens Dagen. A notification that opens the dashboard and leaves somebody to navigate has spent its one interaction on nothing.
+> - **A rejected subscription is deleted, not retried.** 404 and 410 from the push service mean the browser threw it away, and a queue that retries them forever is a queue that grows forever.
+>
+> **Say where push works, next to the toggle.** It works in the browser on Android, and on iOS **only once the app has been installed to the home screen** — a platform rule, not a bug, and the reason D116's install control exists. Inställningar has to state this beside the switch rather than in a help page, because the person who needs it is the one about to turn on a reminder that will never arrive. Offer the install control there when the app is not installed.
+>
+> Nothing here is built in the pass that writes this down.
 >
 > **Some habits are health data.** "Ta tabletten" is a record of medication, which under the GDPR is the same special category as the weights already are (D107). The privacy page must say so when this ships: what a habit name can contain, that it is stored like everything else, that it is in the export, and that it is deleted with the account. This is not an afterthought at the end of the phase — the page changes in the same pass as the feature.
 >
@@ -629,14 +658,80 @@ Not phases. Each is a good idea with no deadline and no dependency on the others
 > **A plate photo into the decomposition path**, if the local model handles images. Phase 8's parsing already takes a sentence and returns a structure the backend re-prices; an image is the same contract with a different input. Strictly conditional on the model running on hardware the owner controls (D94): a photograph of somebody's dinner is not going to a cloud API, and if the local model cannot do it then this does not happen.
 >
 > **Desktop keyboard shortcuts for logging.** The fast path is measured on a phone and lives on a phone, but the app is used at a desk too, and a keystroke that opens the weight sheet with focus in the field is the desktop equivalent of the two taps. Small, self-contained, and worth nothing until somebody actually logs from a laptop often enough to be annoyed.
+>
+> **Bounce handling for outbound mail**, or at minimum forwarding the noreply mailbox somewhere a person reads. Today a message that hard-bounces is `sent` as far as this app is concerned: the queue's job ends when the relay accepts it, and the relay's rejection arrives later, by mail, to an address nobody opens. That is the same shape as D109's dead invite link — everything reports success and the recipient got nothing. The cheap version is a real forward on the noreply address and a line in `docs/backup.md`'s neighbourhood saying so; the real version reads bounces back into `outbound_email` and marks the row, which is worth doing before this app has more than a handful of accounts.
 
 ---
 
 ## 7. Session conventions
 
+### Branching
+
+**Production deploys from `main`.** That is the whole reason for the rule below:
+a commit on `main` is a commit that the next redeploy ships.
+
+- **Never commit to `main` directly.** All work happens on `dev`.
+- `main` receives **merges only, through a pull request**, when the owner decides
+  to update production. Not when a pass finishes, not when CI goes green: when
+  somebody decides to deploy.
+- **CI runs on both branches**, so `dev` is never a place where the suite is
+  allowed to be red.
+- **Every pass ends with `dev` pushed and CI green.** A pass that ends with
+  unpushed work has put the record of it in one place that is not backed up.
+- **`STATE.md` names which commits on `dev` are not yet on `main`.** The gap
+  between the two is the difference between what is built and what is running,
+  and it is invisible from inside either branch. D115's two navigation surfaces
+  drifted for exactly that reason.
+
+- **Restart the development server when a change needs it.** Do not ask first and do
+  not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
+  dependencies at boot, and neither notices a file it read once. A green `pnpm build`
+  proves nothing about a server that has been up for a week.
+  - **Kill by port, never by name.** `pkill -f vite` silently does nothing on Windows,
+    so a "restart" leaves the old process serving the old transform and the next error
+    looks like a bug in the code that was just fixed. `Get-NetTCPConnection -LocalPort
+    5173 -State Listen` gives the PID.
+  - Clear `apps/web/node_modules/.vite` when a dependency or the Tailwind config
+    changed. The API's `tsx watch` picks up source edits on its own and rarely needs it.
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
 - Migrations are additive and checked in. Never edit an applied migration.
+- **No test may be skipped, and CI fails if one is.** `scripts/check-skips.mjs`
+  reads the run's own JSON report and refuses any skipped or todo test outside a
+  one-file allowlist. A skipped test is not a failing test, which is exactly the
+  problem: it is silence, and this project has been caught by silence twice. The
+  guard also refuses an empty or missing report, because a guard that reads
+  nothing finds nothing.
+- **Nine tests are CI-only by configuration, and the local run says so.** The S3
+  destination's live suite (`backup-s3-live.test.ts`) needs a real S3 server and
+  `pg_dump`; CI starts MinIO and sets `S3_TEST_ENDPOINT`, a workstation usually
+  has neither. They are **skipped rather than faked**, because a suite that goes
+  green when its subject is absent is worse than one that says it did not run —
+  that is the mistake the whole file exists to correct, and it is the reason the
+  local and CI totals differ by exactly nine. The file prints a line naming the
+  skip on every local run, and asserts that where the endpoint *is* configured
+  nothing is half-skipped, so a CI box that lost `pg_dump` fails instead of
+  quietly covering less. To run them here: start MinIO and set
+  `S3_TEST_ENDPOINT`, `S3_TEST_ACCESS_KEY`, `S3_TEST_SECRET_KEY`.
+- **Every third-party image is pinned by digest, and an image changes only when
+  somebody changes the digest.** `postgres:16-alpine@sha256:...` in the compose
+  files and the CI service, the same for the Node and nginx bases in
+  `infra/*.Dockerfile` and for MinIO in the workflow. A tag is a name somebody
+  else controls: `bitnami/minio` withdrew its `latest`, `minio/minio` on Docker
+  Hub started refusing to be pulled at all, and both arrived as a red build on a
+  branch that had not touched infrastructure. A digest cannot be repointed.
+  - **Changing one is a commit that says so**, with the new digest read from
+    `docker buildx imagetools inspect <image>:<tag>` and the image pulled and
+    started before the change is pushed, not after.
+  - The two **own** images are the exception: `ghcr.io/lundstream/vikt-api` and
+    `-web` are published by this repo's own release workflow and the moving tag
+    is how a deploy happens. Pinning those would mean editing the stack file to
+    release, which is the deploy procedure and not supply-chain safety.
+  - GitHub Actions are referenced by major-version tag, which has the same
+    property and is not fixed here. Named so it is a decision rather than an
+    oversight: those tags are moved by the action authors on their own
+    repositories and the failure mode is a step changing behaviour, not an image
+    disappearing from under a build.
 - **Harness scripts clean up after themselves.** Every script that drives a browser deletes its profile directory on exit, and every script that writes screenshots keeps only the last three sets, pruning older ones as it starts. The scratchpad reached 5.4 GB of abandoned Edge profiles because forty scripts each made one and none removed it; a stale profile is also a stale service worker waiting to mislead the next verification pass. `scratchpad/harness.mjs` does both in one call.
 - Before implementing a phase, re-read section 3 and section 4. The math and the isolation rules are where this project can quietly go wrong.

@@ -58,13 +58,46 @@ infra/restore-check.sh vikt.dump
 
 Only once the scratch restore matches should anything touch the live database.
 
+### Where backups can go
+
+**A directory, or a Windows share.** Choose under Administration, Backup.
+
+A **directory** is any path the API container can write, and that includes a
+share the host already mounts. Point it somewhere that does not die with the
+machine the database is on.
+
+A **bucket** is any S3-compatible endpoint: AWS, Backblaze B2, MinIO, or the S3
+service most NAS boxes now ship. Set the address, bucket, folder, access key and
+secret under Administration, Backup (D133). Leave the address empty for AWS
+itself.
+
+**Path style is a checkbox and it matters.** AWS addresses a bucket as
+`bucket.host/key`; MinIO and most NAS endpoints want `host/bucket/key` and fail
+in a way that reads like a wrong address rather than a wrong option. It defaults
+to on, which is right for everything except AWS.
+
+The secret is encrypted at rest under `SECRET_KEY`, the same way the SMTP
+password is, and is never sent back to the browser. Saving other settings leaves
+it alone; clearing it is its own checkbox. The key needs `PutObject`,
+`ListBucket` and `DeleteObject` on the bucket — the last because retention
+prunes old backups, and a key that can write but not delete fills the bucket up
+forever.
+
+**Press "Testa anslutningen" after configuring one.** It writes a small object
+and deletes it again, which is the only way to find out that the address,
+bucket, folder, key and secret are together a place this process can write.
+Each of them can be individually plausible and collectively wrong, and the
+button names which one is wrong rather than repeating the SDK's message about
+signatures. The result goes in the admin log either way, so a pass dates the
+last time the destination was known to work.
+
 ### What is not implemented
 
-**Only a local destination.** SMB and S3 appear in the settings because that is
-the column that would have to change, and the app **refuses** them with a reason
-rather than accepting the setting and doing nothing. Point the local path at a
-mount that lives somewhere other than the Proxmox host: an NFS mount, a NAS
-share, anything that does not die with the hypervisor.
+**Writing to a Windows share directly.** Both Node SMB clients authenticate with
+NTLMv1, which current Samba and Windows refuse by default, and hand-writing
+NTLMv2 is authentication code whose errors are silent. D132 and D133 have the
+account. Mount the share on the host and use a directory destination; the README
+has the fstab and compose lines.
 
 **Uploads are not in it.** The app's backup is the database. Photos live on disk
 outside it by D10, and Phase 7 has not shipped, so there is nothing there yet;

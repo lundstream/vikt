@@ -20,6 +20,8 @@ import {
   type MilestoneMetric,
 } from "shared";
 import { Celebration } from "../components/Celebration.js";
+import { Disclosure } from "../components/Disclosure.js";
+import { Sheet } from "../components/Sheet.js";
 import { ProgressHeader } from "../components/ProgressHeader.js";
 import { SavingsRules } from "../components/SavingsRules.js";
 import { MilestoneFields, band } from "../components/MilestoneFields.js";
@@ -103,41 +105,32 @@ export function Progress() {
           />
 
           {/*
-            The counters that move daily sit above the list that moves monthly.
-            A milestone list changes when you add one; the streak and the sober
-            count change every morning, and they are what someone opens this
-            screen to look at.
-          */}
-          <StreakPanel sober={progress.data.sober} />
+            The pot next, then the streak, then the two lists folded away
+            (D126).
 
+            The order is what somebody opens this screen to find out, in
+            descending order of how often the answer has changed since last
+            time. The header card answers "how far" — D60 put every unreached
+            milestone in it, nearest first, which is why there is no separate
+            distance block here: pulling that list out of the card would only
+            put a border between two halves of one answer. The pot answers "can
+            I afford the reward yet", and it moves daily. The lists answer
+            "what did I set up", which changes when somebody changes it, and
+            that is the definition of reference material (§5).
+          */}
           <div className="mt-10">
-            <PotPanel pot={progress.data.pot} today={today} />
+            <PotPanel pot={progress.data.pot} />
           </div>
 
-          <section className="mt-10">
-            <h2 className="text-base text-ink">{t("progress.milestones")}</h2>
+          <StreakPanel sober={progress.data.sober} />
 
-            {progress.data.milestones.length === 0 ? (
-              <p className="mt-2 max-w-prose text-note text-muted">
-                {t("progress.noMilestones")}
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-edge border-y border-edge">
-                {progress.data.milestones.map((milestone) => (
-                  <MilestoneRow
-                    key={milestone.id}
-                    milestone={milestone}
-                    onClaim={() => void claim.mutateAsync(milestone.id)}
-                    claiming={claim.isPending}
-                  />
-                ))}
-              </ul>
-            )}
+          <MilestonesSection
+            milestones={progress.data.milestones}
+            onClaim={(id) => void claim.mutateAsync(id)}
+            claiming={claim.isPending}
+          />
 
-            <MilestoneForm />
-          </section>
-
-          <SavingsRuleForm />
+          <SavingsSection pot={progress.data.pot} today={today} />
         </>
       ) : null}
 
@@ -160,7 +153,7 @@ export function Progress() {
  * that is about accumulation rather than change, and it deliberately does not
  * borrow the lingonberry that belongs to the trend line alone (§5).
  */
-function PotPanel({ pot, today }: { pot: PotDto; today: string }) {
+function PotPanel({ pot }: { pot: PotDto }) {
   const tokens = useTokens();
   const reducedMotion = usePrefersReducedMotion();
 
@@ -264,19 +257,6 @@ function PotPanel({ pot, today }: { pot: PotDto; today: string }) {
         </p>
       )}
 
-      {/*
-        The rules, editable and removable (D54). They were the last log type
-        without either, and unlike the others a change here is retroactive —
-        the pot accrues on read, so the rule is the record. The consequence is
-        previewed and confirmed before it is saved.
-      */}
-      {pot.rules.length > 0 ? (
-        <div className="mt-8">
-          <h3 className="text-note text-muted">{t("pot.rules")}</h3>
-          <p className="mt-1 max-w-prose text-micro text-muted">{t("pot.retroactiveNote")}</p>
-          <SavingsRules rules={pot.rules} today={today} />
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -296,6 +276,128 @@ function PotTooltip({
       <p className="text-muted">{formatLongDay(point.localDate, LOCALE)}</p>
       <p className="num mt-1 text-ink">{formatSek(point.balanceSek)}</p>
     </div>
+  );
+}
+
+/* --------------------------------------------------------- folded lists */
+
+/**
+ * The milestones somebody has set up, folded away, with the button that adds
+ * one beside the fold (D126).
+ *
+ * Two changes, and they are the same change. The list was open on arrival and
+ * an empty create form sat underneath it, so a screen about *how far there is
+ * to go* opened on a form for typing in a new target. Both are now what §5
+ * calls reference material: one tap from the fold, nothing on screen until
+ * asked for.
+ *
+ * The add button stays outside the disclosure on purpose. Adding a milestone is
+ * not a thing you do to the list, so it must not cost a fold first, and a
+ * button that is only reachable through a disclosure is the failure the
+ * component's own doc warns about.
+ */
+function MilestonesSection({
+  milestones,
+  onClaim,
+  claiming,
+}: {
+  milestones: MilestoneDto[];
+  onClaim: (id: string) => void;
+  claiming: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <section className="mt-10 border-t border-edge pt-6">
+      <Disclosure
+        label={t("progress.milestones")}
+        summary={String(milestones.length)}
+        testId="milestones"
+      >
+        {milestones.length === 0 ? (
+          <p className="mt-2 max-w-prose text-note text-muted">{t("progress.noMilestones")}</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-edge border-y border-edge">
+            {milestones.map((milestone) => (
+              <MilestoneRow
+                key={milestone.id}
+                milestone={milestone}
+                onClaim={() => onClaim(milestone.id)}
+                claiming={claiming}
+              />
+            ))}
+          </ul>
+        )}
+      </Disclosure>
+
+      <button
+        type="button"
+        data-testid="open-milestone-form"
+        className="btn mt-4"
+        onClick={() => setAdding(true)}
+      >
+        {t("progress.addMilestone")}
+      </button>
+
+      <Sheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={t("progress.addMilestone")}
+        testId="milestone-sheet"
+      >
+        <MilestoneForm onDone={() => setAdding(false)} />
+      </Sheet>
+    </section>
+  );
+}
+
+/**
+ * The savings rules, on the same pattern.
+ *
+ * They used to hang off the bottom of the pot panel, which put a list nobody
+ * edits from month to month directly under the chart that changes daily. The
+ * retroactive note travels with them: a rule is the record the pot accrues
+ * from (D54), and that is worth reading beside the rules rather than beside
+ * the balance.
+ */
+function SavingsSection({ pot, today }: { pot: PotDto; today: string }) {
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <section className="mt-10 border-t border-edge pt-6">
+      <Disclosure
+        label={t("pot.rules")}
+        summary={String(pot.rules.length)}
+        testId="savings-rules"
+      >
+        {pot.rules.length === 0 ? (
+          <p className="mt-2 max-w-prose text-note text-muted">{t("pot.noRulesYet")}</p>
+        ) : (
+          <>
+            <p className="mt-2 max-w-prose text-micro text-muted">{t("pot.retroactiveNote")}</p>
+            <SavingsRules rules={pot.rules} today={today} />
+          </>
+        )}
+      </Disclosure>
+
+      <button
+        type="button"
+        data-testid="open-rule-form"
+        className="btn mt-4"
+        onClick={() => setAdding(true)}
+      >
+        {t("pot.addRule")}
+      </button>
+
+      <Sheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={t("pot.addRule")}
+        testId="rule-sheet"
+      >
+        <SavingsRuleForm onDone={() => setAdding(false)} />
+      </Sheet>
+    </section>
   );
 }
 
@@ -472,7 +574,7 @@ function MilestoneEditor({
           <button
             type="submit"
             data-testid={`save-milestone-${milestone.id}`}
-            className="btn-secondary"
+            className="btn"
             disabled={update.isPending || remove.isPending}
           >
             {t("progress.saveMilestone")}
@@ -569,7 +671,7 @@ function StatusLine({ milestone }: { milestone: MilestoneDto }) {
   );
 }
 
-function MilestoneForm() {
+function MilestoneForm({ onDone }: { onDone: () => void }) {
   const create = useCreateMilestone();
   const [fields, setFields] = useState({
     label: "",
@@ -592,8 +694,10 @@ function MilestoneForm() {
 
     try {
       await create.mutateAsync(parsed.value);
-      // The metric survives, because the next milestone is usually on the same
-      // one: 100, then 95, then 90.
+      // Closing on success is the acknowledgement: the milestone appears in the
+      // list behind the sheet, and its count goes up by one. Clearing the
+      // fields first anyway, because the sheet is not unmounted and a failed
+      // second attempt should not reopen onto the first one's values.
       setFields((current) => ({
         ...current,
         label: "",
@@ -601,13 +705,14 @@ function MilestoneForm() {
         rewardText: "",
         rewardCostSek: "",
       }));
+      onDone();
     } catch (error) {
       setErrors({ form: error instanceof ApiError ? error.message : t("auth.unreachable") });
     }
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="mt-6 border-t border-edge pt-5">
+    <form onSubmit={onSubmit} noValidate>
       <MilestoneFields
         idPrefix="ms"
         {...fields}
@@ -617,7 +722,7 @@ function MilestoneForm() {
         <button
           type="submit"
           data-testid="add-milestone"
-          className="btn-secondary mt-4"
+          className="btn mt-4"
           disabled={create.isPending}
         >
           {t("progress.addMilestone")}
@@ -680,7 +785,7 @@ function StreakPanel({
   );
 }
 
-function SavingsRuleForm() {
+function SavingsRuleForm({ onDone }: { onDone: () => void }) {
   const create = useCreateSavingsRule();
   const me = useMe();
   const today = todayLocalDate(me.data?.profile.timezone ?? "Europe/Stockholm");
@@ -720,15 +825,16 @@ function SavingsRuleForm() {
       await create.mutateAsync(parsed.data);
       setLabel("");
       setAmountSek("");
+      onDone();
     } catch (error) {
       setErrors({ form: error instanceof ApiError ? error.message : t("auth.unreachable") });
     }
   }
 
   return (
-    <section className="mt-10 border-t border-edge pt-6">
-      <h2 className="text-base text-ink">{t("pot.addRule")}</h2>
-      <p className="mt-1 max-w-prose text-note text-muted">{t("pot.addRuleNote")}</p>
+    <>
+      {/* What a rule does, before the fields that make one. */}
+      <p className="max-w-prose text-note text-muted">{t("pot.addRuleNote")}</p>
 
       <form onSubmit={onSubmit} noValidate className="mt-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -774,10 +880,10 @@ function SavingsRuleForm() {
           </p>
         ) : null}
 
-        <button type="submit" data-testid="add-rule" className="btn-secondary mt-4">
+        <button type="submit" data-testid="add-rule" className="btn mt-4">
           {t("pot.addRule")}
         </button>
       </form>
-    </section>
+    </>
   );
 }

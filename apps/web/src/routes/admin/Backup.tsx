@@ -22,6 +22,13 @@ type Settings = {
   destinationPath: string;
   scheduleMinute: number | null;
   retainDays: number;
+  s3Endpoint: string;
+  s3Region: string;
+  s3Bucket: string;
+  s3PathStyle: boolean;
+  s3AccessKeyId: string;
+  /** Whether one is stored, never the secret itself (D133). */
+  s3SecretSet: boolean;
   updatedAt: string | null;
   updatedByEmail: string | null;
 };
@@ -80,17 +87,40 @@ export function Backup() {
     retry: false,
   });
 
+  const [kind, setKind] = useState<"local" | "s3">("local");
   const [path, setPath] = useState("");
   const [clock, setClock] = useState("");
   const [retain, setRetain] = useState("30");
+  const [endpoint, setEndpoint] = useState("");
+  const [region, setRegion] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [pathStyle, setPathStyle] = useState(true);
+  const [accessKey, setAccessKey] = useState("");
+  /**
+   * Empty means "leave the stored one alone" (D133).
+   *
+   * The screen never receives the secret, so there is nothing to prefill and
+   * nothing to send back unless somebody types a new one. Clearing it is its
+   * own control below, because "clear" and "leave alone" are two intentions and
+   * an empty box cannot be both.
+   */
+  const [secret, setSecret] = useState("");
+  const [clearSecret, setClearSecret] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loaded.data) return;
-    setPath(loaded.data.settings.destinationPath);
-    setClock(toClock(loaded.data.settings.scheduleMinute));
-    setRetain(String(loaded.data.settings.retainDays));
+    const settings = loaded.data.settings;
+    setKind(settings.destinationKind === "s3" ? "s3" : "local");
+    setPath(settings.destinationPath);
+    setClock(toClock(settings.scheduleMinute));
+    setRetain(String(settings.retainDays));
+    setEndpoint(settings.s3Endpoint);
+    setRegion(settings.s3Region);
+    setBucket(settings.s3Bucket);
+    setPathStyle(settings.s3PathStyle);
+    setAccessKey(settings.s3AccessKeyId);
   }, [loaded.data]);
 
   const save = useMutation({
@@ -100,10 +130,25 @@ export function Backup() {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          destinationKind: "local",
+          destinationKind: kind,
           destinationPath: path,
           scheduleMinute: fromClock(clock),
           retainDays: Number(retain) || 30,
+          ...(kind === "s3"
+            ? {
+                s3Endpoint: endpoint,
+                s3Region: region,
+                s3Bucket: bucket,
+                s3PathStyle: pathStyle,
+                s3AccessKeyId: accessKey,
+                // Absent leaves it alone; an explicit empty string clears it.
+                ...(clearSecret
+                  ? { s3SecretAccessKey: "" }
+                  : secret === ""
+                    ? {}
+                    : { s3SecretAccessKey: secret }),
+              }
+            : {}),
         }),
       });
       if (!response.ok) {
@@ -115,12 +160,42 @@ export function Backup() {
     onSuccess: () => {
       setProblem(null);
       setNotice(t("backup.saved"));
+      setSecret("");
+      setClearSecret(false);
       void queryClient.invalidateQueries({ queryKey: ["admin", "backup"] });
     },
     onError: (error: Error) => {
       setNotice(null);
       setProblem(error.message);
     },
+  });
+
+  /**
+   * Writes a probe file to the destination and deletes it again (D130).
+   *
+   * It tests what is **saved**, not what is typed, which is why it sits below
+   * the save button rather than beside the fields: a test of unsaved values
+   * would pass and then the schedule would run against the old ones.
+   */
+  const test = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/backup/test", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      return response.json() as Promise<{
+        ok: boolean;
+        wrote: string | null;
+        reason: string | null;
+      }>;
+    },
+    onSuccess: (result) => {
+      setNotice(result.ok ? t("backup.testOk") : null);
+      setProblem(result.ok ? null : `${t("backup.testFailed")} ${result.reason ?? ""}`.trim());
+      void queryClient.invalidateQueries({ queryKey: ["admin", "log"] });
+    },
+    onError: () => setProblem(t("backup.testFailed")),
   });
 
   const run = useMutation({
@@ -168,6 +243,17 @@ export function Backup() {
       {data && !data.secretKeyPresent ? (
         <p className="mb-4 max-w-prose text-note text-ink" data-testid="backup-no-key">
           {t("backup.noKey")}
+        </p>
+      ) : null}
+
+      {/*
+        A destination saved as a share before D133 removed it. The row can still
+        say `smb`, the runs will fail, and the screen has to say why and what to
+        do rather than showing a kind the selector below cannot even display.
+      */}
+      {data?.settings.destinationKind === "smb" ? (
+        <p className="mb-4 max-w-prose text-note text-ink" data-testid="backup-smb-gone">
+          {t("backup.smbGone")}
         </p>
       ) : null}
 
@@ -221,7 +307,7 @@ export function Backup() {
           does not hold a copy of every user's data in memory to hand it over.
         */}
         <a
-          className={`btn-secondary inline-flex w-auto px-6 ${
+          className={`btn inline-flex w-auto px-6 ${
             data?.downloadable ? "" : "pointer-events-none opacity-50"
           }`}
           href="/api/admin/backup/latest"
@@ -244,27 +330,167 @@ export function Backup() {
       ) : null}
 
       <form onSubmit={submit} className="panel max-w-md space-y-4">
+        {/*
+          Where it goes, chosen before anything is typed, because the fields
+          below mean different things for each and a form that showed both at
+          once would be asking for a path and a share at the same time.
+        */}
         <label className="block text-micro text-muted">
-          {t("backup.path")}
-          <input
-            id="backup-path"
-            className="field mt-1 w-full"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-          />
+          {t("backup.kind")}
+          <select
+            id="backup-kind"
+            data-testid="backup-kind"
+            className="select mt-1 w-full"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as "local" | "s3")}
+          >
+            <option value="local">{t("backup.kindLocal")}</option>
+            <option value="s3">{t("backup.kindS3")}</option>
+          </select>
         </label>
 
-        {/*
-          Three examples and a failure mode, because "Katalog att skriva till"
-          on its own does not say whether a UNC path works, whether the
-          directory has to exist, or what happens when it cannot be written.
-          The SMB answer is the useful one: mount it, and it becomes local.
-        */}
-        <div className="space-y-1 text-micro text-muted">
-          <p>{t("backup.pathHelp")}</p>
-          <p>{t("backup.pathExamples")}</p>
-          <p>{t("backup.pathUnwritable")}</p>
-        </div>
+        {kind === "s3" ? (
+          <div className="space-y-4" data-testid="backup-s3-fields">
+            <label className="block text-micro text-muted">
+              {t("backup.s3Endpoint")}
+              <input
+                id="backup-s3-endpoint"
+                className="field mt-1 w-full"
+                placeholder="http://nas.local:9000"
+                value={endpoint}
+                onChange={(event) => setEndpoint(event.target.value)}
+              />
+            </label>
+            <p className="text-micro text-muted">{t("backup.s3EndpointHint")}</p>
+
+            <div className="flex gap-4">
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.s3Bucket")}
+                <input
+                  id="backup-s3-bucket"
+                  className="field mt-1 w-full"
+                  placeholder="backups"
+                  value={bucket}
+                  onChange={(event) => setBucket(event.target.value)}
+                />
+              </label>
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.s3Region")}
+                <input
+                  id="backup-s3-region"
+                  className="field mt-1 w-full"
+                  placeholder="us-east-1"
+                  value={region}
+                  onChange={(event) => setRegion(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label className="block text-micro text-muted">
+              {t("backup.s3Prefix")}
+              <input
+                id="backup-path"
+                className="field mt-1 w-full"
+                placeholder="vikt"
+                value={path}
+                onChange={(event) => setPath(event.target.value)}
+              />
+            </label>
+
+            <div className="flex gap-4">
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.s3Key")}
+                <input
+                  id="backup-s3-key"
+                  className="field mt-1 w-full"
+                  autoComplete="off"
+                  value={accessKey}
+                  onChange={(event) => setAccessKey(event.target.value)}
+                />
+              </label>
+              <label className="block flex-1 text-micro text-muted">
+                {t("backup.s3Secret")}
+                <input
+                  id="backup-s3-secret"
+                  data-testid="backup-s3-secret"
+                  className="field mt-1 w-full"
+                  type="password"
+                  autoComplete="new-password"
+                  value={secret}
+                  disabled={clearSecret}
+                  onChange={(event) => setSecret(event.target.value)}
+                />
+              </label>
+            </div>
+
+            {/*
+              The stored secret is never sent to this screen, so there is
+              nothing to prefill: an empty box means "leave it alone". Clearing
+              it is a separate control, because "clear" and "leave alone" are
+              two intentions and one empty field cannot express both.
+            */}
+            {data?.settings.s3SecretSet ? (
+              <>
+                <p className="text-micro text-muted">{t("backup.s3SecretSet")}</p>
+                <label className="flex items-center gap-2 text-micro text-muted">
+                  <input
+                    type="checkbox"
+                    className="check"
+                    data-testid="backup-s3-clear"
+                    checked={clearSecret}
+                    onChange={(event) => setClearSecret(event.target.checked)}
+                  />
+                  {t("backup.s3SecretClear")}
+                </label>
+              </>
+            ) : null}
+
+            {/*
+              Path style is a setting rather than a guess (D133). AWS wants the
+              bucket in the host name and everything self-hosted wants it in the
+              path, and getting it wrong fails in a way that reads like a wrong
+              address rather than a wrong option.
+            */}
+            <label className="flex items-center gap-2 text-micro text-muted">
+              <input
+                type="checkbox"
+                className="check"
+                data-testid="backup-s3-pathstyle"
+                checked={pathStyle}
+                onChange={(event) => setPathStyle(event.target.checked)}
+              />
+              {t("backup.s3PathStyle")}
+            </label>
+            <p className="text-micro text-muted">{t("backup.s3PathStyleHint")}</p>
+
+            <p className="text-micro text-muted">{t("backup.s3Help")}</p>
+          </div>
+        ) : (
+          <>
+            <label className="block text-micro text-muted">
+              {t("backup.path")}
+              <input
+                id="backup-path"
+                className="field mt-1 w-full"
+                value={path}
+                onChange={(event) => setPath(event.target.value)}
+              />
+            </label>
+
+            {/*
+              Examples and a failure mode, because "Katalog att skriva till" on
+              its own does not say whether the directory has to exist or what
+              happens when it cannot be written. A share the host already
+              mounts is still the answer for a server this client cannot talk
+              to, and it is a local path like any other.
+            */}
+            <div className="space-y-1 text-micro text-muted">
+              <p>{t("backup.pathHelp")}</p>
+              <p>{t("backup.pathExamples")}</p>
+              <p>{t("backup.pathUnwritable")}</p>
+            </div>
+          </>
+        )}
 
         <div className="flex gap-4">
           <label className="block flex-1 text-micro text-muted">
@@ -292,14 +518,30 @@ export function Backup() {
 
         <p className="text-micro text-muted">{t("backup.timeHint")}</p>
 
-        <button
-          type="submit"
-          data-testid="save-backup"
-          className="btn w-auto px-6"
-          disabled={save.isPending}
-        >
-          {t("profile.save")}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            data-testid="save-backup"
+            className="btn w-auto px-6"
+            disabled={save.isPending}
+          >
+            {t("profile.save")}
+          </button>
+
+          {/*
+            Tests what is saved, not what is typed. A test of unsaved values
+            would pass and then the schedule would run against the old ones.
+          */}
+          <button
+            type="button"
+            data-testid="test-backup"
+            className="btn w-auto px-6"
+            disabled={test.isPending}
+            onClick={() => test.mutate()}
+          >
+            {test.isPending ? t("backup.testing") : t("backup.test")}
+          </button>
+        </div>
       </form>
 
       <p className="mt-6 max-w-prose text-micro text-muted">{t("backup.restoreHint")}</p>

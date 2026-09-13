@@ -12,67 +12,47 @@
  */
 
 /**
- * The smallest round step that fits `count` marks or fewer into `range`.
+ * Every step this project will consider, finest first, filtered by the caller's
+ * constraints.
  *
- * Smallest, not "the first one bigger than range / count": rounding the raw
- * step up lands on 1 kg for a two-kilo window, which is three marks on the
- * element the whole product is about. Trying candidates in order and taking the
- * first that fits gives 0.5 there and 2 on a wide window.
- *
- * 2.5 is in the progression because weight moves in half-kilos, so 0.25 and 2.5
- * are both steps a reader of these axes expects to see.
+ * Exported so a test can assert what is and is not admissible rather than
+ * inferring it from the output.
  */
-export function niceStep(range: number, count: number, maxStep?: number): number {
-  if (!Number.isFinite(range) || range <= 0) return 1;
+export function candidateSteps(
+  range: number,
+  maxStep?: number,
+  quantum?: number,
+): number[] {
+  if (!Number.isFinite(range) || range <= 0) return [1];
 
   const magnitude = Math.pow(10, Math.floor(Math.log10(range)));
-  let fallback: number | null = null;
+  const steps: number[] = [];
 
   for (const exponent of [-2, -1, 0, 1]) {
     for (const multiple of [1, 2, 2.5, 5]) {
       const step = multiple * magnitude * Math.pow(10, exponent);
       if (step <= 0) continue;
-      /**
-       * `maxStep` caps how coarse the axis may get. The weight axis passes 1
-       * kg: on a six-kilo window the first step that fits five marks is 2, and
-       * a scale marked in two-kilo jumps cannot show the half-kilo the whole
-       * product is about. When the cap means no candidate fits `count`, the
-       * coarsest allowed step is used and the axis simply gets more marks —
-       * the cap is a promise about the scale, `count` only a preference.
-       */
       if (maxStep !== undefined && step > maxStep + 1e-9) continue;
 
-      // The epsilon is load-bearing: `0.05 / 0.01` is 4.999999999999999, so
-      // without it this accepts a step that actually produces six marks.
-      if (Math.floor(range / step + 1e-9) + 1 <= count) return step;
-      // The coarsest step the cap still allows, kept for when none fit.
-      if (maxStep !== undefined) fallback = step;
+      if (quantum !== undefined && quantum > 0) {
+        const multiples = step / quantum;
+        if (Math.abs(multiples - Math.round(multiples)) > 1e-6) continue;
+      }
+
+      steps.push(step);
     }
   }
 
-  // Capped and nothing fit: the cap wins, and the axis gets more marks.
-  if (fallback !== null) return fallback;
-  return range / Math.max(1, count - 1);
+  return steps.length > 0 ? steps : [range];
 }
 
-/**
- * Round ticks inside `[min, max]`, de-duplicated on the **rendered** label.
- *
- * The de-duplication is not decoration: the trend axis once rendered "108"
- * twice, because two different values rounded to the same string at one decimal
- * place. Comparing formatted output is the only check that matches what the
- * reader actually sees.
- */
-export function niceTicks(
+/** The marks a given step puts inside `[min, max]`, de-duplicated on the label. */
+function marksFor(
   min: number,
   max: number,
-  count: number,
+  step: number,
   format: (value: number) => string,
-  maxStep?: number,
 ): number[] {
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
-
-  const step = niceStep(max - min, count, maxStep);
   const ticks: number[] = [];
   const seen = new Set<string>();
 
@@ -93,4 +73,57 @@ export function niceTicks(
   }
 
   return ticks;
+}
+
+/**
+ * Round ticks inside `[min, max]`, de-duplicated on the **rendered** label.
+ *
+ * The de-duplication is not decoration: the trend axis once rendered "108"
+ * twice, because two different values rounded to the same string at one decimal
+ * place. Comparing formatted output is the only check that matches what the
+ * reader actually sees.
+ *
+ * ## The step is chosen by counting, not by estimating
+ *
+ * `floor(range / step) + 1` is how many marks a step *would* place if the first
+ * one sat exactly on `min`. It does not: it sits on the first multiple of the
+ * step at or above `min`, which is usually higher, so the estimate is often one
+ * too many. On a 3,1 kg window that difference decided between a step of 1 —
+ * three marks on the chart this product is about — and a step of 0.5, which is
+ * six.
+ *
+ * So every admissible step is tried, the marks are built, and the one that
+ * actually lands the most marks without exceeding `count` wins. That is also
+ * what keeps the result in the four-to-six band without a second rule saying so:
+ * the finest step that fits is the one with the most marks under the cap.
+ *
+ * When nothing fits — a capped `maxStep` on a wide window — the coarsest
+ * admissible step is used and the axis simply gets more marks. The cap is a
+ * promise about the scale; `count` is only a preference.
+ */
+export function niceTicks(
+  min: number,
+  max: number,
+  count: number,
+  format: (value: number) => string,
+  maxStep?: number,
+  quantum?: number,
+): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
+
+  const steps = candidateSteps(max - min, maxStep, quantum);
+
+  let best: number[] | null = null;
+  let coarsest: number[] | null = null;
+
+  for (const step of steps) {
+    const marks = marksFor(min, max, step, format);
+    coarsest = marks;
+
+    if (marks.length <= count && (best === null || marks.length > best.length)) {
+      best = marks;
+    }
+  }
+
+  return best ?? coarsest ?? [];
 }

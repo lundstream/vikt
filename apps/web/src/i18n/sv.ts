@@ -62,6 +62,12 @@ export const sv = {
   "account.deleteDays": "{n} dagar",
   "account.deletePhotos": "{n} foton",
   "account.passwordToConfirm": "Ditt lösenord",
+  "account.typeEmailToConfirm": "Skriv din mejladress för att bekräfta",
+  "admin.revokeConfirmBody":
+    "Koden {code} slutar gälla direkt och går inte att använda för att registrera ett konto. Du kan skapa en ny när som helst.",
+  "admin.disableConfirmBody":
+    "{email} kan inte logga in förrän kontot slås på igen. Ingenting raderas, och alla sessioner avslutas.",
+  "admin.typeEmailToConfirm": "Skriv kontots mejladress för att bekräfta",
   "account.passwordWhy":
     "Lösenordet krävs, för en öppen session ska inte räcka för att radera ett år av loggning.",
   "account.deleteConfirm": "Radera för alltid",
@@ -225,13 +231,35 @@ export const sv = {
   "settings.sendNow": "Skicka nu",
   "settings.retry": "Försök igen",
   "settings.discard": "Kasta",
-  "settings.conflicts": "Samma dag från två enheter",
+  // Heading and note cover all tre fall (D153), så varje rad får säga sitt eget.
+  // "Samma dag från två enheter" var sant om ett av dem och fel om resten.
+  "settings.conflicts": "Det här väntar på ditt svar",
   "settings.conflictsNote":
-    "Den här dagen skrevs på en annan enhet innan din post hann fram. Vi har behållit " +
-    "båda så att du kan välja, i stället för att skriva över något du inte sett.",
+    "Något du loggat kunde inte skickas som det var. Vi har behållit det du skrev så " +
+    "att du kan välja, i stället för att skriva över eller slänga något du inte sett.",
   "settings.conflictTheirs": "Sparad på servern",
   "settings.conflictMine": "Din väntande post",
-  "settings.conflictKeepTheirs": "Behåll den som redan finns",
+  // ------------------------------------------------ version och länkar (D151)
+  "about.version": "Version {version}",
+  // The build did not say, which is a fact rather than an error.
+  "about.versionUnknown": "Version okänd",
+  "about.source": "Källkod",
+  "about.privacy": "Integritet",
+  "about.terms": "Villkor",
+  "settings.conflictKeepTheirs": "Behåll den sparade",
+  "settings.conflictUseMine": "Använd den väntande",
+  // Which collision it is (D150). Two creates for one day is one thing; an
+  // edit whose rad ändrades under tiden är en annan.
+  "settings.conflictSameDay":
+    "Två vägningar skrevs för samma dag, från olika enheter. Bara en kan gälla.",
+  "settings.conflictChanged":
+    "Vägningen du ändrade hade hunnit ändras någon annanstans. Bara en kan gälla.",
+  // Raden en ändring pekade på är borttagen och dagen är tom (D153). Ingen
+  // krock: det finns inget att jämföra med, bara ett val att göra.
+  "settings.conflictGone":
+    "Vägningen du ändrade är borttagen, och dagen har ingen vägning alls. Det du skrev finns kvar.",
+  "settings.conflictAddAgain": "Lägg till igen",
+  "settings.conflictDropMine": "Släng den",
   "settings.conflictOther": "Okänd post",
   /* --- installera som app (D116) ------------------------------------------ */
   "install.title": "Installera som app",
@@ -258,6 +286,10 @@ export const sv = {
     "veta att en siffra saknas än en gammal siffra som ser aktuell ut.",
 
   "queue.kind.weight": "Vikt",
+  // Två rader saknades och renderade sin egen nyckel i kölistan, eftersom
+  // uppslaget castas till en nyckel och typkollen därför inte såg det (D153).
+  "queue.kind.weight-update": "Ändrad vägning",
+  "queue.kind.habit-check": "Vana",
   "queue.kind.manual-intake": "Kalorier",
   "queue.kind.food-entry": "Mat",
   "queue.kind.daily": "Dagen",
@@ -268,6 +300,7 @@ export const sv = {
   "queue.status.pending": "Väntar",
   "queue.status.failed": "Nekad av servern",
   "queue.status.conflict": "Krockar med en annan enhet",
+  "queue.status.gone": "Raden är borttagen",
   "queue.attempts": "{n} försök",
   "queue.attemptOne": "1 försök",
 
@@ -395,6 +428,144 @@ export const sv = {
   "announce.defaultBody":
     "Vikt är nere för underhåll {weekday} {date} kl {from} till {to}. Du kan logga som vanligt under tiden, det sparas på telefonen och skickas när appen är tillbaka.",
 
+  /* ---------------------------------------------------------------- coachen */
+
+  "coach.title": "Coach",
+  "coach.name": "Bengt",
+  "coach.what":
+    "{name} svarar på frågor om hur det går, utifrån dina egna siffror. Inga nya siffror räknas fram, och ingenting ändras.",
+  "coach.reviewTitle": "Veckans sammanfattning",
+  "coach.writeReview": "Skriv veckans",
+  "coach.writing": "Skriver…",
+  "coach.noReviews": "Ingen sammanfattning än. Be om veckans, så skriver han en.",
+  "coach.reviewRefused":
+    "Sammanfattningen innehöll en siffra som inte kommer ur dina uppgifter, så den sparades inte.",
+  "coach.weekOf": "Veckan från {date}",
+  "coach.readAll": "Läs hela",
+  "coach.dismiss": "Tack, läst",
+  "coach.nameNeutral": "Coachen",
+  "coach.limits":
+    "Siffrorna i svaren kontrolleras mot dina egna uppgifter, men orden runt dem gör det inte: coachen kan ha fel om hur appen fungerar. Det som står på de andra skärmarna är det som gäller.",
+  "coach.toneTitle": "Tonläge",
+  "coach.toneTorr": "Torr",
+  "coach.tonePeppig": "Peppig",
+  "coach.toneSaklig": "Saklig",
+  "coach.toneTorrWhat": "Kort och underdriven, och roligare när det går bra än när det går trögt.",
+  "coach.tonePeppigWhat": "Varmare och gladare när det går bra, lika lugn när det går trögt.",
+  "coach.toneSakligWhat": "Ingen personlighet alls. Siffrorna och vad de betyder.",
+  "coach.toneBoth": "Gäller både sammanfattningen och chatten.",
+  "coach.chatTitle": "Fråga {name}",
+  "coach.empty":
+    "Fråga något om hur det går. Till exempel hur veckan sett ut, eller varför underhållsnivån rört sig.",
+  "coach.ask": "Din fråga",
+  "coach.placeholder": "Hur har veckan sett ut?",
+  "coach.send": "Fråga",
+  "coach.thinking": "Tänker…",
+  "coach.you": "Du",
+  "coach.newConversation": "Nytt samtal",
+  "coach.refusedNote": "Svaret stoppades av appens spärrar, och det du ser är appens egen text.",
+  "coach.busy": "Coachen är upptagen just nu. Försök igen om en stund.",
+  "coach.unreachable":
+    "Coachen går inte att nå just nu. Den kör på en dator hemma som inte alltid är igång, och frågan sparas inte.",
+  "coach.limited": "Du har frågat många gånger den här timmen. Prova igen om en stund.",
+  "coach.readsOnly":
+    "{name} kan bara läsa. Ingenting loggas och ingen plan ändras: det gör du själv under",
+  "coach.historyTitle": "Tidigare samtal",
+  "coach.historyWhat":
+    "Samtalen sparas på ditt konto, visas bara för dig och används inte till något annat. De följer med i exporten och försvinner med kontot.",
+  "coach.noHistory": "Inga samtal än.",
+  "coach.turns": "{count} rader, senast {date}",
+  "coach.forget": "Ta bort",
+  "coach.forgetAll": "Ta bort alla samtal",
+  "coach.forgetAllTitle": "Ta bort alla samtal?",
+  "coach.forgetAllBody":
+    "Allt du har frågat och allt Bengt har svarat försvinner. Det går inte att ångra.",
+
+  /* ---------------------------------------------------------------- vanor */
+
+  "habit.title": "Vanor",
+  "habit.empty":
+    "En egen checklista. Skriv det du vill göra varje dag, och bocka av när det är gjort.",
+  "habit.examplesLead": "Tre vanliga, om du vill börja där:",
+  "habit.exampleWater": "Två liter vatten",
+  "habit.exampleVitamins": "Vitaminer",
+  "habit.exampleStretch": "Stretching",
+  "habit.add": "Lägg till vana",
+  "habit.edit": "Ändra listan",
+  "habit.editTitle": "Ändra listan",
+  "habit.name": "Namn",
+  "habit.namePlaceholder": "D-vitamin",
+  "habit.icon": "Ikon",
+  "habit.iconNone": "Ingen",
+  "habit.icon.droppe": "Droppe",
+  "habit.icon.tablett": "Tablett",
+  "habit.icon.stretch": "Stretching",
+  "habit.icon.promenad": "Promenad",
+  "habit.icon.somn": "Sömn",
+  "habit.icon.bok": "Bok",
+  "habit.icon.tand": "Tandborste",
+  "habit.icon.sol": "Dagsljus",
+  "habit.icon.andning": "Andning",
+  "habit.icon.penna": "Penna",
+  "habit.change": "Ändra",
+  "habit.moveUp": "Flytta upp",
+  "habit.moveDown": "Flytta ner",
+  "habit.save": "Spara",
+  "habit.thisHabit": "vanan",
+  "habit.remove": "Ta bort",
+  "habit.removeTitle": "Ta bort {name}?",
+  "habit.removeKeepBody":
+    "Vanan försvinner från listan. Dagarna du redan bockat av finns kvar, och de följer med i exporten.",
+  "habit.removeAllBody":
+    "Vill du bli av med historiken också, ta bort allt. Det går inte att ångra.",
+  "habit.removeKeep": "Ta bort, behåll historiken",
+  "habit.removeAll": "Ta bort allt",
+  "habit.reminder": "Påminnelse",
+  "habit.reminderWhat":
+    "En notis med vanans namn. Den hoppas över om du redan bockat av den den dagen.",
+  "habit.streakDays": "{days} dagar i rad",
+  "habit.streakOne": "1 dag i rad",
+  "habit.rule":
+    "Dagar i rad räknas från de dagar du fyllt i listan. En dag du inte var här alls är okänd, inte missad, och räkningen börjar då om från senaste dagen du fyllde i.",
+  "habit.saveFailed": "Det gick inte att spara just nu.",
+
+  "push.title": "Påminnelser",
+  "push.what":
+    "Två påminnelser, var och en med en tid för vardagar och en för helgen. Varje tid har en egen på- och avknapp, och alla är avstängda tills du slår på dem.",
+  "push.where":
+    "Push fungerar i webbläsaren på Android. På iPhone och iPad fungerar det bara när appen är installerad på hemskärmen.",
+  "push.unsupported": "Den här webbläsaren kan inte ta emot push. Påminnelserna går inte att slå på här.",
+  "push.notAsked": "Webbläsaren har inte frågat än. Tryck nedan, så frågar den.",
+  "push.denied":
+    "Du har nekat notiser för den här sidan, och webbläsaren frågar inte igen. Slå på notiser för sidan i webbläsarens inställningar, så fungerar knapparna här.",
+  "push.granted": "Den här enheten är ansluten och kan ta emot påminnelser.",
+  "push.allow": "Tillåt notiser",
+  "push.weighLabel": "Påminn mig att väga mig",
+  "push.dayLabel": "Påminn mig att fylla i dagen",
+  "push.weekdays": "Vardagar",
+  "push.weekend": "Helg",
+  "push.timeWeekdays": "Tid på vardagar",
+  "push.timeWeekend": "Tid på helgen",
+  "push.test": "Skicka en testnotis",
+  "push.testing": "Skickar…",
+  "push.testSent": "Skickad till {count} enhet. Kommer den inte fram är det enheten som blockerar den.",
+  "push.testNone": "Ingen enhet tog emot den. Anslut den här enheten först.",
+  "push.testFailed": "Det gick inte att skicka just nu.",
+  "push.forget": "Ta bort",
+  "push.thisDevice": "den här enheten",
+  "push.unnamedDevice": "Enhet utan namn",
+  "push.lastSeen": "Senast nådd {date}",
+  "push.preview": "Notisen säger: {text}",
+  "push.notifyWeigh": "Dags att väga dig",
+  "push.notifyDay": "Dags att fylla i dagen",
+  "push.notifyHabit": "Kom ihåg: {name}",
+  "push.habitsOn":
+    "Vanor med påminnelse: {names}. Tiderna ändrar du på Dagen, under Vanor, i vanans egen ruta.",
+  "push.habitsNone":
+    "Ingen vana har en påminnelse än. Du sätter den när du skapar vanan på Dagen, under Vanor.",
+  "settings.requestMail": "Mejla mig när någon ber om en kod",
+  "settings.requestMailHint":
+    "Gäller bara dig som administrerar. Förfrågan hamnar i listan under Administration oavsett, och pricken vid Administration visas också oavsett. Det här handlar bara om mejlet.",
   "settings.newsMail": "Mejla mig när något nytt kommer",
   "settings.newsMailHint":
     "Gäller nyheter. Driftmeddelanden mejlas oavsett, eftersom de handlar om tjänsten du använder.",
@@ -410,6 +581,10 @@ export const sv = {
   "admin.announceBody": "Text",
   "admin.announceBodyHint":
     "Lämna tomt för underhåll, så skrivs texten ut från tiderna i läsarens egen tidszon.",
+  "admin.announceFormatHint":
+    "Du kan använda ## rubrik, ### underrubrik, **fet**, punktlistor med -, numrerade listor och [länktext](adress). Annan formatering skrivs ut som den står.",
+  "admin.announcePreview": "Så här ser den ut",
+  "admin.announcePreviewEmpty": "Skriv något i rutan ovanför så visas det här.",
   "admin.announceFrom": "Från",
   "admin.announceTo": "Till",
   "admin.announceLead": "Visa banner i förväg (minuter)",
@@ -554,11 +729,11 @@ export const sv = {
   /* --- admin: backups (D103) ---------------------------------------------- */
   "admin.tabBackup": "Backup",
   "backup.what":
-    "En backup är en krypterad kopia av hela databasen. Den skrivs till katalogen nedan och krypteras innan den lämnar processen, så filen går inte att läsa utan SECRET_KEY.",
+    "En backup är en krypterad kopia av hela databasen. Den skrivs dit du väljer nedan och krypteras innan den lämnar processen, så filen går inte att läsa utan SECRET_KEY.",
   "backup.lastRun": "Senaste körning",
   "backup.nextRun": "Nästa körning",
   "backup.noSchedule": "Ingen schemalagd",
-  "backup.destination": "Katalog",
+  "backup.destination": "Skrivs till",
   "backup.runNow": "Kör nu",
   "backup.running": "Kör…",
   "backup.failed": "Misslyckades",
@@ -570,7 +745,29 @@ export const sv = {
   "backup.pathHelp":
     "En katalog på maskinen, till exempel /var/backups/vikt. Peka den på något som inte dör med servern: en monterad NFS- eller SMB-resurs fungerar, eftersom den ser ut som en vanlig katalog.",
   "backup.pathExamples":
-    "Lokalt: /var/backups/vikt. SMB monterad: /mnt/nas/vikt (montera //nas/backup i fstab först). S3: s3://mitt-konto/vikt, ännu inte implementerat och sparas inte.",
+    "Lokalt: /var/backups/vikt. Monterad resurs: /mnt/nas/vikt, om värden redan monterar den. S3: ännu inte implementerat och sparas inte.",
+  "backup.kind": "Var backupen hamnar",
+  "backup.kindLocal": "Katalog på maskinen",
+  "backup.kindS3": "S3-hink",
+  "backup.s3Endpoint": "Adress",
+  "backup.s3EndpointHint": "Lämna tomt för AWS. För MinIO, en NAS eller Backblaze: hela adressen, till exempel http://nas.local:9000.",
+  "backup.s3Region": "Region",
+  "backup.s3Bucket": "Hink",
+  "backup.s3Prefix": "Mapp i hinken",
+  "backup.s3Key": "Åtkomstnyckel",
+  "backup.s3Secret": "Hemlig nyckel",
+  "backup.s3SecretSet": "En hemlig nyckel är sparad. Lämna fältet tomt för att behålla den.",
+  "backup.s3SecretClear": "Ta bort den sparade nyckeln",
+  "backup.s3PathStyle": "Adressera hinken i sökvägen",
+  "backup.s3PathStyleHint": "På för MinIO, NAS och de flesta andra. Av för AWS, som lägger hinken i värdnamnet.",
+  "backup.s3Help":
+    "Dumpen krypteras innan den lämnar maskinen, så det som skickas går inte att läsa utan SECRET_KEY. Nyckeln behöver få skriva, lista och ta bort i hinken.",
+  "backup.smbGone":
+    "Att skriva till en Windows-utdelning direkt går inte: de bibliotek som finns talar NTLMv1, som dagens servrar nekar. Montera utdelningen på värden och välj Katalog på maskinen i stället.",
+  "backup.test": "Testa anslutningen",
+  "backup.testing": "Testar…",
+  "backup.testOk": "Det gick bra. En liten fil skrevs och togs bort igen.",
+  "backup.testFailed": "Det gick inte.",
   "backup.pathUnwritable":
     "Går katalogen inte att skriva till skapas den om den saknas, och annars misslyckas körningen med felet från filsystemet. Den raden syns här och ingen halv fil blir kvar.",
   "backup.time": "Tid på dygnet",
@@ -617,6 +814,7 @@ export const sv = {
   "measure.thigh": "Lår (cm)",
   "measure.arm": "Arm (cm)",
   "measure.save": "Spara mått",
+  "measure.removeLabel": "måtten för dagen",
   "measure.saved": "Sparat.",
   // Why the chart shows a smoothed line rather than the numbers just entered.
   "measure.smoothingNote":
@@ -632,7 +830,10 @@ export const sv = {
   "activity.intensityLow": "Lätt",
   "activity.intensityHigh": "Hårt",
   "activity.add": "Lägg till",
-  "activity.remove": "Ta bort",
+  // Named, for the two-tap confirm: "Ta bort promenad?" beats "Är du säker?".
+  "activity.removeLabel": "{what}",
+  // The same form, amending a row instead of adding one (D56, closed).
+  "activity.saveEdit": "Spara ändringen",
   "activity.approxKcal": "≈ {kcal} kcal",
   "activity.noEstimate": "Ingen uppskattning",
   "activity.dayTotal": "≈ {kcal} kcal i dag",
@@ -741,10 +942,25 @@ export const sv = {
   "chart.trend": "Trend",
   "chart.reading": "Daglig vägning",
   "chart.imported": "Importerad",
+  // ---------------------------------------------- månadskalendern (D145)
+  // Two letters, Monday first. The grid is seven columns on a 360 px screen and
+  // three-letter days do not fit without shrinking the figures beside them.
+  "weekday.mon": "må",
+  "weekday.tue": "ti",
+  "weekday.wed": "on",
+  "weekday.thu": "to",
+  "weekday.fri": "fr",
+  "weekday.sat": "lö",
+  "weekday.sun": "sö",
+  "calendar.allWeighings": "alla vägningar",
+  "calendar.hideWeighings": "dölj kalendern",
+  "calendar.weighingsLabel": "Vägningar per dag",
+  "calendar.weighing": "vägning",
+  "calendar.help":
+    "Tryck på en dag för att ändra vägningen, eller på en tom dag för att fylla i den.",
   "chart.trendValue": "Trend {value} kg",
   "chart.readValue": "Vägd {value} kg",
   "chart.importedValue": "Importerad {value} kg",
-  "chart.noReading": "Ingen vägning den dagen",
   "chart.summary": "Trendlinje: {from} kg till {to} kg över {days} dagar.",
   "chart.emptyLabel": "Trendlinje utan data än.",
 
@@ -845,11 +1061,41 @@ export const sv = {
     "Kolla mängderna innan du sparar. Kalorierna kommer från livsmedelsdatabasen, inte från tolkningen.",
   "llm.matched": "{kcal} kcal enligt databasen",
   "llm.noMatch": "Ingen träff i databasen, sparas utan energivärde",
+  // Where the figure would be, when the picture did not say a quantity.
+  "llm.amountUnknown": "inte än",
+  // A partial save: what had a mängd was written, what did not is still on
+  // screen. Saying how many is more use than naming them all in a toast.
+  "llm.someWithoutAmount":
+    "{count} rader saknar mängd och sparades inte. Fyll i mängden, eller ta bort raden.",
+  "llm.noneWithAmount": "Ingen rad har någon mängd än. Fyll i minst en.",
   "llm.include": "Ta med {name}",
   "llm.saveRows": "Spara {count} rader",
   "llm.nothingFound": "Hittade ingen mat i texten. Skriv om den, eller sök upp maten själv.",
   "llm.unavailableNow": "Tolkningen är inte igång just nu. Sök upp maten själv så länge.",
   "llm.logged": "{count} rader loggade",
+
+  // ------------------------------------------------ maten som fotografi (D143)
+  "photo.take": "Fotografera maten",
+  // The button inside the sheet. Shorter than the sheet's own title, which is
+  // the quick action's name: a heading and the control under it saying the same
+  // four words reads as a stutter.
+  "photo.shutter": "Ta ett foto",
+  "photo.working": "Tittar på bilden…",
+  // The measured figure, in the app's own register. No spinner metaphor: the
+  // honest thing to say to somebody waiting is how long it takes. Two numbers
+  // because there are two cases and the app cannot tell which it is in: under a
+  // second with the model already running, about six when it has to load first.
+  "photo.waiting": "Det tar oftast ett par sekunder, ibland upp till tio.",
+  "photo.noteLabel": "Vad är det, om bilden inte räcker",
+  "photo.notePlaceholder": "kebabpizza, hela",
+  "photo.tooLarge": "Bilden är för stor även efter förminskningen. Ta en ny.",
+  "photo.unreadable": "Bilden gick inte att läsa. Ta en ny.",
+  "photo.unavailableNow":
+    "Bildtolkningen är inte igång just nu. Bilden sparades inte, så den behöver tas om. Skriv in maten själv så länge.",
+  "photo.rateLimited": "Du har skickat många bilder den senaste timmen. Vänta en stund.",
+  "photo.nothingFound": "Hittade ingen mat på bilden. Ta en ny, eller skriv in maten själv.",
+  "photo.checkBeforeSaving":
+    "Mängderna är uppskattade från bilden. Kolla dem innan du sparar. Kalorierna kommer från livsmedelsdatabasen.",
 
   "recipe.title": "Vad kan jag laga?",
   "recipe.intro":
@@ -916,11 +1162,26 @@ export const sv = {
   "pantry.countedNote": "{count} av dem hamnar i ingredienslistan när de används.",
 
   "food.recent": "Senast loggat",
+  /*
+    "Igen" logs to the day being viewed; these log to today. The labels have to
+    carry that difference on their own, because the two sit on the same screen
+    (D124).
+  */
+  "food.sourceTyped": "inskrivet",
+  "food.sourceDatabase": "ur matdatabasen",
+  "food.entryAmount": "{grams} g, {kcal} kcal",
+  "food.copyToToday": "Logga i dag",
+  "food.copyDayToToday": "Logga hela dagen i dag",
+  "food.copyingDay": "Loggar…",
+  "food.copiedToToday": "{name} loggad i dag.",
+  "food.copiedDay": "{n} rader loggade i dag.",
+  "food.copiedDayPartial": "{n} av {total} rader loggades i dag. Resten ligger kvar på dagen du tittar på.",
   "food.again": "Igen",
   "food.meals": "Sparade måltider",
   "food.itemOne": "1 rad",
   "food.itemMany": "{count} rader",
   "food.find": "Hitta mat",
+  "food.ways": "Sätt att lägga till mat",
   "food.searchPlaceholder": "Sök på namn",
   "food.searchAction": "Sök",
   "food.today": "I dag",
@@ -990,9 +1251,15 @@ export const sv = {
 
   // -------------------------------------------------------------- quick log
   "quick.title": "Logga vikt",
+  // The same sheet, opened on a day that already has a reading (D145).
+  "quick.editTitle": "Ändra vägningen",
+  "quick.removeReadingLabel": "vägningen {day}",
   "quick.cancel": "Avbryt",
   "quick.weight": "Vikt (kg)",
   "quick.calories": "Kalorier i dag (frivilligt)",
+  // The same field with the sheet open on a past day (D145). "i dag" there
+  // named the wrong day, directly above a field holding that day's figure.
+  "quick.caloriesThatDay": "Kalorier den dagen (frivilligt)",
   "quick.caloriesHint": "En siffra för hela dagen. Matloggning kommer senare.",
   "quick.numberInvalid": "Skriv ett tal, med komma eller punkt som decimaltecken.",
   "quick.numberAmbiguous":
@@ -1057,6 +1324,9 @@ export const sv = {
   "macro.viewLabel": "Period",
   "macro.viewToday": "I dag",
   "macro.viewWeek": "7 dagar",
+  "macro.noDaysLogged": "Inget loggat den här veckan.",
+  "macro.tooFewComplete":
+    "För få dagar med {name}uppgifter: {days} av {logged} loggade dagar har fullständiga uppgifter, det behövs {needed}.",
   "macro.overDays": "snitt över {days} dagar",
   "macro.weekIsTheVerdict":
     "Sjudagarssnittet är det som jämförs med rekommendationen, eftersom värdena gäller genomsnittet över minst en vecka.",
@@ -1142,7 +1412,6 @@ export const sv = {
     when to reach for it, which the old label never did.
   */
   "estimate.open": "Skriv in själv",
-  "estimate.openHint": "När maten inte finns i databasen",
   "food.favourites": "Sparade favoriter",
   "food.star": "Spara som favorit",
   "food.unstar": "Ta bort favorit",

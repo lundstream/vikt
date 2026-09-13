@@ -34,8 +34,15 @@ export type StatefulRoute = {
   match: string;
   /** Current body for a GET. Called fresh on every request, with its URL. */
   get: (url: string) => unknown;
-  /** Applies a POST body. Absent means the route is read-only. */
+  /** Applies a POST or PUT body. Absent means the route is read-only. */
   post?: (body: unknown) => void;
+  /**
+   * What a write answers with. Defaults to `{}`.
+   *
+   * Needed by any screen that reads its own write's response — "did the probe
+   * succeed" is not a question the next GET can answer.
+   */
+  wrote?: unknown;
   /**
    * How long the request takes.
    *
@@ -104,16 +111,22 @@ export function stubFetch(
       // Deep-copied, not referenced. `get()` normally returns the live array a
       // test mutates in `post`, so holding the wrapper object would let the
       // response reflect writes that happened after the request was made.
-      const snapshot =
-        method === "POST" ? null : JSON.parse(JSON.stringify(route.get(url) ?? null));
+      /**
+       * A write is a POST, a PUT **or a PATCH**. The admin screens save with
+       * PUT and the profile saves with PATCH, and a stub that only recognised
+       * POST answered those from `get()` and dropped the body on the floor, so
+       * a test asserting what a form sends passed while asserting nothing.
+       */
+      const writing = method === "POST" || method === "PUT" || method === "PATCH";
+      const snapshot = writing ? null : JSON.parse(JSON.stringify(route.get(url) ?? null));
 
       if (route.delayMs) {
         await new Promise((resolve) => setTimeout(resolve, route.delayMs));
       }
-      if (method === "POST" && route.post) {
+      if (writing && route.post) {
         route.post(init?.body ? JSON.parse(String(init.body)) : {});
       }
-      const body = method === "POST" ? {} : snapshot;
+      const body = writing ? (route.wrote ?? {}) : snapshot;
       return {
         ok: true,
         status: 200,

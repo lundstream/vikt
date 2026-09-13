@@ -20,8 +20,9 @@ import { AppShell } from "../../src/components/AppShell.js";
  * tidiness, and the 404 is the security property.
  */
 
-function me(isAdmin: boolean) {
+function me(isAdmin: boolean, pendingRequests = 0) {
   return {
+    pendingRequests,
     id: "00000000-0000-0000-0000-000000000001",
     email: "someone@example.test",
     displayName: "Someone",
@@ -42,10 +43,10 @@ function me(isAdmin: boolean) {
   };
 }
 
-function openMore(isAdmin: boolean) {
+function openMore(isAdmin: boolean, pending = 0) {
   renderRoute(<AppShell>{null}</AppShell>, {
     path: "/",
-    responses: [{ match: "/api/me", body: me(isAdmin) }],
+    responses: [{ match: "/api/me", body: me(isAdmin, pending) }],
   });
   fireEvent.click(screen.getByTestId("nav-more"));
 }
@@ -74,5 +75,45 @@ describe("the Mer sheet", () => {
     for (const id of ["more-data", "more-profile", "more-installningar", "more-signout"]) {
       expect(screen.getByTestId(id).querySelector("svg"), `${id} has no icon`).toBeTruthy();
     }
+  });
+});
+
+/**
+ * The marker on the admin entry (D129).
+ *
+ * A dot rather than a count, on the same reasoning D108 gives for the news one:
+ * the number is never large enough to be information, and a numbered badge is
+ * the shape of an app that wants attention rather than one that has something
+ * to say. Gran, because a request waiting is work rather than a failure.
+ *
+ * It is computed from the rows, so it appears whether or not the mail went out
+ * and whether or not this admin has the mail turned off.
+ */
+describe("the pending-request marker", () => {
+  afterEach(cleanup);
+
+  it("marks the admin row when something is waiting", async () => {
+    openMore(true, 2);
+    await waitFor(() => expect(screen.getByTestId("more-admin")).toBeTruthy());
+
+    expect(screen.getByTestId("more-pending")).toBeTruthy();
+    // The Mer button carries it too, since Admin is behind the sheet on a phone.
+    expect(screen.getByTestId("more-unread")).toBeTruthy();
+  });
+
+  it("shows nothing when nothing is waiting", async () => {
+    openMore(true, 0);
+    await waitFor(() => expect(screen.getByTestId("more-admin")).toBeTruthy());
+
+    expect(screen.queryByTestId("more-pending")).toBeNull();
+  });
+
+  /** And never for an account that has no admin row to mark. */
+  it("shows nothing to a non-admin", async () => {
+    openMore(false, 3);
+    await waitFor(() => expect(screen.getByTestId("more-signout")).toBeTruthy());
+
+    expect(screen.queryByTestId("more-admin")).toBeNull();
+    expect(screen.queryByTestId("more-pending")).toBeNull();
   });
 });

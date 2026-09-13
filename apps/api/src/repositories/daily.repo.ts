@@ -82,6 +82,23 @@ export async function deleteMeasurementForDayExcept(
     );
 }
 
+/**
+ * Scoped by user id as well as row id, like every other delete here. Returns
+ * whether a row went, so the service can answer 404 rather than pretending.
+ */
+export async function deleteMeasurement(
+  userId: string,
+  db: Db,
+  id: string,
+): Promise<boolean> {
+  const rows = await db
+    .delete(measurementLog)
+    .where(and(eq(measurementLog.userId, userId), eq(measurementLog.id, id)))
+    .returning({ id: measurementLog.id });
+
+  return rows.length > 0;
+}
+
 export async function listMeasurements(
   userId: string,
   db: Db,

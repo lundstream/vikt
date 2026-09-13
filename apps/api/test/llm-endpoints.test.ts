@@ -26,6 +26,15 @@ function stubLlm(reply: ChatResult, reachable = true): LlmClient {
   return {
     enabled: true,
     chat: async () => reply,
+    /**
+     * The coach's path (D139). These suites do not use it; it answers with the
+     * same reply in one chunk so the stub stays a complete `LlmClient`.
+     */
+    chatStream: async (_options, onDelta) => {
+      const result = reply;
+      if (result.ok) onDelta(result.content);
+      return result;
+    },
     reachable: async () => reachable,
   };
 }
@@ -33,6 +42,7 @@ function stubLlm(reply: ChatResult, reachable = true): LlmClient {
 const offLlm: LlmClient = {
   enabled: false,
   chat: async () => ({ ok: false, reason: "disabled" }),
+  chatStream: async () => ({ ok: false, reason: "disabled" }),
   reachable: async () => false,
 };
 

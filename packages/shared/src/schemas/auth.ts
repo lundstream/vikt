@@ -116,6 +116,19 @@ export const meResponseSchema = z.object({
    * cached by an older build still parses and the app still opens offline.
    */
   isAdmin: z.boolean().default(false),
+  /**
+   * How many invite requests are waiting for an answer (D129).
+   *
+   * Zero for everybody who is not an admin, and computed rather than stored:
+   * it is a count of rows in a state, and a stored copy of that is a second
+   * thing to keep in step.
+   *
+   * On `/me` for the same reason `isAdmin` is: the navigation has to decide
+   * during the first paint whether to mark the admin entry, and a second
+   * request would make the marker appear a moment late. Defaulted so an
+   * identity cached by an older build still parses.
+   */
+  pendingRequests: z.number().int().min(0).default(0),
   profile: z.object({
     /** Null until the user fills it in (D105). Not a zero, never a default. */
     heightCm: z.number().nullable(),
@@ -129,6 +142,31 @@ export const meResponseSchema = z.object({
     soberAssumeUnloggedDry: z.boolean(),
     /** Whether news announcements are also mailed (D108). Opt-out. */
     newsMail: z.boolean().default(true),
+    /**
+     * Whether this admin is mailed about a new invite request (D129). Read
+     * only for an admin, opt-out, and defaulted for an older cached identity.
+     */
+    requestMail: z.boolean().default(true),
+    /**
+     * The two reminders (D136), off until turned on, with their times as
+     * minutes past midnight in this profile's own timezone. Defaulted so an
+     * identity cached by an older build still parses.
+     */
+    remindWeigh: z.boolean().default(false),
+    remindWeighMinute: z.number().int().min(0).max(1439).default(420),
+    remindDay: z.boolean().default(false),
+    remindDayMinute: z.number().int().min(0).max(1439).default(1320),
+    /**
+     * The same two for Saturday and Sunday. The pair above is the weekday one.
+     * Defaulted like the rest, so an identity cached before this existed parses
+     * and the screen simply shows the fallback until the next `/me`.
+     */
+    /** Which voice the coach uses (D140). Defaulted for an older identity. */
+    coachTone: z.enum(["torr", "peppig", "saklig"]).default("torr"),
+    remindWeighWeekend: z.boolean().default(false),
+    remindWeighWeekendMinute: z.number().int().min(0).max(1439).default(420),
+    remindDayWeekend: z.boolean().default(false),
+    remindDayWeekendMinute: z.number().int().min(0).max(1439).default(1320),
     /**
      * Which theme to use (D117). Defaulted so an identity cached by an older
      * build still parses and the app still opens offline.
@@ -196,6 +234,23 @@ export const updateProfileSchema = z
     soberAssumeUnloggedDry: z.boolean(),
     /** Whether news announcements are also mailed (D108). Opt-out. */
     newsMail: z.boolean(),
+    /** Whether an admin is mailed about a new invite request (D129). Opt-out. */
+    requestMail: z.boolean(),
+    /**
+     * The two reminders (D136). Minutes past local midnight, and two pairs
+     * each: the plain names are Monday to Friday, the `Weekend` ones are
+     * Saturday and Sunday.
+     */
+    remindWeigh: z.boolean(),
+    remindWeighMinute: z.number().int().min(0).max(1439),
+    remindDay: z.boolean(),
+    remindDayMinute: z.number().int().min(0).max(1439),
+    /** Which voice the coach uses (D140). */
+    coachTone: z.enum(["torr", "peppig", "saklig"]),
+    remindWeighWeekend: z.boolean(),
+    remindWeighWeekendMinute: z.number().int().min(0).max(1439),
+    remindDayWeekend: z.boolean(),
+    remindDayWeekendMinute: z.number().int().min(0).max(1439),
     /** Which theme to use: system, dark or light (D117). */
     theme: themeSchema,
     /**

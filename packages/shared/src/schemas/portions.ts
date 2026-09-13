@@ -33,7 +33,7 @@ export type StatedPortionInput = z.infer<typeof statedPortionSchema>;
  * database knew the portion and the figure is a guess, which is a thing the
  * user needs to be told rather than a thing to round away.
  */
-export const portionSourceSchema = z.enum(["hint", "user_hint", "estimate"]);
+export const portionSourceSchema = z.enum(["hint", "user_hint", "estimate", "unknown"]);
 
 export const foodPortionSchema = z.object({
   id: z.string().uuid(),

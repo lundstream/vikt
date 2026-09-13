@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { sumOrNull } from "shared";
+import { todayLocalDate } from "../../src/lib/dates.js";
 import { db } from "../../src/lib/queue/db.js";
 import { useQueueSync } from "../../src/lib/queue/useQueue.js";
 import { useFoodEntries, useSaveFoodEntry } from "../../src/lib/food.js";
@@ -29,15 +30,18 @@ import { stubFetch, type StatefulRoute } from "./harness.js";
  * `queue.test.ts` pins the notification itself.
  */
 
+/**
+ * Today, from the app's own helper rather than the machine's clock parts.
+ *
+ * `day-reset` and `copy-forward` both had this bug: a date built from
+ * `new Date()` is the runner's zone, which matches the workstation and is two
+ * hours behind a UTC CI runner, so between 22:00 and midnight UTC the fixture
+ * and the screen disagreed. This file writes and reads its own rows rather than
+ * rendering a date picker, so it never failed — which is exactly why it is
+ * worth changing now rather than when it does.
+ */
 function today(): string {
-  const d = new Date();
-  return (
-    d.getFullYear() +
-    "-" +
-    String(d.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(d.getDate()).padStart(2, "0")
-  );
+  return todayLocalDate("Europe/Stockholm");
 }
 
 const entry = (id: string, kcal: number) => ({

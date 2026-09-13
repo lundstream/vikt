@@ -87,10 +87,25 @@ export function allJsxStrings(): CopyString[] {
   return componentFiles().flatMap(jsxStrings);
 }
 
-/** The landing page alone, for the rules that apply only to it. */
+/**
+ * The public bundle's own copy, for the rules that apply only to it.
+ *
+ * `Landing.tsx` and `RequestCode.tsx`, because the request form moved to /kod
+ * (D127) and moving copy out of one file must not move it out of the guards.
+ * That is exactly what happened: the string count dropped to the floor this
+ * suite asserts, which is the only reason anybody noticed.
+ *
+ * The two text pages are not here. Their prose is quoted policy rather than
+ * interface copy, and the dash rule reads differently in a sentence somebody
+ * may have to read carefully.
+ */
 export function landingStrings(): string[] {
-  const file = path.join(WEB_SRC, "landing/Landing.tsx");
-  return [...new Set(jsxStrings(file).map((entry) => entry.text))];
+  const files = ["landing/Landing.tsx", "landing/RequestCode.tsx"];
+  return [
+    ...new Set(
+      files.flatMap((name) => jsxStrings(path.join(WEB_SRC, name)).map((entry) => entry.text)),
+    ),
+  ];
 }
 
 /**

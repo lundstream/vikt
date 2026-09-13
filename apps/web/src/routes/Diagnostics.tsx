@@ -424,15 +424,15 @@ export function Diagnostics() {
       </dl>
 
       <div className="mt-8 space-y-3">
-        <button type="button" className="btn-secondary" onClick={() => void checkFormats()}>
+        <button type="button" className="btn" onClick={() => void checkFormats()}>
           {t("diag.checkFormats")}
         </button>
-        <button type="button" className="btn-secondary" onClick={() => void checkCamera()}>
+        <button type="button" className="btn" onClick={() => void checkCamera()}>
           {t("diag.checkCamera")}
         </button>
         <button
           type="button"
-          className="btn-secondary"
+          className="btn"
           data-testid="check-sw"
           onClick={() => void checkServiceWorker()}
         >
@@ -440,7 +440,7 @@ export function Diagnostics() {
         </button>
         <button
           type="button"
-          className="btn-secondary"
+          className="btn"
           data-testid="check-queue"
           onClick={() => void checkQueue()}
         >
@@ -448,7 +448,7 @@ export function Diagnostics() {
         </button>
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-edge px-4 text-note text-ink"
+          className="btn w-auto px-4"
           data-testid="check-save-path"
           onClick={() => void checkSavePath()}
         >
@@ -498,7 +498,7 @@ export function Diagnostics() {
         <button
           type="button"
           data-testid="tap-probe"
-          className="btn-secondary mt-4"
+          className="btn mt-4"
           onPointerDown={() => record("pointerdown")}
           onTouchStart={() => record("touchstart")}
           onClick={() => void probeWrite()}
