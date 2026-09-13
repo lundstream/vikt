@@ -380,11 +380,13 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. **76 commits**, and the next deploy is
-`v1.1.0`:
+between what is built and what is running. **78 commits**, plus the one that
+records this. The next deploy is `v1.1.0`:
 
 | | |
 |---|---|
+| `cae47d9` | Fire the reduced-transparency branch rather than read it |
+| `cd178b0` | Record the pass: four items, and what the sweep actually proved |
 | `7ebe70e` | The coach gets the data, and two rules about what it may do with it |
 | `7d3ae2f` | A swipe between sections, and the five times it must not fire |
 | `c0b8af0` | A deleted row is a question, not a refusal |
