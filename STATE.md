@@ -642,7 +642,10 @@ build served by `vite preview`:
   `rgba(15, 20, 24, 0.72)` with `blur(10px)`, light the same blur at `0.45`, and
   in both the focus sits on `#ms-label`, the first field, with no ring and no
   border on the panel. Before this pass the ring was on the panel itself, in Is,
-  on a screen where Is means a raw reading;
+  on a screen where Is means a raw reading. The reduced-transparency branch was
+  emulated rather than read off the stylesheet: the blur goes to `none` and the
+  opacity to `0.88` dark and `0.78` light, with `matchMedia` confirming the page
+  agreed it was in that state;
 - **The version footer and the source offer** (D151): Inställningar at 360 px and
   desktop showing "Version dev · 107321a" with all five links resolving, and
   /integritet carrying the AGPL offer in words with the repository linked. The

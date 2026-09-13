@@ -7100,6 +7100,13 @@ Shot in both themes at 360 px and desktop. Dark: scrim
 `rgba(15, 20, 24, 0.72)`, `blur(10px)`, focus on `#ms-label`, no border and no
 ring on the panel. Light: the same with `0.45`.
 
+The reduced-transparency branch was emulated rather than read off the
+stylesheet, because "the CSS says so" is how a rule ends up shipping behind a
+query the browser spells differently. With
+`prefers-reduced-transparency: reduce` emulated, the blur is `none` and the
+opacity is `0.88` in dark and `0.78` in light, in both cases with `matchMedia`
+confirming the page agreed it was in that state.
+
 ### D153 — A deleted row is a question, not a refusal
 
 *2026-09-13.*
