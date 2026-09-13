@@ -82,6 +82,12 @@ services:
       APP_NAME: ${APP_NAME:-Vikt}
       LANDING_ENABLED: ${LANDING_ENABLED:-false}
       REQUEST_ENABLED: ${REQUEST_ENABLED:-false}
+      # The API reads this too, not just nginx (D157). `assertProdSecrets`
+      # refuses to boot when either flag above is true and this is empty,
+      # because /integritet has to name someone the reader can write to.
+      # Forwarded to nginx as well, further down, where it is substituted
+      # into the built page (D121).
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}

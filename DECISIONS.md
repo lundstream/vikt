@@ -7544,3 +7544,80 @@ test proving nothing, which is worse than a red one.
 It matches on the image *name* now, asserts the count explicitly, and has a new
 case holding that the registry is still the default. A filter feeding a loop
 needs its length asserted, or it is not a test.
+
+### D157 — A green test that asserted the bug
+
+*2026-09-13, during the 1.1.0 deploy.*
+
+The stack was updated, the images were right, every variable was set, and the
+API crash-looped. The reason, in its own words:
+
+```
+Refusing to start. Fix the environment:
+  - CONTACT_EMAIL is not set, and LANDING_ENABLED or REQUEST_ENABLED is true.
+```
+
+`CONTACT_EMAIL` **was** set. It was in Portainer, spelled correctly, visible in
+the panel, and it had reached the nginx container. It had never reached the API,
+because `docker-compose.portainer.yml` forwarded it to `nginx` and not to `api`.
+
+That is D147's failure mode exactly — a variable the compose does not forward is
+silently absent — and D147 built a test to prevent it. The test ran. It passed.
+
+#### The test asserted the defect
+
+`stack-variables.test.ts` parses the **api service's** environment block
+specifically, which is the right design. To prove the parser was not simply
+returning every name in the file, it asserted that one variable found elsewhere
+was absent from the api block. The variable it picked was `CONTACT_EMAIL`:
+
+```ts
+// Not the nginx service's own, which sits in a different environment block.
+expect(forwarded.has("CONTACT_EMAIL")).toBe(false);
+```
+
+So the guard against "the API does not get what it needs" contained a line
+stating that the API does not get `CONTACT_EMAIL`, and was green for as long as
+that was true. Fixing the compose turned the guard red, which is the first
+useful thing it did here.
+
+**A test pins the behaviour somebody believed at the time.** The belief was that
+`CONTACT_EMAIL` is nginx's, because that is where it is substituted into the
+page (D121). It is also read by `assertProdSecrets` at boot, which is a hundred
+lines away in a different package, and nothing connected the two.
+
+The sanity assertion now uses `OPERATOR`, which really is nginx's alone: it goes
+into the built page and nothing on the server reads it.
+
+#### Two holes behind the one defect
+
+**`CONTACT_EMAIL` is not in `envSchema`.** The guard's main loop walks the schema
+and checks each variable is forwarded and documented; anything read straight off
+`process.env` is invisible to it. There is now an explicit short list of those,
+checked the same way, because the cost of missing one is the API not starting.
+
+**It was never in `.env.example` as a settable line.** It appeared only inside a
+comment about `REQUEST_ENABLED`. The new check found that within a minute of
+being written: an operator copying the example would never have set it, which is
+the same outage arriving by a different route.
+
+#### What it cost, and what it did not
+
+Production was down for about four minutes, between the first stack update and
+the corrected one. Nothing was lost: the migrator runs before the environment
+check, so all nine migrations had already applied on the crash-looping boot, and
+the row counts afterwards matched the backup exactly, 95 weight readings
+included.
+
+The backup taken in step 1 was never needed, which is the outcome that justifies
+taking it rather than the one that excuses skipping it next time.
+
+#### The deploy itself
+
+Built on the workstation and loaded onto the host (D156), because the GHCR
+packages are private and making them public is the owner's click. `local/`
+prefix, `1.1.0`, `APP_VERSION` and `APP_COMMIT` baked in as D151 requires.
+`/api/health` reports `1.1.0` and `62dde4f` from outside, the modes line reads
+`landing=on request=off mail=on llm=on`, the vision self-test passed in 6.5 s,
+and the previous images are tagged `local/vikt-{api,web}:d11c2fe` on the host so
+a rollback is one variable.

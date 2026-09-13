@@ -104,8 +104,48 @@ describe("infra/docker-compose.portainer.yml", () => {
   it("is read correctly enough to be worth asserting on", () => {
     expect(forwarded.has("DATABASE_URL")).toBe(true);
     expect(forwarded.has("SESSION_SECRET")).toBe(true);
-    // Not the nginx service's own, which sits in a different environment block.
-    expect(forwarded.has("CONTACT_EMAIL")).toBe(false);
+    // `OPERATOR` really is nginx's alone: it is substituted into the built
+    // page and nothing on the server reads it. Proving the parser does not
+    // simply return every name in the file needs a variable that is genuinely
+    // in the other service, and this line used to use `CONTACT_EMAIL` for
+    // that, which is how D157 happened.
+    expect(forwarded.has("OPERATOR")).toBe(false);
+  });
+
+  /**
+   * `CONTACT_EMAIL` is read by **both** services, and this test is the reason
+   * to say so out loud (D157).
+   *
+   * nginx substitutes it into the built page (D121). The API reads it at boot
+   * in `assertProdSecrets` and **refuses to start** without it whenever
+   * `LANDING_ENABLED` or `REQUEST_ENABLED` is true. It is not in `envSchema`,
+   * so the loop below never covered it, and this file previously asserted the
+   * opposite of what the API needs: that the api service does *not* get it.
+   *
+   * That assertion was green for as long as it was wrong, and it took
+   * production down on the 1.1.0 deploy: the API crash-looped on a variable
+   * that was set in Portainer, spelled correctly, and visible in the panel.
+   *
+   * A test can only pin the behaviour somebody believed at the time. This one
+   * is written from the failure instead.
+   */
+  it("forwards CONTACT_EMAIL to the API, which refuses to boot without it", () => {
+    expect(forwarded.has("CONTACT_EMAIL")).toBe(true);
+  });
+
+  /**
+   * Everything the API reads at boot but does not declare in `envSchema`.
+   *
+   * The loop below walks the schema, so anything read straight off
+   * `process.env` is invisible to it. That is a small list and it is written
+   * here rather than inferred, because the cost of missing one is the API not
+   * starting.
+   */
+  it("forwards what the API reads outside the schema", () => {
+    for (const name of ["CONTACT_EMAIL"]) {
+      expect(forwarded.has(name), `${name} never reaches the api service`).toBe(true);
+      expect(documented().has(name), `${name} is not in .env.example`).toBe(true);
+    }
   });
 
   it.each(variables)("forwards %s to the api container", (name) => {
