@@ -74,10 +74,16 @@ fi
 #
 # Deleted by age rather than by count, so a week when the job did not run does
 # not silently shorten the window that survives.
-find "$BACKUP_DIR" -name 'vikt-*.dump' -mtime "+$RETAIN_DAYS" -delete
-find "$BACKUP_DIR" -name 'uploads-*.tar.gz' -mtime "+$RETAIN_DAYS" -delete
+#
+# `-maxdepth 1`, so this only ever prunes the dumps this script made (D159).
+# Without it the delete recursed, and a dump deliberately kept in a
+# subdirectory -- a release's rollback dump, which has to outlive any rotation
+# window -- was on a thirty day timer nobody had set. `releases/` is the
+# subdirectory that convention uses.
+find "$BACKUP_DIR" -maxdepth 1 -name 'vikt-*.dump' -mtime "+$RETAIN_DAYS" -delete
+find "$BACKUP_DIR" -maxdepth 1 -name 'uploads-*.tar.gz' -mtime "+$RETAIN_DAYS" -delete
 
-REMAINING="$(find "$BACKUP_DIR" -name 'vikt-*.dump' | wc -l | tr -d ' ')"
+REMAINING="$(find "$BACKUP_DIR" -maxdepth 1 -name 'vikt-*.dump' | wc -l | tr -d ' ')"
 echo "[$(date -u +%FT%TZ)] done. $REMAINING dumps kept, retention ${RETAIN_DAYS}d"
 
 # --- the part people skip --------------------------------------------------

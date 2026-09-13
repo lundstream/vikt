@@ -7743,3 +7743,47 @@ else" in CE.
 Recorded rather than glossed, because the honest gain here is narrower than
 "least privilege": the token is **revocable on its own**, and it removes the
 step where a secret gets typed into something that is recording.
+
+### D159 — The retention job would have deleted the rollback dump
+
+*2026-09-13.*
+
+`backup.sh` prunes old dumps by age:
+
+```sh
+find "$BACKUP_DIR" -name 'vikt-*.dump' -mtime "+$RETAIN_DAYS" -delete
+```
+
+Two properties of that line, neither intended: `find` **recurses**, and the
+match is on **name only**. So anything named `vikt-*.dump` anywhere under
+`/var/backups/vikt`, including in a subdirectory somebody made deliberately to
+keep something, was on a thirty day timer.
+
+That was found while deciding where to put the dump taken before 1.1.0. A
+release's rollback dump has to survive for as long as that release is the one
+running, which is by definition longer than a rotation window — and the job that
+exists to protect backups would have deleted it, silently, a month in. The
+failure would have surfaced at the only moment it matters.
+
+`-maxdepth 1` on both prunes and on the count that reports what is kept. The
+script now only ever deletes the dumps it made itself, in the directory it made
+them in, and `releases/` is the convention for the ones that are kept on
+purpose.
+
+**A count that lies is worse than no count**, so the `REMAINING` line got
+`-maxdepth 1` too. Without it the script would have reported release dumps as
+part of the rotation window, so a run that had pruned everything it made would
+still print a reassuring number.
+
+#### Where the dump is
+
+`/var/backups/vikt/releases/pre-1.1.0-62dde4f.dump` is the intended path, and
+INFRA.md carries the checksum and the contents. It is **not there yet**: moving
+it needs host access, the Portainer password was rotated in the same hour it was
+taken, and the token that replaces it (D158) is Fredrik's to create. Until then
+the only copy is on the workstation under gitignored `scratch/`, which is
+recorded rather than left to be discovered.
+
+Verified twice by restoring, once from the original and once from the copy:
+38 tables, 3 402 rows, 95 weight readings, `pg_restore` exit 0. Checksumming a
+copy proves the bytes; restoring it proves the bytes are a database.
