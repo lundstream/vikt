@@ -7787,3 +7787,56 @@ recorded rather than left to be discovered.
 Verified twice by restoring, once from the original and once from the copy:
 38 tables, 3 402 rows, 95 weight readings, `pg_restore` exit 0. Checksumming a
 copy proves the bytes; restoring it proves the bytes are a database.
+
+### D160 — Ask the registry the question the deploy will ask
+
+*2026-09-13.*
+
+The 1.1.0 deploy stopped on a private package. The repository was public, the
+images were built and pushed, the workflow was green, and the Docker host could
+not pull any of it — because a package on GHCR has **its own visibility**,
+separate from the repository's, and it defaults to private.
+
+Nothing between the push and the deploy had asked whether anybody could pull the
+result. The workflow could not have noticed: `docker/login-action` authenticates
+the job, so every request it makes succeeds regardless of visibility. A green
+release proved the images existed, not that they were reachable.
+
+#### The check
+
+After the push, `release.yml` asks for an **anonymous** pull token and fetches
+the manifest with it. No credential, deliberately going around the login the job
+already has, because the question is what an unauthenticated Docker host sees.
+
+A private package fails at the **token endpoint** with 401 rather than at the
+manifest, so both are checked and either one fails the release. The error
+message names the package and the exact place to change it, because the person
+reading it at that moment is trying to deploy.
+
+Shown to work in both directions before it was committed: the two real packages
+pass, and a repository that cannot be read anonymously returns 403 at the token
+endpoint and fails the check.
+
+#### What public actually looks like
+
+Proved three ways, and they agree:
+
+| | `release.yml` pushed | anonymous manifest | anonymous `docker pull` |
+|---|---|---|---|
+| `vikt-api:v1.1.0` | `sha256:93020ecf…8373` | `sha256:93020ecf…8373` | `sha256:93020ecf…8373` |
+| `vikt-web:v1.1.0` | `sha256:b9365eb1…7c1c` | `sha256:b9365eb1…7c1c` | `sha256:b9365eb1…7c1c` |
+
+The pull was done after `docker logout ghcr.io`, with no auth entry for the
+registry in the Docker config, which is the state the production host is in.
+
+#### One thing worth knowing about these images
+
+`v1.1.0` in the registry was built from `0a546a7`. **The images actually running
+in production were built on the workstation from `62dde4f`**, one commit
+earlier. No application code differs between them — `0a546a7` changed a compose
+file, a test, `.env.example` and this file — but `APP_COMMIT` is baked in, so
+deploying the registry image would change what `/api/health` reports without
+changing what the app does.
+
+Recorded because a digest that does not match the running container is the kind
+of thing that costs an hour during an incident, and the answer is boring.

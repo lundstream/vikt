@@ -137,6 +137,68 @@ jobs:
           cache-from: type=registry,ref=${{ steps.image.outputs.ref }}:buildcache
           cache-to: type=registry,ref=${{ steps.image.outputs.ref }}:buildcache,mode=max
 
+      # Can anybody actually pull this? (D160)
+      #
+      # A package on GHCR has its own visibility, separate from the repository's,
+      # and it defaults to private. The 1.1.0 deploy found that out at the worst
+      # moment: the repository was public, the images were built and pushed, and
+      # the stack could not pull them because the packages were still private.
+      # Nothing between the push and the deploy had asked the question.
+      #
+      # So it is asked here, with no credential at all. `docker/login-action`
+      # has already authenticated this job, so a plain pull would succeed
+      # whatever the visibility is; this deliberately goes around it and talks
+      # to the registry the way the Docker host will, with an anonymous token.
+      #
+      # A private package fails at the token endpoint with 401 rather than at
+      # the manifest, so both are checked and either one fails the release.
+      - name: Prove the package is anonymously pullable
+        run: |
+          set -euo pipefail
+          ref='${{ steps.image.outputs.ref }}'
+          repo="${ref#ghcr.io/}"
+          tag='${{ steps.version.outputs.value }}'
+
+          echo "asking GHCR for an anonymous pull token for $repo"
+          code=$(curl -s -o /tmp/token.json -w '%{http_code}' \
+            "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io")
+
+          if [ "$code" != "200" ]; then
+            echo "::error::$repo is not anonymously pullable: token endpoint returned $code."
+            echo "::error::The package is private. Packages, ${repo##*/}, Package settings, Change visibility."
+            cat /tmp/token.json || true
+            exit 1
+          fi
+
+          token=$(jq -r '.token // empty' /tmp/token.json)
+          if [ -z "$token" ]; then
+            echo "::error::token endpoint returned 200 with no token for $repo"
+            exit 1
+          fi
+
+          # The manifest itself, with the same Accept set a Docker daemon sends.
+          status=$(curl -s -o /tmp/manifest.json -w '%{http_code}' \
+            -H "Authorization: Bearer $token" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json' \
+            -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+            -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+            -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+            "https://ghcr.io/v2/${repo}/manifests/${tag}")
+
+          if [ "$status" != "200" ]; then
+            echo "::error::anonymous manifest fetch for ${repo}:${tag} returned $status"
+            cat /tmp/manifest.json || true
+            exit 1
+          fi
+
+          if grep -q 'UNAUTHORIZED\|DENIED' /tmp/manifest.json; then
+            echo "::error::registry refused the anonymous fetch for ${repo}:${tag}"
+            cat /tmp/manifest.json
+            exit 1
+          fi
+
+          echo "$repo:$tag is anonymously pullable"
+
       # What to put in the stack. Printed rather than assumed, because the
       # commit tag is the one worth pinning and it is not the one anybody
       # remembers.
