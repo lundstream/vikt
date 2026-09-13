@@ -55,27 +55,62 @@ const variables = Object.keys(envSchema.shape).sort();
  * matters is the text an operator reads and edits, and a YAML library would
  * happily accept a key nested under the wrong service.
  */
-function apiEnvironment(): Set<string> {
+function serviceEnvironment(service: string): Set<string> {
   const text = readFileSync(COMPOSE, "utf8");
-  const start = text.indexOf("\n  api:");
-  expect(start, "the compose has no api service").toBeGreaterThan(-1);
+  const start = text.indexOf(`\n  ${service}:`);
+  expect(start, `the compose has no ${service} service`).toBeGreaterThan(-1);
 
   // Up to the next top-level service, which is two-space indented like `api:`.
   const rest = text.slice(start + 1);
   const end = rest.search(/\n {2}[a-z][a-z0-9_-]*:\n/);
-  const service = end === -1 ? rest : rest.slice(0, end);
+  const block = end === -1 ? rest : rest.slice(0, end);
 
-  const envStart = service.indexOf("\n    environment:");
-  expect(envStart, "the api service has no environment block").toBeGreaterThan(-1);
+  const envStart = block.indexOf("\n    environment:");
+  expect(envStart, `the ${service} service has no environment block`).toBeGreaterThan(-1);
 
   const names = new Set<string>();
-  for (const line of service.slice(envStart).split("\n")) {
+  for (const line of block.slice(envStart).split("\n")) {
     // Six spaces is one level inside `environment:`; anything shallower ends it.
     const match = line.match(/^ {6}([A-Z][A-Z0-9_]*):/);
     if (match?.[1]) names.add(match[1]);
     else if (/^ {4}\S/.test(line) && !line.includes("environment:")) break;
   }
   return names;
+}
+
+/**
+ * What the API reads at boot without declaring in `envSchema` (D157).
+ *
+ * `assertProdSecrets` reads `CONTACT_EMAIL` straight off `process.env` and
+ * refuses to start without it whenever `LANDING_ENABLED` or `REQUEST_ENABLED`
+ * is true. The main loop below walks the schema, so it cannot see this one, and
+ * the cost of missing it is the API not starting.
+ *
+ * It is also what makes the negative control below correct: a variable in the
+ * nginx block is nginx's alone **unless** it is in the schema or on this list.
+ */
+const READ_OUTSIDE_SCHEMA = ["CONTACT_EMAIL"];
+
+/**
+ * Variables that reach nginx and nothing on the server reads.
+ *
+ * **Derived, never chosen** (D157). This is the negative control that proves
+ * `serviceEnvironment` returns one service's block rather than every name in
+ * the file, and the previous version of it named `CONTACT_EMAIL` by hand — a
+ * variable the API needs, which made the guard assert the defect and took
+ * production down when the fix finally contradicted it.
+ *
+ * Computing the control removes the hand that picked wrong. Anything nginx is
+ * given that the schema does not declare and that is not on the short list
+ * above belongs to nginx, and no future edit can pick the wrong one.
+ */
+function nginxOnly(): string[] {
+  const schema = new Set(Object.keys(envSchema.shape));
+  const alsoTheApi = new Set(READ_OUTSIDE_SCHEMA);
+
+  return [...serviceEnvironment("nginx")].filter(
+    (name) => !schema.has(name) && !alsoTheApi.has(name),
+  );
 }
 
 /** Every `NAME=` the example file defines, commented-out ones included. */
@@ -98,18 +133,36 @@ describe("the schema itself", () => {
 });
 
 describe("infra/docker-compose.portainer.yml", () => {
-  const forwarded = apiEnvironment();
+  const forwarded = serviceEnvironment("api");
 
   /** The parser, shown working, before anything is asserted with it. */
   it("is read correctly enough to be worth asserting on", () => {
     expect(forwarded.has("DATABASE_URL")).toBe(true);
     expect(forwarded.has("SESSION_SECRET")).toBe(true);
-    // `OPERATOR` really is nginx's alone: it is substituted into the built
-    // page and nothing on the server reads it. Proving the parser does not
-    // simply return every name in the file needs a variable that is genuinely
-    // in the other service, and this line used to use `CONTACT_EMAIL` for
-    // that, which is how D157 happened.
-    expect(forwarded.has("OPERATOR")).toBe(false);
+  });
+
+  /**
+   * The negative control, computed rather than named (D157).
+   *
+   * Without one, a parser that returned every variable in the file would
+   * satisfy every other assertion here. With one chosen by hand, the hand can
+   * choose a variable the API needs — which is what happened, and what the
+   * guard then asserted for as long as it was wrong.
+   */
+  it("returns one service's block, not every name in the file", () => {
+    const control = nginxOnly();
+
+    expect(
+      control.length,
+      "no nginx-only variable left to use as a control; the assertion below proves nothing",
+    ).toBeGreaterThan(0);
+
+    for (const name of control) {
+      expect(
+        forwarded.has(name),
+        `${name} reaches nginx and is not in the schema, so it should not be in the api block`,
+      ).toBe(false);
+    }
   });
 
   /**
@@ -142,7 +195,7 @@ describe("infra/docker-compose.portainer.yml", () => {
    * starting.
    */
   it("forwards what the API reads outside the schema", () => {
-    for (const name of ["CONTACT_EMAIL"]) {
+    for (const name of READ_OUTSIDE_SCHEMA) {
       expect(forwarded.has(name), `${name} never reaches the api service`).toBe(true);
       expect(documented().has(name), `${name} is not in .env.example`).toBe(true);
     }

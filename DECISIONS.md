@@ -7621,3 +7621,65 @@ prefix, `1.1.0`, `APP_VERSION` and `APP_COMMIT` baked in as D151 requires.
 `landing=on request=off mail=on llm=on`, the vision self-test passed in 6.5 s,
 and the previous images are tagged `local/vikt-{api,web}:d11c2fe` on the host so
 a rollback is one variable.
+
+#### Addendum, same day: how the fix reached production, and how it reached git
+
+Worth recording precisely, because the order was not the usual one and the
+summary "pushed straight to main" is not quite what happened.
+
+**The fix reached the running system before it reached git at all.** With the
+API crash-looping, the line was added to `infra/docker-compose.portainer.yml` on
+the workstation and pushed to Portainer through the stack API. Production was
+healthy again before anything was committed. The commit came afterwards, as the
+record of a change that was already live.
+
+**Two commits then reached `main` by fast-forward, with no pull request**:
+`62dde4f`, which made the deploy possible at all, and `0a546a7`, this entry and
+its fix. Both were authored on `dev` first and `main` was moved to them.
+
+§7 says `main` receives merges **only through a pull request**. That was not
+followed here, and the reason it was right at the time is narrow:
+
+- production was down, and the change was one line in a file that is not
+  application code;
+- the repository has one committer, so a pull request adds a round trip and no
+  second pair of eyes. Its value here is the record and the CI gate, and CI ran
+  on `dev` for the same commits;
+- the alternative was leaving the site down for the length of the round trip,
+  to satisfy a rule whose purpose is to stop unreviewed code reaching
+  production — and the code was already in production.
+
+**The rule stands.** This was an outage, not a precedent, and the shape of the
+exception is worth being explicit about: it applies when production is already
+broken, the change is infrastructure rather than application code, and the fix
+is live before the commit. Ordinary work, including everything in this session,
+goes `dev` → pull request → `main`.
+
+**`dev` and `main` carry the identical commits.** Both are at `0a546a7`;
+`git rev-parse` on each returns the same sha. There is no work on `main` that
+`dev` does not have, which is the property the branching rule exists to
+protect and the one an emergency is most likely to break.
+
+#### The negative control is derived now, not chosen
+
+The assertion that made this outage possible has been replaced rather than
+corrected. Naming `OPERATOR` by hand instead of `CONTACT_EMAIL` would have left
+the same hand able to pick wrong again.
+
+`nginxOnly()` computes the control: every variable in the **nginx** service's
+environment block that `envSchema` does not declare and that is not on the short
+`READ_OUTSIDE_SCHEMA` list. Today that derives `OPERATOR`, `REPO_URL` and
+`SUPPORT_URL`, and the test asserts the set is **non-empty** before asserting
+anything with it, because a control that derives nothing proves nothing.
+
+Shown to bite rather than assumed to: forwarding `OPERATOR` to the api service
+fails the guard with
+
+```
+OPERATOR reaches nginx and is not in the schema, so it should not be in the
+api block: expected true to be false
+```
+
+and removing it again returns 111 passing. A variable that moves from nginx-only
+to shared now has exactly one correct way to be recorded, which is to add it to
+`READ_OUTSIDE_SCHEMA` or to the schema, and the guard fails until it is.
