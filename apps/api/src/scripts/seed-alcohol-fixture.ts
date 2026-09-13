@@ -32,6 +32,7 @@ import { register } from "../services/auth.service.js";
 import { saveWeightEntry } from "../services/weight.service.js";
 import { saveDailyLog, saveActivity } from "../services/daily.service.js";
 import { saveManualIntake } from "../services/intake.service.js";
+import { createManualFood, saveFoodEntry } from "../services/food.service.js";
 import { addDays } from "shared";
 
 const EMAIL = "alkohol@example.test";
@@ -137,7 +138,46 @@ for (let back = DAYS - 1; back >= 0; back -= 1) {
   }
 }
 
+/**
+ * Meals, so the sheet is genuinely full.
+ *
+ * Without these the food section says nothing was logged, which leaves one
+ * fewer domain competing for room in a reply capped at six sentences — and the
+ * whole question here is whether alcohol survives a **full** sheet. A fixture
+ * that makes the answer easier is not a test.
+ */
+const MEALS = [
+  { name: "Havregrynsgröt", kcalPer100: 60 },
+  { name: "Kycklingfilé", kcalPer100: 110 },
+  { name: "Rotfruktsgratäng", kcalPer100: 95 },
+  { name: "Laxfilé med potatis", kcalPer100: 130 },
+  { name: "Grekisk yoghurt", kcalPer100: 59 },
+];
+
+const items = [];
+for (const meal of MEALS) {
+  items.push(await createManualFood(userId, db, { name: meal.name, kcalPer100: meal.kcalPer100 }));
+}
+
+for (let back = 6; back >= 0; back -= 1) {
+  const localDate = addDays(AS_OF, -back);
+  for (const slot of [0, 1, 2]) {
+    const item = items[(back + slot) % items.length]!;
+    await saveFoodEntry(userId, db, {
+      clientUuid: randomUUID(),
+      localDate,
+      foodItemId: item.id,
+      grams: 200 + slot * 50,
+      mealSlot: (["breakfast", "lunch", "dinner"] as const)[slot]!,
+      // Typed by hand rather than parsed, so it is confirmed and certain.
+      confidence: 1,
+      confirmed: true,
+    });
+  }
+}
+
 console.log(`seeded ${DAYS} days ending ${AS_OF}`);
+console.log(`meals: ${MEALS.length} foods across the last 7 days, 3 entries a day`);
 console.log(`alcohol: ${alcoholUnits} units across ${alcoholDays} days, ${DAYS - alcoholDays} sober`);
 console.log(`sign in with ${EMAIL} / ${PASSWORD}`);
 

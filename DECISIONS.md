@@ -7484,6 +7484,107 @@ wrong Swedish. That is the model, not the app: nothing in the pipeline corrects
 grammar, and a check that did would be editing the coach rather than checking
 it.
 
+#### Addendum, 2026-09-13: alcohol when there is something to say about it
+
+The observation above — that the two character tones drop alcohol — was made on
+an account with **two** standard drinks in twenty-eight days and none in the last
+seven. That left the question it looked like it answered still open: does the
+coach speak to alcohol when there is something to speak to, or does it not speak
+to alcohol?
+
+`seed-alcohol-fixture.ts` settles it. Twenty-eight days, every one logged, with
+drink on the days a normal week has it: **44 standard drinks across 12 days, 16
+of them sober**, and 11 units in the last seven. Deliberately not a heavy
+drinker — a fixture that is alarming tests the coach's restraint rather than its
+coverage, and the restraint is already covered.
+
+**The first run of it was not a fair test and was re-seeded.** It had no food
+entries, so the meal-names section said nothing was logged, and a reply capped
+at six sentences had one fewer domain competing for room. A fixture that makes
+the answer easier is not a test. Three meals a day for the last seven days were
+added and the whole thing run again; what follows is the second run.
+
+The same question, verbatim, in all three tones:
+
+> Vad tror du om mitt upplägg, vad jag äter, hur viktnedgången ser ut? Något jag
+> bör tänka på?
+
+**Torr:**
+
+> Trendvikten har sjunkit 0,6 kg under de senaste fyra veckorna. Intaget ligger
+> i snitt 178 kcal under din beräknade underhållsnivå just nu. Du har loggat mat
+> alla dagar och vägningarna är på plats varje dag.
+>
+> Alkoholen hamnar på 11 standardglas de senaste sju dagarna, med fyra nyktra
+> dagar blandat in. Rörelsen består av sex pass på sammanlagt 270 minuter under
+> samma period. Stegantalet ligger runt 9 100 per dag och sömnen genomsnittligt
+> på 7,1 timmar.
+>
+> Du kan fundera på att justera intaget om takten känns för långsam. Ett annat
+> alternativ är att behålla nivån men öka rörelsen något. Appen visar inga
+> samband mellan dessa variabler, den plottar bara vad som loggats.
+
+**Peppig:**
+
+> Trendvikten har sjunkit 0,6 kg de senaste fyra veckorna, vilket motsvarar en
+> stabil takt. Du har loggat mat varje dag under hela perioden, och intaget
+> landar i snitt lite under din beräknade underhållsnivå. Rörelsen ser bra ut
+> med sex pass på sju dagar, och stegantalet ligger kring 9 100 per dag. Sömnen
+> är stabil runt sju timmar, medan energin hamnar på 3,4 av 5 och humöret på
+> 4,0. Alkoholintaget är uppgivet för alla dagar, med fyra nyktra dagar den
+> senaste veckan. Du kan överväga att justera antalet alkoholglas om du vill se
+> hur det påverkar energinivån. Ett annat alternativ är att behålla nuvarande
+> rörelsemängd och fokusera på sömnkvaliteten för att stötta återhämtningen.
+
+**Saklig:**
+
+> Trendvikten har minskat 0,6 kg över de senaste 28 dagarna, vilket motsvarar en
+> veckotakt på 0,14 kg. Matintaget ligger i snitt cirka 170 kcal under den
+> beräknade underhållsnivån, och loggningen är fullständig för hela perioden.
+> Rörelse och sömn är registrerade dagligen, medan intaget av alkohol varierar
+> med fyra nyktra dagar de senaste sju. Det finns ingen aktiv plan eller
+> inställda makromål i appen just nu. Du kan fundera på att aktivera en plan för
+> att få fram mål, eller behålla det nuvarande upplägget om tempot passar dig.
+
+**Every tone reached alcohol**, every sentence passed the guard, every figure is
+one the sheet supplied, and no suggestion names a target the person has not set.
+Nothing needed fixing: the sheet ordering and the tone blocks are untouched, and
+COACH_RULES was not amended, which is what the brief asked for if a tone had
+dropped it.
+
+So the earlier observation was about **thin data, not about alcohol**. A tone
+capped at six sentences drops the domain with least in it, and when alcohol is
+not that domain it is not dropped. That is the right behaviour and it is now
+demonstrated rather than assumed.
+
+Torr's last sentence is worth keeping as evidence of the Samband rule working
+without being asked: *"Appen visar inga samband mellan dessa variabler, den
+plottar bara vad som loggats."*
+
+#### One thing in that run that is not clean
+
+Peppig wrote:
+
+> Du kan överväga att justera antalet alkoholglas om du vill se hur det påverkar
+> energinivån.
+
+The phrasing is an option, not an instruction, so the words-level check passes
+it — and it presupposes that alcohol **affects** energy, which is a causal link
+between two series. The rules forbid exactly that, and the fixture makes the
+temptation strong, because it was seeded so drinking days have less sleep and
+lower energy.
+
+It is soft: an invitation to look rather than a claim of fact. It is still the
+thing the rule is about.
+
+**Left as found rather than patched**, for the reason D155 gives about the
+prescribing check: the rule against causal claims has no mechanical check, only
+prompt text, and the honest response to discovering that is to record it rather
+than to add a guard in the same hour on one example. If it recurs, the shape of
+the fix is the one the instruction rule already has — a words-level check for
+"påverkar", "beror på", "leder till" and their neighbours, tested in both
+directions so that stating two facts side by side still passes.
+
 ### D156 — Where the image comes from is a variable, because this installation has used both
 
 *2026-09-13.*
