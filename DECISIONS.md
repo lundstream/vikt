@@ -7840,3 +7840,59 @@ changing what the app does.
 
 Recorded because a digest that does not match the running container is the kind
 of thing that costs an hour during an incident, and the answer is boring.
+
+### D161 — The verdict goes in a file, and the cause was not what I said it was
+
+*2026-09-13.*
+
+`shoot2.mjs` takes forty screenshots and checks each one. Run in the background
+with its stdout piped, it produced all forty images and **none** of its forty
+verdict lines, so a sweep that had genuinely checked every screen could not
+prove it had checked anything.
+
+The reaction at the time was to write `overflow.mjs`, a second script asking the
+same questions without taking the pictures. That worked and was the wrong shape:
+two scripts asking one question will eventually disagree, and the one that is
+cheaper to run is the one that gets trusted.
+
+#### The diagnosis was wrong
+
+I recorded the cause as `process.exit(0)` truncating a buffered pipe, in
+`STATE.md` and in a commit message. **`shoot2.mjs` contains no `process.exit`.**
+It ends at `ws.close()` and lets the event loop drain.
+
+That was written from a plausible mechanism rather than from the file, and it
+survived because it explained the symptom and nobody checked it against the
+source. Both places are corrected. The real cause of the lost pipe is still not
+established, and saying so is the honest end of it: what is established is that
+stdout was empty, exit was 0, and the images were all there.
+
+The fix does not depend on knowing. **The verdict is written to `verdict.txt` in
+the output directory, one line per screen, appended as each is taken.** A file
+survives a lost pipe whatever lost it.
+
+#### Three properties worth the space
+
+**The exit code is read back from the file**, not computed from a counter. That
+is the difference between "this run believes it passed" and "the record on disk
+says it passed": a line that never reached the file is not counted, which is the
+right answer, because an unrecorded check is not a check.
+
+**Appended as it goes**, so a run that dies half way through still leaves what
+it established. The summary line is written last, so its absence reads as "this
+did not finish" rather than as a pass.
+
+**`process.exitCode` rather than `process.exit()`** — the mechanism I wrongly
+blamed is a real one, and worth not introducing while fixing something else.
+
+#### What the sweep checks now
+
+Overflow and blankness, folded in from the deleted script, plus the swipe track
+(D154). Blankness is judged on rendered text length rather than on the image,
+because a screenshot of a white page and one of a still-loading page are the
+same bytes to look at and different things to find.
+
+All of it is asked in **one** `Runtime.evaluate` rather than four, so the
+numbers describe the same paint. Four round trips let the page settle between
+them, which is how a measurement ends up describing a state no screenshot was
+taken of.

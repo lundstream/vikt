@@ -753,4 +753,20 @@ a commit on `main` is a commit that the next redeploy ships.
     repositories and the failure mode is a step changing behaviour, not an image
     disappearing from under a build.
 - **Harness scripts clean up after themselves.** Every script that drives a browser deletes its profile directory on exit, and every script that writes screenshots keeps only the last three sets, pruning older ones as it starts. The scratchpad reached 5.4 GB of abandoned Edge profiles because forty scripts each made one and none removed it; a stale profile is also a stale service worker waiting to mislead the next verification pass. `scratchpad/harness.mjs` does both in one call.
+- **A harness script's verdict lives in a file, not in its output.** Every check
+  it makes is appended to `verdict.txt` in the same directory as whatever it
+  produced, as it makes them, and the exit code is computed by **reading that
+  file back** rather than from a counter in memory. Printing as well is fine;
+  relying on the print is not.
+  - Run in the background with stdout piped, `shoot2.mjs` once produced all
+    forty screenshots and none of its forty verdict lines, so a sweep that had
+    genuinely checked every screen could prove nothing. The reaction was to
+    write a second script asking the same questions, which is how one check
+    becomes two that can disagree; the fix is that the answer is written down
+    where losing a pipe cannot reach it.
+  - **Append as you go.** A run that dies half way through then still leaves
+    what it had established, and the missing summary line is itself readable as
+    "this did not finish".
+  - **`process.exitCode`, never `process.exit()`.** The second ends the process
+    immediately and takes unflushed output with it.
 - Before implementing a phase, re-read section 3 and section 4. The math and the isolation rules are where this project can quietly go wrong.

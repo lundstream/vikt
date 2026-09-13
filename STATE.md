@@ -781,17 +781,21 @@ sheet were shot separately, because they need a real photograph, a disclosure
 opened, a row logged or a sheet opened first, and none of that belongs in a
 screenshot sweep.
 
-**The verdict was taken separately from the pictures this time**, by
-`overflow.mjs`. `shoot2` prints one line per shot and ends with
-`process.exit(0)`, which truncates a buffered pipe: run in the background the
-forty files arrived and the forty lines did not, and a sweep whose assertion is
-lost is a sweep that proved nothing. The new probe asks the same question
-without taking the pictures, in two minutes rather than twenty, and it also
-reads the swipe's track on every screen: **0 of 40 with horizontal overflow, 0
-blank, and `transform` empty on every one of them**. That last one is D154's
-containing-block rule checked on the real pages rather than argued from the
-code, because a leftover identity transform would pin every sheet in the app to
-the content column.
+**The verdict was taken separately from the pictures that time**, by a second
+script, `overflow.mjs`: run in the background with stdout piped, `shoot2`
+produced the forty files and none of the forty lines, and a sweep whose
+assertion is lost proved nothing. The separate probe found **0 of 40 with
+horizontal overflow, 0 blank, and `transform` empty on every one of them** —
+that last being D154's containing-block rule checked on the real pages rather
+than argued from the code.
+
+**The reason given here for the lost output was wrong**, and is corrected in
+D161. `shoot2.mjs` contained no `process.exit(0)`; the claim was written from a
+plausible cause rather than from the file, and repeated into a commit message.
+What replaced both scripts is a sweep that writes each verdict to `verdict.txt`
+beside the screenshots as it goes and derives its exit code by reading that file
+back, so the answer survives whatever happens to the pipe. `overflow.mjs` is
+deleted: two scripts asking one question is how they come to disagree.
 
 Measurements, and the conditions they were taken under, are in
 `docs/measurements.md`. The landing page's tap figures are pinned to that file
