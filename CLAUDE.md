@@ -683,6 +683,25 @@ a commit on `main` is a commit that the next redeploy ships.
   and it is invisible from inside either branch. D115's two navigation surfaces
   drifted for exactly that reason.
 
+- **Credentials are never pasted into a prompt, and never printed in a
+  transcript.** A secret that has appeared in a session is burned and has to be
+  rotated, so the way not to burn one is to have no step that asks for it. This
+  has now cost two rotations of the same Portainer credential.
+  - **Tools read them from the environment.** `PORTAINER_TOKEN` for the
+    Portainer API, the same shape for anything added later. A script that cannot
+    find its credential **fails with the variable name and exits**; it does not
+    prompt, does not accept one as an argument, and has no interactive fallback,
+    because a prompt inside a recorded session puts the secret straight back
+    into the recording.
+  - **Nothing echoes one back.** A value read from the environment is used, not
+    logged, and a script that reports what it configured names the variable and
+    says `<secret, set>` rather than the value.
+  - `scripts/portainer.mjs` is the only path from this repository to Portainer,
+    and `apps/api/test/secrets-hygiene.test.ts` holds both halves: it scans the
+    committed scripts, workflows and infra files for a password path, and it
+    **runs** the helper with the variable unset to prove it refuses instead of
+    waiting for input.
+
 - **Restart the development server when a change needs it.** Do not ask first and do
   not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
   dependencies at boot, and neither notices a file it read once. A green `pnpm build`

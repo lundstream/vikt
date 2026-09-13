@@ -7683,3 +7683,63 @@ api block: expected true to be false
 and removing it again returns 111 passing. A variable that moves from nginx-only
 to shared now has exactly one correct way to be recorded, which is to add it to
 `READ_OUTSIDE_SCHEMA` or to the schema, and the guard fails until it is.
+
+### D158 — No step that asks for a password
+
+*2026-09-13.*
+
+The 1.1.0 deploy was driven by a Portainer password pasted into a session. The
+session is a transcript, so the password is burned and has to be rotated. That
+is the **second** time the same credential has been rotated for the same reason:
+the first was D120's, given during the original deployment work.
+
+Twice is a pattern, and the pattern is not carelessness. It is that the runbook
+had a step that needed a password, so somebody produced one, and the only place
+to put it was the conversation. A rule saying "do not paste secrets" does not
+survive a step that cannot proceed without one.
+
+**So the step is gone.** `PORTAINER_TOKEN` is read from the environment, and
+`scripts/portainer.mjs` is the only path from this repository to Portainer. With
+the variable unset it prints the variable name and exits **2** — not 1, so a
+caller can tell "not configured" from "the request failed" — and there is no
+interactive fallback, no flag that takes a credential, and no call to the
+password-exchange endpoint at all. There is nothing to type a password into.
+
+`X-API-Key` rather than a bearer JWT, for a reason beyond convenience: obtaining
+a JWT means sending a username and password, so a JWT-based path has the problem
+built into it. An access token is issued once, used directly, and revoked on its
+own without changing anybody's password.
+
+#### What the guard actually checks
+
+`secrets-hygiene.test.ts` has two halves and the second is the one worth having.
+
+It **scans** the committed scripts, workflows and infra files for a password
+path: the password-exchange endpoint, a `Password` field in a request body,
+`read -s`, `Get-Credential`, a prompt naming a secret, and the old
+`PORTAINER_PASSWORD` variable. That half is ordinary.
+
+It also **runs the helper** with the variable unset, a five second timeout and
+an empty stdin, and asserts it exited 2 rather than waiting. A script that
+prompted would block or read EOF and carry on; either shows up here as a
+failure. Asserting the refusal by reading the source would only prove the source
+says so.
+
+Writing it caught its own first offender immediately: the helper's header
+comment explained that it does not call `/api/auth`, and spelling the path out
+tripped the scan. The comment was reworded rather than the guard loosened. **A
+guard a comment can talk its way around is not a guard**, and the alternative —
+an exception for "mentions, not uses" — is the beginning of an allowlist.
+
+#### What this does not buy
+
+Portainer 2.33 Community Edition has two roles, administrator and standard user.
+The least role that can redeploy the `vikt` stack is a standard user with access
+to the `local` environment and to the stack, and such a user can still reach the
+Docker API proxy for that environment, which is most of what an administrator
+can do to containers on it. There is no "may redeploy this stack and nothing
+else" in CE.
+
+Recorded rather than glossed, because the honest gain here is narrower than
+"least privilege": the token is **revocable on its own**, and it removes the
+step where a secret gets typed into something that is recording.
