@@ -7273,3 +7273,200 @@ the page colour, the bar still marking the section you have not left yet.
 The real phone is listed in STATE.md as waiting on the owner. A headless browser
 can dispatch a touch; it cannot tell you whether the thumb that lives on the
 left edge of a phone triggers this by accident all day.
+
+### D155 — The coach gets the data, and two rules about what it may do with it
+
+*2026-09-13.*
+
+Asked what somebody was eating, the coach answered that it only saw summaries.
+That was **true**, and it was the app's fault rather than the model's: the sheet
+carried a trend, a rate, a maintenance figure and a macro mean, and a person
+asking "vad tror du om mitt upplägg" is asking about food, drink, movement and
+sleep, none of which were in it.
+
+#### The sheet
+
+Every domain, over **7 and 28 days**, because one window alone invites the wrong
+reading of the other: a good week inside a bad month, or a month's average
+hiding the week it is about. Intake against measured maintenance with its
+coverage; each macro against the person's own target with the number of logged
+days under it; fibre only where it is tracked at all; alcohol units and sober
+days; activity sessions and minutes; steps; sleep hours; energy and mood;
+habits with their streaks; measurements and their smoothed change; and the
+**names** of what was eaten in the last seven days, per day, names only.
+
+The names are the one place this loosens D139's "aggregates, never rows", and
+the loosening is narrow and deliberate. A list of foods is not a food log: no
+amounts, no times, no macros per item, no note. What it buys is the difference
+between a coach that can say something about somebody's eating and one that
+correctly says it cannot.
+
+**Nothing is recomputed.** Every figure comes through the service or the shared
+calc function that already produces it for a screen — `dayMacros`,
+`buildActivityIndex`, `smoothedChange`, `coverageOver`, `currentStreak`. A coach
+with its own maintenance figure would eventually disagree with the dashboard in
+front of somebody looking at both.
+
+**An empty domain says so with the data as subject, never `0`.** "0 pass" claims
+somebody sat still for a week; what is true is that nothing was logged. This is
+D140's addendum applied to the sheet the prompt is about, and it is held by a
+test that greps for `0 pass`, `0 minuter`, `0 steg` and the rest as whole
+figures.
+
+#### One way to write a number
+
+`num(value, unit, decimals)` formats with the shared Swedish formatter **and**
+registers the figure in the guard's traceable set, in one call. It is the only
+way a number reaches the text, so the rule "every figure in the sheet is one a
+reply may quote" is structural rather than remembered — the previous sheet did
+the two halves in separate statements and could therefore do one of them.
+
+A test runs the reply guard over the sheet's own sentences. On the first run it
+found one figure that had been written as a literal: **"vilket är 1 procent av
+kroppsvikten"**, in a line that had been there since D139. A reply repeating that
+sentence would have been refused for stating a number the app had not supplied —
+the worst kind of false refusal, because the app put the number there.
+
+Ten units now, not four: kcal, kg, kg/week, percent, grams, minutes, steps,
+hours, standard drinks, cm, counts, and the 1 to 5 ratings. Each vouches only
+for itself, so "140 g" and "140 kcal" cannot stand in for each other. The
+figure pattern gained the unit words with a lookahead rather than a word
+boundary, because `%` is not a word character and "140 grader" must not match
+the `g` in it.
+
+#### Two rules, and one of them is also a check
+
+Added to COACH_RULES, tone independent, verbatim in every profile:
+
+**Praise is allowed, tied to a fact.** "Sju loggade dagar av sju, det är hela
+veckan" is praise about something; praise with nothing behind it is the thing
+said to everybody.
+
+**At most two suggestions, each an option.** "du kan", "om du vill", "ett
+alternativ är" — never "du måste", "du ska", "du bör". A direction may be named,
+such as more protein or more movement or more sleep, never a figure the person
+has not set as a target themselves.
+
+That second one is also a **words-level check**, and it has to be, because the
+question that produced this whole pass ends "Något jag bör tänka på?" — the
+question hands the model the forbidden word, and an accommodating model uses the
+words it is given. The patterns need a modal **and** a person for it to be
+addressed to: `ska` is one of the commonest words in Swedish, and refusing every
+sentence with it in would refuse "det ska bli intressant att se nästa vecka".
+
+One exemption: a sentence naming care. "Du bör ta det med vården" is the
+sentence D139 built a whole detection path to produce, and refusing the model
+for arriving at it independently would be the check working against its own
+purpose.
+
+**Two series may sit side by side, never joined by a cause.** The brief for this
+asked the coach to connect two series only through a relation Samband had
+already computed — and Samband has computed none, on purpose. D34 is explicit
+and the schema says so in as many words: no r, no fitted line, no verdict,
+because every pair is one person's self-report over a few weeks with obvious
+third causes. So the sheet carries what Samband actually has, which is which
+pairs it plots and how many days line up, and the rule is written against that:
+the coach may say the app draws those two together and may state both facts, and
+may never say one caused the other.
+
+#### What the live run changed
+
+**A false refusal, found in the warm tone.** The reply
+
+> "Du har loggat mat två dagar den här veckan, med gryta och havregrynsgröt som
+> exempel, medan rörelse och steg inte är ifyllda än."
+
+was refused as blame. It is a true sentence about what was logged followed by a
+separate clause about what the app does not have, with the data as its subject —
+exactly what the rules ask for. The old patterns let the person, the logging verb
+and the negation come from anywhere in the sentence; commas and semicolons stop
+the match now, so the negation has to belong to the clause the person is in.
+
+**A breadth rule, because all three tones answered from the weight alone.** With
+the sheet in front of them and the question asking about the whole picture,
+every tone talked about the trend and nothing else. So: a broad question is
+answered from several domains, with a short sentence each about food, alcohol,
+movement and sleep in so far as they are in the sheet — and the two-to-four
+sentence limit is relaxed to six for that case, in one place rather than edited
+into three tone blocks that would then disagree. Length for breadth is about
+answering the question, not about how it sounds, so it belongs in the shared
+rules.
+
+#### The size, measured
+
+3 296 prompt tokens for the worst realistic turn: the system prompt, six past
+turns and the question. The variant is loaded with **`num_ctx` 65 536**, so the
+turn uses 5.3 percent of the window and leaves 62 066 tokens. `docs/measurements.md`
+carries the table and the 2.92 characters per token it also produced.
+
+The 9 000 character budget is therefore not about the model. It is about keeping
+the sheet small enough to be read: a sheet three times this size would fit and
+would be worse.
+
+#### The three tones, verbatim
+
+The question, in all three, against `qwen3.6:27b` on the development account:
+
+> Vad tror du om mitt upplägg, vad jag äter, hur viktnedgången ser ut? Något jag
+> bör tänka på?
+
+**Torr:**
+
+> Trendvikten har sjunkit 1,1 kg på fyra veckor, vilket ligger nära den
+> planerade takten. Matloggen är sparsam just nu med bara två dagar ifyllda
+> denna vecka, medan intaget de senaste fyra veckorna i snitt landat kring
+> 2 246 kcal per loggad dag. Rörelse och steg är inte registrerade denna vecka,
+> men under månaden har det blivit fem pass och ett genomsnitt på 9 400 steg när
+> uppgifterna finns. Sömnen ligger stabilt kring sju timmar med goda värden för
+> både energi och humör. Du kan fylla i mer mat eller rörelse om du vill se hur
+> det påverkar bilderna, eller låta det vara som det är.
+
+**Peppig:**
+
+> Trendvikten har sjunkit 1,1 kg på sista månaden och midjan minskat något,
+> vilket är ett tydligt tecken på framåtrotation. Matloggningen täcker bara en av
+> de senaste sju dagarna, så intaget är inte ifyllt än för övrig vecka. Rörelse
+> och steg räknas heller inte in just nu eftersom ingen aktivitet eller
+> stegantal är loggat de senaste dagarna. Du kan lägga till mat om du vill se hur
+> det står till med kalorierna, eller så kan du börja logga rörelse för att få en
+> tydligare bild av utgiften.
+
+**Saklig:**
+
+> Trendvikten har minskat 1,1 kg de senaste 28 dagarna, vilket motsvarar en
+> veckotakt på 0,27 kg. Måltavlan är 83,5 kg med en planerad takt på 0,25 kg i
+> veckan, och trenden ligger därmed nära den satta målet.
+>
+> Under de senaste sju dagarna har mat loggats endast två dagar, medan alkohol,
+> rörelse och steg inte är ifyllda för samma period. Under 28-dagarsperioden har
+> intaget i snitt varit 2 246 kcal per loggad dag på 71 procent av dagarna, med
+> ett proteinsnitt som överstiger målet men kolhydrater och fett som ligger under
+> respektive mål.
+>
+> Rörelse är loggad med fem pass totalt under månaden, medan stegantalet i snitt
+> landat på 9 400 per dag när det är ifyllt. Sömnen har legat på i genomsnitt
+> 7,3 timmar, energi på 3,7 av 5 och humör på 3,9 av 5 baserat på 14 dagar med
+> data.
+>
+> Underhållsnivån är ännu inte räknad fram eftersom appen behöver fler dagar med
+> både vikt och matloggar för att göra en uppskattning. Du kan fylla i mer
+> rörelse eller sömn om du vill, eller logga mat de dagar det saknas för att få
+> en tydligare bild av intaget.
+
+Every sentence of all three passed the guard. Every suggestion is an option and
+none of them says "du bör", which is the thing the question was inviting.
+
+**What is honest to say about the coverage.** Food, movement and sleep are in
+all three, on every roll. **Alcohol is reliably in `saklig` and drops out of the
+two character tones**, and the reason is visible in the sheet: this account has
+no alcohol in the last seven days and two standard drinks in twenty-eight, and
+the tones that are capped at five or six sentences drop the domain with least in
+it. That is arguably the right call rather than a defect, and it is not
+something a prompt line fixed — three more lines of instruction moved it for one
+roll and not the next. Recorded as it is rather than re-rolled until it read
+well.
+
+The neutral tone's first paragraph also contains "den satta målet", which is
+wrong Swedish. That is the model, not the app: nothing in the pipeline corrects
+grammar, and a check that did would be editing the coach rather than checking
+it.

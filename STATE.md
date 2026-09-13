@@ -54,6 +54,13 @@ when it will be down, and its mail goes out.
   around the milestone sheet was a focus ring on the dialog container: focus goes
   to the first field now and the sheet's own border is gone, because a sheet is
   Skymning on a dimmed page and needs no edge.
+- **The coach sees the data, not a summary of it** (D155). Intake against
+  measured maintenance, each macro against the person's own target, alcohol,
+  movement, steps, sleep, energy, mood, habits and measurements, all over 7 and
+  28 days, plus the names of what was eaten in the last week. It may praise what
+  the data shows, offer at most two suggestions phrased as options, and never
+  join two series with a cause, because Samband computes no coefficient to lean
+  on. A domain with nothing in it says so with the data as the subject.
 - **A swipe moves between sections on a phone** (D154). The page follows the
   finger and completes past a quarter of the screen or on a flick, and a tap in
   the bar runs the same slide. It stays out of five cases: the 24 px the
@@ -521,6 +528,20 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **The coach on the whole picture, in all three tones** (D155), against the
+  real model on the LAN: "Vad tror du om mitt upplägg, vad jag äter, hur
+  viktnedgången ser ut? Något jag bör tänka på?" All three replies are in D155
+  verbatim, every sentence passed the guard, and every suggestion is an option
+  rather than an instruction, which is the thing the question was inviting. Food,
+  movement and sleep are in all three on every roll; alcohol is reliably in the
+  neutral tone and drops out of the two character tones, which is recorded as it
+  is rather than re-rolled, because this account has two standard drinks in a
+  month and none in the week. Two things the live run found and fixed: a **false
+  refusal**, where a true sentence about what was logged was read as blame
+  because the negation in a later clause counted, and every tone answering a
+  broad question from the weight trend alone with the whole sheet in front of
+  it. The turn costs 3 296 tokens against a `num_ctx` of 65 536, measured with
+  `coach-size.ts` and recorded in `docs/measurements.md`;
 - **The section swipe, with real touches in mobile emulation** (D154): 360 px,
   `Input.dispatchTouchEvent` rather than dispatched objects, so the browser's own
   hit testing decides where the touch lands. Forward and back both complete; a

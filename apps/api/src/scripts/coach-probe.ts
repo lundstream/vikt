@@ -19,7 +19,7 @@ import { createDb } from "../db/index.js";
 import { loadEnv } from "../env.js";
 import { users } from "../db/schema.js";
 import { createLlmClient } from "../llm/client.js";
-import { buildCoachFacts, CONTEXT_CHAR_BUDGET } from "../llm/coach-context.js";
+import { buildCoachFacts, CONTEXT_CHAR_BUDGET, FIGURE_UNITS } from "../llm/coach-context.js";
 import { checkSentence, sentencesOf } from "../llm/coach-guard.js";
 import { buildCoachPrompt } from "../llm/prompts/coach.js";
 import { coachToneSchema } from "shared";
@@ -44,10 +44,10 @@ console.log("=".repeat(72));
 console.log(facts.text);
 console.log("-".repeat(72));
 console.log(`chars: ${facts.chars} of a ${CONTEXT_CHAR_BUDGET} budget`);
-console.log(`figures kcal: ${facts.figures.kcal.join(", ")}`);
-console.log(`figures kg: ${facts.figures.kg.join(", ")}`);
-console.log(`figures kg/vecka: ${facts.figures.kgPerWeek.join(", ")}`);
-console.log(`figures procent: ${facts.figures.percent.join(", ")}`);
+for (const unit of FIGURE_UNITS) {
+  const values = facts.figures[unit];
+  if (values.length > 0) console.log(`figures ${unit}: ${values.join(", ")}`);
+}
 console.log(`floor: ${facts.guardrails.intakeFloorKcal}, max rate: ${facts.guardrails.maxRateKgWeek}`);
 
 const tone = coachToneSchema.catch("torr").parse(toneArgument ?? user.id);

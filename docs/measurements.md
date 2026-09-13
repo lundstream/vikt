@@ -197,3 +197,41 @@ confirmation appearing: **264 ms**.
 Audited programmatically across six screens on **both themes** after the theme
 setting landed (D117): **zero** contrast failures against WCAG AA, and a visible
 focus ring on all 186 interactive elements.
+
+---
+
+## What a coach turn costs, with the data sheet
+
+Taken 2026-09-13 with `apps/api/src/scripts/coach-size.ts`, against the real
+`qwen3.6:27b` on the workstation, on the development account. The script asks
+Ollama rather than counting characters: `prompt_eval_count` is the model's own
+answer for the turn it was given, and `/api/ps` reports the context the variant
+was actually loaded with.
+
+The turn measured is the worst realistic one: the system prompt, **six** past
+turns at the length this model writes, and the question.
+
+| | chars | tokens |
+|---|---|---|
+| the data sheet alone | 2 938 | — |
+| the whole system prompt | 6 881 | — |
+| the whole turn | 9 613 | **3 296** |
+| the reply | — | 174 |
+
+**2.92 characters per token** on Swedish, which is the figure to reach for when
+estimating the next thing rather than measuring it. (The 3.4 the context budget
+was written against was an estimate; this is the measurement, and it is worse,
+so the budget is conservative in the right direction.)
+
+**`num_ctx` is 65 536**, reported by `/api/ps` for the loaded model. Ollama
+0.33.2 takes it from the model rather than the old 4 096 default, and
+`qwen3.6:27b` declares 262 144. So one turn uses **5.3 percent** of the window
+and leaves **62 066 tokens** of margin.
+
+The `CONTEXT_CHAR_BUDGET` of 9 000 characters is therefore not about the model
+at all — it is about keeping the sheet small enough to be read. A sheet three
+times this size would still fit and would be worse.
+
+Before the data sheet (D155) the block was a dozen aggregates at about 1 100
+characters. The new one is 2 938 on the same account and is held under 9 000 by
+a test on a synthetic account with four weeks in every domain.

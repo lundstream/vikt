@@ -107,6 +107,12 @@ export function refusalMessage(reason: string, facts: CoachFacts): string {
         "så jag svarar inte alls. Det som saknas är uppgifter som inte är ifyllda än, " +
         "och du fyller i dem där de hör hemma."
       );
+    case "instruction":
+      return (
+        "Jag höll på att tala om för dig vad du ska göra, och det är inte min roll. " +
+        "Jag kan peka på vad siffrorna visar och på sin höjd föreslå en riktning, " +
+        "men vad du gör med den är ditt val."
+      );
     case "untraceable":
       return (
         "Jag höll på att svara med en siffra som inte kommer ur dina egna uppgifter, så jag " +

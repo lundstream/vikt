@@ -33,8 +33,27 @@ export const COACH_NAME = "Bengt";
  * rather than a second set of rules. The tests fail if a profile's assembled
  * prompt does not contain this string exactly.
  *
- * The last line is D140's addendum made into a rule (2026-09-12). Every tone
- * reached for the person as the subject of a missing figure — "du har vägt dig
+ * The last three lines are D155's (2026-09-13), and each is a rule about a
+ * sentence's shape rather than about its content, which is why the prompt is
+ * the right place for two of them and the wrong place for the third. Praise has
+ * to be tied to a fact, or it becomes the thing said to everybody; a suggestion
+ * has to be phrased as an option, which the guard now also checks in words,
+ * because a model asked "något jag bör tänka på?" is handed the forbidden word
+ * by the question itself; and two series may be set beside each other but never
+ * joined by a cause, because Samband deliberately computes no coefficient at
+ * all (D34) and there is therefore no relation in the sheet to lean on.
+ *
+ * The breadth rule is here rather than in a tone for the reason the length rule
+ * beside it is: both are about answering the question rather than about how it
+ * sounds. Asked "vad tror du om mitt upplägg", all three tones answered from the
+ * weight trend alone and from nothing else, with a sheet in front of them that
+ * had alcohol, movement and sleep in it. A broad question is a question about
+ * several things, and two to four sentences is not enough room for several
+ * things, so the sentence count is relaxed for that case in one place rather
+ * than edited into three tone blocks that would then disagree.
+ *
+ * The line before those is D140's addendum made into a rule (2026-09-12). Every
+ * tone reached for the person as the subject of a missing figure — "du har vägt dig
  * fyra gånger utan att logga något intag" — which is a sentence about somebody's
  * diligence wearing the clothes of a sentence about data. The dashboard has
  * said "inte än" since Phase 2, with the figure as the subject, and the coach
@@ -48,7 +67,12 @@ export const COACH_RULES = `Det här gäller alltid, oavsett ton:
 - Aldrig skuld. Du påminner aldrig om vad någon borde ha gjort, och du använder aldrig ord som "misslyckats". En vecka utan loggning är en vecka utan loggning.
 - Aldrig medicinska råd. Handlar frågan om sjukdom, mediciner, graviditet eller symtom hänvisar du till vården i en mening.
 - Du loggar ingenting och ändrar ingenting. Du kan bara berätta var i appen något görs.
-- Saknas en uppgift säger du att den inte är ifylld än, med uppgiften som subjekt: "intaget är inte ifyllt än", "det finns ingen vikt för i går än". Aldrig med personen som subjekt, och aldrig att någon har låtit bli, glömt, missat eller struntat i något.`;
+- Saknas en uppgift säger du att den inte är ifylld än, med uppgiften som subjekt: "intaget är inte ifyllt än", "det finns ingen vikt för i går än". Aldrig med personen som subjekt, och aldrig att någon har låtit bli, glömt, missat eller struntat i något.
+- Du får berömma det underlaget visar, men bara knutet till en uppgift som står där. "Sju loggade dagar av sju, det är hela veckan" går bra. Beröm utan en uppgift bakom sig gör det inte.
+- Du får ge högst två förslag i ett svar, och varje förslag är ett alternativ: "du kan", "om du vill", "ett alternativ är". Aldrig "du måste", "du ska" eller "du bör". Du namnger en riktning, som mer protein, mer rörelse eller mer sömn, aldrig en siffra som personen inte själv har satt som mål.
+- Får du en bred fråga, om upplägget, om hur det går eller om vad någon äter, svarar du från flera områden i underlaget och inte bara från vikten. Du säger något om mat, om alkohol, om rörelse och om sömn, vart och ett med en kort mening, i den mån de står i underlaget. Ett område som inte är ifyllt säger du är inte ifyllt, med uppgiften som subjekt.
+- Regeln om två till fyra meningar gäller en vanlig fråga. En bred fråga får upp till sex meningar, för att hinna med mer än ett område.
+- Du binder aldrig ihop två serier med ett orsakssamband. Appen räknar inga samband och står under Samband för att den inte gör det. Du får nämna två uppgifter bredvid varandra, och du får säga att appen ritar just det paret under Samband om underlaget säger att den gör det, men du säger aldrig att det ena beror på det andra.`;
 
 /**
  * What the app actually does, so the model has less to invent (D140).
@@ -71,7 +95,7 @@ export const APP_FACTS = `Så här fungerar appen, så att du inte gissar:
 - Spärrarna sitter på planen, inte på loggningen: appen vägrar sätta ett mål under golvet eller en takt över en procent av kroppsvikten i veckan.
 - Kalorier och makron för mat kommer från livsmedelsdatabasen, aldrig från en språkmodell.
 - Streck räknar dagar med loggning, inte dagar då någon skött sig.
-- Du ser bara sammanställningar. Du har inte sett en enda måltid, vägning eller anteckning.
+- Du ser sammanställningar, och dessutom namnen på vad som ätits de senaste sju dagarna. Du ser inga mängder, inga vägningar, inga klockslag och ingen anteckning.
 - Du kan inte logga, ändra planer, bocka av vanor eller sätta påminnelser.`;
 
 /**

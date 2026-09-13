@@ -70,6 +70,17 @@ const FACTS: CoachFacts = {
     kg: [84.2, 1.4],
     percent: [72, 86],
     kgPerWeek: [0.35, 0.84],
+    // The data sheet's units (D155). Written out rather than spread from an
+    // empty set, so a unit added without a thought about what a reply may
+    // quote in it shows up here as a compiler error.
+    grams: [118, 140],
+    minutes: [145],
+    steps: [8200],
+    hours: [7.2],
+    drinks: [4],
+    cm: [92.4, 1.2],
+    count: [3, 5, 7, 28],
+    scale: [3.4],
   },
   guardrails: { intakeFloorKcal: 1500, maxRateKgWeek: 0.84 },
   chars: 42,
@@ -205,6 +216,123 @@ describe("what the coach may say", () => {
     ]) {
       expect(checkReply(sentence, FACTS).ok, sentence).toBe(true);
     }
+  });
+
+  /**
+   * The blame check reads one clause, not one sentence (D155).
+   *
+   * Found live, in the warm tone: "Du har loggat mat två dagar den här veckan,
+   * med gryta och havregrynsgröt som exempel, medan rörelse och steg inte är
+   * ifyllda än." The person, a logging verb and a negation were all in the
+   * sentence, and none of them were in the same clause — the first half says
+   * what was logged and the second says what the app does not have, with the
+   * data as its subject, which is precisely what the rules ask for.
+   */
+  it("does not read a reproach across a comma", () => {
+    const verdict = checkReply(
+      "Du har loggat mat två dagar den här veckan, med gryta och havregrynsgröt " +
+        "som exempel, medan rörelse och steg inte är ifyllda än.",
+      FACTS,
+    );
+
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("still refuses the reproach itself", () => {
+    for (const sentence of [
+      "Du har inte loggat något intag den här veckan.",
+      "Du har aldrig fyllt i sömnen.",
+      "Du har vägt dig fyra gånger utan att logga något intag.",
+      "Du glömde bocka av vanorna i går.",
+    ]) {
+      const verdict = checkReply(sentence, FACTS);
+      expect(verdict.ok, `let through: ${sentence}`).toBe(false);
+      if (!verdict.ok) expect(verdict.reason).toBe("blame");
+    }
+  });
+
+  /**
+   * The instruction rule (D155), both directions.
+   *
+   * The reason it is in code and not only in the prompt is the question that
+   * produced it: "något jag bör tänka på?" hands the model the forbidden word,
+   * and an accommodating model uses the words it was given. A suggestion is
+   * still allowed, and that is the half this has to get right — a check that
+   * refused "du kan" would leave the coach with nothing to offer at all.
+   */
+  it("refuses a suggestion phrased as an instruction", () => {
+    for (const sentence of [
+      "Du bör äta mer protein.",
+      "Du måste sova mer.",
+      "Du ska röra på dig oftare.",
+      "Mer protein borde du prioritera.",
+      "Man bör äta frukost.",
+      "Se till att du kommer ut och går.",
+    ]) {
+      const verdict = checkReply(sentence, FACTS);
+      expect(verdict.ok, `let through: ${sentence}`).toBe(false);
+      if (!verdict.ok) expect(verdict.reason).toBe("instruction");
+    }
+  });
+
+  it("lets the same suggestion through as an option", () => {
+    for (const sentence of [
+      "Du kan lägga till lite mer protein om du vill.",
+      "Ett alternativ är att sova lite mer.",
+      "Om du vill finns det utrymme för mer rörelse.",
+      "Du skulle kunna ta en promenad på lunchen.",
+      "Det ska bli intressant att se nästa vecka.",
+      "Nästa vägning ska visa om det håller i sig.",
+    ]) {
+      const verdict = checkReply(sentence, FACTS);
+      expect(verdict.ok, `refused: ${sentence}`).toBe(true);
+    }
+  });
+
+  /** The one instruction the app does want, and built a whole path to produce. */
+  it("still lets it send somebody to care", () => {
+    const verdict = checkReply("Det där bör du ta med vården.", FACTS);
+    expect(verdict.ok).toBe(true);
+  });
+
+  /** The floor and the rate are unchanged by any of this. */
+  it("keeps the floor and the rate checks exactly as they were", () => {
+    const floor = checkReply("Sikta på 1 200 kcal om dagen.", FACTS);
+    expect(floor.ok).toBe(false);
+    if (!floor.ok) expect(floor.reason).toBe("floor");
+
+    const rate = checkReply("Försök gå ner 1,5 kg i veckan.", FACTS);
+    expect(rate.ok).toBe(false);
+    if (!rate.ok) expect(rate.reason).toBe("rate");
+  });
+
+  /** The units the data sheet added, each vouching only for itself (D155). */
+  it("traces the data sheet's own units", () => {
+    expect(checkReply("Proteinet ligger på 118 g per dag.", FACTS).ok).toBe(true);
+    expect(checkReply("Det blev 145 minuter rörelse.", FACTS).ok).toBe(true);
+    expect(checkReply("Runt 8 200 steg per dag.", FACTS).ok).toBe(true);
+    expect(checkReply("Sömnen ligger på 7,2 timmar.", FACTS).ok).toBe(true);
+    expect(checkReply("Midjan är 92,4 cm.", FACTS).ok).toBe(true);
+    expect(checkReply("Det blev 4 standardglas.", FACTS).ok).toBe(true);
+    expect(checkReply("Tre pass på 7 dagar.", FACTS).ok).toBe(true);
+  });
+
+  it("refuses a figure in one of those units that it was not given", () => {
+    const verdict = checkReply("Proteinet ligger på 210 g per dag.", FACTS);
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.reason).toBe("untraceable");
+  });
+
+  /** A gram is not a kilo and a step is not a minute. */
+  it("does not let one new unit vouch for another", () => {
+    // 145 is a real figure in the sheet, in minutes.
+    const verdict = checkReply("Du har gått 145 steg.", FACTS);
+    expect(verdict.ok).toBe(false);
+  });
+
+  /** "140 grader" is not "140 g". */
+  it("does not read a unit out of the middle of a word", () => {
+    expect(checkReply("Ugnen stod på 210 grader.", FACTS).ok).toBe(true);
   });
 
   it("knows a medical question when it sees one", () => {
