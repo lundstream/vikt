@@ -1,0 +1,19 @@
+{
+  "//": [
+    "Deliberately one rule, not a preset (D162).",
+    "",
+    "A style preset on a Tailwind stylesheet spends its time complaining about",
+    "@apply and @tailwind and about conventions this project has already",
+    "decided, and the noise is how a linter gets switched off. What this exists",
+    "to catch is one thing, and it is a thing that shipped: four duplicate",
+    ".select blocks sat after the intended one, and because CSS takes the last",
+    "of equal specificity they were the rule actually in force. Four properties",
+    "of a deliberate design were silently overridden, including the light",
+    "theme's chevron, for as long as nobody diffed the file against itself.",
+    "",
+    "no-duplicate-selectors fails on exactly that and on nothing else."
+  ],
+  "rules": {
+    "no-duplicate-selectors": true
+  }
+}

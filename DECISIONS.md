@@ -7896,3 +7896,86 @@ All of it is asked in **one** `Runtime.evaluate` rather than four, so the
 numbers describe the same paint. Four round trips let the page settle between
 them, which is how a measurement ends up describing a state no screenshot was
 taken of.
+
+### D162 — Four duplicate blocks were the rule actually in force
+
+*2026-09-13.*
+
+`apps/web/src/styles/index.css` contained **five** `.select` blocks. Four of
+them were copies of each other, and the fifth — the first in the file — was the
+one somebody had written on purpose.
+
+CSS takes the last declaration of equal specificity, so **the duplicates won**.
+Every deliberate property of `.select` had been silently overridden since the
+first commit of this repository, and the file read as though it had not.
+
+#### What was actually being rendered
+
+Measured on `/app/admin?vy=backup` through the browser, before and after, rather
+than reasoned about:
+
+| | before, duplicates winning | after |
+|---|---|---|
+| border radius | `6px` (`rounded-md`) | `8px` (`rounded-lg`), matching `.field` |
+| surface, dark | `#0F1418` Natt, the **page** colour | `#16232B` Skymning, the card colour |
+| padding | `8px` | `10px` |
+| font size | `16px` (`text-base`) | `15px` (`text-body`) |
+| chevron, light theme | `#6B7B82` | `#5c6b72` |
+
+The surviving block's own comment says it matches `.field` "exactly apart from
+the chevron", and it did not: a select sat on the page colour while every other
+control sat on the card colour, which is the rule `.field`'s comment states in
+the paragraph above it.
+
+The last row is the clearest defect. The duplicate carried **one** hardcoded
+chevron colour for both themes, so the light theme was drawing the dark theme's
+grey. The intended block has a light colour and a `.dark .select` override, and
+that override survived only because its specificity is higher than the
+duplicates'.
+
+**So this is not a tidy-up, and the brief's expectation that the rendering would
+be unchanged is not what happened.** Removing dead duplicates usually changes
+nothing; removing live ones changes four things, and all four move towards what
+the file says it intends.
+
+#### Where they came from, and where they did not
+
+Both the intended block and the four copies arrive in `d313a34`, the initial
+commit of this repository, which was imported from the old one. The duplication
+is an artefact of that import.
+
+That is **not** the same question as the one that prompted this. During one
+session the count went 5 to 6, and later 5 to 11, with no command touching the
+file. Four reproductions, each checked with `git diff` afterwards:
+
+| | result |
+|---|---|
+| kill the dev server by port, clear `.vite`, start it again | unchanged |
+| `pnpm build` | unchanged |
+| the full screenshot sweep, forty screens | unchanged |
+| `pnpm --filter web test`, which runs postcss and Tailwind over this exact file | unchanged |
+
+Searched as well: no `writeFile`, `appendFile` or `createWriteStream` anywhere in
+the repository's own code, no Vite plugin that writes (both `configureServer`
+hooks are middleware), no `predev` or `postinstall`, no codegen, no `.vscode`,
+no watcher dependency, and no git filter or `.gitattributes` rule that could
+rewrite CSS.
+
+**The writer was not found, and that is recorded as observed rather than
+solved.** What is known: the increments happened only inside an editor-hosted
+session, never in response to anything reproducible from a shell. The remaining
+explanation is something outside the repository holding a stale buffer, which
+cannot be tested from here.
+
+#### The guard
+
+`stylelint` with exactly one rule, `no-duplicate-selectors`, wired into
+`pnpm lint` so it runs in the pre-commit hook and in CI.
+
+One rule rather than a preset, deliberately. A style preset on a Tailwind
+stylesheet spends its time objecting to `@apply` and to conventions this project
+has already decided, and that noise is how a linter comes to be switched off.
+
+Shown to bite before it was trusted: against the file as it was, it reports all
+eight duplicate selectors with the line each was first used at, and exits 2.
+Against the file as it is, it exits 0.
