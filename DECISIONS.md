@@ -7483,3 +7483,64 @@ The neutral tone's first paragraph also contains "den satta målet", which is
 wrong Swedish. That is the model, not the app: nothing in the pipeline corrects
 grammar, and a check that did would be editing the coach rather than checking
 it.
+
+### D156 — Where the image comes from is a variable, because this installation has used both
+
+*2026-09-13.*
+
+The 1.1.0 deploy began by reading what production actually runs, and the answer
+was not what the runbook assumed. **The deployed stack file was not the file in
+this repository.** Portainer was running a 91-line compose that hardcoded
+
+```yaml
+api:    image: vikt-api:d11c2fe
+nginx:  image: vikt-web:d11c2fe
+```
+
+while `infra/docker-compose.portainer.yml` is 213 lines and pulls
+`ghcr.io/lundstream/vikt-{api,web}:${IMAGE_TAG}`. So step 5 of the runbook —
+"set `IMAGE_TAG`, Update the stack, Re-pull image" — **could not have worked**:
+the deployed file never reads `IMAGE_TAG`, and setting it would have done
+nothing at all while the panel showed the value that had been typed. That is the
+exact failure shape D147's guard exists to prevent, one level up: the guard
+checks that the *repository's* compose forwards what the API reads, and nothing
+checked that the host was running the repository's compose.
+
+#### Two paths, one of them undocumented
+
+This installation has deployed both ways. `release.yml` builds and pushes to
+GHCR, and the runbook is written for pulling from there. But production got here
+by being **built on the workstation and `docker load`ed onto the host** (D120) —
+which is why the running images report `RepoDigests: []`, why no `v1.0` exists
+in any registry, and why the rollback plan was a sentence rather than a plan.
+
+Only the registry path was written down. The path actually used was folklore.
+
+#### A prefix, not a second file
+
+`IMAGE_REPO` defaults to `ghcr.io/lundstream/` and is set to `local/` when the
+images were built on a workstation:
+
+```yaml
+image: ${IMAGE_REPO:-ghcr.io/lundstream/}vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+```
+
+A prefix rather than a flag, and one file rather than two, because a second
+compose file for local deploys is precisely how the deployed stack came to be a
+different file from the one in the repository. The two paths now differ in one
+string and nothing else: same tag, same variables, same file, same guard.
+
+The default is the registry, so the ordinary deploy needs no new variable and
+only the unusual one has to say so.
+
+#### The guard would have passed by finding nothing
+
+`stack-variables.test.ts` asserted the image lines by matching the literal
+`ghcr.io/lundstream/vikt-`, then checking the matches. With the registry behind
+a variable that substring no longer appears, so the filter would have returned
+an empty array and every assertion over it would have held vacuously — a green
+test proving nothing, which is worse than a red one.
+
+It matches on the image *name* now, asserts the count explicitly, and has a new
+case holding that the registry is still the default. A filter feeding a loop
+needs its length asserted, or it is not a test.

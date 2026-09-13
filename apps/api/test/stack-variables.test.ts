@@ -170,12 +170,20 @@ describe("the images the stack pulls", () => {
   });
 
   /**
+   * Matched on the image *name* rather than on the registry literal, because
+   * the registry is a variable now (D156): `${IMAGE_REPO:-ghcr.io/lundstream/}`
+   * so the same file serves a registry pull and a workstation build that was
+   * loaded onto the host. The test that used to look for the literal string
+   * would have gone quietly to zero matches and passed nothing.
+   */
+  const own = images.filter((image) => /vikt-(api|web):/.test(image));
+
+  /**
    * A `latest` fallback means a redeploy pulls whatever `main` happened to be
    * when nobody was looking, and a stack that cannot say which version it runs
    * cannot be rolled back to a known one either (D148).
    */
   it("pins a version rather than latest", () => {
-    const own = images.filter((image) => image.includes("ghcr.io/lundstream/vikt-"));
     expect(own).toHaveLength(2);
 
     for (const image of own) {
@@ -185,11 +193,21 @@ describe("the images the stack pulls", () => {
     }
   });
 
+  /**
+   * The registry stays the default, so the ordinary deploy needs no variable
+   * set and only a local build has to say so.
+   */
+  it("defaults to the registry", () => {
+    for (const image of own) {
+      expect(image, `${image} lost its registry default`).toContain(
+        "${IMAGE_REPO:-ghcr.io/lundstream/}",
+      );
+    }
+  });
+
   /** Both images come from one commit and one workflow. One tag, always. */
   it("moves both images together", () => {
-    const tags = images
-      .filter((image) => image.includes("ghcr.io/lundstream/vikt-"))
-      .map((image) => image.slice(image.indexOf(":") + 1));
+    const tags = own.map((image) => image.replace(/^.*vikt-(?:api|web):/, ""));
 
     expect(new Set(tags).size).toBe(1);
   });

@@ -60,7 +60,19 @@ services:
     # whatever main happened to be when nobody was looking, and a stack that
     # cannot say which version it is running cannot be rolled back to a known
     # one either.
-    image: ghcr.io/lundstream/vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+    #
+    # `IMAGE_REPO` is where the image comes from, and it exists because this
+    # installation has deployed both ways (D120, D156). The default is the
+    # registry, which is what `release.yml` publishes to and what a normal
+    # deploy pulls. Setting it to `local/` instead means the images were built
+    # on the workstation and loaded onto the host, which is how production got
+    # here and is the fallback whenever the registry is not an option.
+    #
+    # It is a prefix rather than a flag so the two paths differ in one string
+    # and nothing else: same tag, same variables, same file. The alternative
+    # was a second compose file for local deploys, which is how the deployed
+    # stack came to be a different file from the one in the repository.
+    image: ${IMAGE_REPO:-ghcr.io/lundstream/}vikt-api:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -151,8 +163,8 @@ services:
       start_period: 30s
 
   nginx:
-    # The same tag as the API, always. See `IMAGE_TAG` above.
-    image: ghcr.io/lundstream/vikt-web:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
+    # The same tag and the same source as the API, always. See above.
+    image: ${IMAGE_REPO:-ghcr.io/lundstream/}vikt-web:${IMAGE_TAG:?set IMAGE_TAG, e.g. 1.1.0}
     restart: unless-stopped
     depends_on:
       api:
