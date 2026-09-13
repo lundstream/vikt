@@ -54,6 +54,11 @@ when it will be down, and its mail goes out.
   around the milestone sheet was a focus ring on the dialog container: focus goes
   to the first field now and the sheet's own border is gone, because a sheet is
   Skymning on a dimmed page and needs no edge.
+- **A `<select>` looks like every other control again** (D162). Four duplicate
+  `.select` blocks sat after the intended one and, being last, were the rule
+  actually in force: the wrong radius, the page colour instead of the card
+  colour, the wrong padding and size, and the dark theme's chevron drawn on the
+  light theme. `stylelint` fails the build on a duplicate selector now.
 - **The coach sees the data, not a summary of it** (D155). Intake against
   measured maintenance, each macro against the person's own target, alcohol,
   movement, steps, sleep, energy, mood, habits and measurements, all over 7 and
@@ -559,7 +564,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1764 tests**: 494 shared, 353 web, 917 api. **Nine more run in CI**, and they
+**1773 tests**: 494 shared, 353 web, 926 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -602,6 +607,18 @@ build served by `vite preview`:
   link, rendered as elements rather than as characters;
 - Administration, Förfrågningar and Backup, the latter with the share fields
   shown and the test-connection button beside Spara;
+- **A `<select>`, measured before and after the duplicates were removed**
+  (D162), on Administration, Backup, at 360 px in both themes. The rendering
+  **changed**, which is the finding: radius 6 px to 8 px, the dark surface from
+  Natt to Skymning, padding 8 px to 10 px, size 16 px to 15 px, and the light
+  theme's chevron from the dark grey `#6B7B82` to its own `#5c6b72`. Removing
+  dead duplicates changes nothing; these were live;
+- **Alcohol in the coach against a thick account** (D155 addendum), on a fixture
+  with 44 standard drinks across 12 of 28 days and 11 in the last week: all
+  three tones reached alcohol, every sentence passed the guard, and no
+  suggestion named a target the person had not set. The first fixture had no
+  meals and was re-seeded, because an empty food section leaves one fewer domain
+  competing for room in a six sentence reply and makes the answer easier;
 - **The coach on the whole picture, in all three tones** (D155), against the
   real model on the LAN: "Vad tror du om mitt upplägg, vad jag äter, hur
   viktnedgången ser ut? Något jag bör tänka på?" All three replies are in D155
@@ -802,6 +819,22 @@ Measurements, and the conditions they were taken under, are in
 by a test, so a fast path that changes without the page changing fails the
 suite.
 
+### Waiting on the owner, for the Portainer token (D158)
+
+The deploy path no longer has a step that asks for a password, which means it
+cannot run at all until there is a token. **Fredrik creates it**, because a
+token an agent generated is a token that went through a transcript.
+
+`INFRA.md`, "The Portainer token", has the steps: a standard user with access to
+the `local` environment and to the `vikt` stack, an access token on that account,
+`PORTAINER_TOKEN` exported on the workstation, then
+`node scripts/portainer.mjs check`.
+
+**Blocked on it:** moving the pre-1.1.0 rollback dump to the host (D159). It is
+verified and checksummed but still only on the workstation, under gitignored
+`scratch/rollback-dumps/`, so **do not clear `scratch/`**. INFRA.md, "The 1.1.0
+rollback dump", has the path and the remaining commands.
+
 ### Before the next CI run
 
 **MinIO comes from quay.io now**, pinned by digest like everything else (D138).
@@ -821,6 +854,9 @@ somebody had read off a log with nothing behind it.
 
 | What it holds | File | CI step |
 |---|---|---|
+| No duplicate selector in the stylesheet, because the last of equal specificity is the one in force (D162) | `.stylelintrc.json` | Lint |
+| Nothing committed asks for or carries a credential, and the Portainer helper refuses rather than prompts (§7, D158) | `apps/api/test/secrets-hygiene.test.ts` | Test |
+| Every variable the API reads reaches the api service, with the negative control derived rather than named (D147, D157) | `apps/api/test/stack-variables.test.ts` | Test |
 | Lingon belongs to the trend line and the wordmark, and nothing else gets an accent it has not earned (§5) | `apps/web/test/colour-meaning.test.ts` | Test |
 | No en or em dashes, no shouted words, no doubled spaces, in the register and in JSX (§5) | `apps/web/test/copy-style.test.ts` | Test |
 | Every class name resolves, nothing shouts through CSS, and Honung is only used where something costs (§5) | `apps/web/test/class-names.test.ts` | Test |
