@@ -23,8 +23,8 @@ import {
   reviewPlan,
   toNumber,
   toNumberOrNull,
-  weeklyMean,
   WEEKLY_WINDOW_DAYS,
+  windowMacroTotal,
   WHTR_RULE_OF_THUMB,
 } from "shared";
 import type { Db } from "../db/index.js";
@@ -112,14 +112,16 @@ function assembleMacros(input: {
     override: number | null,
   ): MacroLineDto => {
     /**
-     * Only days whose coverage cleared the threshold contribute to the mean.
-     * A day that is 40% labelled would otherwise pull the average down and be
-     * indistinguishable from a day of genuinely low intake — the same absent-
-     * is-not-zero failure as D44, arriving through the back door of an average.
+     * Every logged day contributes its **known** grams, and the mean is a floor
+     * as soon as one of them was under the gate (D55, addendum 2026-09-15).
+     *
+     * This used to drop a partial day, on the reasoning that a 40% labelled day
+     * would drag the mean down as if intake were low. It would, if the result
+     * were stated as a total; stated as "minst", it is exactly as true as the
+     * day's own "minst", and dropping it hid a week of real logging whenever the
+     * food data was thin, which for fibre is most weeks.
      */
-    const weekly = weeklyMean(
-      window.map((day) => (day[key].complete ? day[key].grams : null)),
-    );
+    const weekly = windowMacroTotal(window, key);
 
     /**
      * Days with **anything at all** on them, which is a fact about the day and
@@ -142,8 +144,11 @@ function assembleMacros(input: {
       todayCoverage: today[key].coverage,
       todayComplete: today[key].complete,
       // Below a few days an "average" is one dinner wearing a week's clothes.
-      weeklyMeanG: weekly.days >= MIN_DAYS_FOR_WEEKLY ? weekly.mean : null,
+      weeklyMeanG: weekly.days >= MIN_DAYS_FOR_WEEKLY ? weekly.meanG : null,
       weeklyDays: weekly.days,
+      weeklyComplete: weekly.complete,
+      weeklyCoverage: weekly.coverage,
+      weeklyPartialDays: weekly.partialDays,
       weeklyDaysLogged: daysLogged,
     };
   };

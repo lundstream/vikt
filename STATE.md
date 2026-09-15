@@ -59,6 +59,15 @@ when it will be down, and its mail goes out.
   actually in force: the wrong radius, the page colour instead of the card
   colour, the wrong padding and size, and the dark theme's chevron drawn on the
   light theme. `stylelint` fails the build on a duplicate selector now.
+- **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
+  Below the coverage gate a macro is the known sum after "minst", in Sten, with
+  the share of the food carrying it on the line under it: on Översikt's day card
+  in both views, on Mat's new macro line under the day's kcal, and in the coach's
+  sheet over 7 and 28 days. A week is the mean of its logged days' known grams,
+  so a partial day counts instead of hiding the week. Nothing is shown only when
+  no logged food carries the value. Exercised on the development account with a
+  partial day (two food rows added on 2026-09-15, "Kvarg med bär" and "Middag
+  hos vänner"), shot at 360 px and desktop.
 - **The coach sees the data, not a summary of it** (D155). Intake against
   measured maintenance, each macro against the person's own target, alcohol,
   movement, steps, sleep, energy, mood, habits and measurements, all over 7 and

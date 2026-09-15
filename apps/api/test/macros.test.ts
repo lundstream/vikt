@@ -240,7 +240,12 @@ describe("macro coverage", () => {
  * comparison the UI is allowed to make.
  */
 describe("the weekly average", () => {
-  it("averages complete days only, and says how many there were", async () => {
+  /**
+   * D55, addendum 2026-09-15. The half-labelled day used to be dropped so it
+   * could not drag the mean down as if intake were low. It contributes its
+   * known 20 g now, and the mean is marked as a floor instead of hidden.
+   */
+  it("averages every logged day's known grams, and marks the mean as a floor", async () => {
     const { app, db } = ctx();
     const user = await createUser(app, db);
     await withPlan(app, user, 2000);
@@ -248,13 +253,33 @@ describe("the weekly average", () => {
     for (const offset of [0, -1, -2]) {
       await logFood(app, user, { kcal: 1500, proteinG: 100, carbsG: 150, fatG: 50 }, offset);
     }
-    // A half-labelled day. It must not drag the mean down as if it were low.
     await logFood(app, user, { kcal: 900, proteinG: 20 }, -3);
     await logFood(app, user, { kcal: 900 }, -3);
 
     const macros = (await insights(app, user)).json().macros;
-    expect(macros.protein.weeklyDays).toBe(3);
+    expect(macros.protein.weeklyDays).toBe(4);
+    expect(macros.protein.weeklyMeanG).toBe((100 * 3 + 20) / 4);
+    expect(macros.protein.weeklyComplete).toBe(false);
+    expect(macros.protein.weeklyPartialDays).toBe(1);
+    expect(macros.protein.weeklyCoverage).toBeCloseTo((4500 + 900) / (4500 + 1800), 3);
+  });
+
+  it("is a plain mean when every day was complete, and absent where no food carries it", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await withPlan(app, user, 2000);
+
+    for (const offset of [0, -1, -2]) {
+      await logFood(app, user, { kcal: 1500, proteinG: 100, carbsG: 150, fatG: 50 }, offset);
+    }
+
+    const macros = (await insights(app, user)).json().macros;
     expect(macros.protein.weeklyMeanG).toBe(100);
+    expect(macros.protein.weeklyComplete).toBe(true);
+    expect(macros.protein.weeklyCoverage).toBe(1);
+    // Three logged days, and not one entry carrying fibre: nothing to state.
+    expect(macros.fiber.weeklyMeanG).toBeNull();
+    expect(macros.fiber.weeklyDaysLogged).toBe(3);
   });
 
   it("has no average from one day, which is not a week", async () => {

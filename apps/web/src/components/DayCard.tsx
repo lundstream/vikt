@@ -91,7 +91,7 @@ export function DayCard({
         </>
       )}
 
-      {macros ? <Macros macros={macros} /> : null}
+      {macros ? <Macros macros={macros} dayLogged={!nothingLogged} /> : null}
     </section>
   );
 }
@@ -114,7 +114,7 @@ const MACRO_KEYS = ["protein", "carbs", "fat", "fiber"] as const;
  */
 type MacroView = "today" | "week";
 
-function Macros({ macros }: { macros: MacroTargetsDto }) {
+function Macros({ macros, dayLogged }: { macros: MacroTargetsDto; dayLogged: boolean }) {
   /**
    * Coverage is per macro, because a food can carry protein and not fibre. In
    * practice a source usually carries all four or none, so all four rows end up
@@ -188,6 +188,7 @@ function Macros({ macros }: { macros: MacroTargetsDto }) {
             line={macros[key]}
             view={view}
             showCoverage={sharedCoverage === null}
+            dayLogged={dayLogged}
           />
         ))}
       </ul>
@@ -273,12 +274,15 @@ function MacroRow({
   line,
   view,
   showCoverage,
+  dayLogged,
 }: {
   name: (typeof MACRO_KEYS)[number];
   line: MacroLineDto;
   view: MacroView;
   /** False when the group says it once above, for all four at the same figure. */
   showCoverage: boolean;
+  /** Anything at all logged today, so an absent figure can say which absence. */
+  dayLogged: boolean;
 }) {
   const label = t(`macro.${name}` as TranslationKey);
 
@@ -287,53 +291,64 @@ function MacroRow({
   const filled = amount === null ? null : amount / line.targetG;
 
   /**
-   * Below the coverage gate a total is a floor rather than a figure (D55), so
-   * the day says "minst". The weekly mean is built only from days that cleared
-   * the gate, so it never needs the hedge.
+   * Below the coverage gate a total is a floor rather than a figure (D55), in
+   * both views, and drawn in Sten. Today when the day's own coverage is under
+   * the gate; over the week when any day in the mean was, because the mean is
+   * built from each day's known grams and a floor averaged in is still a floor
+   * (D55, addendum 2026-09-15).
    */
-  const partialToday = view === "today" && line.todayG !== null && !line.todayComplete;
+  const partial =
+    amount !== null && (view === "today" ? !line.todayComplete : !line.weeklyComplete);
 
   const heading =
     amount === null
       ? t("stat.notYet")
-      : partialToday
+      : partial
         ? t("macro.atLeastOfTarget", { amount: grams(amount), target: grams(line.targetG) })
         : t("macro.gramsOfTarget", { amount: grams(amount), target: grams(line.targetG) });
 
   /**
-   * When a mean is withheld, say which of the two reasons it is (D122).
+   * When a figure is withheld, say which reason it is (D122).
    *
    * "Inte än" on its own was reported against fibre, next to three macros that
-   * rendered fine — a reader cannot tell from that whether they have logged
-   * nothing, or whether what they logged does not carry the figure. They are
-   * different situations with different things to do about them, and fibre is
-   * where the second one lives: crowdsourced food data omits fibre far more
-   * often than protein, so the same week can withhold one and show three.
+   * rendered fine, and a reader cannot tell from that whether they have logged
+   * nothing or whether what they logged does not carry the figure. The same
+   * line applies to all four macros, because a rule that only fires for the
+   * macro that prompted it is a rule nobody remembers when the next one goes
+   * quiet.
    *
-   * The same line applies to all four rather than to fibre alone. A rule that
-   * only fires for the macro that prompted it is a rule nobody remembers when
-   * the next one goes quiet.
+   * "Too few complete days" is no longer a reason: a partial day contributes
+   * its known grams now. What is left is nothing logged, too few days logged
+   * for a week to mean anything, and logged food that carries none of it.
    */
-  const weeklyReason =
-    view === "week" && line.weeklyMeanG === null
-      ? line.weeklyDaysLogged === 0
-        ? t("macro.noDaysLogged")
-        : t("macro.tooFewComplete", {
-            name: label.toLowerCase(),
-            days: line.weeklyDays,
-            logged: line.weeklyDaysLogged,
-            needed: MIN_DAYS_FOR_WEEKLY,
-          })
-      : null;
+  const withheldReason =
+    amount !== null
+      ? null
+      : view === "week"
+        ? line.weeklyDaysLogged === 0
+          ? t("macro.noDaysLogged")
+          : line.weeklyDaysLogged < MIN_DAYS_FOR_WEEKLY
+            ? t("macro.fewDaysLogged", {
+                logged: line.weeklyDaysLogged,
+                needed: MIN_DAYS_FOR_WEEKLY,
+              })
+            : t("macro.noFoodCarriesWeek", { name: label.toLowerCase() })
+        : dayLogged
+          ? t("macro.noFoodCarriesToday", { name: label.toLowerCase() })
+          : null;
 
   const footnote =
-    view === "week"
-      ? line.weeklyMeanG === null
-        ? weeklyReason
+    withheldReason ??
+    (view === "week"
+      ? partial
+        ? t("macro.partialWeek", {
+            days: line.weeklyDays,
+            percent: Math.round(line.weeklyCoverage * 100),
+          })
         : t("macro.overDays", { days: line.weeklyDays })
-      : showCoverage && partialToday
+      : showCoverage && partial
         ? t("macro.partial", { percent: Math.round(line.todayCoverage * 100) })
-        : null;
+        : null);
 
   return (
     <li>
@@ -345,7 +360,12 @@ function MacroRow({
           ) : null}
         </span>
 
-        <span className="num shrink-0 text-note text-muted">{heading}</span>
+        <span
+          data-testid={`macro-${name}-figure`}
+          className={`num shrink-0 text-note ${partial ? "figure-partial" : "text-muted"}`}
+        >
+          {heading}
+        </span>
       </div>
 
       {/*

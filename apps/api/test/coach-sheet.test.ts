@@ -166,6 +166,139 @@ async function busyAccount(db: Db, user: TestUser): Promise<void> {
   );
 }
 
+/**
+ * A plan and seven days of food, and nothing else, so the macro block is the
+ * only thing that varies (D55, addendum 2026-09-15).
+ *
+ * `partial` adds a dinner as large as the breakfast that carries no macros, so
+ * every day is half covered. `food: false` logs manual intake only, which
+ * carries no macros at all.
+ */
+async function macroAccount(
+  db: Db,
+  user: TestUser,
+  { partial, food }: { partial: boolean; food: boolean },
+): Promise<void> {
+  const userId = user.userId;
+  const day = (back: number) => localDate(-back);
+  const week = [...Array(7).keys()];
+
+  await db.insert(plans).values({
+    userId,
+    name: "Test",
+    startDate: day(27),
+    goalWeightKg: "85.00",
+    targetIntakeKcal: 2000,
+    intakeFloorKcal: 1500,
+    targetRateKgWeek: "0.40",
+    startWeightKg: "90.00",
+    tdeeAtWrite: "2400.00",
+    tdeeSourceAtWrite: "formula",
+  });
+
+  if (!food) {
+    await db.insert(manualIntake).values(
+      week.map((back) => ({ userId, clientUuid: randomUUID(), localDate: day(back), kcal: 1800 })),
+    );
+    return;
+  }
+
+  const [item] = await db
+    .insert(foodItems)
+    .values({
+      source: "manual",
+      name: "Kvarg",
+      kcalPer100: "100.00",
+      proteinPer100: "6.00",
+      carbsPer100: "12.00",
+      fatPer100: "3.00",
+      fiberPer100: "1.20",
+      createdBy: userId,
+    })
+    .returning({ id: foodItems.id });
+
+  await db.insert(foodEntries).values(
+    week.flatMap((back) => [
+      {
+        userId,
+        clientUuid: randomUUID(),
+        localDate: day(back),
+        mealSlot: "breakfast" as const,
+        foodItemId: item!.id,
+        grams: "500.0",
+        kcal: "500.0",
+        proteinG: "30.0",
+        carbsG: "60.0",
+        fatG: "15.0",
+        fiberG: "6.0",
+        confirmed: true,
+      },
+      ...(partial
+        ? [
+            {
+              userId,
+              clientUuid: randomUUID(),
+              localDate: day(back),
+              mealSlot: "dinner" as const,
+              foodItemId: item!.id,
+              grams: "500.0",
+              kcal: "500.0",
+              proteinG: null,
+              carbsG: null,
+              fatG: null,
+              fiberG: null,
+              confirmed: true,
+            },
+          ]
+        : []),
+    ]),
+  );
+}
+
+function macroBlock(facts: CoachFacts): string {
+  return facts.text.slice(facts.text.indexOf("MAKRON MOT DINA EGNA MÅL"), facts.text.indexOf("ALKOHOL"));
+}
+
+describe("macro sums in the sheet (D55, addendum 2026-09-15)", () => {
+  it("states a complete week as a plain snitt", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await macroAccount(db, user, { partial: false, food: true });
+
+    const block = macroBlock(await buildCoachFacts(user.userId, db, env, localDate()));
+    const protein = block.split("\n").find((line) => line.startsWith("Protein:"))!;
+
+    expect(protein).toContain("7 dagar: snitt 30 g från 7 loggade dagar");
+    expect(protein).not.toContain("minst");
+  });
+
+  it("says minst and the share of the energy that carries it for a partial week", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await macroAccount(db, user, { partial: true, food: true });
+
+    const block = macroBlock(await buildCoachFacts(user.userId, db, env, localDate()));
+    const protein = block.split("\n").find((line) => line.startsWith("Protein:"))!;
+
+    expect(protein).toContain("7 dagar: snitt minst 30 g från 7 loggade dagar");
+    expect(protein).toContain("varav 7 med ofullständiga uppgifter");
+    expect(protein).toContain("50 procent av energin har uppgift om protein");
+    // No complete day, so nothing is claimed about being under the target.
+    expect(protein).not.toContain("under målet");
+  });
+
+  it("says there is nothing only when no logged food carries the macro", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await macroAccount(db, user, { partial: false, food: false });
+
+    const block = macroBlock(await buildCoachFacts(user.userId, db, env, localDate()));
+
+    expect(block).toContain("Ingen loggad mat har uppgift om protein, så det finns inget snitt.");
+    expect(block).not.toContain("snitt minst");
+  });
+});
+
 describe("the sheet the coach is given", () => {
   it("covers every domain the question can be about", async () => {
     const { app, db } = ctx();

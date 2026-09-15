@@ -1027,6 +1027,50 @@ The gate lives in `calc/macros.ts` as `MACRO_COVERAGE_THRESHOLD`, next to the
 function that applies it, so the bar the browser draws and the figure the server
 sends cannot disagree about what "complete" means.
 
+#### Addendum, 2026-09-15: every span says "minst", and a partial day is no longer dropped
+
+**The rule, at every span.** Below the gate a macro figure is the **sum of what
+is known**, preceded by "minst", drawn in Sten (`.figure-partial`), with the
+share of the energy that carries it on the info line beneath. Nothing is shown
+**only when no logged food carries the value**. The spans are the day (Översikt's
+day card, and Mat, which now shows the day's macros under its kcal total), the
+seven-day mean (Översikt), and seven and twenty-eight days (the coach's sheet).
+
+**A window's figure is built from its days' known values.** The mean, over the
+days with anything logged, of each day's known grams, and "minst" as soon as any
+of those days was under the gate. This reverses the last sentence of the third
+paragraph above, which **excluded** a partial day from the seven-day mean.
+
+That exclusion was written against a real hazard: a 40% labelled day pulls an
+average down, and stated as a total it reads as low intake. But the fix it chose
+hid the week instead. On crowdsourced data a week of honest logging could clear
+the gate on fewer than three days for fibre and show nothing at all (D122 is the
+report of exactly that), while every one of those days had a known floor worth
+stating. Stated as "minst", the averaged-in partial day is as true as the day's
+own "minst": the figure is never above what was eaten, and never hidden when
+something is known.
+
+- A logged day on which **no** food carried the macro contributes zero known
+  grams and counts as partial, which is still a correct floor. The window is
+  absent only when no logged food in it carried the macro, or nothing was
+  logged.
+- The weekly figure still needs three logged days (`MIN_DAYS_FOR_WEEKLY`),
+  which is NNR's "a week" and not this gate.
+- D122's reason "too few days with complete data" is retired. Three remain:
+  nothing logged, fewer than three days logged, and logged food that carries
+  none of it.
+- In the coach's sheet: "snitt minst X g från N loggade dagar, varav K med
+  ofullständiga uppgifter (P procent av energin har uppgift om …)", and "under
+  målet" is counted **over complete days only**, because a partial day under the
+  target may not be under it.
+- The gate itself is unchanged: 0.9, per macro, weighted by energy.
+
+One function does the window, `windowMacroTotal` in `calc/macros.ts`, used by
+the insights service and the coach's sheet; `dayMacros` does the day for the
+dashboard, the sheet and Mat. Tested for complete, partial and absent at each
+level: the shared calc, the insights API, the D122 reason test, the coach sheet,
+and a render test of the day card in both views and of Mat's line.
+
 ---
 
 ### D56 — Edit and delete ship with the create, and the audit that came with the rule

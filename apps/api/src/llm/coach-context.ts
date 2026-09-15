@@ -5,6 +5,7 @@ import {
   computeMeasurementSeries,
   currentStreak,
   dayMacros,
+  windowMacroTotal,
   eachDay,
   formatDecimal,
   MEASUREMENT_SITES,
@@ -355,6 +356,10 @@ export async function buildCoachFacts(
 
   say("");
   say("MAKRON MOT DINA EGNA MÅL");
+  say(
+    "Ett snitt som står som minst bygger på mat där uppgiften saknas för en del av energin, " +
+      "så det verkliga snittet är minst så högt.",
+  );
 
   const macroNames = {
     protein: "Protein",
@@ -380,35 +385,45 @@ export async function buildCoachFacts(
       const perWindow: string[] = [];
       let tracked = false;
 
+      /**
+       * The same rule as the dashboard (D55, addendum 2026-09-15): every logged
+       * day contributes its known grams, and the snitt says "minst" as soon as
+       * one of them was under the gate. Until then this dropped partial days,
+       * which on thin food data left the coach with "no average" for a week of
+       * real logging.
+       */
       for (const window of WINDOWS) {
-        const grams = windowDays(window)
-          .map((day) => dayMacros(macroDays.get(day) ?? []))
-          .filter((day) => day.kcal !== null)
-          .map((day) => day[key])
-          .filter((entry) => entry.complete)
-          .map((entry) => entry.grams)
-          // `complete` says the day's coverage cleared the threshold, not that
-          // the figure is present; an absent one is not a day of zero grams.
-          .filter((grams): grams is number => grams !== null);
-
-        if (grams.length === 0) continue;
+        const dayTotals = windowDays(window).map((day) => dayMacros(macroDays.get(day) ?? []));
+        const total = windowMacroTotal(dayTotals, key);
+        if (total.meanG === null) continue;
         tracked = true;
 
-        const average = mean(grams)!;
-        const under = grams.filter((value) => value < target).length;
-        perWindow.push(
-          `${num(window, "count")} dagar: snitt ${num(average, "grams")} g från ` +
-            `${num(grams.length, "count")} ${dayWord(grams.length)}, ` +
-            `${num(under, "count")} av dem under målet`,
-        );
+        // Under the target is only known for a complete day. A partial day
+        // under it may not be, so it is not counted either way.
+        const completeDays = dayTotals.filter((day) => day.kcal !== null && day[key].complete);
+        const under = completeDays.filter((day) => (day[key].grams ?? 0) < target).length;
+
+        let sentence =
+          `${num(window, "count")} dagar: snitt ${total.complete ? "" : "minst "}` +
+          `${num(total.meanG, "grams")} g från ${num(total.days, "count")} loggade ${dayWord(total.days)}`;
+        if (!total.complete) {
+          sentence +=
+            `, varav ${num(total.partialDays, "count")} med ofullständiga uppgifter ` +
+            `(${num(total.coverage * 100, "percent")} procent av energin har uppgift om ` +
+            `${macroNames[key].toLowerCase()})`;
+        }
+        if (completeDays.length > 0) {
+          sentence += total.complete
+            ? `, ${num(under, "count")} av dem under målet`
+            : `, ${num(under, "count")} av de fullständiga dagarna under målet`;
+        }
+        perWindow.push(sentence);
       }
 
       if (!tracked) {
         say(
           `${macroNames[key]}: mål ${num(target, "grams")} g per dag (${source}). ` +
-            (key === "fiber"
-              ? "Fiber är inte ifyllt på någon loggad dag, så det finns inget att jämföra."
-              : "Inga loggade dagar har fullständiga uppgifter, så det finns inget snitt."),
+            `Ingen loggad mat har uppgift om ${macroNames[key].toLowerCase()}, så det finns inget snitt.`,
         );
         continue;
       }

@@ -1050,6 +1050,10 @@ export const sv = {
   "food.dayTotal": "{kcal} kcal {day}",
   // Absent is not zero. An empty day says so rather than claiming 0 kcal.
   "food.dayNothingYet": "Inget loggat {day} än",
+  "food.macroFigure": "{name} {amount} g",
+  "food.macroAtLeast": "{name} minst {amount} g",
+  "food.macroPartial": "{percent} % av maten {day} har uppgifter",
+  "food.macroPartialEach": "{list} av maten {day} har uppgifter",
   "food.dayLoading": "Läser in dagen",
   "food.dayThis": "den dagen",
   // ------------------------------------------------ the optional LLM layer
@@ -1325,8 +1329,10 @@ export const sv = {
   "macro.viewToday": "I dag",
   "macro.viewWeek": "7 dagar",
   "macro.noDaysLogged": "Inget loggat den här veckan.",
-  "macro.tooFewComplete":
-    "För få dagar med {name}uppgifter: {days} av {logged} loggade dagar har fullständiga uppgifter, det behövs {needed}.",
+  "macro.fewDaysLogged": "{logged} av {needed} dagar loggade den här veckan.",
+  "macro.noFoodCarriesWeek": "Ingen mat du loggat den här veckan har uppgift om {name}.",
+  "macro.noFoodCarriesToday": "Ingen mat du loggat i dag har uppgift om {name}.",
+  "macro.partialWeek": "snitt över {days} dagar, {percent} % av maten har uppgifter",
   "macro.overDays": "snitt över {days} dagar",
   "macro.weekIsTheVerdict":
     "Sjudagarssnittet är det som jämförs med rekommendationen, eftersom värdena gäller genomsnittet över minst en vecka.",

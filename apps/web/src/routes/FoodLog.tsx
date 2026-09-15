@@ -3,7 +3,8 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import type { FoodEntry, FoodItem, MealTemplate } from "shared";
 import {
   allPortionUnits,
-  resolveDefaultAmount, MIN_SEARCH_LENGTH, formatDecimal, formatKcal, sumOrNull } from "shared";
+  resolveDefaultAmount, MIN_SEARCH_LENGTH, formatDecimal, formatKcal, sumOrNull, dayMacros } from "shared";
+import { DayMacroLine } from "../components/DayMacroLine.js";
 import { useMe } from "../lib/session.js";
 import {
   useDeletePortion,
@@ -276,6 +277,26 @@ export function FoodLog() {
     [todayEntries.data],
   );
 
+  /**
+   * The day's macros, by the function the dashboard uses (D55, addendum
+   * 2026-09-15), so Mat and Översikt cannot disagree about the same day.
+   */
+  const dayMacroTotals = useMemo(
+    () =>
+      todayEntries.data === undefined || todayEntries.data.length === 0
+        ? null
+        : dayMacros(
+            todayEntries.data.map((entry) => ({
+              kcal: entry.kcal,
+              proteinG: entry.proteinG,
+              carbsG: entry.carbsG,
+              fatG: entry.fatG,
+              fiberG: entry.fiberG,
+            })),
+          ),
+    [todayEntries.data],
+  );
+
   if (me.isPending) return null;
   if (!me.data) return <Navigate to="/login" replace />;
 
@@ -481,6 +502,7 @@ export function FoodLog() {
                   ? t("food.dayNothingYet", { day: dayWord })
                   : t("food.dayTotal", { kcal: formatKcal(dayTotal), day: dayWord })}
             </p>
+            {dayMacroTotals ? <DayMacroLine day={dayMacroTotals} dayWord={dayWord} /> : null}
           </div>
           <Link className="text-note text-muted underline underline-offset-4" to="/">
             {t("profile.back")}

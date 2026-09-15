@@ -11,6 +11,7 @@ import {
   proteinTarget,
   PROTEIN_G_PER_KG,
   weeklyMean,
+  windowMacroTotal,
   type MacroEntry,
 } from "./macros.js";
 
@@ -195,6 +196,60 @@ describe("macro coverage", () => {
   it("sums only the entries that carry the macro", () => {
     const day = dayMacros([entry(400, { carbsG: 50 }), entry(100, { carbsG: 10 }), entry(20)]);
     expect(day.carbs.grams).toBe(60);
+  });
+});
+
+/**
+ * A window's figure is the mean of its days' known grams, and says "minst" as
+ * soon as one of them was under the gate (D55, addendum 2026-09-15).
+ */
+describe("a macro over a window of days", () => {
+  const complete = dayMacros([entry(1000, { proteinG: 60 }), entry(1000, { proteinG: 40 })]);
+
+  it("is a plain mean when every logged day cleared the gate", () => {
+    const total = windowMacroTotal([complete, complete, dayMacros([])], "protein");
+
+    expect(total.meanG).toBe(100);
+    expect(total.days).toBe(2);
+    expect(total.partialDays).toBe(0);
+    expect(total.coverage).toBe(1);
+    expect(total.complete).toBe(true);
+  });
+
+  it("includes a partial day's known grams and marks the mean as a floor", () => {
+    // 20 g known from half of a 1800 kcal day.
+    const partial = dayMacros([entry(900, { proteinG: 20 }), entry(900)]);
+    const total = windowMacroTotal([complete, complete, complete, partial], "protein");
+
+    expect(total.meanG).toBe((100 * 3 + 20) / 4);
+    expect(total.days).toBe(4);
+    expect(total.partialDays).toBe(1);
+    expect(total.coverage).toBeCloseTo((6000 + 900) / (6000 + 1800), 6);
+    expect(total.complete).toBe(false);
+  });
+
+  it("counts a logged day that carries none of the macro as zero known grams, and partial", () => {
+    const none = dayMacros([entry(800)]);
+    const total = windowMacroTotal([complete, none], "protein");
+
+    expect(total.meanG).toBe(50);
+    expect(total.partialDays).toBe(1);
+    expect(total.complete).toBe(false);
+  });
+
+  it("is absent only when no logged food in the window carries the macro", () => {
+    const total = windowMacroTotal([complete, complete], "fiber");
+
+    expect(total.meanG).toBeNull();
+    expect(total.days).toBe(2);
+    expect(total.coverage).toBe(0);
+    expect(total.complete).toBe(false);
+  });
+
+  it("is absent, with no days, when nothing was logged", () => {
+    const total = windowMacroTotal([dayMacros([]), dayMacros([])], "protein");
+
+    expect(total).toEqual({ meanG: null, days: 0, partialDays: 0, coverage: 0, complete: false });
   });
 });
 

@@ -158,12 +158,38 @@ describe("a withheld macro mean", () => {
       expect(lines[key].weeklyMeanG, `${key} should have a mean`).not.toBeNull();
     }
 
-    // Fibre does not, and the pair of counts says why: days were logged, and
-    // none of them cleared the gate.
+    // Fibre does not, and the counts say why: days were logged, and no food in
+    // any of them carries fibre (D55, addendum 2026-09-15: a partial day now
+    // contributes, so this is the only way days can be logged and no mean shown).
     expect(lines.fiber.weeklyMeanG).toBeNull();
-    expect(lines.fiber.weeklyDays).toBe(0);
+    expect(lines.fiber.weeklyComplete).toBe(false);
     expect(lines.fiber.weeklyDaysLogged, "days were logged, fibre just was not in them")
-      .toBeGreaterThan(0);
+      .toBe(5);
+  });
+
+  /**
+   * The case the old gate hid: some days carry fibre and some do not. The mean
+   * is there, built from the known grams, and it is marked as a floor.
+   */
+  it("shows a floor, not nothing, when only some days carry fibre", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await withPlan(app, user);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const complete = await makeItem(db, user, COMPLETE);
+    const noFibre = await makeItem(db, user, NO_FIBRE);
+    for (let back = 0; back < 5; back += 1) {
+      await logDay(app, user, addDays(today, -back), back < 2 ? complete : noFibre);
+    }
+
+    const lines = await macros(app, user);
+    // 200 g at 5 g per 100 g is 10 g on each of two days, over five logged days.
+    expect(lines.fiber.weeklyMeanG).toBeCloseTo(4, 6);
+    expect(lines.fiber.weeklyComplete).toBe(false);
+    expect(lines.fiber.weeklyPartialDays).toBe(3);
+    expect(lines.fiber.weeklyCoverage).toBeCloseTo(0.4, 6);
+    expect(lines.protein.weeklyComplete).toBe(true);
   });
 
   /** The other reason, which must not be reported as the first one. */
@@ -200,5 +226,6 @@ describe("a withheld macro mean", () => {
     expect(lines.fiber.weeklyMeanG).not.toBeNull();
     expect(lines.fiber.weeklyDays).toBeGreaterThanOrEqual(3);
     expect(lines.fiber.weeklyDaysLogged).toBe(lines.fiber.weeklyDays);
+    expect(lines.fiber.weeklyComplete).toBe(true);
   });
 });

@@ -101,10 +101,21 @@ const macroLineSchema = z.object({
   /**
    * The seven-day mean, which is what NNR's values actually refer to, and the
    * only figure compared against `targetG`.
+   *
+   * Built from each logged day's **known** grams (D55, addendum 2026-09-15),
+   * so a day under the coverage gate contributes what is known instead of
+   * being dropped. Null when fewer than `MIN_DAYS_FOR_WEEKLY` days were logged,
+   * or when no logged food this week carries the macro.
    */
   weeklyMeanG: z.number().nullable(),
-  /** How many of the last seven days contributed to that mean. */
+  /** How many of the last seven days contributed to that mean: the logged ones. */
   weeklyDays: z.number().int().min(0).max(7),
+  /** Every contributing day cleared the gate. False means the mean says "minst". */
+  weeklyComplete: z.boolean(),
+  /** 0-1 of the week's logged energy that carried this macro. */
+  weeklyCoverage: z.number().min(0).max(1),
+  /** Contributing days whose own coverage was under the gate. */
+  weeklyPartialDays: z.number().int().min(0).max(7),
   /**
    * How many of the last seven days had **anything** logged, whether or not
    * this macro's coverage cleared the threshold (D122).

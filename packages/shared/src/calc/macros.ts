@@ -250,6 +250,73 @@ export function dayMacros(entries: readonly MacroEntry[]): DayMacros {
   };
 }
 
+/* ------------------------------------------------- over several days */
+
+export type MacroName = "protein" | "carbs" | "fat" | "fiber";
+
+/**
+ * One macro over a window of days: seven on the dashboard, seven and
+ * twenty-eight in the coach's sheet (D55, addendum 2026-09-15).
+ */
+export type WindowMacroTotal = {
+  /**
+   * The mean, over the days with anything logged, of each day's **known**
+   * grams. Null only when no logged food in the window carries the macro at
+   * all, or when nothing was logged.
+   */
+  meanG: number | null;
+  /** Days with anything logged: the denominator. An unlogged day is absent. */
+  days: number;
+  /** Of those, the days whose own coverage was under the gate. */
+  partialDays: number;
+  /** 0-1 of the window's logged energy that carried this macro. */
+  coverage: number;
+  /** Every logged day cleared the gate. False makes `meanG` a floor: "minst". */
+  complete: boolean;
+};
+
+/**
+ * A window's figure is built from its days' known values, and is a floor as
+ * soon as any of those days was.
+ *
+ * Until 2026-09-15 a day under the gate was **left out** of the mean, which
+ * meant a week of honest logging from crowdsourced data could show nothing at
+ * all for fibre, while every day of it had a known lower bound worth stating.
+ * Summing what is known and saying "minst" is true in both directions: the
+ * figure is never higher than what was eaten, and never hidden when something
+ * is known.
+ *
+ * A logged day on which no food carried the macro contributes zero grams to
+ * that sum and counts as partial, which is still a correct floor. Only when
+ * *no* logged food in the whole window carried it is there nothing to say.
+ */
+export function windowMacroTotal(days: readonly DayMacros[], key: MacroName): WindowMacroTotal {
+  const logged = days.filter((day) => day.kcal !== null);
+  const carried = logged.some((day) => day[key].grams !== null);
+
+  if (logged.length === 0 || !carried) {
+    return { meanG: null, days: logged.length, partialDays: logged.length, coverage: 0, complete: false };
+  }
+
+  const energy = logged.reduce((sum, day) => sum + Math.max(0, day.kcal ?? 0), 0);
+  const covered = logged.reduce(
+    (sum, day) => sum + day[key].coverage * Math.max(0, day.kcal ?? 0),
+    0,
+  );
+  // As in `total`: an all-zero-kcal window cannot be weighted by energy.
+  const coverage =
+    energy > 0 ? covered / energy : logged.reduce((sum, day) => sum + day[key].coverage, 0) / logged.length;
+  const partialDays = logged.filter((day) => !day[key].complete).length;
+
+  return {
+    meanG: logged.reduce((sum, day) => sum + (day[key].grams ?? 0), 0) / logged.length,
+    days: logged.length,
+    partialDays,
+    coverage,
+    complete: partialDays === 0,
+  };
+}
+
 /**
  * The seven-day mean of a daily series, which is what NNR's values compare
  * against.
