@@ -53,6 +53,35 @@ describe("the prompt", () => {
     }
   });
 
+  /**
+   * The two interpretation rules travel with the rest, in every tone (D155,
+   * addendum 2026-09-15).
+   *
+   * "Om", not "hur", carries both of its examples, because the forbidden one is
+   * the sentence a live run produced and the allowed one is the shape to reach
+   * for instead. The meaning rule carries the markers for general knowledge, the
+   * order for thin data, the two limits it does not loosen, and macros.
+   */
+  it("carries the om-not-hur rule and the meaning rule in every tone", () => {
+    const rules = [
+      /titta på om något syns, aldrig på hur en sak påverkar en annan/,
+      /titta på om energin ser annorlunda ut/,
+      /om du vill se hur det påverkar din energi" går inte/,
+      /vad det betyder för personens mål/,
+      /"i regel" eller "för de flesta", och utan egna siffror/,
+      /tunt för ett område säger du det först/,
+      /bara underlagets egna, och förslagen är fortfarande högst två/,
+      /För makron säger du om de spelar roll för målet och varför/,
+    ];
+
+    for (const rule of rules) {
+      expect(COACH_RULES).toMatch(rule);
+      for (const tone of COACH_TONES) {
+        expect(buildCoachPrompt(tone, "x"), `${tone}: ${rule}`).toMatch(rule);
+      }
+    }
+  });
+
   /** The fact sheet exists to answer the false claim a live run produced. */
   it("says that no day is invalid, which is what the model got wrong", () => {
     expect(APP_FACTS).toMatch(/Ingen dag är ogiltig/);

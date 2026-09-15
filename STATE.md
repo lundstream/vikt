@@ -68,6 +68,15 @@ when it will be down, and its mail goes out.
   no logged food carries the value. Exercised on the development account with a
   partial day (two food rows added on 2026-09-15, "Kvarg med bär" and "Middag
   hos vänner"), shot at 360 px and desktop.
+- **The coach has two rules about what it may mean** (D155, addendum
+  2026-09-16): invite looking at whether something shows, never at how one thing
+  affects another, and say in one sentence what each area means for the goal,
+  marked as general when it is general. Run live in all three tones on the
+  development account and the alcohol fixture, replies recorded verbatim. **The
+  "se hur det påverkar" sentence did not return. The macro sentence the rule asks
+  for appeared in one reply of six**, and two replies on the fixture made an
+  unmarked general claim that alcohol "kan påverka" something. Recorded, not
+  tuned; still no words-level causal check.
 - **Samband puts intake against trend change one week at a time** (D166). One
   point per whole Monday-to-Sunday week with six logged days, the trend change
   shifted by its lag and stated per week, nothing until four whole weeks ("Inte

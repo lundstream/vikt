@@ -7629,6 +7629,123 @@ the fix is the one the instruction rule already has — a words-level check for
 "påverkar", "beror på", "leder till" and their neighbours, tested in both
 directions so that stating two facts side by side still passes.
 
+#### Addendum, 2026-09-16: "om", not "hur", and what each area means
+
+Two lines added to `COACH_RULES`, tone independent, so every profile carries
+them verbatim, and `coach-tones.test.ts` asserts both reach all three tones.
+
+1. **"Om", not "hur".** The coach invites looking at *whether* something shows,
+   never at *how* one thing affects another, unless the sheet shows that
+   Samband computed it, and Samband computes nothing (D34, D166). The rule
+   carries two examples: the allowed shape, "om du vill kan du titta på om
+   energin ser annorlunda ut de veckor du dricker mindre", and Peppig's sentence
+   from the addendum above as the forbidden one.
+2. **What each area means for the goal, in one sentence.** General knowledge
+   about food, movement and sleep is allowed for that sentence, marked as
+   general ("i regel", "för de flesta") and carrying no figure of its own. Thin
+   data is named as thin first. Figures are still only the sheet's, and options
+   are still at most two. For macros the reply says whether they matter for the
+   goal and why.
+
+**No words-level causal check was added.** The rule has prompt text and two
+examples, and nothing mechanical behind it. That is the position this entry took
+on 2026-09-13 and it has not changed: a guard written against one sentence is a
+guard against that sentence.
+
+The same question as above, verbatim, in all three tones, on 2026-09-16 against
+data as of 2026-09-15, through `coach-probe.ts`. Replies are copied from the
+probe's output, not retyped.
+
+> Vad tror du om mitt upplägg, vad jag äter, hur viktnedgången ser ut? Något jag
+> bör tänka på?
+
+#### The development account
+
+**Torr** (qwen3.6:27b, 16.8 s, 7 sentences, all passed the guard):
+
+> Trendvikten har gått ner 1,0 kg på 28 dagar, vilket ligger nära den planerade takten. Målen för protein, kolhydrater och fett är inte ifyllda än, eftersom en stor del av energin saknar uppgifter om makron. Rörelsen är inte ifylld de senaste sju dagarna, men stegen har legat på 9 640 i snitt under månaden. Sömnen ligger på 7,4 timmar och humöret på 3,9 av 5, båda från 13 dagar. För de flesta hjälper regelbunden loggning att hålla koll på intaget, och protein spelar ofta roll för att behålla muskler när vikten minskar. Du kan fylla i mer mat om du vill få en tydligare bild av makrona. Ett alternativ är att notera rörelse de dagar du rör på dig.
+
+**Peppig** (qwen3.6:27b, 4.3 s, 6 sentences, all passed the guard):
+
+> Trendvikten har gått ner 1,0 kg på 28 dagar, vilket ligger nära den planerade takten. Intaget är inte ifyllt för de flesta av de senaste dagarna, och det betyder att underhållsnivån ännu inte kan räknas fram. Rörelsen är inte loggad denna vecka, men över månaden har du 5 pass och snittar cirka 9640 steg på dagarna då det finns data. I regel hjälper regelbunden rörelse de flesta att behålla muskelmassa när vikten minskar. Sömnen ligger på ett snitt på 7,4 timmar, vilket i regel gynnar återhämtningen för de flesta. Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre alkohol, eller om det finns mönster mellan intag och trendförändring under fliken Samband.
+
+**Saklig** (qwen3.6:27b, 5.0 s, 8 sentences, all passed the guard):
+
+> Trendvikten har minskat med 1,0 kg under de senaste 28 dagarna, vilket motsvarar den planerade takten. Viktloggen innehåller 12 av 28 dagar, medan matintaget är registrerat på 19 dagar, varav många uppgifter saknar fullständig makroinformation.
+>
+> Under veckan har endast tre dagar loggats för mat, och rörelse samt stegantal är inte ifyllda ännu. De senaste måltiderna inkluderar havregrynsgröt, filmjölk, kvarg med bär samt måltider hos anhöriga och vänner. Alkoholintaget är lågt med två standardglas på en månad, och sömnen ligger i snitt på 7,4 timmar när den är registrerad.
+>
+> Det saknas idag underhållsnivå eftersom det krävs fler dagar med både vikt- och matloggning för att appen ska kunna beräkna den. I regel hjälper en stabil kostvanan och regelbunden rörelse de flesta att behålla muskelmassa när vikten minskar. Om du vill kan du komplettera veckans loggning eller titta på om energin ser annorliden ut de dagar du rör dig mer.
+
+#### The alcohol fixture
+
+**Torr** (qwen3.6:27b, 5.1 s, 9 sentences, all passed the guard):
+
+> Trendvikten har minskat 0,6 kg under de senaste fyra veckorna. Matloggningen täcker alla dagar och intaget ligger i snitt cirka 175 kcal under din beräknade underhållsnivå. Du tränar regelbundet med sju pass per vecka och sover i genomsnitt 7,1 timmar. Alkoholkonsumtionen är uppgiven för samtliga dagar, med fyra nyktra dagar den senaste veckan.
+>
+> För de flesta leder ett moderat kaloriunderskott kombinerat med styrketräning till att muskelmassa bevaras bättre under viktnedgång. Alkohol innehåller energi som inte bidrar till näringstillförseln på samma sätt som mat, vilket kan påverka hur kroppen hanterar underskottet. I regel är sömn viktigt för återhämtning efter fysisk aktivitet.
+>
+> Om du vill kan du titta på om energinivåerna ser annorlunda ut de veckor du dricker mindre alkohol. Ett alternativ är att fylla i dina egna makromål så att appen kan visa hur ditt intag av protein, kolhydrater och fett förhåller sig till dem.
+
+**Peppig** (qwen3.6:27b, 4.6 s, 7 sentences, all passed the guard):
+
+> Det är roligt att se att du har loggat varje dag i fyra veckor, vilket ger en väldigt tydlig bild av läget. Trendvikten har gått ner 0,6 kg under perioden, vilket motsvarar en takt på 0,14 kg i veckan.
+>
+> Ditt intag ligger i snitt lite under din beräknade underhållsnivå, och du äter regelbundet lax, kyckling och rotfrukter. Du tränar också flitigt med sju pass i veckan och sover i snitt 7,1 timmar per natt. För de flesta bidrar tillräckligt med sömn till bättre återhämtning efter träning, även om appen inte räknar samband mellan dessa uppgifter.
+>
+> Eftersom det inte finns någon aktiv plan just nu saknas också specifika makromål att jämföra mot. Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre alkohol, eller om du känner för det kan du testa att lägga upp en vanan som passar in i din vardag.
+
+**Saklig** (qwen3.6:27b, 5.6 s, 8 sentences, all passed the guard):
+
+> Trendvikten har minskat med 0,6 kg över 28 dagar, vilket motsvarar en takt på 0,14 kg i veckan. Intaget ligger i genomsnitt 176 kcal under den adaptiva underhållsnivån de senaste sju dagarna, och loggningen är komplett för hela perioden.
+>
+> Matloggen visar upprepade måltider med lax, kyckling, rotfrukter och havregryn, men makromål saknas eftersom ingen aktiv plan finns ställd in. Alkoholkonsumtionen ligger på 11 standardglas de senaste sju dagarna, medan rörelsen omfattar 315 minuter fördelat på sju pass. Sömnen genomsnittas till 7,1 timmar per natt, med energinivå 3,4 av 5 och humöret 4,0 av 5.
+>
+> En stabil viktminskning i regel kräver ett konsekvent kaloriunderskott, vilket ditt intag visar jämfört med underhållsnivån. Alkohol kan påverka fettförbränningen, och om du vill kan du titta på hur energin ser ut de veckor alkoholkonsumtionen varierar. Rörelsen är regelbunden, och för de flesta bidrar styrketräning eller muskelaktivering till att behålla muskelmassa när vikten går ner.
+
+#### What came back, plainly
+
+**The "hur" sentence went away, and the "hur" shape did not entirely.** None of
+the six replies invites somebody to change something "om du vill se hur det
+påverkar" anything, which was the sentence the rule was written against. But:
+
+- Saklig on the alcohol fixture wrote "om du vill kan du titta på **hur** energin
+  ser ut de veckor alkoholkonsumtionen varierar". That invites looking at how
+  energy looks, not at how alcohol affects it, so it is softer than the original.
+  It is still "hur" where the rule asks for "om".
+- Two replies on the alcohol fixture state a general causal claim **without
+  marking it as general**. Torr wrote that alcohol "kan påverka hur kroppen
+  hanterar underskottet", and Saklig wrote "Alkohol kan påverka
+  fettförbränningen". Neither joins two of the person's own series, which is
+  what the Samband rule is about, but both are the kind of sentence the meaning
+  rule says has to carry "i regel" or "för de flesta".
+
+**The macro requirement was met once in six.** Only Torr on the development
+account said whether macros matter for the goal and why: protein "spelar ofta
+roll för att behålla muskler när vikten minskar". Peppig and Saklig on the
+development account say nothing about what macros mean. On the alcohol fixture,
+which has no active plan and so no macro targets, all three tones say the targets
+are missing, and Torr suggests setting them, but none says whether macros matter
+for losing weight. The rule asks for exactly that and the model mostly did not do
+it.
+
+**The allowed example became a template.** Four of the six replies end on some
+version of "titta på om energin ser annorlunda ut de veckor du dricker mindre",
+including Peppig on the development account, which has two standard drinks in a
+month. An example in a prompt is read as the answer as well as the shape.
+
+**What held.** Every sentence in all six passed the guard; every figure is one
+the sheet supplied; no reply prescribed; general knowledge was marked with "i
+regel" or "för de flesta" in most of the sentences that used it; and every tone
+covered more than one area.
+
+**Left as found.** Tuning the prompt against six replies is the same mistake as
+a guard written against one sentence. If the unmarked causal sentence or the
+missing macro sentence recur, the fix for the first is the words-level check
+this entry has described since 2026-09-13; the second probably wants the macro
+sentence placed in the sheet's macro block, beside the targets, where the model
+reads it with the figures, rather than in a rule it reads before them.
+
 ### D156 — Where the image comes from is a variable, because this installation has used both
 
 *2026-09-13.*

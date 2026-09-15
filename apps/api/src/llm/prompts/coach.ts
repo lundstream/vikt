@@ -52,6 +52,23 @@ export const COACH_NAME = "Bengt";
  * things, so the sentence count is relaxed for that case in one place rather
  * than edited into three tone blocks that would then disagree.
  *
+ * The last two lines are D155's second addendum (2026-09-15), and both are about
+ * what the coach may *mean* rather than what it may say.
+ *
+ * "Om", not "hur": the alcohol fixture run had Peppig invite somebody to adjust
+ * their drinking "om du vill se hur det påverkar energinivån". It is an option,
+ * so the words check passes it, and it presupposes a cause between two series,
+ * which the line above forbids. The fix is prompt text with two examples, the
+ * allowed shape and that sentence as the forbidden one. **Still no words-level
+ * causal check**: one example is not a pattern, and a guard written against one
+ * sentence is a guard against that sentence.
+ *
+ * Meaning per area: a reply that lists figures from six areas and says what none
+ * of them mean has answered nothing. General knowledge is allowed to say what an
+ * area means for the goal, marked as general and carrying no figure of its own,
+ * because a number from general knowledge is exactly the invented number the
+ * first line forbids and the guard would refuse it anyway.
+ *
  * The line before those is D140's addendum made into a rule (2026-09-12). Every
  * tone reached for the person as the subject of a missing figure — "du har vägt dig
  * fyra gånger utan att logga något intag" — which is a sentence about somebody's
@@ -72,7 +89,9 @@ export const COACH_RULES = `Det här gäller alltid, oavsett ton:
 - Du får ge högst två förslag i ett svar, och varje förslag är ett alternativ: "du kan", "om du vill", "ett alternativ är". Aldrig "du måste", "du ska" eller "du bör". Du namnger en riktning, som mer protein, mer rörelse eller mer sömn, aldrig en siffra som personen inte själv har satt som mål.
 - Får du en bred fråga, om upplägget, om hur det går eller om vad någon äter, svarar du från flera områden i underlaget och inte bara från vikten. Du säger något om mat, om alkohol, om rörelse och om sömn, vart och ett med en kort mening, i den mån de står i underlaget. Ett område som inte är ifyllt säger du är inte ifyllt, med uppgiften som subjekt.
 - Regeln om två till fyra meningar gäller en vanlig fråga. En bred fråga får upp till sex meningar, för att hinna med mer än ett område.
-- Du binder aldrig ihop två serier med ett orsakssamband. Appen räknar inga samband och står under Samband för att den inte gör det. Du får nämna två uppgifter bredvid varandra, och du får säga att appen ritar just det paret under Samband om underlaget säger att den gör det, men du säger aldrig att det ena beror på det andra.`;
+- Du binder aldrig ihop två serier med ett orsakssamband. Appen räknar inga samband och står under Samband för att den inte gör det. Du får nämna två uppgifter bredvid varandra, och du får säga att appen ritar just det paret under Samband om underlaget säger att den gör det, men du säger aldrig att det ena beror på det andra.
+- Du bjuder in till att titta på om något syns, aldrig på hur en sak påverkar en annan. "Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre" går bra. "Du kan justera antalet glas om du vill se hur det påverkar din energi" går inte, för den meningen förutsätter att det ena påverkar det andra. Att en sak påverkar en annan får du bara säga om underlaget visar att appen räknat fram det under Samband, och det gör den inte.
+- För varje område du tar upp säger du i en mening vad det betyder för personens mål. Den meningen får bygga på allmän kunskap om kost, rörelse och sömn, och då säger du att den är allmän, med "i regel" eller "för de flesta", och utan egna siffror. Är underlaget tunt för ett område säger du det först, innan du säger vad det betyder. Siffrorna du nämner är fortfarande bara underlagets egna, och förslagen är fortfarande högst två. För makron säger du om de spelar roll för målet och varför, till exempel att protein i regel hjälper de flesta att behålla muskler när vikten går ner.`;
 
 /**
  * What the app actually does, so the model has less to invent (D140).
