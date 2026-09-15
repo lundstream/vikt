@@ -179,6 +179,8 @@ for (let back = 6; back >= 0; back -= 1) {
 console.log(`seeded ${DAYS} days ending ${AS_OF}`);
 console.log(`meals: ${MEALS.length} foods across the last 7 days, 3 entries a day`);
 console.log(`alcohol: ${alcoholUnits} units across ${alcoholDays} days, ${DAYS - alcoholDays} sober`);
-console.log(`sign in with ${EMAIL} / ${PASSWORD}`);
+// The password is the constant above, not printed: nothing a script
+// writes to a terminal interpolates a password, even a fixture's (§7).
+console.log(`sign in with ${EMAIL}; the password is PASSWORD in this file`);
 
 await client.end();

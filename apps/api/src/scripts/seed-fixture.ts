@@ -103,6 +103,8 @@ for (const offset of OFFSETS) {
 
 console.log(`seeded ${OFFSETS.length} weighings ending ${AS_OF}, rising from ${START_KG} kg`);
 console.log(`timezone: ${TIMEZONE}`);
-console.log(`sign in with ${EMAIL} / ${PASSWORD}`);
+// The password is the constant above, not printed: nothing a script
+// writes to a terminal interpolates a password, even a fixture's (§7).
+console.log(`sign in with ${EMAIL}; the password is PASSWORD in this file`);
 
 await client.end();

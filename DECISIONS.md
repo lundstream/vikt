@@ -7845,6 +7845,53 @@ Recorded rather than glossed, because the honest gain here is narrower than
 "least privilege": the token is **revocable on its own**, and it removes the
 step where a secret gets typed into something that is recording.
 
+#### Addendum, 2026-09-15: the environment is never listed, and a server can echo the token
+
+The rule grew four clauses, each of them a way a secret leaves a process without
+anybody deciding to leak it: listing the environment (`Get-ChildItem env:`,
+`env`, `printenv`), writing a secret to a file (`Set-Content`, `Out-File`, `tee`,
+`>`, `writeFile`), echoing or logging its value, and — found by writing the test
+rather than by reading the code — **printing something a server sent back**.
+
+**The echo leak was real.** `scripts/portainer.mjs` prints response bodies on
+`get` and up to 400 characters of any error page. `secrets-echo.test.ts` runs it
+with a dummy token against a local server that reflects `X-API-Key` into every
+response, and against the script as it was the token came out three ways: a
+reflected success on stdout, an echoed body on stdout, and an error page on
+stderr. A proxy that echoes request headers into an error page is an ordinary
+thing to meet, and the token would have gone into whatever was recording. Every
+print now passes through `redact()`, which replaces the token with `<redacted>`
+rather than suppressing the line, and a request that never reaches a server is
+caught so its message is redacted too. Five of five pass.
+
+The test checks three places after every run — stdout, stderr, and every file
+under the working, temp and home directories the helper was given — and first
+asserts the token really was sent, so a helper that failed before the request
+cannot pass by saying nothing.
+
+**The static patterns are tested both ways**, against lines they must catch and
+lines they must leave alone, so the guard is shown to bite without the
+repository ever containing an offender. Their first run over the committed files
+still found five:
+
+- **three false positives**, `createLlmClient(env)` in three API scripts. The
+  env-command pattern had treated a bare `(` as a shell separator; it takes
+  `$(` and a backtick now, and applies only to shell, PowerShell and YAML files,
+  because in TypeScript `env` is an ordinary identifier and a shell-shaped
+  pattern will keep finding shell-looking shapes in a language that is not
+  shell. The line that tripped it is now one of the innocent lines;
+- **two true shapes**, the fixture seeders printing `${PASSWORD}`. A committed
+  development password is not a secret, and the lines were reworded anyway
+  rather than the pattern given an exception, for the reason the first half of
+  this entry gives about comments: an exception is the start of an allowlist.
+
+**A secret in a scratch file counts.** The 1.1.0 deploy captured the VAPID pair
+into `vapid.txt` in the session scratchpad, which is the "written to a file"
+clause exactly. It was the only file there holding a secret value, and it was
+deleted when the clause was written. `apps/api/src/scripts/vapid.ts` still prints
+a generated pair by design, because installing it is its job; it belongs in a
+terminal nobody is recording, which is now said where the rule is.
+
 ### D159 — The retention job would have deleted the rollback dump
 
 *2026-09-13.*

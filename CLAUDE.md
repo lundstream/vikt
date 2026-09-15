@@ -695,12 +695,30 @@ a commit on `main` is a commit that the next redeploy ships.
     into the recording.
   - **Nothing echoes one back.** A value read from the environment is used, not
     logged, and a script that reports what it configured names the variable and
-    says `<secret, set>` rather than the value.
-  - `scripts/portainer.mjs` is the only path from this repository to Portainer,
-    and `apps/api/test/secrets-hygiene.test.ts` holds both halves: it scans the
-    committed scripts, workflows and infra files for a password path, and it
+    says `<secret, set>` rather than the value. Whether one is present is checked
+    with `[ -n "$VAR" ]`, which prints nothing about it.
+  - **The environment is never listed.** No `Get-ChildItem env:`, no `env`, no
+    `printenv`: a listing of the environment is a listing of every secret in it,
+    all at once, into whatever is recording. A script that needs a variable
+    reads that one by name.
+  - **A secret is never written to a file.** No `Set-Content`, `Out-File`, `tee`
+    or `>` of a token, and no `writeFile` of one. A file outlives the session,
+    and a file in a working tree is one `git add .` from being public. A scratch
+    file holding a generated key counts: the last deploy captured the VAPID pair
+    into one, and it was deleted when this rule was written.
+  - **No echo, `Write-Host` or log line includes one.** And because a server can
+    reflect a request header into a response body, anything a script prints that
+    came from outside passes through redaction of the token first: a script that
+    prints error pages is a script that can print the token without meaning to.
+  - `scripts/portainer.mjs` is the only path from this repository to Portainer.
+    `apps/api/test/secrets-hygiene.test.ts` scans the committed scripts,
+    workflows and infra files for every shape above, with the patterns tested
+    both ways against lines they must catch and lines they must leave alone, and
     **runs** the helper with the variable unset to prove it refuses instead of
-    waiting for input.
+    waiting for input. `apps/api/test/secrets-echo.test.ts` runs it with a dummy
+    token against a local server that echoes the key into every response, and
+    asserts the token appears in none of stdout, stderr or any file under the
+    directories the helper was given.
 
 - **Restart the development server when a change needs it.** Do not ask first and do
   not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
