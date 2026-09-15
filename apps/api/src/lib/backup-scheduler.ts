@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { runBackup, readBackupSettings } from "../services/backup.service.js";
+import { latestRestoreCheck, runRestoreCheck } from "../services/restore-check.service.js";
+import { restoreCheckDue } from "./restore-verdict.js";
 
 /**
  * The schedule D96 wrote and never installed (D103).
@@ -47,6 +49,25 @@ export function startBackupScheduler(app: FastifyInstance): () => void {
       lastRunOn = today;
       const outcome = await runBackup(app.db, app.config, null);
       app.log.info({ outcome }, "scheduled backup");
+
+      /**
+       * The restore check, monthly, on the file just written (D168).
+       *
+       * Right after a scheduled backup rather than on its own clock, so the
+       * dump it reads is the newest there is, and only for a directory, which
+       * is what it can read. `running` stays set, so no tick starts a backup
+       * on top of a restore that is still going.
+       */
+      if (outcome.ok && settings.destinationKind === "local") {
+        const last = await latestRestoreCheck(app.db);
+        if (restoreCheckDue(last ? { startedAt: new Date(last.startedAt) } : null, new Date())) {
+          const check = await runRestoreCheck(app.db, app.config, {
+            trigger: "schedule",
+            fileName: outcome.fileName,
+          });
+          app.log.info({ check }, "scheduled restore check");
+        }
+      }
     } catch (error) {
       // Never let one bad tick kill the timer: a dead scheduler is a silent
       // absence of backups, which is the failure this whole file is about.

@@ -14,6 +14,7 @@ import {
   testBackupDestination,
   writeBackupSettings,
 } from "../services/backup.service.js";
+import { latestRestoreCheck } from "../services/restore-check.service.js";
 
 /**
  * Backups, from the admin screen (D103).
@@ -23,6 +24,23 @@ import {
  * live database by succeeding, and it stays a documented command somebody has to
  * type.
  */
+
+/** The newest restore check (D168), or null before the first one. */
+const restoreCheckSchema = z.object({
+  id: z.string().uuid(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+  status: z.enum(["running", "ok", "failed"]),
+  trigger: z.enum(["schedule", "command"]),
+  fileName: z.string().nullable(),
+  tables: z.number().int().nullable(),
+  rows: z.number().int().nullable(),
+  migrations: z.number().int().nullable(),
+  error: z.string().nullable(),
+  ageDays: z.number().int(),
+  /** Older than thirty-five days, which the screen says in words. */
+  old: z.boolean(),
+});
 
 const runSchema = z.object({
   id: z.string().uuid(),
@@ -69,6 +87,7 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
             secretKeyPresent: z.boolean(),
             /** Whether there is a file the download would actually send. */
             downloadable: z.boolean(),
+            lastRestoreCheck: restoreCheckSchema.nullable(),
           }),
           404: errorResponseSchema,
         },
@@ -82,6 +101,7 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
         nextRunAt: nextRunAt(settings.scheduleMinute)?.toISOString() ?? null,
         secretKeyPresent: secretsAvailable(),
         downloadable: (await latestBackupFile(app.db)) !== null,
+        lastRestoreCheck: await latestRestoreCheck(app.db),
       };
     },
   );
@@ -126,7 +146,7 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
           error: result.reason,
           message:
             result.reason === "no_secret_key"
-              ? "SECRET_KEY is not set, so the share password cannot be stored encrypted. " +
+              ? "SECRET_KEY is not set, so the bucket's secret key cannot be stored encrypted. " +
                 "It is refused rather than saved in the clear or quietly dropped."
               : "Only local and S3 destinations are implemented. Writing to a Windows " +
                 "share directly is not: both Node SMB clients speak NTLMv1, which " +

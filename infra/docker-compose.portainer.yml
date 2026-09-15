@@ -147,9 +147,16 @@ services:
       LLM_VISION_MODEL: ${LLM_VISION_MODEL:-}
       OLLAMA_VISION_TIMEOUT_MS: ${OLLAMA_VISION_TIMEOUT_MS:-60000}
     volumes:
-      # Where the scheduled backup writes (D103). Bind it somewhere off this
-      # host if the backups are to survive the host.
-      - vikt_backups:/backups
+      # Where the scheduled backup writes (D103, D168): a directory on the host,
+      # bound in at /backups. Choose /backups under Administration, Backup.
+      #
+      # A bind mount, not the named volume this used to be. The API runs as uid
+      # 1000, a named volume's mountpoint belongs to root, and a path that is
+      # not mounted at all, such as /var/backups/vikt, is inside the container
+      # and not writable either: production's nightly backup failed with EACCES
+      # on exactly that. The host directory is created and handed to uid 1000
+      # before the stack starts (INFRA.md), and it outlives the container.
+      - ${BACKUP_HOST_DIR:?set BACKUP_HOST_DIR to a host directory owned by uid 1000, e.g. /var/backups/vikt/app}:/backups
     networks:
       - backend
       # `edge` so nginx can reach it, and so the food-database lookups have
@@ -228,4 +235,3 @@ networks:
 
 volumes:
   vikt_pgdata:
-  vikt_backups:

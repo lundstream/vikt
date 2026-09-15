@@ -349,3 +349,48 @@ describe("infra/.env.example", () => {
     ).toBe(true);
   });
 });
+
+/**
+ * The backup directory is a host directory, and the stack cannot start without
+ * one (D168).
+ *
+ * Compose-level rather than an API variable, so the loops above do not see it.
+ * Production's nightly backup failed with EACCES because the path it was given
+ * was inside the container with nothing mounted there, and a named volume at
+ * /backups would have failed the same way for uid 1000. These hold the fix in
+ * place: a required bind from `BACKUP_HOST_DIR`, documented, and no named volume.
+ */
+describe("the backup directory", () => {
+  const text = readFileSync(COMPOSE, "utf8").replace(/\r\n/g, "\n");
+
+  /** The api service's block, as the operator reads it. */
+  const apiBlock = (() => {
+    const start = text.indexOf("\n  api:");
+    expect(start, "the compose has no api service").toBeGreaterThan(-1);
+    const rest = text.slice(start + 1);
+    const end = rest.search(/\n {2}[a-z][a-z0-9_-]*:\n/);
+    return end === -1 ? rest : rest.slice(0, end);
+  })();
+
+  it("binds a required host directory at /backups", () => {
+    expect(apiBlock).toMatch(/^ {6}- \$\{BACKUP_HOST_DIR:\?[^}]*\}:\/backups\s*$/m);
+  });
+
+  it("mounts no named volume at /backups, and declares none", () => {
+    expect(apiBlock).not.toMatch(/- [a-z_]+:\/backups/);
+    expect(text).not.toMatch(/^ {2}vikt_backups:/m);
+  });
+
+  it("documents every variable the api service's volumes read", () => {
+    // From `volumes:` up to the next key at the same depth, such as `networks:`.
+    const volumes = apiBlock.slice(apiBlock.indexOf("\n    volumes:") + 1);
+    const next = volumes.slice(1).search(/\n {4}[a-z_]+:/);
+    const block = next === -1 ? volumes : volumes.slice(0, next + 1);
+    const names = [...block.matchAll(/\$\{([A-Z][A-Z0-9_]*)/g)].map((match) => match[1]!);
+
+    expect(names).toContain("BACKUP_HOST_DIR");
+    for (const name of names) {
+      expect(documented().has(name), `${name} is read by the api volumes and not in .env.example`).toBe(true);
+    }
+  });
+});

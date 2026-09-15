@@ -1377,6 +1377,31 @@ export const backupRuns = pgTable(
   (t) => [index("backup_runs_started_idx").on(t.startedAt)],
 );
 
+/**
+ * Every restore check, successful or not (D168).
+ *
+ * A backup is only known to work once it has been read back. The check restores
+ * the newest encrypted dump into a scratch database, judges it against the live
+ * one, drops the scratch database, and leaves one of these whatever happened.
+ */
+export const restoreChecks = pgTable(
+  "restore_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    status: text("status", { enum: ["running", "ok", "failed"] }).notNull().default("running"),
+    /** `schedule` after a nightly backup, `command` from pnpm or `docker exec`. */
+    trigger: text("trigger", { enum: ["schedule", "command"] }).notNull(),
+    fileName: text("file_name"),
+    tables: integer("tables"),
+    rows: integer("rows"),
+    migrations: integer("migrations"),
+    error: text("error"),
+  },
+  (t) => [index("restore_checks_started_idx").on(t.startedAt)],
+);
+
 
 /**
  * What a background worker last did, so a stalled one cannot look like an idle

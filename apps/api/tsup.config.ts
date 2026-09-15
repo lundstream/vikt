@@ -5,6 +5,8 @@ export default defineConfig({
     index: "src/index.ts",
     migrate: "src/db/migrate.ts",
     invite: "src/scripts/invite.ts",
+    // `docker exec vikt-api-1 node dist/restore-check.js` on the host (D168).
+    "restore-check": "src/scripts/restore-check.ts",
   },
   format: ["esm"],
   target: "node22",

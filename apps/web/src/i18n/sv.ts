@@ -743,9 +743,9 @@ export const sv = {
   "backup.saved": "Sparat.",
   "backup.path": "Katalog att skriva till",
   "backup.pathHelp":
-    "En katalog på maskinen, till exempel /var/backups/vikt. Peka den på något som inte dör med servern: en monterad NFS- eller SMB-resurs fungerar, eftersom den ser ut som en vanlig katalog.",
+    "Katalogen i API-containern som backupen skrivs till. I stacken är det /backups, som binds till en katalog på värden (BACKUP_HOST_DIR). Låt värdkatalogen ligga på något som inte dör med servern: en NFS- eller SMB-resurs som värden monterar fungerar, eftersom den ser ut som en vanlig katalog.",
   "backup.pathExamples":
-    "Lokalt: /var/backups/vikt. Monterad resurs: /mnt/nas/vikt, om värden redan monterar den. S3: ännu inte implementerat och sparas inte.",
+    "I stacken: /backups. På en utvecklingsmaskin: en katalog i projektet, till exempel ./backups. Till en S3-hink väljer du S3-hink ovan.",
   "backup.kind": "Var backupen hamnar",
   "backup.kindLocal": "Katalog på maskinen",
   "backup.kindS3": "S3-hink",
@@ -769,7 +769,7 @@ export const sv = {
   "backup.testOk": "Det gick bra. En liten fil skrevs och togs bort igen.",
   "backup.testFailed": "Det gick inte.",
   "backup.pathUnwritable":
-    "Går katalogen inte att skriva till skapas den om den saknas, och annars misslyckas körningen med felet från filsystemet. Den raden syns här och ingen halv fil blir kvar.",
+    "Saknas katalogen skapas den. Går den inte att skapa eller skriva till misslyckas körningen med felet från filsystemet, felet visas här och ingen halv fil blir kvar.",
   "backup.time": "Tid på dygnet",
   "backup.retain": "Spara i dagar",
   "backup.timeHint": "Lämna tiden tom för att stänga av schemat. Gamla filer tas bort efter antalet dagar, räknat på filens ålder.",
@@ -777,7 +777,16 @@ export const sv = {
   "backup.noKey":
     "SECRET_KEY är inte satt. Ingen backup skrivs, för en okrypterad kopia av allas data ska inte lämna maskinen av misstag.",
   "backup.restoreHint":
-    "Återställning är ett kommando, inte en knapp: se docs/backup.md. Det är den enda åtgärden som förstör en databas genom att lyckas, och den ska kräva att någon skriver den.",
+    "Att lägga tillbaka en backup i den databas som körs är ett kommando, inte en knapp: se docs/backup.md. Det är den enda åtgärden som förstör en databas genom att lyckas, och den ska kräva att någon skriver den. Återställningstestet ovan rör aldrig den databasen.",
+  "backup.restoreCheck": "Senaste återställningstest",
+  "backup.restoreCheckOk": "{date}, gick att läsa in: {tables} tabeller, {rows} rader",
+  "backup.restoreCheckFailed": "{date}, gick inte att läsa in",
+  "backup.restoreCheckRunning": "pågår, startade {date}",
+  "backup.restoreCheckOld": "Det senaste återställningstestet är {days} dagar gammalt, äldre än 35 dagar.",
+  "backup.restoreCheckHow":
+    "Testet körs av sig självt efter en schemalagd backup, när det senaste är minst 30 dagar gammalt. Det läser in den nyaste backupen i en tillfällig databas, jämför den med den som körs och tar bort den igen.",
+  "backup.restoreCheckS3":
+    "Återställningstestet läser backuper från en katalog. Med en S3-hink körs det inte av sig självt: hämta en backup och kör testet på filen.",
   "nav.data": "Data",
 
   // the daily screen

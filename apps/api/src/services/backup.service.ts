@@ -27,6 +27,7 @@ import {
   type S3Target,
 } from "../lib/backup-s3.js";
 import { backupInFlight, backupSettled } from "../lib/backup-crash-guard.js";
+import { BACKUP_FILE_SALT, BACKUP_FILE_USE, BACKUP_MAGIC } from "../lib/backup-file.js";
 
 /**
  * Backups, run by the app and recorded (D103).
@@ -64,9 +65,9 @@ import { backupInFlight, backupSettled } from "../lib/backup-crash-guard.js";
 
 const SINGLETON = "singleton";
 
-/** Its own use string, so a backup key cannot read the mail password. */
-const BACKUP_USE = "vikt.backup.file";
-const SALT = Buffer.from("vikt.secrets.v1");
+/** The file's constants live with the reader that has to agree with them (D168). */
+const BACKUP_USE = BACKUP_FILE_USE;
+const SALT = BACKUP_FILE_SALT;
 
 export type BackupSettings = {
   destinationKind: "local" | "smb" | "s3";
@@ -589,7 +590,7 @@ async function dumpEncrypted(
     stderr += String(chunk).slice(0, 2000);
   });
 
-  const header = Buffer.concat([Buffer.from("VIKTBK1"), iv]);
+  const header = Buffer.concat([Buffer.from(BACKUP_MAGIC), iv]);
   out.write(header);
   let bytes = header.length;
 

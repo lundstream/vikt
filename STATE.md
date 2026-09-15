@@ -68,6 +68,21 @@ when it will be down, and its mail goes out.
   no screen had offered before. Exercised on the development account at 360 px
   and desktop: 90 rows, no page overflow, and the downloaded workbook matching
   the table in 2 014 of 2 014 cells.
+- **The backup leaves the container, and the app reads one back** (D168).
+  `/backups` is a required bind mount from a host directory (`BACKUP_HOST_DIR`)
+  instead of a named volume the API's uid 1000 could not write, which is where
+  production's `EACCES` came from. A restore check decrypts the newest dump with
+  `SECRET_KEY`, restores it into a scratch database, compares it with the live
+  one, drops it again and records the result; it runs monthly after a scheduled
+  backup and from `docker exec vikt-api-1 node dist/restore-check.js`.
+  Administration, Backup shows **Senaste återställningstest** in Sten, "Inte än"
+  before the first, and calls a test older than 35 days old in words, not colour.
+  Exercised by running this tree's API image against the development database
+  with the directory bound in: the schedule wrote
+  `vikt-20260915T232635Z.dump.enc` (336 112 bytes) and the check that followed it
+  read it back, **ok, 46 tables, 3 912 rows, 32 migrations**, with the same
+  result from the command and no scratch database left behind. Shot at 360 px
+  (no page overflow) and desktop.
 - **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
   Below the coverage gate a macro is the known sum after "minst", in Sten, with
   the share of the food carrying it on the line under it: on Översikt's day card
@@ -266,6 +281,9 @@ is its first real run. Rollback, with no migration to cross, is
 **Take a backup first (step 1).** Production still has no scheduled backup.
 `backup.sh` is on the host now and equal to the repository (D163), so
 `/srv/vikt/infra/backup.sh` on the host gives a dump in `/var/backups/vikt/`.
+From 1.2.0 the stack also needs `BACKUP_HOST_DIR` and the host directory behind
+it before it will deploy at all (D168), and the compose file changed, so the
+deploy is `--release-file`.
 
 The runbook lives in `INFRA.md`, "Deploying a version, in order", because it is
 about **this installation** and this file is public (D119).
@@ -924,9 +942,18 @@ urgent than anything else in this file.
 - `backup_settings` has **no row**: no destination and no schedule.
 - `backup_runs` has **no rows**: not one backup has ever run, scheduled or by
   hand through the app.
-- The `vikt_vikt_backups` volume is empty. The host had no `backup.sh`, no cron
-  line and no systemd timer, which is correct since D103 moved scheduling into
-  the app — but it means nothing else is covering for it.
+- **The destination it was given could not have worked** (D168). The compose
+  mounted a named volume at `/backups`, whose mountpoint belongs to root while
+  the API runs as uid 1000, and the path configured in the app,
+  `/var/backups/vikt`, was not mounted at all: a directory inside the container,
+  also unwritable, and gone with the container. 1.2.0 replaces the volume with a
+  required bind mount from the host, so a stack with nowhere to write **fails to
+  deploy** instead of failing every night at three.
+- The host had no `backup.sh`, no cron line and no systemd timer, which is
+  correct since D103 moved scheduling into the app — but it means nothing else
+  is covering for it. That stays deliberate (D168): the app's encrypted nightly
+  run is the backup, `backup.sh` is the manual pre-deploy dump, and no cron line
+  is installed.
 - **`backup.sh` and `restore-check.sh` are on the host now** (D163), equal by
   sha256 to the repository, and runnable without a compose file. **They have no
   schedule.** Adding the cron line in INFRA.md, "Host-side scripts", gives a
@@ -938,11 +965,23 @@ The only backup of production that exists is the pre-1.1.0 dump taken by hand on
 13 September, now at `/var/backups/vikt/releases/pre-1.1.0-62dde4f.dump` and
 verified by restoring it.
 
-**Set it in Administration, Backup**: a destination (a directory bound into the
-API container, or S3) and a time. That is a decision about where every user's
-data goes and who holds the `SECRET_KEY` that decrypts it, so it was left to
-you rather than configured from here. Then press "Kör nu" once and check that a
-row appears under the runs.
+**Three commands on the Docker host, then one screen.** The directory has to
+exist and belong to uid 1000 before the stack starts:
+
+```sh
+sudo mkdir -p /var/backups/vikt/app
+sudo chown 1000:1000 /var/backups/vikt/app
+sudo chmod 700 /var/backups/vikt/app
+```
+
+Then set `BACKUP_HOST_DIR=/var/backups/vikt/app` in the stack's variables (1.2.0
+refuses to deploy without it), and in **Administration, Backup** set the
+destination to `/backups` and a time. That is still a decision about where every
+user's data goes and who holds the `SECRET_KEY` that decrypts it, so it is
+yours; what has changed is that the path now leads somewhere. Press "Kör nu"
+once and check that a row appears under the runs. Within a month the screen will
+also say whether that backup could be read back, and
+`docker exec vikt-api-1 node dist/restore-check.js` answers it on demand.
 
 The Portainer token exists (D158) and `node scripts/portainer.mjs check` works.
 It authenticates as `admin (role 1)` rather than the standard user INFRA.md

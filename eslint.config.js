@@ -201,6 +201,17 @@ export default tseslint.config(
              * could be, because there is one per installation.
              */
             "describeDestination",
+            /**
+             * Restore checks are per installation as well (D168): one database,
+             * one destination, and the dump being read back holds every
+             * account at once. `runRestoreCheck` runs on the backup schedule or
+             * from a command on the host, with no session in either case, and
+             * `latestRestoreCheck` feeds the admin screen behind requireAdmin.
+             * A leading `userId` would suggest a restore could belong to one
+             * person, which is exactly what it cannot.
+             */
+            "runRestoreCheck",
+            "latestRestoreCheck",
 
             /**
              * Announcements are per installation (D108): one notice, everybody

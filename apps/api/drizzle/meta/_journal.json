@@ -218,6 +218,13 @@
       "when": 1788310205000,
       "tag": "0030_food_search_fold",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788310206000,
+      "tag": "0031_restore_checks",
+      "breakpoints": true
     }
   ]
 }

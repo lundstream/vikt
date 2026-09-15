@@ -60,11 +60,25 @@ Only once the scratch restore matches should anything touch the live database.
 
 ### Where backups can go
 
-**A directory, or a Windows share.** Choose under Administration, Backup.
+**A directory, or an S3 bucket.** Choose under Administration, Backup.
 
 A **directory** is any path the API container can write, and that includes a
 share the host already mounts. Point it somewhere that does not die with the
 machine the database is on.
+
+**In the Portainer stack the directory is `/backups`**, bound from a directory
+on the host named by `BACKUP_HOST_DIR` (D168). The API runs as uid 1000, so the
+host directory has to belong to that uid before the stack starts:
+
+```sh
+sudo mkdir -p /var/backups/vikt/app
+sudo chown 1000:1000 /var/backups/vikt/app
+sudo chmod 700 /var/backups/vikt/app
+```
+
+A path that is not bound in, such as `/var/backups/vikt`, is inside the container
+and not writable: that is the `EACCES` a scheduled backup fails with when the
+directory setting and the mount disagree.
 
 A **bucket** is any S3-compatible endpoint: AWS, Backblaze B2, MinIO, or the S3
 service most NAS boxes now ship. Set the address, bucket, folder, access key and
@@ -104,12 +118,44 @@ outside it by D10, and Phase 7 has not shipped, so there is nothing there yet;
 the shell script below still tars that directory, and until photos exist the two
 cover the same ground.
 
+### Checking that a backup restores
+
+**The app checks its own backups** (D168). After a scheduled backup to a
+directory, when the last check is at least thirty days old, it reads the newest
+encrypted dump, decrypts it with `SECRET_KEY`, restores it into a scratch
+database, compares that with the live database, and drops the scratch database.
+Administration, Backup shows the last result as "Senaste återställningstest",
+"Inte än" before the first one, and says so in words when the last is older
+than thirty-five days.
+
+The same check from a command, on a file or on the newest backup:
+
+```sh
+pnpm --filter api restore-check                               # on a workstation
+pnpm --filter api restore-check /path/vikt-20260916T031700Z.dump.enc
+docker exec vikt-api-1 node dist/restore-check.js             # on the Docker host
+```
+
+The container has `pg_restore`, the key, the database and `/backups`, so the
+host needs nothing but `docker`. The check needs a role that may create a
+database for the scratch copy. It never writes to the live database.
+
+It reads directories only. A bucket's backup is checked by downloading it and
+running the command on the file.
+
 ---
 
 ## The shell script, which still works
 
 `infra/backup.sh` predates the above and is kept: it runs without the app, which
 is what you want when the app is the thing that is broken.
+
+**What runs where, decided** (D168). Production's nightly backup is the app's
+scheduled one, encrypted, to the bound host directory. `backup.sh` is the manual
+tool somebody runs before a deploy, for a plain dump that restores without the
+app or its key, and **no cron line is installed** for it: a second, unencrypted
+nightly copy beside the encrypted one is a copy of everybody's data that nothing
+needs.
 
 **It runs on a Portainer-managed host.** Both it and `restore-check.sh` use a
 compose file beside them when there is one, and otherwise reach Postgres by

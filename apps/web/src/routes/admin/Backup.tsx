@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDecimal } from "shared";
 import { formatLongDay } from "../../lib/dates.js";
 import { LOCALE, t } from "../../i18n/index.js";
 
@@ -45,13 +46,45 @@ type Run = {
   error: string | null;
 };
 
+/** The newest restore check (D168). */
+type RestoreCheck = {
+  startedAt: string;
+  status: "running" | "ok" | "failed";
+  fileName: string | null;
+  tables: number | null;
+  rows: number | null;
+  error: string | null;
+  ageDays: number;
+  old: boolean;
+};
+
 type Loaded = {
   settings: Settings;
   runs: Run[];
   nextRunAt: string | null;
   secretKeyPresent: boolean;
   downloadable: boolean;
+  lastRestoreCheck: RestoreCheck | null;
 };
+
+/**
+ * One line for the newest restore check, in Sten whatever it says (D168).
+ *
+ * "Inte än" until one has run. Old is a sentence of its own under the list,
+ * never a colour: a check thirty-six days old is information about when, not a
+ * warning state, and §5 gives warnings no colour.
+ */
+function restoreCheckLine(check: RestoreCheck | null): string {
+  if (check === null) return t("stat.notYet");
+  const date = formatLongDay(check.startedAt.slice(0, 10), LOCALE);
+  if (check.status === "running") return t("backup.restoreCheckRunning", { date });
+  if (check.status === "failed") return t("backup.restoreCheckFailed", { date });
+  return t("backup.restoreCheckOk", {
+    date,
+    tables: check.tables ?? 0,
+    rows: formatDecimal(check.rows ?? 0, { decimals: 0 }),
+  });
+}
 
 /** `480` becomes `08:00`. The stored form is minutes, the shown form is a clock. */
 function toClock(minute: number | null): string {
@@ -282,7 +315,30 @@ export function Backup() {
         <dd className="truncate text-right text-ink">
           {data?.settings.destinationPath || t("stat.notYet")}
         </dd>
+
+        <dt className="text-muted">{t("backup.restoreCheck")}</dt>
+        <dd className="num text-right text-uncertain" data-testid="backup-restore-check">
+          {restoreCheckLine(data?.lastRestoreCheck ?? null)}
+        </dd>
       </dl>
+
+      {/*
+        Old in words, and the reason when it failed. The line above stays Sten
+        in every state, so neither of these is carried by colour.
+      */}
+      {data?.lastRestoreCheck?.old ? (
+        <p className="mb-2 max-w-prose text-note text-muted" data-testid="backup-restore-old">
+          {t("backup.restoreCheckOld", { days: data.lastRestoreCheck.ageDays })}
+        </p>
+      ) : null}
+      {data?.lastRestoreCheck?.status === "failed" && data.lastRestoreCheck.error ? (
+        <p className="mb-2 max-w-prose text-note text-muted" data-testid="backup-restore-error">
+          {data.lastRestoreCheck.error}
+        </p>
+      ) : null}
+      <p className="mb-6 max-w-prose text-micro text-muted">
+        {t(data?.settings.destinationKind === "s3" ? "backup.restoreCheckS3" : "backup.restoreCheckHow")}
+      </p>
 
       {/* The reason, whenever the last run has one. §3: never a silent failure. */}
       {last?.error ? (

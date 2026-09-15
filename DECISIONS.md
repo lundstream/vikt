@@ -8764,3 +8764,112 @@ the answer really is one.
   through the page's own session, 71 248 bytes, opened and compared with the
   table fetched beside it: **2 014 cells, 0 mismatched**, 22 sheets, the first
   "Dagar".
+
+---
+
+### D168 — The backup leaves the container, and the app reads one back
+
+**The scheduled backup had never written a byte anywhere that survives the
+container, and no backup this app has ever taken had been read back.** Two
+halves of one gap, closed together.
+
+#### The mount
+
+The compose mounted a named volume, `vikt_backups`, at `/backups`. The API runs
+as uid 1000 and a named volume's mountpoint is created owned by root, so the
+process could not write it. The destination the app had actually been given was
+`/var/backups/vikt`, which is not mounted at all: a path inside the container's
+own filesystem, also not writable by uid 1000. That is where production's
+`EACCES` came from, and it is the failure mode where every individual part looks
+right.
+
+So `/backups` is now a **bind mount from the host**, required:
+
+```yaml
+- ${BACKUP_HOST_DIR:?set BACKUP_HOST_DIR to a host directory owned by uid 1000, e.g. /var/backups/vikt/app}:/backups
+```
+
+`:?` rather than a default, so a stack deployed without it **fails instead of
+running with no backups**. The host side is three commands in INFRA.md and
+`.env.example`: create the directory, `chown 1000:1000`, `chmod 700`. Its own
+directory under `/var/backups/vikt`, because that directory holds the release
+rollback dumps as root and should keep holding them as root.
+`stack-variables.test.ts` holds all of it: a required bind at `/backups`, no
+named volume there and none declared, and every `${VAR}` the api service's
+volumes read documented in `.env.example`.
+
+#### The restore check
+
+A backup nobody has restored is a hope (`docs/backup.md` has said so since D96,
+about the shell script's dumps, which were checked; the app's encrypted ones
+never were). `runRestoreCheck` takes the newest `vikt-*.dump.enc` in the backup
+directory, decrypts it with `SECRET_KEY`, creates a scratch database with a
+generated name, `pg_restore`s into it, compares it with the live database, drops
+the scratch database whatever happened, and records one `restore_checks` row
+whatever happened.
+
+**It never writes to the live database.** Putting a backup back is still a
+command somebody types; this only proves the command would have something to
+work with.
+
+`judgeRestore` is deliberately **not** an equality check. The dump is older than
+the comparison, so the live database has gained rows since, and a check that
+failed on that would fail every night. What it refuses is structural: a table
+the live database has and the restore does not, no migrations at all, **more**
+migrations than the running schema (a dump newer than the code), a restore with
+the schema and no rows, and no weight readings when the live database has some.
+Fewer migrations than live is fine: the API migrates a restored dump on start.
+
+It runs **monthly, after a scheduled backup**, rather than on a clock of its
+own, so the file it reads is the newest one there is. From a command it is
+`pnpm --filter api restore-check [file]` or, on the Docker host,
+`docker exec vikt-api-1 node dist/restore-check.js` — the container already has
+`pg_restore`, the key, the database and the mount, so the host needs nothing but
+`docker`. It reads directories only: with an S3 destination it records a failed
+row saying to download a file and run it on that, because there is no
+`getObject` here to pretend otherwise.
+
+Administration, Backup gains **Senaste återställningstest**, in Sten in every
+state, "Inte än" until one has run. A check older than 35 days says so **in a
+sentence**, not in colour: it is information about when, and §5 gives warnings
+no colour. Thirty-five rather than thirty, so a check that ran late because the
+backup ran late is not called old, while a schedule that has stopped is.
+
+#### What runs where, decided
+
+Production's nightly backup is the app's scheduled, encrypted one to the bound
+host directory. `infra/backup.sh` stays the **manual pre-deploy** dump, the one
+that restores without the app or its key. **No cron line is installed**: a
+second, unencrypted nightly copy of everybody's data, on the host beside the
+database it protects and pruned on a different clock, is not a backup strategy.
+It is a decision now rather than an omission, written into INFRA.md and
+`docs/backup.md`.
+
+#### The screen's sentences were also wrong
+
+The destination help said S3 was "ännu inte implementerat och sparas inte",
+which stopped being true at D133, and offered `/var/backups/vikt` as the
+example: the exact path that fails. Both rewritten, along with the API's 422
+message that called the S3 secret a "share password".
+
+#### Verified
+
+- **Tests:** `restore-verdict.test.ts` (14: the file format decrypts, a wrong
+  key and a truncated file and a not-a-backup file are each refused with their
+  own reason, the due rule, and every judgement above), the compose guards in
+  `stack-variables.test.ts`, and the suites around them. The api suite is 990
+  passing, the web suite 381.
+- **Exercised for real, against the development database**, by building the API
+  image from this tree and running it with the dev database and
+  `scratch/backups` bound at `/backups` — because the workstation has no
+  `pg_dump`, and because that is the arrangement production will have. It
+  applied `0031_restore_checks` on the way up (1 applied, 32 recorded), and
+  `id` inside it is uid 1000 writing the bound host directory, which is the
+  thing that failed in production.
+- The destination `/backups` and a time were set **through the screen**. The
+  scheduler then took a backup by itself: `vikt-20260915T232635Z.dump.enc`,
+  336 112 bytes, on the host side of the mount. Thirty-seven seconds later the
+  check it triggers ran: **ok, 46 tables, 3 912 rows, 32 migrations**. Then the
+  same thing from the host's command, `docker exec … node dist/restore-check.js`,
+  exit 0, a second row with trigger `command` and the same counts. Afterwards:
+  **zero** `vikt_restorecheck%` databases left on the server.

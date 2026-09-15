@@ -11,6 +11,7 @@
     "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest",
     "invite": "tsx src/scripts/invite.ts",
+    "restore-check": "tsx src/scripts/restore-check.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
