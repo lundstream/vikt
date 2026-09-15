@@ -280,8 +280,14 @@ export function demux(buffer) {
   return text;
 }
 
-/** The lines INFRA.md step 6 reads, and nothing else from the log. */
-const LOG_LINES = /migration|starting api|api up|deployment modes|vapid|vision|smtp|"level":(40|50|60)|\berror\b|\bwarn/i;
+/**
+ * The lines INFRA.md step 6 reads, and nothing else from the log.
+ *
+ * `api build` is first in the runbook and was missing here (D169): the version
+ * is the answer to "is this the new image", and a deploy that printed every
+ * line except that one made the operator go and look somewhere else.
+ */
+const LOG_LINES = /api build|migration|starting api|api up|deployment modes|vapid|vision|smtp|"level":(40|50|60)|\berror\b|\bwarn/i;
 
 async function deploy(version, options) {
   const planned = await plan(version, options);

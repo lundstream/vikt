@@ -1,6 +1,7 @@
 import "./lib/dotenv.js";
 import { assertProdSecrets, describeModes, loadEnv } from "./env.js";
 import { buildApp } from "./app.js";
+import { buildInfo } from "./lib/build-info.js";
 import { importMailSettingsFromEnv } from "./services/mail-settings.service.js";
 import { startBackupScheduler } from "./lib/backup-scheduler.js";
 import { startReminderScheduler } from "./lib/reminder-scheduler.js";
@@ -131,6 +132,19 @@ try {
   // this. In Docker the equivalent is an internal network with no published
   // ports — see DECISIONS.md D12.
   await app.listen({ host: env.HOST, port: env.PORT });
+  /**
+   * Which build this is, in the log, first (D169).
+   *
+   * It was baked into the image at D151 and reported by `/api/health`, which
+   * means the one place it was missing was the log an operator reads while a
+   * deploy is going up. INFRA.md step 6 is a list of lines to compare against,
+   * and it could not answer its own first question: is this the new image, or
+   * did the pull quietly do nothing? `stack.mjs deploy` prints these lines, so
+   * it now prints the version too, from the container rather than from what it
+   * asked Portainer for.
+   */
+  const build = buildInfo();
+  app.log.info({ version: build.version, commit: build.shortCommit }, "api build");
   app.log.info(
     { appName: env.APP_NAME, trustProxy: env.TRUST_PROXY, cookieSecure: env.COOKIE_SECURE },
     "api up",

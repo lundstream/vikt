@@ -146,7 +146,10 @@ beforeAll(async () => {
     if (/\/containers\/\w+\/logs$/.test(url.pathname)) {
       res.writeHead(200, { "content-type": "application/octet-stream" });
       return res.end(
-        logFrame("Running migrations...\nMigrations: 0 applied, 30 recorded in total\nsomething unrelated\napi up\n"),
+        logFrame(
+          "Running migrations...\nMigrations: 0 applied, 30 recorded in total\nsomething unrelated\n" +
+            '{"level":30,"msg":"api build","version":"1.1.1","commit":"12a9daa"}\napi up\n',
+        ),
       );
     }
     if (url.pathname === "/api/endpoints/2/docker/images/json") {
@@ -264,6 +267,14 @@ describe("stack.mjs deploy", () => {
     expect(sent.size).toBe(before.length);
 
     expect(result.stdout).toContain("Migrations: 0 applied, 30 recorded in total");
+    /**
+     * The version, which is the line INFRA.md step 6 reads first (D169). It is
+     * baked into the image, so it is the only thing in the log that can say
+     * whether the pull actually replaced anything, and the excerpt used to drop
+     * it while keeping everything around it.
+     */
+    expect(result.stdout).toContain('"msg":"api build"');
+    expect(result.stdout).toContain('"version":"1.1.1"');
     expect(result.stdout).not.toContain("something unrelated");
     expect(result.stdout).toContain("deployed 1.1.1");
     expect(leaked(result), "a secret the server returned was printed").toEqual([]);

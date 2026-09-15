@@ -83,6 +83,16 @@ when it will be down, and its mail goes out.
   read it back, **ok, 46 tables, 3 912 rows, 32 migrations**, with the same
   result from the command and no scratch database left behind. Shot at 360 px
   (no page overflow) and desktop.
+- **A release builds once, and the log says which build it is** (D169).
+  `release.yml` triggers on a tag, a published release and a manual run, not on
+  a push to `main`, which started a second run of the same commit that failed
+  every time by asking the registry for a tag named `dev`. The anonymous-pull
+  proof now asks about `sha-<commit>`, which every run publishes, and `latest`
+  follows releases. The API logs `api build` with the version and commit as its
+  first line, and `stack.mjs` prints it, so INFRA.md step 6 can answer whether
+  the pull replaced anything. The migrator's `already exists, skipping` notice
+  is off at the client that emits it, so a boot log starts with the migration
+  names instead of two lines that read like a fault.
 - **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
   Below the coverage gate a macro is the known sum after "minst", in Sten, with
   the share of the food carrying it on the line under it: on Översikt's day card

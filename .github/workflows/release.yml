@@ -12,23 +12,27 @@
 name: release
 
 on:
+  # Tags, not branches (D169).
+  #
+  # `gh release create` pushes a tag to `main` and publishes a release, which
+  # used to start **two** runs of this workflow on the same commit: one for the
+  # tag and one for the branch. The branch run then failed every time, by
+  # construction rather than by accident — it builds with no version, so "Prove
+  # the package is anonymously pullable" asked the registry for a tag named
+  # `dev`, which nothing ever pushes, and got a 404. A workflow that is red on
+  # every release teaches everybody to ignore it.
+  #
+  # Only released versions are ever deployed here: the stack pins `IMAGE_TAG`
+  # and the runbook cuts versions with `gh release create` (INFRA.md, step 3).
+  # An untagged `main` build was a thing nothing pulled. So the trigger is the
+  # tag, the published release, and a manual run for when something needs
+  # rebuilding. The `paths-ignore` that used to keep docs-only pushes from
+  # building went with the branch trigger: it never applied to tags anyway.
   push:
-    branches: ["main"]
-    # A version tag on main, which is what makes a release (D148). The images
-    # come out tagged `1.1.0`, `1.1`, `sha-<commit>` and `latest`, and the stack
-    # pins the version one so a rollback is editing a line rather than finding a
-    # commit.
+    # A version tag, which is what makes a release (D148). The images come out
+    # tagged `1.1.0`, `1.1`, `sha-<commit>` and `latest`, and the stack pins the
+    # version one so a rollback is editing a line rather than finding a commit.
     tags: ["v*.*.*"]
-    # Docs-only pushes should not produce an image. The stack would pull an
-    # identical binary under a new tag and call it a deployment.
-    #
-    # Path filters and tag pushes do not mix reliably — a tag adds no commits
-    # for a filter to look at — which is why the `release` trigger below is kept
-    # and is the one the runbook uses: `gh release create` fires it with no path
-    # filter anywhere near it.
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   # A published release, which is how INFRA.md's runbook cuts a version.
   release:
     types: [published]
@@ -91,11 +95,15 @@ jobs:
           #
           #   1.1.0        what the stack pins. A rollback is one edit (D148).
           #   1.1          follows the patch releases inside a minor.
-          #   sha-<commit> what a `main` build with no version is reachable as.
-          #   latest       only from the default branch, and only for a local
-          #                `docker run`. Nothing in production pins it.
+          #   sha-<commit> what any build is reachable as, whatever started it.
+          #   latest       the newest release, and only for a local `docker run`.
+          #                Nothing in production pins it.
+          #
+          # `latest` used to be `enable={{is_default_branch}}`, which with the
+          # branch trigger gone would never be true again (D169). It follows
+          # releases now, which is what the name has always implied.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' || github.event_name == 'release' }}
             type=sha,format=long
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -157,7 +165,16 @@ jobs:
           set -euo pipefail
           ref='${{ steps.image.outputs.ref }}'
           repo="${ref#ghcr.io/}"
-          tag='${{ steps.version.outputs.value }}'
+
+          # A tag this run actually pushed (D169).
+          #
+          # It used to ask about `steps.version.outputs.value`, which is `dev`
+          # for anything that is not a tag or a release — and `dev` is never
+          # pushed, so the check 404'd on every non-release run and called it a
+          # private package. `sha-<commit>` comes from `type=sha,format=long`
+          # and exists for every run there is, so that is what is proved, plus
+          # the version tag whenever this run is a release.
+          tag="sha-${{ github.sha }}"
 
           echo "asking GHCR for an anonymous pull token for $repo"
           code=$(curl -s -o /tmp/token.json -w '%{http_code}' \

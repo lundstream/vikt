@@ -32,7 +32,22 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const { db, client } = createDb(databaseUrl, { max: 1 });
+/**
+ * Notices off, at the source that emits them (D169).
+ *
+ * Drizzle's migrator opens with `create schema if not exists drizzle` and
+ * `create table if not exists __drizzle_migrations`, and Postgres answers each
+ * with `NOTICE: relation "__drizzle_migrations" already exists, skipping`.
+ * postgres-js prints notices to the console, so **every** container start began
+ * with two lines that look like something went wrong and mean the opposite.
+ * INFRA.md step 6 has an operator reading this log for the migration names, and
+ * noise at the top of it is noise in the one place it costs something.
+ *
+ * Silenced by telling the client not to report them, rather than by filtering
+ * the output downstream: a grep would also hide the notice that matters. The
+ * test database has done exactly this since it was written, for the same reason.
+ */
+const { db, client } = createDb(databaseUrl, { max: 1, onnotice: () => {} });
 
 /**
  * How many migrations this database has already recorded.

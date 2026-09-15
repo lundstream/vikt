@@ -8873,3 +8873,69 @@ message that called the S3 secret a "share password".
   same thing from the host's command, `docker exec … node dist/restore-check.js`,
   exit 0, a second row with trigger `command` and the same counts. Afterwards:
   **zero** `vikt_restorecheck%` databases left on the server.
+
+---
+
+### D169 — A release builds once, and the log says which build it is
+
+Three things about deploying that were wrong in the same direction: something
+ran that should not, something was missing from what an operator reads, and
+something printed noise that looks like an error and is not.
+
+#### The release workflow ran twice and failed once, every time
+
+`gh release create` pushes a tag to `main` and publishes a release. With
+`branches: ["main"]` beside `tags: ["v*.*.*"]` in the trigger, that started
+**two** runs of `release.yml` on the same commit, and the branch one failed by
+construction: a build with no tag calls itself `dev` (D151), and the step that
+proves the image is anonymously pullable (D160) then asked GHCR for a tag named
+`dev`, which nothing publishes. `anonymous manifest fetch for
+lundstream/vikt-web:dev returned 404`, next to a green run of the identical
+commit. The last pair was `35031311942` beside `35031311925`, for 1.1.1.
+
+**Tags, not branches.** Nothing here has ever deployed an untagged `main` build:
+the stack pins `IMAGE_TAG` and the runbook cuts versions with `gh release
+create`. So the branch trigger is gone rather than the check being loosened. Two
+consequences handled with it: `latest` was `enable={{is_default_branch}}`, which
+could never be true again, and now follows releases, which is what the name
+always implied; and the `paths-ignore` written for branch pushes went too, since
+a tag adds no commits for a path filter to look at.
+
+**The proof asks about a tag that exists.** `sha-<commit>` comes from
+`type=sha,format=long` and is published by every run whatever started it, so
+that is what is fetched anonymously, rather than a version string that is `dev`
+outside a release. `apps/api/test/release-workflow.test.ts` holds the trigger,
+the proof's tag, and `latest`'s condition.
+
+#### The log did not say which build it was
+
+The version has been baked into the image since D151 and reported by
+`/api/health`. The one place it was missing was the log, which is what INFRA.md
+step 6 tells an operator to read while a deploy comes up — so the runbook's list
+of lines could not answer its own first question: **is this the new image, or
+did the pull quietly do nothing?**
+
+The API now writes `api build` with the version and the short commit as the
+first line after it binds, and `scripts/stack.mjs` includes it in the excerpt it
+prints. That excerpt is described in the script as "the lines INFRA.md step 6
+reads", and it had every line in that list except the one worth reading first.
+
+#### The migrator opened every boot with a notice
+
+`relation "__drizzle_migrations" already exists, skipping`, twice, on every
+container start, because Drizzle's migrator issues `create ... if not exists`
+and postgres-js prints Postgres notices. Silenced **at the client that emits
+them**, by passing `onnotice` through `createDb`, not by filtering the output:
+a grep would also hide the notice that means something. The test database has
+done exactly this since it was written, with the same reason in a comment.
+
+#### Verified
+
+- `release-workflow.test.ts` (8) and `stack-deploy.test.ts` (7, now asserting the
+  version line reaches the excerpt and that unrelated lines still do not), the
+  full api suite, lint and typecheck.
+- `pnpm --filter api db:migrate` against the development database prints one
+  line, `Migrations: none to apply, 32 already recorded`, and no notice.
+- The development API, restarted by its own watcher, logs
+  `api build` with `version=dev` and the checkout's commit, which is what an
+  unbuilt tree should say.

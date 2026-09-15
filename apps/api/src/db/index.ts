@@ -15,9 +15,13 @@ import * as schema from "./schema.js";
  */
 export type Db = PgDatabase<PostgresJsQueryResultHKT, typeof schema>;
 
-export function createDb(databaseUrl: string, options: { max?: number } = {}) {
+export function createDb(
+  databaseUrl: string,
+  options: { max?: number; onnotice?: (notice: unknown) => void } = {},
+) {
   const client = postgres(databaseUrl, {
     max: options.max ?? 10,
+    ...(options.onnotice ? { onnotice: options.onnotice } : {}),
     // Drizzle maps numeric columns to strings on purpose. Do not add a type
     // parser that turns them into floats — see CLAUDE.md §3 and shared/parse.ts.
   });
