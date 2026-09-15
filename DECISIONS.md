@@ -7889,6 +7889,27 @@ Verified twice by restoring, once from the original and once from the copy:
 38 tables, 3 402 rows, 95 weight readings, `pg_restore` exit 0. Checksumming a
 copy proves the bytes; restoring it proves the bytes are a database.
 
+#### Addendum, 2026-09-15: on the host, restored, and the premise it rested on
+
+The dump is at `/var/backups/vikt/releases/pre-1.1.0-62dde4f.dump`, sha256 equal
+after the copy, and `restore-check.sh` ran against it with exit 0: the derived
+figures for the account with the most readings match the live database exactly.
+The workstation copy is deleted.
+
+Putting it there showed that **the host has none of the D96 setup** — no
+`/srv/vikt/infra`, no `backup.sh`, no cron line, no `/var/backups/vikt` until
+this created it. That is correct after D103, which moved the schedule into the
+app. What is not correct is that the app's schedule was never configured either:
+`backup_settings` has no row and `backup_runs` has none. Production has never
+taken a backup that somebody did not start by hand, which is the exact gap D103
+was written to close, reopened one step later at "set the destination".
+
+`restore-check.sh` assumes a shell on the host with Docker and a compose file
+beside it. None of that exists, so the unmodified script ran inside the
+production Postgres container with `COMPOSE` pointed at a two-line shim that
+drops `-f FILE exec -T postgres` and runs the rest in place. Recorded because a
+restore check that needs a machine nobody has is a check nobody runs.
+
 ### D160 — Ask the registry the question the deploy will ask
 
 *2026-09-13.*

@@ -819,21 +819,31 @@ Measurements, and the conditions they were taken under, are in
 by a test, so a fast path that changes without the page changing fails the
 suite.
 
-### Waiting on the owner, for the Portainer token (D158)
+### Waiting on the owner: production has never taken a scheduled backup
 
-The deploy path no longer has a step that asks for a password, which means it
-cannot run at all until there is a token. **Fredrik creates it**, because a
-token an agent generated is a token that went through a transcript.
+Found on 2026-09-15 while putting the rollback dump on the host, and more
+urgent than anything else in this file.
 
-`INFRA.md`, "The Portainer token", has the steps: a standard user with access to
-the `local` environment and to the `vikt` stack, an access token on that account,
-`PORTAINER_TOKEN` exported on the workstation, then
-`node scripts/portainer.mjs check`.
+- `backup_settings` has **no row**: no destination and no schedule.
+- `backup_runs` has **no rows**: not one backup has ever run, scheduled or by
+  hand through the app.
+- The `vikt_vikt_backups` volume is empty. The host has no `backup.sh`, no cron
+  line and no systemd timer, which is correct since D103 moved scheduling into
+  the app — but it means nothing else is covering for it.
 
-**Blocked on it:** moving the pre-1.1.0 rollback dump to the host (D159). It is
-verified and checksummed but still only on the workstation, under gitignored
-`scratch/rollback-dumps/`, so **do not clear `scratch/`**. INFRA.md, "The 1.1.0
-rollback dump", has the path and the remaining commands.
+The only backup of production that exists is the pre-1.1.0 dump taken by hand on
+13 September, now at `/var/backups/vikt/releases/pre-1.1.0-62dde4f.dump` and
+verified by restoring it.
+
+**Set it in Administration, Backup**: a destination (a directory bound into the
+API container, or S3) and a time. That is a decision about where every user's
+data goes and who holds the `SECRET_KEY` that decrypts it, so it was left to
+you rather than configured from here. Then press "Kör nu" once and check that a
+row appears under the runs.
+
+The Portainer token exists (D158) and `node scripts/portainer.mjs check` works.
+It authenticates as `admin (role 1)` rather than the standard user INFRA.md
+recommends: fine for the runbook, more power than it needs.
 
 ### Before the next CI run
 
