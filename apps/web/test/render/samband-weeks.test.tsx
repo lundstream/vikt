@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { formatKcal, type CorrelationPane } from "shared";
+import { formatKcal, TRANSITIONAL_INTAKE_CHANGE_KCAL, type CorrelationPane } from "shared";
 import { PaneChart } from "../../src/routes/Correlations.js";
 
 /**
@@ -71,6 +71,41 @@ describe("the weekly pane", () => {
     expect(notes).toContain(`uppmätta underhållsnivå, ${formatKcal(2480)} kcal`);
     expect(notes).toContain("närmast en ändring i intaget hamnar vid sidan av linjen");
     expect(screen.getByText("Antal veckor")).toBeTruthy();
+  });
+
+  /**
+   * The ring note (D170). Said only when a ring is drawn, and it names the same
+   * threshold the calc uses rather than a number typed into the copy.
+   */
+  it("explains the rings when a week's intake moved", () => {
+    render(
+      <PaneChart
+        pane={weekly({
+          sampleSize: 5,
+          pairs: points(5).map((point, index) => ({ ...point, transitional: index === 3 })),
+          enough: true,
+          reference: { maintenanceKcal: 2480, kcalPerKg: 7700 },
+        })}
+        minPairs={14}
+        dailyLogDays={60}
+      />,
+    );
+
+    const note = screen.getByTestId("week-ring-note").textContent ?? "";
+    expect(note).toContain(formatKcal(TRANSITIONAL_INTAKE_CHANGE_KCAL));
+    expect(note).toContain("Ringar i stället för fyllda punkter");
+  });
+
+  it("says nothing about rings when every week is a steady one", () => {
+    render(
+      <PaneChart
+        pane={weekly({ sampleSize: 5, pairs: points(5), enough: true })}
+        minPairs={14}
+        dailyLogDays={60}
+      />,
+    );
+
+    expect(screen.queryByTestId("week-ring-note")).toBeNull();
   });
 
   it("says why there is no line when maintenance is not measured", () => {

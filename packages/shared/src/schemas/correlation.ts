@@ -19,6 +19,17 @@ export const pairSchema = z.object({
   localDate: z.string(),
   x: z.number(),
   y: z.number(),
+  /**
+   * Weekly panes only (D170): the week's mean intake moved by at least
+   * `TRANSITIONAL_INTAKE_CHANGE_KCAL` from the previous week's, so the trend is
+   * still catching up and the point is drawn as a ring rather than a dot.
+   *
+   * Still not a statistic (D34). It is a fact about the intake axis, computed
+   * from two of this pane's own x values, and it changes how a point is drawn
+   * rather than adding a verdict about it. Absent on the daily panes, where
+   * there is no such thing.
+   */
+  transitional: z.boolean().optional(),
 });
 
 export const CORRELATION_PANES = [

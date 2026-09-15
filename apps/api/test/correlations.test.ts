@@ -11,7 +11,8 @@ const ctx = useTestApp();
 
 type Pane = {
   pane: string;
-  pairs: { localDate: string; x: number; y: number }[];
+  /** `transitional` is the weekly pane's ring flag (D170); daily panes have none. */
+  pairs: { localDate: string; x: number; y: number; transitional?: boolean }[];
   sampleSize: number;
   unpairedDays: number;
   range: { from: string; to: string } | null;
@@ -296,6 +297,26 @@ describe("intake against trend change", () => {
     ).json<{ panes: Pane[] }>();
     return paneNamed(body, "intake_trend_change");
   }
+
+  /**
+   * The ring flag reaches the browser (D170).
+   *
+   * The pane-level key check above cannot see this: it is a field on each pair.
+   * A body whose intake never moves has no transitional week at all, which is
+   * the half worth asserting on the wire — a flag that arrived as `true`
+   * everywhere would draw every point as a ring and nothing would fail.
+   */
+  it("marks no week as transitional where intake never changed", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await obeyingBody(db, user, 84);
+
+    const pane = await intakePane(app, user);
+    expect(pane.pairs.length).toBeGreaterThan(4);
+    for (const pair of pane.pairs) {
+      expect(pair.transitional, `week of ${pair.localDate}`).toBe(false);
+    }
+  });
 
   it("counts whole weeks, and says not yet below four", async () => {
     const { app, db } = ctx();

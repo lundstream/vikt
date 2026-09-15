@@ -93,6 +93,15 @@ when it will be down, and its mail goes out.
   the pull replaced anything. The migrator's `already exists, skipping` notice
   is off at the client that emits it, so a boot log starts with the migration
   names instead of two lines that read like a fault.
+- **A week where the eating changed is a ring on Samband** (D170). The weekly
+  pane keeps its approximate line and now says which weeks the line is not
+  really about: a week whose mean intake moved by at least 400 kcal from the
+  previous week's point is drawn hollow, the way an imported reading is in the
+  weight graph, with a note that appears only when there is a ring to explain.
+  The threshold is measured rather than chosen, on the same synthetic body the
+  fixture uses: 400 kcal is where the week of a change first lands more than
+  0,1 kg from the line. Exercised on `samband@example.test` at 360 px and
+  desktop: twelve weeks, eleven filled points and one ring, no page overflow.
 - **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
   Below the coverage gate a macro is the known sum after "minst", in Sten, with
   the share of the food carrying it on the line under it: on Översikt's day card

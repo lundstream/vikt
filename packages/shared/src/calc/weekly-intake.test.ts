@@ -5,6 +5,7 @@ import {
   expectedChangeKgPerWeek,
   MIN_LOGGED_DAYS_PER_WEEK,
   MIN_WHOLE_WEEKS,
+  TRANSITIONAL_INTAKE_CHANGE_KCAL,
   weeklyIntakeAgainstTrend,
   type WeekPoint,
 } from "./weekly-intake.js";
@@ -180,6 +181,60 @@ describe("intake against trend change, per week", () => {
       droppedWeeks: 0,
       lagDays: 9,
     });
+  });
+});
+
+/**
+ * Which weeks are drawn as rings (D170).
+ *
+ * The threshold is not a taste: it is where a week stops landing on the line on
+ * this same body. The first test below is the derivation, the second is the
+ * fixture the screen is shot on, and the third is the case that would make the
+ * mark useless if it were wrong — steady weeks marked as transitional.
+ */
+describe("a transitional week", () => {
+  const classify = (weeklyIntake: number[]) => {
+    const { trend, intake, asOf } = synthetic({ weeklyIntake });
+    return weeklyIntakeAgainstTrend({ trend, intake, asOf }).points;
+  };
+
+  it("is the step where weeks stop landing within 0,1 kg of the line", () => {
+    // 300 kcal: the week of the change is still on the line, and not a ring.
+    const gentle = classify(levels(6, [2000, 2300]));
+    const afterGentle = gentle.find((point) => point.transitional);
+    expect(afterGentle, "a 300 kcal step should not be marked").toBeUndefined();
+    const gentleWeek = gentle.find((point) => weekIndex(point) === 6)!;
+    expect(offLine(gentleWeek)).toBeLessThan(0.1);
+
+    // 400: it is off the line, and it is a ring. That is the threshold.
+    const step = classify(levels(6, [2000, 2400]));
+    const afterStep = step.find((point) => weekIndex(point) === 6)!;
+    expect(offLine(afterStep)).toBeGreaterThan(0.1);
+    expect(afterStep.transitional).toBe(true);
+    expect(TRANSITIONAL_INTAKE_CHANGE_KCAL).toBe(400);
+  });
+
+  it("is exactly the fixture's known transition, and none of its steady weeks", () => {
+    // `seed-samband-fixture.ts`: six weeks at 2000, six at 2800.
+    const points = classify(levels(6, [2000, 2800]));
+    const rings = points.filter((point) => point.transitional);
+
+    expect(rings.map(weekIndex), "one ring, on the week the intake moved").toEqual([6]);
+    // And that ring is a week that is genuinely off the line.
+    expect(offLine(rings[0]!)).toBeGreaterThan(0.1);
+    for (const point of points.filter((entry) => !entry.transitional)) {
+      expect(point.meanIntakeKcal === 2000 || point.meanIntakeKcal === 2800).toBe(true);
+    }
+  });
+
+  it("is never the first point, which has no previous week to differ from", () => {
+    const points = classify(levels(6, [2000, 2800]));
+    expect(points[0]!.transitional).toBe(false);
+  });
+
+  it("marks nothing at all where intake never moves", () => {
+    const points = classify(levels(6, [2400, 2400]));
+    expect(points.every((point) => !point.transitional)).toBe(true);
   });
 });
 

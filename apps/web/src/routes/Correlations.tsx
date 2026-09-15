@@ -10,7 +10,13 @@ import {
   YAxis,
 } from "recharts";
 import type { CorrelationPane } from "shared";
-import { expectedChangeKgPerWeek, formatDecimal, formatKcal, MIN_LOGGED_DAYS_PER_WEEK } from "shared";
+import {
+  expectedChangeKgPerWeek,
+  formatDecimal,
+  formatKcal,
+  MIN_LOGGED_DAYS_PER_WEEK,
+  TRANSITIONAL_INTAKE_CHANGE_KCAL,
+} from "shared";
 import { OfflineNotice } from "../components/SyncIndicator.js";
 import { useCorrelations } from "../lib/daily.js";
 import { formatLongDay, todayLocalDate } from "../lib/dates.js";
@@ -279,10 +285,29 @@ export function PaneChart({
                   alpha in a tight cluster read as an empty panel.
                 */}
                 <Scatter
-                  data={pane.pairs}
+                  data={pane.pairs.filter((pair) => pair.transitional !== true)}
                   fill={alpha(tokens.data, 0.9)}
                   stroke={tokens.paper}
                   strokeWidth={0.75}
+                  shape="circle"
+                  isAnimationActive={false}
+                />
+                {/*
+                  Weeks where the eating changed, as rings (D170).
+
+                  The same mark the weight graph gives an imported reading, for
+                  the same reason: it is a point of a different kind, not a worse
+                  one. Here the kind is "the trend has not finished answering
+                  this week yet", which is why it sits off the line, and the note
+                  under the chart says so in words rather than leaving the reader
+                  to infer it from a shape. No colour and no accent: §5 keeps
+                  those for the trend, and this is not a failure (§3).
+                */}
+                <Scatter
+                  data={pane.pairs.filter((pair) => pair.transitional === true)}
+                  fill="none"
+                  stroke={alpha(tokens.data, 0.9)}
+                  strokeWidth={1.25}
                   shape="circle"
                   isAnimationActive={false}
                 />
@@ -406,6 +431,16 @@ function WeekNotes({ pane }: { pane: CorrelationPane }) {
           ? t("corr.expectedNote", { maintenance: formatKcal(pane.reference.maintenanceKcal) })
           : t("corr.noExpected")}
       </p>
+      {/*
+        What a ring means, whenever there is one to explain (D170). Said only
+        when the chart actually draws one: a sentence about a mark nobody can
+        see is noise, and this pane already carries three notes.
+      */}
+      {pane.pairs.some((pair) => pair.transitional === true) ? (
+        <p data-testid="week-ring-note">
+          {t("corr.ringNote", { kcal: formatKcal(TRANSITIONAL_INTAKE_CHANGE_KCAL) })}
+        </p>
+      ) : null}
     </div>
   );
 }

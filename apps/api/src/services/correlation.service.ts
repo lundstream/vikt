@@ -93,6 +93,9 @@ export async function getCorrelations(
         localDate: point.weekStart,
         x: point.meanIntakeKcal,
         y: point.trendChangeKgPerWeek,
+        // A week where the eating changed, which the chart draws as a ring
+        // because the trend has not finished answering it yet (D170).
+        transitional: point.transitional,
       })),
       sampleSize: weekly.points.length,
       unpairedDays: weekly.droppedWeeks,

@@ -52,6 +52,32 @@ export const MIN_LOGGED_DAYS_PER_WEEK = Math.ceil(COVERAGE_GATE * 7);
 /** A shifted week needs readings this far apart to have a rate at all. */
 const MIN_SPAN_DAYS = 4;
 
+/**
+ * A week-over-week change in mean intake at or above this is a **transitional**
+ * week, drawn as a ring rather than a filled point (D170).
+ *
+ * Derived rather than chosen, on the synthetic body `weekly-intake.test.ts` and
+ * the Samband fixture both use: six weeks at one level, six at another, and the
+ * step between them varied. How far the week of the change lands from the
+ * expected line:
+ *
+ *   step   100    200    300    400    500    600    800
+ *   off   0.025  0.051  0.077  0.103  0.130  0.156  0.208   kg per week
+ *
+ * 0.1 kg per week is where a point stops being on the line at this chart's
+ * scale, and 400 kcal is the first step that crosses it. The fixture's own step
+ * is 800, comfortably past it.
+ *
+ * **Two things this does not mark, deliberately.** The first week of any history
+ * sits about 0.13 off the line because the trend is still warming up from its
+ * seed, which is not a change in eating and has no previous week to compare
+ * with. And the week *before* a change is off the line too, often further: its
+ * lag-shifted span reaches into the next level, which the tests above pin. Both
+ * are about the trend catching up, which is what the note under the chart says
+ * in words; the ring marks only the week where the intake actually moved.
+ */
+export const TRANSITIONAL_INTAKE_CHANGE_KCAL = 400;
+
 export type WeekPoint = {
   /** The Monday. */
   weekStart: string;
@@ -62,6 +88,12 @@ export type WeekPoint = {
   daysLogged: number;
   /** Change in the trend over the lag-shifted week, kg per week. */
   trendChangeKgPerWeek: number;
+  /**
+   * Whether mean intake moved by at least `TRANSITIONAL_INTAKE_CHANGE_KCAL`
+   * from the previous week with a point. The first point is never one: there is
+   * nothing to have changed from.
+   */
+  transitional: boolean;
 };
 
 export type WeeklyIntakeAgainstTrend = {
@@ -166,12 +198,24 @@ export function weeklyIntakeAgainstTrend(input: {
     const end = byDate.get(lastReading.localDate)!.trend;
     const total = logged.reduce((sum, day) => sum + (intakeOn(input.intake, day) ?? 0), 0);
 
+    const meanIntakeKcal = total / logged.length;
+    const previous = points.at(-1);
+
     points.push({
       weekStart,
       weekEnd,
-      meanIntakeKcal: total / logged.length,
+      meanIntakeKcal,
       daysLogged: logged.length,
       trendChangeKgPerWeek: (7 * (end - start)) / span,
+      /**
+       * Against the previous **point**, not the previous calendar week: a week
+       * dropped for coverage has no mean to compare with, and comparing across
+       * the gap is the honest reading of "what changed since the last week this
+       * chart shows".
+       */
+      transitional:
+        previous !== undefined &&
+        Math.abs(meanIntakeKcal - previous.meanIntakeKcal) >= TRANSITIONAL_INTAKE_CHANGE_KCAL,
     });
   }
 

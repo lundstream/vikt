@@ -8939,3 +8939,70 @@ done exactly this since it was written, with the same reason in a comment.
 - The development API, restarted by its own watcher, logs
   `api build` with `version=dev` and the checkout's commit, which is what an
   unbuilt tree should say.
+
+---
+
+### D170 — A week where the eating changed is drawn as a ring
+
+Samband's weekly pane draws a dashed line for what 7 700 kcal per kilo says a
+week's intake should do (D166), and the note under it says that weeks near a
+change in intake sit off the line while the trend catches up. **Which weeks
+those are was left to the reader**, on a chart where being off the line is the
+only thing a point can say.
+
+So the weeks that changed are marked, and marked the way the weight graph marks
+an imported reading: a **hollow ring** instead of a filled point. The same mark
+for the same meaning, which is that this is a point of a different kind rather
+than a worse one. No colour, no accent, no warning (§3, §5).
+
+#### The threshold is measured, not chosen
+
+A week is transitional when its mean intake differs from the previous week's
+point by at least **400 kcal**. That number comes from the synthetic body the
+weekly tests and the Samband fixture both use: six weeks at one level, six at
+another, with the step between them varied, asking how far the week of the
+change lands from the expected line.
+
+| step, kcal | 100 | 200 | 300 | **400** | 500 | 600 | 800 |
+|---|---|---|---|---|---|---|---|
+| off the line, kg/week | 0.025 | 0.051 | 0.077 | **0.103** | 0.130 | 0.156 | 0.208 |
+
+0,1 kg per week is where a point stops reading as on the line at this chart's
+scale, and 400 is the first step past it. The fixture's own step is 800.
+
+**Two things are deliberately not ringed**, and both are about the trend rather
+than the eating:
+
+- **the first week of any history** sits about 0.13 off the line because the
+  trend is still warming up from its seed. It has no previous week to differ
+  from, and calling it transitional would be a claim about eating that nothing
+  supports;
+- **the week before a change** is off the line too, often further than the week
+  after it, because its lag-shifted span reaches into the next level. That is
+  pinned by a test that predates this one, and it is a property of the shift,
+  not of that week's food.
+
+Both are what the existing note already says in words: distance from the line
+near a change is the trend catching up.
+
+#### Still no statistic (D34)
+
+`transitional` is computed from two of the pane's own x values and changes how a
+point is drawn. It adds no verdict, no coefficient and no fit, and the guard
+that reads the raw payload for those words still passes. The note that explains
+the rings appears **only when a ring is drawn**, and it names the same constant
+the calc uses rather than a number retyped into the copy.
+
+#### Verified
+
+- `weekly-intake.test.ts` (15): 300 kcal is not marked and lands inside 0,1 kg;
+  400 is marked and lands outside it; the fixture's six-and-six body produces
+  **exactly one** ring, on the week the intake moved, and that week is genuinely
+  off the line; the first point is never one; a body whose intake never moves
+  produces none.
+- `correlations.test.ts` (12) for the flag on the wire, `samband-weeks.test.tsx`
+  for the note appearing with a ring and staying away without one, the web suite
+  (383) and a workspace typecheck.
+- **Through the interface**, on `samband@example.test` at desktop and 360 px:
+  twelve weeks, **eleven filled points and one ring**, the ring note naming
+  400 kcal, and no page overflow at 360.

@@ -975,6 +975,8 @@ export const sv = {
     "Den streckade linjen är vad 7 700 kcal per kilo säger att veckans snittintag borde ge med din uppmätta underhållsnivå, {maintenance} kcal. En punkt över linjen gick upp mer än intaget förklarar, en punkt under gick ner mer. Veckorna närmast en ändring i intaget hamnar vid sidan av linjen medan trenden hinner ikapp, och vatten, salt och dagar som inte loggats flyttar också punkter.",
   "corr.noExpected":
     "Linjen för vad intaget borde ge visas när underhållsnivån är uppmätt ur din egen loggning, inte uträknad ur en formel.",
+  "corr.ringNote":
+    "Ringar i stället för fyllda punkter är veckor där snittintaget ändrats med minst {kcal} kcal sedan veckan innan. Då hinner trendvikten inte med under veckan, så punkten hamnar vid sidan av linjen av den anledningen och inte för att veckan gick annorlunda än intaget säger.",
   "corr.sampleSize": "Antal dagar",
   "corr.range": "Period",
   "corr.rangeValue": "{from} till {to}",
