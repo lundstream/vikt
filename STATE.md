@@ -162,35 +162,68 @@ phase 3.
 
 ## Inför nästa deploy
 
-**The deploy is a runbook, and it is in `INFRA.md` under "Deploying a version, in
-order".** Nine steps, starting at **step 0: make `v1.0` a rollback target that
-exists**. Then back up and prove the backup restores, set every new
-variable, merge and cut the version, wait for `release`, pin `IMAGE_TAG` and
-redeploy, read the named lines out of the API log, check it from a phone on
-mobile data, and roll back by editing one line.
+**The next deploy is `1.1.1`, and it is cut from the commit "Prepare 1.1.1: a
+deploy is a command that asks its questions first", not from the tip of
+`dev`.** What `dev` gains after that commit (the "minst" sums, search, Samband,
+the coach's interpretation rules, the day table and Excel export, the landing
+copy) is `1.2.0`, and waits until Fredrik has deployed `1.1.1`. INFRA.md step 3
+has the release-branch commands for exactly this.
 
-**The build running in production is `v1.0`, and the next deploy is `v1.1.0`.**
-That build was never tagged when it shipped, which meant the compose could pin a
-version the registry had never heard of: the images were `docker load`ed onto
-the host and have never been in GHCR at all. Step 0 gives them a name in git and
-in the registry and then pulls the tag back, because a rollback that has not
-been pulled once is a sentence rather than a plan.
+**Production runs `1.1.0`**: images built on the workstation from `62dde4f`,
+loaded onto the host as `local/vikt-api:1.1.0` and `local/vikt-web:1.1.0`. The
+`v1.1.0` tag is `0a546a7`, and `apps/*/src` and `packages/shared/src` are
+identical between the two, so "since 1.1.0" means the same from either.
 
-**`1.1.0` adds no migration.** The runbook's step 6 still expects nine named
-lines and a total of 30, exactly as it did before this pass: everything in the
-last four items is client side or prompt side, so a rollback to `v1.0` crosses
-nothing new. Step 7 carries a short list of what to look for on the phone,
-including the swipe, which is the one thing only a real phone can settle.
+#### What `1.1.1` changes in the app
 
-**Two findings from writing it**, both of which would have surfaced at the worst
-moment: the GHCR packages are still **private** although the repository is
-public, so the stack would fail at the pull; and `d11c2fe` is a commit in
-`vikt-old`, not in this repository, so the git tag had to go there. The tag is
-made.
+- **The `.select` cascade (D162).** Four duplicate `.select` blocks were
+  winning over the one written on purpose, since the repository's first commit.
+  Removing them changes every dropdown in four measured ways, all towards what
+  `.field` already does: **corner radius** `6px` to `8px`; **surface in the dark
+  theme** from Natt, the page colour, to Skymning, the card colour; **padding**
+  `8px` to `10px`; **font size** `16px` to `15px` (`text-body`). A fifth line in
+  D162's table is the light theme's **chevron**, `#6B7B82` to `#5c6b72`, which
+  had been drawing the dark theme's grey. A stylelint rule now fails the build
+  on a duplicate selector.
+- **Coach rules: none.** `COACH_RULES` and the tone blocks are byte-identical to
+  `1.1.0`. The alcohol pass (`cf6ffc0`) tested the coach against a thick
+  fixture and changed no prompt text; the fixture seeder is a development
+  script and does nothing in production.
+- **Nothing else in `apps/*/src` or `packages/shared/src`.** The rest since
+  `1.1.0` is tooling, tests, the host-side scripts and the runbook.
 
-It lives there rather than here because it is about **this installation** and
-this file is public (D119). What stays here is the one thing that has to be
-pasted into the app rather than typed at a host.
+#### What it does not change
+
+- **No migration.** `apps/api/drizzle` is untouched since `v1.1.0`: 30 files at
+  both. Step 6 expects `Migrations: 0 applied, 30 recorded in total`.
+- **No new variables.** `infra/docker-compose.portainer.yml`,
+  `apps/api/src/env.ts` and `infra/.env.example` are unchanged since `v1.1.0`,
+  and `node scripts/stack.mjs plan` reports "new in the release and not set:
+  none".
+
+#### How it is deployed, and what is new about that
+
+**The first pull-based deploy of this installation, and the first with no
+password anywhere** (D164). The one stack change besides the tag is
+`IMAGE_REPO`, from `local/` to `ghcr.io/lundstream/`, and the script sets it:
+
+```sh
+node scripts/stack.mjs plan 1.1.1
+node scripts/stack.mjs deploy 1.1.1 --yes
+```
+
+`plan` has run read only against production (for `1.1.0`: nothing blocks).
+`deploy --yes` has run only against the test's fake Portainer, so this deploy
+is its first real run. Rollback, with no migration to cross, is
+`node scripts/stack.mjs deploy 1.1.0 --repo local/ --keep-file --yes`; the
+`local/` images are still on the host.
+
+**Take a backup first (step 1).** Production still has no scheduled backup.
+`backup.sh` is on the host now and equal to the repository (D163), so
+`/srv/vikt/infra/backup.sh` on the host gives a dump in `/var/backups/vikt/`.
+
+The runbook lives in `INFRA.md`, "Deploying a version, in order", because it is
+about **this installation** and this file is public (D119).
 
 **Every pass on `dev` still appends to this section**, and nothing merges to
 `main` until it has been read. Anything operational that a pass discovers goes
@@ -198,12 +231,25 @@ into the runbook; anything a user will see goes into the news post below.
 
 ### Till Nyheter
 
-**Färdig text, klistra in som den är** under Administration, Meddelanden. Den
-täcker allt som syns sedan den version som körs i produktion i dag. Inga tankstreck
-(§5), och registret är appens eget: du, inte "användaren".
+**Färdig text, klistra in som den är** under Administration, Meddelanden. Inga
+tankstreck (§5), och registret är appens eget: du, inte "användaren".
 
 <details>
-<summary>Nyhetstexten</summary>
+<summary>1.1.1</summary>
+
+```markdown
+## Version 1.1.1
+
+Listorna du väljer ur ser ut som textfälten igen. De har samma rundade hörn,
+samma luft runt texten och samma textstorlek, och i mörkt tema ligger de på
+kortets färg i stället för på sidans bakgrund. I ljust tema har pilen i listan
+fått rätt grå nyans. Inget annat ändras, och inga siffror räknas om.
+```
+
+</details>
+
+<details>
+<summary>1.1.0, om den inte redan är publicerad</summary>
 
 ```markdown
 Det här är en stor uppdatering. Nedan står allt som syns, skärm för skärm.
@@ -385,89 +431,24 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. **78 commits**, plus the one that
-records this. The next deploy is `v1.1.0`:
+between what is built and what is running. `main` is `0a546a7`, the `v1.1.0`
+tag. **Everything below goes into `1.1.1`**, together with the commit that
+prepares it:
 
 | | |
 |---|---|
-| `cae47d9` | Fire the reduced-transparency branch rather than read it |
-| `cd178b0` | Record the pass: four items, and what the sweep actually proved |
-| `7ebe70e` | The coach gets the data, and two rules about what it may do with it |
-| `7d3ae2f` | A swipe between sections, and the five times it must not fire |
-| `c0b8af0` | A deleted row is a question, not a refusal |
-| `a1ba060` | STATE: the scrim, and where the Is line actually came from |
-| `3ec204f` | One scrim, and the sheet has no edge of its own |
-| `739cafb` | The build says what it is, and the source is offered where people are |
-| `107321a` | The rollback target did not exist, so step 0 makes one |
-| `fabb44d` | An edit is not a second opinion, and a conflict has two answers |
-| `b4aa63b` | Assert the pinning in CI rather than on a deploy |
-| `5422a4c` | The deploy is a runbook, and the log says what it did |
-| `f405626` | Pin the stack to a version, and answer the rollback question |
-| `3e88bf1` | Every variable the API reads reaches the container |
-| `030224e` | Close the last two D56 gaps, six phases late |
-| `4ae10fc` | STATE: name the sparse development account the screenshots used |
-| `3e1387b` | Record the pass: the curve, the calendar, and the edit-window audit |
-| `a1343b8` | A weight printed on a label is not an amount |
-| `591e57d` | Every reading is reachable, through a month rather than a longer list |
-| `f804643` | The trend line is a curve between readings, not a staircase |
-| `05ad7c1` | STATE: the screenshot sweep this pass, and what it covered |
-| `c5a722b` | Photo logging, item 6: the record |
-| `10fddf1` | Photo logging, item 7: what the interface found, and three fixes it caused |
-| `2283468` | Photo logging, item 5: the probe is a maintained script, and what a photo costs |
-| `41438b9` | Photo logging, item 4: the surface, and proving the model can see |
-| `c277d0a` | Photo logging, item 3: one proposal list, and a row that cannot be saved |
-| `4142b7c` | Photo logging, item 2: what a photograph is allowed to say |
-| `1172842` | Photo logging, item 1: the picture goes and does not stay |
-| `0a970b0` | A model does see a plate, and it is qwen3-vl:8b |
-| `225918e` | Probe whether any model here can actually see, before building on it |
-| `9c9a3d3` | Record the pass: what CI ran and what is on dev |
-| `2125306` | Notice at boot that the VAPID pair changed |
-| `1faaab0` | 403 keeps the push subscription, because the fault is usually ours |
-| `2af8dd7` | Record the pass: the skip guard's own line, and what is on dev |
-| `6da0adf` | Sentence case for option buttons, and why two dead push rows survived |
-| `9cb04bf` | Absent data has the data as its subject, in every tone |
-| `c35da79` | A guard for skipped tests, and an inventory of the rest |
-| `3011e79` | Record the pass: what CI ran and what is on dev |
-| `d70794b` | Peppig on a bad week, the nine CI only tests, and lowercase tone labels |
-| `6e78363` | Exercise the Sunday sweep, and make a written week cost one lookup |
-| `ee4e696` | One habit, one form: the reminder is offered where the habit is made |
-| `44b708a` | Record the tone pass: what CI ran and what is on dev |
-| `3239a2e` | Three coach tones, the Sunday job, and two limits said out loud |
-| `48a33d1` | Record the coach pass: what CI ran and what is on dev |
-| `a511cb9` | Coach chat, phase 8b |
-| `da310ea` | Pin every third-party image by digest |
-| `feba0d0` | Record the habits pass: what CI ran and where MinIO lives now |
-| `efe56a1` | Pull MinIO from quay.io, since Docker Hub now refuses it |
-| `8528155` | The habit checklist, the second half of Phase 11 |
-| `ff16556` | Record the weekend pass: what CI ran and what is on dev |
-| `5964645` | Each reminder gets a weekday time and a weekend one |
-| `2900709` | Reminders: the push foundation and the two that pay for it |
-| `e575b51` | Entry points on Mat become quick actions, and the guard learns the third way |
-| `8fbe283` | Record the pass: S3, three button tiers, and what CI now proves |
-| `7c3d682` | Give the S3 run tests a database pg_dump can reach |
-| `ca8c17d` | Three button tiers, and the outline one is not among them |
-| `e791bca` | Start MinIO as a step, not a service container |
-| `00d2f8e` | Back up to S3, and reach a Windows share by mounting it on the host |
-| `4426cf1` | A backup destination can no longer take the API down |
-| `5876ea8` | Graphic profile v1.3 supersedes v1.2 |
-| `f02717d` | Correct the deploy handover |
-| `428429a` | Verify the pass through the interface, and fix what that turned up |
-| `ffb4176` | Back up to an SMB share, by speaking it rather than mounting it |
-| `72cd0c0` | Tell the admin a request arrived, and let them turn that off |
-| `db1f18d` | Announcements take a small Markdown subset, parsed not sanitised |
-| `37b85c8` | Asking for a code becomes its own deployment mode, at /kod |
-| `a601b3a` | Framsteg leads with the figures and folds the setup away |
-| `8a80a78` | Enable react-hooks lint rules, and fix what they found |
-| `b6cb9bd` | Record items 1 and 2, and what the brief still has open |
-| `1b4806d` | A logged row opens onto its macros, amount and source |
-| `ea18cc5` | Copy a past day's food forward to today |
-| `443f3ac` | Restart dev when needed, and hand the deploy over in writing |
-| `200ae48` | Record what is on dev and not on main |
-| `0f823e0` | One primary, one secondary, and Honung for what costs something |
-| `b83a1d9` | Write the reminder design into Phase 11, and bounce handling into the backlog |
-| `e864f6a` | Say why a macro mean is withheld, and dismiss the search on a pick |
-| `25a173f` | The weight axis is a ruler again, and holds every reading |
-| `36d6f9a` | Work happens on dev; main receives merges only |
+| `3009d64` | Record the host-side scripts: none were there, now both are equal |
+| `23fd109` | Host-side scripts get a check and an install, and run without compose |
+| `c903b81` | The environment is never listed, and a server can echo the token |
+| `6d55d6f` | The rollback dump is on the host, and production has no backup |
+| `cea4b47` | Record the pass: seven items, one blocked, and three things I got wrong |
+| `cf6ffc0` | Alcohol in the coach when there is something to say about it |
+| `801f597` | Four duplicate blocks were the rule actually in force |
+| `a06151a` | The verdict goes in a file, and the cause was not what I said it was |
+| `04b5d87` | Ask the registry the question the deploy will ask |
+| `30414de` | The retention job would have deleted the rollback dump |
+| `4bac1ae` | No step that asks for a password |
+| `c4bc2dd` | Derive the negative control instead of naming it |
 
 **Merging is a deploy**, and "Inför nästa deploy" above is the handover. `main`
 takes these through a pull request when the owner decides to update production,

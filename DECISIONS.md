@@ -8226,3 +8226,64 @@ a second nightly dump that is unencrypted and sits on the host next to what it
 protects. That can be the right fallback and it is a decision about users' data,
 so `check` says `not installed` with the reason, and `check --require-cron` exists
 for the day somebody decides to add it.
+
+---
+
+### D164 — A deploy is a command that asks its questions first
+
+*2026-09-15.*
+
+Every deploy of this installation so far was a person in Portainer's variables
+panel. Each way that goes wrong has already happened once: a tag set against a
+stack file that did not read it (D156), a password typed into a recorded session
+(D158), and `IMAGE_REPO` left at `local/` from the deploy before, which the
+next deploy would have inherited without anything on the panel saying so.
+
+`scripts/stack.mjs` replaces the panel for the ordinary case.
+
+- **`plan <version>`** reads the stack and changes nothing. It answers, in
+  order: does the stack file read `IMAGE_TAG` and `IMAGE_REPO`; is it the
+  release's `infra/docker-compose.portainer.yml`; is any variable the release
+  requires unset, and does the release read any the running file did not; what
+  `IMAGE_REPO` and `IMAGE_TAG` go from and to; are both images anonymously
+  pullable from GHCR (D160's two questions), or present on the host for a
+  `--repo local/` build; and what is running now. Anything wrong is a
+  `blocked:` line and exit 1.
+- **`deploy <version>`** is the plan and then stops. **`--yes`** sends one
+  stack update: every variable back with its value untouched and in its order,
+  `IMAGE_REPO` and `IMAGE_TAG` set, the stack file kept, `pullImage: true`,
+  `prune: false`. Then it waits for the API to be on the new image and healthy
+  and nginx on the new image. It prints the API log lines INFRA.md step 6 reads,
+  and ends `deployed x.y.z`, or prints the rollback command and exits 1.
+- **A stack file that differs from the release's** is a blocker until the
+  operator says `--release-file` or `--keep-file`. Replacing it silently would
+  undo a deliberate local edit; keeping it silently is how D156 happened.
+
+#### The secrets it has to hold
+
+Portainer returns every stack variable's value in every stack response, and the
+update must send them all back or they are cleared. So this script necessarily
+has `SECRET_KEY`, `SESSION_SECRET`, the database password and the VAPID private
+key in memory. What it may not do is print them: **names only, and values only
+for `IMAGE_REPO` and `IMAGE_TAG`**, the two it owns. Log output passes through
+`portainer.mjs`'s redactor and a line filter.
+
+`stack-deploy.test.ts` stands up a Portainer and a registry locally, has the
+stack return random dummy values for those four, and fails if any of them or the
+token reaches stdout or stderr on a plan, a refused deploy or a completed one.
+The same fake asserts the update body: all variables unchanged but two, pull on,
+prune off, file kept, and no update sent on a missing tag, a stack file that
+does not read `IMAGE_TAG`, a differing file without a flag, or no `--yes`.
+
+`portainer.mjs` gained `request()` for callers that need a raw response, so
+the token is still read and attached in one place.
+
+#### What has run against production, and what has not
+
+`plan 1.1.0`, read only, on 2026-09-15: stack file reads both variables and
+equals the file at `v1.1.0`; 26 variables set, none required and unset, none
+new; `IMAGE_REPO local/ -> ghcr.io/lundstream/`; both 1.1.0 images anonymously
+pullable; api healthy on `local/vikt-api:1.1.0`; nothing blocks.
+
+**`deploy --yes` has not run against production.** The owner deploys 1.1.1, and
+that is its first real run. The panel stays documented as the fallback.
