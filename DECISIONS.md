@@ -8148,3 +8148,81 @@ has already decided, and that noise is how a linter comes to be switched off.
 Shown to bite before it was trusted: against the file as it was, it reports all
 eight duplicate selectors with the line each was first used at, and exits 2.
 Against the file as it is, it exits 0.
+
+---
+
+### D163 — The files that reach production outside an image have a checksum now
+
+*2026-09-15.*
+
+Everything this installation runs arrives in an image, with a tag and a digest,
+except two files: `infra/backup.sh` and `infra/restore-check.sh`, which run from
+the Docker host. They had no update path, and nothing said which version was
+there.
+
+#### The premise was wrong, in the worse direction
+
+The brief for this said the host "still runs the version that deletes the
+rollback dump at 30 days", so the `-maxdepth 1` fix from D159 needed to reach it.
+It did not, because **the host ran no version**. `node scripts/host-scripts.mjs
+check`, run before anything was changed:
+
+```
+MISSING  backup.sh         repository 97c01ed7…a701de   host missing
+MISSING  restore-check.sh  repository 9b3eb71e…8363ab8   host missing
+cron     not installed (/etc/cron.d/vikt-backup)
+```
+
+No `/srv/vikt`, no cron entry. D103 had moved scheduling into the app, and the
+app's schedule has never been configured, so production had no backup of any
+kind (STATE.md). D159's fix was real and was written for a host copy that did not
+exist; the rollback dump was never on a timer.
+
+#### What was built
+
+`scripts/host-scripts.mjs`, on top of `scripts/portainer.mjs`:
+
+- **`check`** compares the sha256 of the committed blob at `HEAD` with the host's
+  copy in `/srv/vikt/infra`, read through a throwaway container from the
+  `postgres:16-alpine` digest the stack already runs. Exit 1 on missing or
+  different, and it says which.
+- **`install`** writes the committed blobs there through Docker's archive
+  endpoint, `root`, mode `755`, then runs `check`.
+- **Committed blob, never working tree.** 162 tracked files have CRLF working
+  copies on the workstation, `backup.sh` among them. A CRLF copy on the host is
+  a "bad interpreter" error, and its checksum would never match a correct
+  install.
+
+After `install` from `23fd109`, both `equal`:
+`backup.sh 02548ca5…9c03634`, `restore-check.sh 12d9f64e…d8d3fe1`.
+
+`portainer.mjs` gained a raw `request()`, so the token is still read in one
+place, and exported `out`/`err` so a second script prints through the same
+redactor. Its CLI now runs only when it is the invoked file: imported, it shared
+`argv` with the importer, and `host-scripts.mjs check` would also have run
+`portainer.mjs check`.
+
+#### The scripts could not have run there anyway
+
+Both reached Postgres only through `docker compose -f $HERE/docker-compose.yml`.
+A Portainer host keeps the stack file inside Portainer, and the repository's
+Portainer compose file cannot be parsed without every stack variable set. So the
+fallback `docs/backup.md` promised for "when the app is the thing that is broken"
+had no invocation that worked on this host. Without a compose file beside them
+they now use `docker exec -i ${POSTGRES_CONTAINER:-vikt-postgres-1}`.
+`host-scripts.test.ts` runs both from a directory with no compose file and a
+stand-in `docker` on PATH, and asserts every call went to the container by name.
+
+**Not exercised on the host.** Running the installed copy from `/srv/vikt/infra`
+needs a container that `chroot`s into the host root, and the session's permission
+policy refused it. That is correct for the policy to ask about and is left to the
+owner. The script body, with the compose call shimmed, did run against production
+the same day (D159 addendum).
+
+#### The cron line is reported and never installed
+
+It is not a sync. With the app's scheduler as the design (D103), the line starts
+a second nightly dump that is unencrypted and sits on the host next to what it
+protects. That can be the right fallback and it is a decision about users' data,
+so `check` says `not installed` with the reason, and `check --require-cron` exists
+for the day somebody decides to add it.

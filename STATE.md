@@ -557,7 +557,7 @@ rather than the gallery. Open Mat on the phone, press Fotografera maten, and say
 whether the camera opens straight away. If it opens the picture gallery instead,
 that is the finding and it is a one-line change.
 
-**Blocked, not skipped:****Blocked, not skipped:** removing the probe request
+**Blocked, not skipped:** removing the probe request
 `human-check-probe@example.test` needs the production database, and the
 Portainer password was rotated after the deployment pass. It is under
 Administration, Förfrågningar, Besvarade, "Ta bort".
@@ -827,9 +827,15 @@ urgent than anything else in this file.
 - `backup_settings` has **no row**: no destination and no schedule.
 - `backup_runs` has **no rows**: not one backup has ever run, scheduled or by
   hand through the app.
-- The `vikt_vikt_backups` volume is empty. The host has no `backup.sh`, no cron
+- The `vikt_vikt_backups` volume is empty. The host had no `backup.sh`, no cron
   line and no systemd timer, which is correct since D103 moved scheduling into
   the app — but it means nothing else is covering for it.
+- **`backup.sh` and `restore-check.sh` are on the host now** (D163), equal by
+  sha256 to the repository, and runnable without a compose file. **They have no
+  schedule.** Adding the cron line in INFRA.md, "Host-side scripts", gives a
+  second, unencrypted nightly dump on the host; that is your call, as is the
+  first run of either from `/srv/vikt/infra`, which this session's permission
+  policy refused. `node scripts/host-scripts.mjs check` says where they stand.
 
 The only backup of production that exists is the pre-1.1.0 dump taken by hand on
 13 September, now at `/var/backups/vikt/releases/pre-1.1.0-62dde4f.dump` and
