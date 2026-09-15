@@ -486,6 +486,18 @@ prepares it:
 | `4bac1ae` | No step that asks for a password |
 | `c4bc2dd` | Derive the negative control instead of naming it |
 
+**And these are 1.2.0, not 1.1.1.** They come after the release commit
+`12a9daa`, so a pull request cut from `dev` would ship them; INFRA.md step 3
+cuts the release branch at `12a9daa` instead. 1.2.0 is not prepared yet (item 11
+above), and migration 0030 is among these:
+
+| | |
+|---|---|
+| `5a61902` | The coach says whether something shows, and what each area means |
+| `7533032` | Samband puts intake against trend change one week at a time |
+| `08b17b4` | Search says where it is, and a typo inside a long name is still a match |
+| `472dc6f` | Incomplete sums say "minst", at every span |
+
 **Merging is a deploy**, and "Inför nästa deploy" above is the handover. `main`
 takes these through a pull request when the owner decides to update production,
 not when the suite goes green.
@@ -500,7 +512,34 @@ Windows and the kill has to be by port.
 
 ## Still open from the briefs
 
-**Finished on `dev` this pass.** Each was a numbered item and each is whole:
+### The 2026-09-15 brief: eight of eleven done, three not started
+
+Stopped after a completed item, as the brief allows. **Items 1 to 8 are finished
+on `dev`**: the rollback dump on the host (D159), the environment never listed
+(D158), the host-side scripts (D163), 1.1.1 prepared with `scripts/stack.mjs`
+(D164), "minst" at every span (D55), search feedback and fuzzy matching (D165),
+Samband per week (D166), and the coach's two interpretation rules (D155).
+
+**Not started, in the brief's order:**
+
+- **9. The day table under Data, and the Excel export.** One row per day with
+  weight, trend, intake with coverage, the four macros with "minst", alcohol,
+  activity minutes, steps, sleep, energy, mood, waist, measured maintenance as of
+  the day with its source, and intake minus maintenance; sortable, scrolling
+  sideways on a phone, from a shared calc and formatter. "Exportera till Excel"
+  as a real .xlsx built on the API with a pinned, testable library: the table
+  first, one sheet per raw entity, Swedish headers, decimal comma, dates as
+  dates. A test that the workbook opens and its first sheet equals the table,
+  beside the CSV and JSON export and the same round trip.
+- **10. Landing copy that is no longer true.** "Logga mat på ett tryck", the
+  offline sentence's "butikskällare", "Om AI", and new screenshots from a seeded
+  demo account at phone frame sizes, with no redesign.
+- **11. Prepare v1.2.0.** "Inför nästa deploy" covering items 5 to 10: migration
+  0030 and the role it needs (INFRA.md, "What role a migration needs"), a Nyheter
+  row per user-visible change, and the runbook step. It depends on 9 and 10, so
+  it is last for a reason.
+
+**Finished on `dev` the pass before.** Each was a numbered item and each is whole:
 
 - **Rules of hooks** is enabled and error-level, `exhaustive-deps` is a warning,
   and the three things it found are fixed. It was never installed, which is why
@@ -581,7 +620,7 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1773 tests**: 494 shared, 353 web, 926 api. **Nine more run in CI**, and they
+**1848 tests**, counted on 2026-09-16 after item 8: 510 shared, 375 web, 963 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -590,7 +629,7 @@ endpoint *is* configured nothing is half-skipped, so a CI box that lost
 `pg_dump` fails rather than quietly covering less (§7). Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 926 with none skipped**, and that is checked rather
+**In CI the api suite runs 972 with none skipped**, and that is checked rather
 than read: `pnpm test:skips` reads the reports and names anything skipped outside
 the allowlist. What matters is the nine: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
@@ -609,8 +648,40 @@ late-is-worse-than-never rule outside a test harness.
 
 **Still open, and only the owner can close it** (see the section below).
 
-**Exercised through the interface**, at 360 px and at 1280 px, on the production
-build served by `vite preview`:
+**The full sweep, 2026-09-16, after item 8**: `shoot2.mjs` over every finished
+screen at 360 px and desktop against the development server, **40 of 40, none
+failed** (signed in, no horizontal overflow, no blank screen, no transform left
+on the section track), verdict in the set's `verdict.txt`. CI green on `dev`
+for every commit this pass, the last being `5a61902`.
+
+**Exercised through the interface on 2026-09-15 and 16**, at 360 px and desktop,
+on the **development server**, not a production build. Driven through Edge over
+CDP, with each screen's measurements written to a verdict file beside its
+screenshots:
+
+- **"Minst" on a partial day** (D55): the development account with two food rows
+  added, one carrying protein, carbohydrate and fat and one carrying nothing.
+  Översikt in both views and Mat: every partial figure "minst" in Sten
+  (`#6B7B82`), the share on the line under it (39 % for the day, 41 % for the
+  week), fibre "Inte än" with "Ingen mat du loggat i dag har uppgift om fiber."
+  No overflow;
+- **Search on Mat** (D165): "Yogghurt" showed the saved yoghurts, then "Söker
+  vidare i livsmedelsdatabasen" in Sten with the list at eighteen rows, clearing
+  at about 300 ms; "zzzqqqx" showed "Söker i livsmedelsdatabasen" and then
+  "Inget hittat för ”zzzqqqx”." once the database had answered. The local
+  "Söker" state was faster than the 60 ms sampling and was **not seen**;
+- **Samband per week** (D166): `samband@example.test` with 12 weekly points, the
+  dashed line drawn and maintenance measured at 2 514 kcal against the 2 500 the
+  seeded body obeys; the development account with 11 whole weeks, 3 dropped, and
+  no line because its maintenance is not measured. **Not "inte än"**, which the
+  brief expected for that account;
+- **The coach, live, in three tones on two accounts** (D155, addendum
+  2026-09-16), through `coach-probe.ts` against `qwen3.6:27b`: the replies are in
+  D155 verbatim, every sentence passed the guard, and the macro sentence the new
+  rule asks for appeared in one of six.
+
+**Exercised through the interface** the pass before, at 360 px and at 1280 px,
+on the production build served by `vite preview`:
 
 - the landing page, with one action and the sentence that replaced the second
   button;
