@@ -59,6 +59,15 @@ when it will be down, and its mail goes out.
   actually in force: the wrong radius, the page colour instead of the card
   colour, the wrong padding and size, and the dark theme's chevron drawn on the
   light theme. `stylelint` fails the build on a duplicate selector now.
+- **A table of days, and the whole account as a real spreadsheet** (D167).
+  Data, Dagar: one row per day with seventeen columns from weight and trend to
+  maintenance as of that day with its source and intake minus it, sortable, in
+  its own sideways-scrolling region. Inställningar, Ta med din data: Excel (the
+  day table first, a sheet per table, Swedish headers, numbers as numbers, dates
+  as dates, "minst" as a number format), the JSON file, and CSV per table, which
+  no screen had offered before. Exercised on the development account at 360 px
+  and desktop: 90 rows, no page overflow, and the downloaded workbook matching
+  the table in 2 014 of 2 014 cells.
 - **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
   Below the coverage gate a macro is the known sum after "minst", in Sten, with
   the share of the food carrying it on the line under it: on Översikt's day card

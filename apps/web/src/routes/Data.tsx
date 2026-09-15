@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Correlations } from "./Correlations.js";
+import { DayTableView } from "../components/DayTable.js";
 import { Link, useSearchParams } from "react-router-dom";
 import { addDays, eachDay, type DailyLogEntry } from "shared";
 import { useActivities, useDailyLogs, useMeasurements } from "../lib/daily.js";
@@ -124,7 +125,7 @@ const SERIES: Series[] = [
   },
 ];
 
-type Tab = "serier" | "samband";
+type Tab = "serier" | "samband" | "dagar";
 
 export function Data() {
   const me = useMe();
@@ -138,7 +139,8 @@ export function Data() {
    * it does.
    */
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get("vy") === "samband" ? "samband" : "serier";
+  const view = params.get("vy");
+  const tab: Tab = view === "samband" ? "samband" : view === "dagar" ? "dagar" : "serier";
 
   const dailyLogs = useDailyLogs();
   const activities = useActivities();
@@ -242,6 +244,7 @@ export function Data() {
         {(
           [
             ["serier", "data.tabSeries"],
+            ["dagar", "data.tabDays"],
             ["samband", "data.tabCorrelations"],
           ] as const
         ).map(([key, label]) => (
@@ -264,9 +267,16 @@ export function Data() {
 
       {tab === "samband" ? <Correlations /> : null}
 
+      {/*
+        One row per day (D167), for the range above. Its own scrolling region,
+        because seventeen columns do not fit a phone and the page must not
+        scroll sideways because of them.
+      */}
+      {tab === "dagar" ? <DayTableView from={from} to={today} /> : null}
+
       {failed ? <OfflineNotice what="data" /> : null}
 
-      {tab === "samband" ? null : loading ? (
+      {tab !== "serier" ? null : loading ? (
         <p role="status" className="text-note text-muted">
           {t("app.loading")}
         </p>

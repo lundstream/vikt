@@ -72,6 +72,24 @@ export function useCorrelations(asOf: string) {
   });
 }
 
+/** The day table under Data (D167). */
+export function useDayTable(from: string, to: string) {
+  return useQuery({
+    queryKey: ["day-table", from, to],
+    queryFn: () => api.dayTable(from, to),
+    staleTime: 60_000,
+  });
+}
+
+/** What the CSV export offers, from the API rather than a list kept here. */
+export function useExportTables() {
+  return useQuery({
+    queryKey: ["export", "tables"],
+    queryFn: () => api.exportTables(),
+    staleTime: Infinity,
+  });
+}
+
 /**
  * Every mutation is an idempotent upsert keyed on `clientUuid`, so a retry
  * after a flaky connection is safe. Phase 6 swaps the direct call for the Dexie

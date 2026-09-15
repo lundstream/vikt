@@ -9,6 +9,7 @@ import {
   type ExportedTable,
 } from "../services/export.service.js";
 import { importUser } from "../services/import.service.js";
+import { buildWorkbook, XLSX_CONTENT_TYPE } from "../services/xlsx.service.js";
 import { badRequest, unprocessable } from "../lib/errors.js";
 
 /**
@@ -74,6 +75,34 @@ export const exportRoutes: FastifyPluginAsyncZod = async (app) => {
          * buffer, and an async generator serialises to `{}`.
          */
         .send(Readable.from(csvFor(request.userId!, app.db, table)));
+    },
+  );
+
+  /**
+   * Everything as one Excel workbook (D167): the day table first, then one
+   * sheet per exported table. `asOf` is the last day of the table, in the
+   * person's own timezone, because a server's idea of today is not theirs (§3).
+   */
+  app.get(
+    "/export/xlsx",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        querystring: z.object({
+          asOf: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")
+            .optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const asOf = request.query.asOf ?? new Date().toISOString().slice(0, 10);
+      const file = await buildWorkbook(request.userId!, app.db, asOf);
+      return reply
+        .header("content-type", XLSX_CONTENT_TYPE)
+        .header("content-disposition", `attachment; filename="vikt-${asOf}.xlsx"`)
+        .send(file);
     },
   );
 

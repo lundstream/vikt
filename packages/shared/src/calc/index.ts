@@ -29,6 +29,7 @@ export * from "./measurements.js";
 export * from "./activity.js";
 export * from "./correlate.js";
 export * from "./weekly-intake.js";
+export * from "./day-table.js";
 export * from "./savings.js";
 export * from "./streak.js";
 export * from "./habit-streak.js";

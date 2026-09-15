@@ -8662,3 +8662,105 @@ The API test builds the same kind of body through the database (84 days at a
 constant 2 000 kcal against 2 500): maintenance measured within 60 kcal of the
 truth, every point on a Monday, and the last three weeks within 0.08 kg per week
 of the line.
+
+---
+
+### D167 — One row per day, and a real spreadsheet of it
+
+*2026-09-16.*
+
+#### The table
+
+Data gains a third tab, **Dagar**: one row per day with the date, weight, trend,
+intake with its coverage, protein, carbohydrate, fat and fibre, alcohol, activity
+minutes, steps, sleep, energy, mood, waist, maintenance as of that day with its
+source, and intake minus maintenance. Seventeen columns, sortable by any of them,
+newest first.
+
+**Every figure comes from the calc that already owns it.** `buildDayTable` in
+`calc/day-table.ts` adds no formula: the trend is §4.1's, the macros and their
+"minst" are `dayMacros` (D55), and **maintenance as of each day is
+`estimateTdee` run with that day as `asOf`**, which is exactly the figure and
+source the dashboard showed on that day. A test checks the table's last row
+against `/api/insights` for today. The API serves the rows; the screen prints
+them with the shared formatter, so nothing is recomputed in the browser.
+
+- **Intake coverage** is the share of the day's logged energy that came from
+  entries carrying any macro at all. It is shown only below 100 %, in Sten, and it
+  is null on a day with no food entries rather than zero.
+- **An empty cell is a figure that is not filled in**, never a zero and never a
+  dash (§5, which also forbids the dash the shared formatter prints for a
+  non-finite value).
+- **Manual intake wins over food entries for its day**, in the macros exactly as
+  in the intake (`resolveMacros`, D44), so a manual day's macros are that one
+  entry. The first draft of the Excel test logged food on a manual day, found
+  the protein cell empty, and the app was right.
+- **It scrolls sideways in its own region**, labelled and focusable, with the
+  date column sticky, so on a phone the table moves and the page does not.
+- **The trend column is plain text, not Lingon.** The first version drew it in
+  the trend colour, and `colour-meaning.test.ts` refused it: §5 gives Lingon to
+  the trend line and the wordmark, and a figure in a table is neither.
+
+#### The Excel file
+
+`GET /api/export/xlsx` writes a real Office Open XML workbook with **`exceljs`,
+pinned to exactly 4.4.0**: the day table as the first sheet, then one sheet per
+exported table.
+
+**Numbers are numbers and dates are dates.** This is the decision worth writing
+down, because the brief asked for "decimal comma" and there are two ways to give
+it. A text cell reading "86,9" shows a comma and cannot be summed, sorted or
+charted, which is the reason anybody wants a spreadsheet instead of a CSV. So
+every figure is a number with a number format, and **Excel draws the decimal
+separator from the reader's locale**: a comma on a Swedish machine. Dates are
+Excel dates with a date format, built at UTC midnight so no timezone moves them a
+day.
+
+**"Minst" is a number format.** A partial macro is written as its known grams
+with the format `"minst "0`: the cell reads "minst 30" and its value is 30, so
+the sheet says what the table says and still adds up. The first version put the
+format on every incomplete cell, including days with nothing logged, which gave
+397 formatted empty cells on the development account; it is only on a cell with a
+figure now, which gave 8, the same 8 the screen shows.
+
+**The raw sheets are typed from the database, not guessed from the values.**
+`information_schema.columns` says which columns are numeric, date, timestamp,
+boolean or JSON, so a name that happens to be digits stays text and a `numeric`
+that Drizzle returns as a string becomes a number.
+
+**Swedish names live in one place**, `packages/shared/src/export-names.ts`, used
+by the workbook's tabs and headers and by the CSV list on screen. A column with no
+Swedish name keeps its database name, and the round-trip test refuses exactly that,
+so a column added to an exported table cannot reach a workbook unnamed.
+
+In memory rather than streamed: a personal account is a few thousand rows, and
+the streaming writer cannot size a column after its rows are written.
+
+#### Beside the CSV and JSON, which were not beside anything
+
+Account deletion's hint said "en JSON-fil med hela kontot och CSV per tabell".
+**No screen offered the CSV at all**; the endpoint existed and nothing linked to
+it. So Inställningar gains **Ta med din data**, with Excel, the JSON file, and a
+link per table for CSV with its Swedish name, and the hint is true.
+
+A render test of an unrelated screen found the first version of that section
+taking **all of Inställningar down**: it trusted the table list's shape, and a
+stub answering without `tables` made `.map` throw. It draws the list only when
+the answer really is one.
+
+#### Verified
+
+- **Tests:** the calc (8), the endpoint (5, including today's maintenance equal to
+  the dashboard's), the workbook in `export-roundtrip.test.ts` (it is a zip; the
+  first sheet equals `/api/day-table` cell by cell as numbers and dates; a partial
+  macro is a number with the "minst" format and an empty cell has neither; every
+  exported row is in its sheet under a Swedish header; another account's rows are
+  absent), and the table's render (sorting, nulls last, "minst" in Sten, empty
+  cells, the scrolling region).
+- **Through the interface**, on the development account at 360 px and desktop:
+  90 rows and 17 columns, the region scrolling 781 px sideways with **no page
+  overflow**, weight sorting ascending with `aria-sort`, 8 "minst" cells, and the
+  export section with Excel, JSON and 21 CSV links. The workbook downloaded
+  through the page's own session, 71 248 bytes, opened and compared with the
+  table fetched beside it: **2 014 cells, 0 mismatched**, 22 sheets, the first
+  "Dagar".

@@ -42,6 +42,7 @@ import { accountRoutes } from "./routes/account.routes.js";
 import { announcementRoutes } from "./routes/announcement.routes.js";
 import { pushRoutes } from "./routes/push.routes.js";
 import { exportRoutes } from "./routes/export.routes.js";
+import { dayTableRoutes } from "./routes/day-table.routes.js";
 import { createMailer, type Mailer } from "./mail/sender.js";
 import { portionRoutes } from "./routes/portions.routes.js";
 import { dailyRoutes } from "./routes/daily.routes.js";
@@ -282,6 +283,7 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
       await api.register(announcementRoutes);
       await api.register(pushRoutes);
       await api.register(exportRoutes);
+      await api.register(dayTableRoutes);
     },
     { prefix: "/api" },
   );

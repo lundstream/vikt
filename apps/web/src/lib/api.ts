@@ -62,6 +62,7 @@ import type {
   RecipeResponse,
   UpdateFoodEntry,
   UpdateTemplate,
+  DayTableResponse,
   FoodEntry,
   FoodItem,
   FoodSearchResult,
@@ -459,6 +460,13 @@ export const api = {
    */
   correlations: (asOf: string) =>
     request<CorrelationsResponse>(`/correlations?asOf=${asOf}`),
+
+  /** One row per day in the range (D167). */
+  dayTable: (from: string, to: string) =>
+    request<DayTableResponse>(`/day-table?from=${from}&to=${to}`),
+
+  /** The tables a CSV export can carry. */
+  exportTables: () => request<{ tables: string[] }>("/export/tables"),
 
   // ------------------------------------------ milestones and the savings pot
   progress: (asOf: string) => request<ProgressResponse>(`/progress?asOf=${asOf}`),

@@ -18,6 +18,7 @@ import { queueDegraded } from "../lib/queue/enqueue.js";
 import { formatLongDay } from "../lib/dates.js";
 import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
 import { DeleteAccount } from "../components/DeleteAccount.js";
+import { ExportData } from "../components/ExportData.js";
 import { NewsMailToggle, RequestMailToggle } from "../components/NewsMailToggle.js";
 import { AppVersion } from "../components/AppVersion.js";
 import { Reminders } from "../components/Reminders.js";
@@ -313,6 +314,8 @@ export function Settings() {
         settings. It is its own destination in the Mer sheet now, so a second
         way in from halfway down another screen is one place too many to look.
       */}
+
+      <ExportData />
 
       <DeleteAccount />
 
