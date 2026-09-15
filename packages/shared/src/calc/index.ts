@@ -11,6 +11,7 @@
  *   measurements.ts   body measurements, smoothed like weight (D32)
  *   activity.ts       MET estimates, kept out of the maths (D33)
  *   correlate.ts      pairing for the scatter view, no statistic (D34)
+ *   weekly-intake.ts  intake against trend change, per calendar week (D166)
  *   savings.ts  §4.5  pot balance, accrued on read         — done, phase 5
  *   streak.ts   §4.6  logging streaks, days since a drink  — done, phase 5
  *   habit-streak.ts   one habit's chain, ticked/missed/unknown (D137)
@@ -27,6 +28,7 @@ export * from "./whtr.js";
 export * from "./measurements.js";
 export * from "./activity.js";
 export * from "./correlate.js";
+export * from "./weekly-intake.js";
 export * from "./savings.js";
 export * from "./streak.js";
 export * from "./habit-streak.js";

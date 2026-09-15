@@ -68,6 +68,16 @@ when it will be down, and its mail goes out.
   no logged food carries the value. Exercised on the development account with a
   partial day (two food rows added on 2026-09-15, "Kvarg med bär" and "Middag
   hos vänner"), shot at 360 px and desktop.
+- **Samband puts intake against trend change one week at a time** (D166). One
+  point per whole Monday-to-Sunday week with six logged days, the trend change
+  shifted by its lag and stated per week, nothing until four whole weeks ("Inte
+  än" and the count), and a dashed line in Sten for what 7 700 kcal per kilo says
+  the week should do, only when maintenance is measured. The line is arithmetic,
+  not a fit, and D34 was reopened for exactly that. Exercised at 360 px and
+  desktop on `samband@example.test` (a seeded body that obeys the arithmetic:
+  12 weeks, the line drawn, settled weeks on it) and on the development account,
+  which has 11 whole weeks and therefore **draws points, not "inte än"**, with
+  no line because its maintenance is not measured.
 - **Food search says where it is, and forgives a typo inside a long name**
   (D165). Mat shows the saved rows at once, says "Söker vidare i
   livsmedelsdatabasen" in Sten while the database is asked, appends what it

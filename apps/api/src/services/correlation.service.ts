@@ -2,16 +2,19 @@ import type { CorrelationPane, CorrelationsResponse } from "shared";
 import {
   buildActivityIndex,
   hasEnoughToPlot,
-  intakeOn,
+  KCAL_PER_KG,
   MIN_PAIRS_TO_PLOT,
+  MIN_WHOLE_WEEKS,
   pairSeries,
   toNumberOrNull,
+  weeklyIntakeAgainstTrend,
   type PairedSeries,
 } from "shared";
 import type { Db } from "../db/index.js";
 import { listActivities, listDailyLogs } from "../repositories/daily.repo.js";
 import { resolveIntake } from "./intake.service.js";
 import { resolveTrend } from "./series.service.js";
+import { currentMaintenance } from "./insights.service.js";
 
 /**
  * The deep-dive screen's data.
@@ -26,21 +29,19 @@ import { resolveTrend } from "./series.service.js";
  * prose would not, and it is the kind of thing that gets acted on.
  */
 
-/** Days a day's trend change is measured across. One day is mostly water. */
-const TREND_CHANGE_WINDOW_DAYS = 7;
-
 export async function getCorrelations(
   userId: string,
   db: Db,
   asOf: string,
 ): Promise<CorrelationsResponse> {
-  const [dailyRows, activityRows, intake, trend] = await Promise.all([
+  const [dailyRows, activityRows, intake, trend, maintenance] = await Promise.all([
     listDailyLogs(userId, db, {}),
     listActivities(userId, db, {}),
     // Both through their owners, so the axes mean the same thing here as on
     // the dashboard and in §4.2 (D47).
     resolveIntake(userId, db, {}),
     resolveTrend(userId, db, asOf),
+    currentMaintenance(userId, db, asOf),
   ]);
 
   /** Absent stays absent: a day with no rating is not a day rated zero. */
@@ -70,38 +71,47 @@ export async function getCorrelations(
   );
 
   /**
-   * Change in the smoothed line over the previous week, in kg, per day.
+   * Intake against trend change, **one point per whole calendar week** (D166).
    *
-   * A single day's trend change against a single day's intake is a scatter of
-   * noise: the trend moves a few grams a day and the smoothing means today's
-   * point already contains last week's eating. A week of change against the
-   * same week's mean intake is the comparison someone actually means.
+   * This used to be a seven-day mean beside a seven-day trend change on every
+   * day, so each point shared six days with the next and a week was drawn as
+   * seven overlapping dots, and the change was measured over the same days as
+   * the intake although the trend lags the scale by about nine. The weekly calc
+   * shifts the span by the lag at this person's cadence and measures it the §4.2
+   * way; it is documented, with what the shift cannot do, in `weekly-intake.ts`.
    */
-  const trendChange = new Map<string, number | null>();
-  for (const [index, point] of trend.entries()) {
-    const earlier = trend[index - TREND_CHANGE_WINDOW_DAYS];
-    trendChange.set(point.localDate, earlier ? point.trend - earlier.trend : null);
-  }
-
-  const meanIntake = new Map<string, number | null>();
-  for (const [index, point] of trend.entries()) {
-    const window = trend.slice(Math.max(0, index - TREND_CHANGE_WINDOW_DAYS + 1), index + 1);
-    const logged = window
-      .map((day) => intakeOn(intake, day.localDate))
-      .filter((kcal): kcal is number => kcal !== null);
-
-    // The §4.2 rule, again: divide by the days that were logged, never by the
-    // days in the window. An unlogged day is not a day of zero calories.
-    meanIntake.set(
-      point.localDate,
-      logged.length === 0 ? null : logged.reduce((a, b) => a + b, 0) / logged.length,
-    );
-  }
+  const weekly = weeklyIntakeAgainstTrend({ trend, intake, asOf });
+  const weeklyFirst = weekly.points[0];
+  const weeklyLast = weekly.points.at(-1);
 
   const panes: CorrelationPane[] = [
     toPane("sleep_energy", pairSeries(sleep, energy)),
     toPane("activity_sweat", pairSeries(activityMinutes, sweat)),
-    toPane("intake_trend_change", pairSeries(meanIntake, trendChange)),
+    {
+      pane: "intake_trend_change",
+      pairs: weekly.points.map((point) => ({
+        localDate: point.weekStart,
+        x: point.meanIntakeKcal,
+        y: point.trendChangeKgPerWeek,
+      })),
+      sampleSize: weekly.points.length,
+      unpairedDays: weekly.droppedWeeks,
+      range:
+        weeklyFirst && weeklyLast ? { from: weeklyFirst.weekStart, to: weeklyLast.weekEnd } : null,
+      enough: weekly.points.length >= MIN_WHOLE_WEEKS,
+      unit: "week",
+      needed: MIN_WHOLE_WEEKS,
+      lagDays: weekly.lagDays,
+      /**
+       * The expected line, only from a measured maintenance figure (D166). A
+       * formula's figure is a guess about this body, and a line drawn from it
+       * would sit on the chart looking exactly like one drawn from data.
+       */
+      reference:
+        maintenance.source === "adaptive" && maintenance.tdee !== null
+          ? { maintenanceKcal: maintenance.tdee, kcalPerKg: KCAL_PER_KG }
+          : null,
+    },
   ];
 
   return {
@@ -120,5 +130,9 @@ function toPane(pane: CorrelationPane["pane"], series: PairedSeries): Correlatio
     unpairedDays: series.unpairedDays,
     range: series.range,
     enough: hasEnoughToPlot(series),
+    unit: "day",
+    needed: MIN_PAIRS_TO_PLOT,
+    lagDays: null,
+    reference: null,
   };
 }

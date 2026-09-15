@@ -911,11 +911,23 @@ export const sv = {
   "corr.activityMinutes": "Rörelse (min)",
   "corr.sweat": "Svettning",
   "corr.meanIntake": "Snittintag (kcal)",
-  "corr.trendChange": "Trendförändring (kg)",
   "corr.sleepEnergyCaption": "En punkt per dag där både sömn och energi är ifyllda.",
   "corr.activitySweatCaption": "Dagens minuter i rörelse mot hur svettig dagen kändes.",
-  "corr.intakeTrendCaption":
-    "Snittintag den senaste veckan mot hur mycket trendvikten rört sig under samma vecka.",
+  "corr.trendChangeWeek": "Trendförändring (kg per vecka)",
+  "corr.intakeTrendWeekCaption":
+    "En punkt per hel vecka, måndag till söndag: veckans snittintag mot hur mycket trendvikten rörde sig.",
+  "corr.sampleWeeks": "Antal veckor",
+  "corr.droppedWeeksLabel": "Veckor med för få loggade dagar",
+  "corr.notYetWeeks": "Inte än. {have} av {need} hela veckor.",
+  "corr.weekNeedsDays": "En vecka räknas när minst {days} av dess dagar har intag loggat.",
+  "corr.droppedWeeks": "{weeks} veckor hade för få loggade dagar och räknas inte med.",
+  "corr.weekOf": "Veckan från {date}",
+  "corr.lagNote":
+    "Trendvikten ligger ungefär {lag} dagar efter vågen, så varje veckas förändring är mätt {lag} dagar senare än veckan den hör till.",
+  "corr.expectedNote":
+    "Den streckade linjen är vad 7 700 kcal per kilo säger att veckans snittintag borde ge med din uppmätta underhållsnivå, {maintenance} kcal. En punkt över linjen gick upp mer än intaget förklarar, en punkt under gick ner mer. Veckorna närmast en ändring i intaget hamnar vid sidan av linjen medan trenden hinner ikapp, och vatten, salt och dagar som inte loggats flyttar också punkter.",
+  "corr.noExpected":
+    "Linjen för vad intaget borde ge visas när underhållsnivån är uppmätt ur din egen loggning, inte uträknad ur en formel.",
   "corr.sampleSize": "Antal dagar",
   "corr.range": "Period",
   "corr.rangeValue": "{from} till {to}",

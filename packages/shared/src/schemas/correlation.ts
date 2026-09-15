@@ -35,8 +35,31 @@ export const paneSchema = z.object({
   /** Days where one axis had a value and the other did not. */
   unpairedDays: z.number().int().min(0),
   range: z.object({ from: z.string(), to: z.string() }).nullable(),
-  /** False below `MIN_PAIRS_TO_PLOT`; the UI then says how much more it needs. */
+  /** False below `needed`; the UI then says how much more it needs. */
   enough: z.boolean(),
+  /**
+   * What one point is (D166). `day` for sleep and movement; `week` for intake
+   * against trend change, which is one point per whole calendar week. For a
+   * weekly pane `sampleSize` counts weeks, `unpairedDays` counts weeks dropped
+   * for too few logged days, and each pair's `localDate` is its Monday.
+   */
+  unit: z.enum(["day", "week"]),
+  /** How many points before the pane draws anything, in its own unit. */
+  needed: z.number().int().min(0),
+  /** The trend's lag the weekly change was shifted by, in days. Null for a daily pane. */
+  lagDays: z.number().int().min(0).nullable(),
+  /**
+   * The expected change the screen draws as a dashed line (D166, reopening D34
+   * on purpose): 7 × (intake − maintenance) / kcalPerKg, kg per week.
+   *
+   * **Not a fit.** Nothing in it comes from the points; it is the measured
+   * maintenance figure and the 7700 constant, and it would be the same line on
+   * an empty chart. Null unless maintenance is measured (`source: "adaptive"`),
+   * because a line drawn from a formula's guess would look like a measurement.
+   */
+  reference: z
+    .object({ maintenanceKcal: z.number(), kcalPerKg: z.number() })
+    .nullable(),
 });
 export type CorrelationPane = z.infer<typeof paneSchema>;
 

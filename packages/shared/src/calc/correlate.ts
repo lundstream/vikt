@@ -24,7 +24,9 @@
  * their own conclusion — or fail to, which is often the correct outcome.
  *
  * If a later change wants a trend line here, that is a decision to reopen D34
- * on purpose, not a tweak to a chart component.
+ * on purpose, not a tweak to a chart component. D166 did, for one line only:
+ * the expected change from measured maintenance and 7700 kcal per kg, which is
+ * arithmetic about the intake pane and computed nowhere near this file.
  *
  * Pure. No I/O, no clock.
  */

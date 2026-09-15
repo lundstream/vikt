@@ -705,17 +705,23 @@ export async function buildCoachFacts(
   for (const pane of correlations.panes) {
     const name = paneNames[pane.pane] ?? pane.pane;
     if (pane.sampleSize === 0) {
-      say(`${name}: det finns ingen dag där båda är ifyllda.`);
+      say(
+        pane.unit === "week"
+          ? `${name}: det finns ingen hel vecka där båda är ifyllda.`
+          : `${name}: det finns ingen dag där båda är ifyllda.`,
+      );
       continue;
     }
 
+    // Weeks for intake against trend change, days for the others (D166).
+    const unit = pane.unit === "week" ? "hela veckor" : "dagar";
     say(
-      // `enough` is the service's own answer, not a threshold recomputed here.
+      // `enough` and `needed` are the service's own answers, not recomputed here.
       pane.enough
-        ? `${name}: ${num(pane.sampleSize, "count")} dagar där båda finns. Appen ritar dem ` +
+        ? `${name}: ${num(pane.sampleSize, "count")} ${unit} där båda finns. Appen ritar dem ` +
           "mot varandra under Samband, men räknar inget samband och påstår ingen orsak."
-        : `${name}: bara ${num(pane.sampleSize, "count")} dagar där båda finns, och ` +
-          `${num(correlations.minPairs, "count")} behövs innan appen ritar något.`,
+        : `${name}: bara ${num(pane.sampleSize, "count")} ${unit} där båda finns, och ` +
+          `${num(pane.needed, "count")} behövs innan appen ritar något.`,
     );
   }
 

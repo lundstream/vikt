@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { auth, createUser, localDate } from "./factories.js";
+import type { FastifyInstance } from "fastify";
+import { expectedChangeKgPerWeek, KCAL_PER_KG } from "shared";
+import { auth, createUser, localDate, type TestUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
+import type { Db } from "../src/db/index.js";
+import { manualIntake, weightLog } from "../src/db/schema.js";
 
 const ctx = useTestApp();
 
@@ -12,6 +16,10 @@ type Pane = {
   unpairedDays: number;
   range: { from: string; to: string } | null;
   enough: boolean;
+  unit: "day" | "week";
+  needed: number;
+  lagDays: number | null;
+  reference: { maintenanceKcal: number; kcalPerKg: number } | null;
 };
 
 const paneNamed = (body: { panes: Pane[] }, name: string) =>
@@ -208,12 +216,19 @@ describe("the response carries no statistic", () => {
     ).json<{ panes: Pane[] }>();
 
     for (const pane of body.panes) {
+      // D166 added what one point is, how many are needed, the lag the weekly
+      // change was shifted by, and the expected line's two inputs. Still no
+      // field computed from the points.
       expect(Object.keys(pane).sort()).toEqual([
         "enough",
+        "lagDays",
+        "needed",
         "pairs",
         "pane",
         "range",
+        "reference",
         "sampleSize",
+        "unit",
         "unpairedDays",
       ]);
     }
@@ -230,5 +245,100 @@ describe("the response carries no statistic", () => {
     for (const banned of ["\"r\"", "rsquared", "pearson", "slope", "trendline", "pvalue"]) {
       expect(raw).not.toContain(banned);
     }
+  });
+});
+
+/**
+ * Intake against trend change, per whole week (D166).
+ *
+ * Rows go straight into the open transaction, as in `coach-sheet.test.ts`: ten
+ * weeks of daily weights and intake through `inject` would recompute the trend
+ * on every write, and nothing under test is on the write path.
+ */
+describe("intake against trend change", () => {
+  const MAINTENANCE = 2500;
+  const INTAKE = 2000;
+
+  /**
+   * A body that obeys 7700 kcal per kg: `days` of daily weights, each the
+   * previous plus the day's deficit, and intake logged on every day. Intake is
+   * constant, so every week after burn-in is settled.
+   */
+  async function obeyingBody(db: Db, user: TestUser, days: number): Promise<void> {
+    const weights: { day: string; kg: number }[] = [];
+    let kg = 95;
+    for (let back = days - 1; back >= 0; back -= 1) {
+      weights.push({ day: localDate(-back), kg });
+      kg += (INTAKE - MAINTENANCE) / KCAL_PER_KG;
+    }
+
+    await db.insert(weightLog).values(
+      weights.map(({ day, kg: value }) => ({
+        userId: user.userId,
+        clientUuid: randomUUID(),
+        localDate: day,
+        weightKg: value.toFixed(2),
+      })),
+    );
+    await db.insert(manualIntake).values(
+      weights.map(({ day }) => ({
+        userId: user.userId,
+        clientUuid: randomUUID(),
+        localDate: day,
+        kcal: INTAKE,
+      })),
+    );
+  }
+
+  async function intakePane(app: FastifyInstance, user: TestUser) {
+    const body = (
+      await app.inject({ method: "GET", url: "/api/correlations", headers: auth(user) })
+    ).json<{ panes: Pane[] }>();
+    return paneNamed(body, "intake_trend_change");
+  }
+
+  it("counts whole weeks, and says not yet below four", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await obeyingBody(db, user, 20);
+
+    const pane = await intakePane(app, user);
+    expect(pane.unit).toBe("week");
+    expect(pane.needed).toBe(4);
+    expect(pane.sampleSize).toBeLessThan(4);
+    expect(pane.enough).toBe(false);
+  });
+
+  it("draws no expected line until maintenance is measured", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await obeyingBody(db, user, 10);
+
+    expect((await intakePane(app, user)).reference).toBeNull();
+  });
+
+  it("puts one point per Monday, and settled weeks on the expected line from measured maintenance", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await obeyingBody(db, user, 84);
+
+    const pane = await intakePane(app, user);
+    expect(pane.enough).toBe(true);
+    expect(pane.lagDays).toBe(9);
+    expect(pane.reference).not.toBeNull();
+    // Measured from the same body, so it is the body's own maintenance.
+    expect(Math.abs(pane.reference!.maintenanceKcal - MAINTENANCE)).toBeLessThan(60);
+
+    for (const pair of pane.pairs) {
+      expect(new Date(`${pair.localDate}T12:00:00Z`).getUTCDay()).toBe(1);
+    }
+
+    // The last weeks are long past burn-in and intake never changed.
+    for (const pair of pane.pairs.slice(-3)) {
+      const expected = expectedChangeKgPerWeek(pair.x, pane.reference!.maintenanceKcal);
+      expect(Math.abs(pair.y - expected), `week of ${pair.localDate}`).toBeLessThan(0.08);
+    }
+    // Whole weeks only: the last one ended before today.
+    expect(pane.range!.to < localDate()).toBe(true);
   });
 });

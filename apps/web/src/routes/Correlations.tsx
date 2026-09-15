@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -9,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { CorrelationPane } from "shared";
-import { formatDecimal } from "shared";
+import { expectedChangeKgPerWeek, formatDecimal, formatKcal, MIN_LOGGED_DAYS_PER_WEEK } from "shared";
 import { OfflineNotice } from "../components/SyncIndicator.js";
 import { useCorrelations } from "../lib/daily.js";
 import { formatLongDay, todayLocalDate } from "../lib/dates.js";
@@ -60,8 +61,8 @@ const PANES: Record<CorrelationPane["pane"], PaneMeta> = {
   },
   intake_trend_change: {
     xLabel: "corr.meanIntake",
-    yLabel: "corr.trendChange",
-    caption: "corr.intakeTrendCaption",
+    yLabel: "corr.trendChangeWeek",
+    caption: "corr.intakeTrendWeekCaption",
     xDecimals: 0,
     yDecimals: 2,
   },
@@ -130,7 +131,7 @@ export function Correlations() {
   );
 }
 
-function PaneChart({
+export function PaneChart({
   pane,
   minPairs,
   dailyLogDays,
@@ -155,7 +156,32 @@ function PaneChart({
   };
 
   const xBounds = bounds((pair) => pair.x);
-  const yBounds = bounds((pair) => pair.y);
+
+  /**
+   * The expected line's two ends, when there is a measured maintenance figure
+   * (D166). Arithmetic on that figure and 7700 kcal per kg, evaluated at the
+   * ends of the x axis, so it does not depend on a single point: it would be
+   * the same line with none of them on the chart.
+   */
+  const reference = pane.reference;
+  const expectedAt = (x: number) =>
+    reference === null ? null : expectedChangeKgPerWeek(x, reference.maintenanceKcal);
+  const lineEnds =
+    reference === null
+      ? null
+      : ([
+          { x: xBounds[0], y: expectedAt(xBounds[0])! },
+          { x: xBounds[1], y: expectedAt(xBounds[1])! },
+        ] as const);
+
+  // The y axis holds the line as well as the points, so neither is clipped.
+  const pointY = bounds((pair) => pair.y);
+  const yBounds = lineEnds
+    ? ([
+        Math.min(pointY[0], lineEnds[0].y, lineEnds[1].y),
+        Math.max(pointY[1], lineEnds[0].y, lineEnds[1].y),
+      ] as const)
+    : pointY;
 
   const xFormat = (value: number) => formatDecimal(value, { decimals: meta.xDecimals });
   const yFormat = (value: number) => formatDecimal(value, { decimals: meta.yDecimals });
@@ -225,13 +251,27 @@ function PaneChart({
                 <Tooltip
                   cursor={{ stroke: tokens.edge }}
                   isAnimationActive={false}
-                  content={<PointTooltip meta={meta} />}
+                  content={<PointTooltip meta={meta} unit={pane.unit} />}
                 />
                 {/*
-                  Points and nothing else. There is deliberately no <Line> in
-                  this file — see D34. A fit over twenty self-rated days would
-                  read as evidence, and it would not be any.
+                  Points, and one dashed reference. There is still no <Line> in
+                  this file and no fit (D34): a line through twenty self-rated
+                  points would read as evidence, and it would not be any.
+
+                  The reference is D166's, and a test holds it to being the only
+                  one: what 7700 kcal per kg says a week at this intake should do,
+                  from a measured maintenance figure. Sten and dashed, because it
+                  is arithmetic about the points rather than one of them.
                 */}
+                {lineEnds ? (
+                  <ReferenceLine
+                    segment={[lineEnds[0], lineEnds[1]]}
+                    stroke={tokens.uncertain}
+                    strokeDasharray="5 4"
+                    strokeWidth={1.5}
+                    ifOverflow="extendDomain"
+                  />
+                ) : null}
                 {/*
                   Fully opaque and outlined, unlike the trend chart's raw dots.
                   There the dots sit behind the line and stay quiet; here they
@@ -251,7 +291,7 @@ function PaneChart({
           </div>
 
           <dl className="num mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-micro text-muted">
-            <dt>{t("corr.sampleSize")}</dt>
+            <dt>{t(pane.unit === "week" ? "corr.sampleWeeks" : "corr.sampleSize")}</dt>
             <dd className="text-right text-ink">
               {formatDecimal(pane.sampleSize, { decimals: 0 })}
             </dd>
@@ -268,13 +308,15 @@ function PaneChart({
             ) : null}
             {pane.unpairedDays > 0 ? (
               <>
-                <dt>{t("corr.unpaired")}</dt>
+                <dt>{t(pane.unit === "week" ? "corr.droppedWeeksLabel" : "corr.unpaired")}</dt>
                 <dd className="text-right text-ink">
                   {formatDecimal(pane.unpairedDays, { decimals: 0 })}
                 </dd>
               </>
             ) : null}
           </dl>
+
+          {pane.unit === "week" ? <WeekNotes pane={pane} /> : null}
         </>
       ) : (
         <PreData pane={pane} minPairs={minPairs} dailyLogDays={dailyLogDays} />
@@ -299,7 +341,31 @@ function PreData({
   minPairs: number;
   dailyLogDays: number;
 }) {
-  const remaining = Math.max(0, minPairs - pane.sampleSize);
+  const needed = pane.needed ?? minPairs;
+  const remaining = Math.max(0, needed - pane.sampleSize);
+
+  /**
+   * A weekly pane says "inte än" and how many whole weeks it has (D166). Weeks
+   * rather than days, because a day is not a point here, and "12 dagar av 14"
+   * would promise a chart two days away that is really two weeks away.
+   */
+  if (pane.unit === "week") {
+    return (
+      <div className="mt-4 flex h-[260px] flex-col justify-center rounded-md border border-dashed border-edge px-5 text-note">
+        <p className="text-ink" data-testid="weeks-not-yet">
+          {t("corr.notYetWeeks", { have: pane.sampleSize, need: needed })}
+        </p>
+        <p className="mt-2 text-micro text-muted">
+          {t("corr.weekNeedsDays", { days: MIN_LOGGED_DAYS_PER_WEEK })}
+        </p>
+        {pane.unpairedDays > 0 ? (
+          <p className="mt-2 text-micro text-muted">
+            {t("corr.droppedWeeks", { weeks: pane.unpairedDays })}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 flex h-[260px] flex-col justify-center rounded-md border border-dashed border-edge px-5 text-note">
@@ -307,8 +373,8 @@ function PreData({
         {pane.sampleSize === 0
           ? t("corr.noneYet")
           : pane.sampleSize === 1
-            ? t("corr.oneYet", { need: minPairs })
-            : t("corr.someYet", { have: pane.sampleSize, need: minPairs })}
+            ? t("corr.oneYet", { need: needed })
+            : t("corr.someYet", { have: pane.sampleSize, need: needed })}
       </p>
       <p className="mt-2 text-micro text-muted">
         {plural(remaining, "corr.oneMoreDay", "corr.moreDays")}
@@ -325,21 +391,46 @@ function PreData({
   );
 }
 
+/**
+ * What the weekly pane has to say under its chart (D166): that the trend lags
+ * the scale and the change was measured that much later, and what the dashed
+ * line is, what distance from it means, and why a week near a change in intake
+ * sits off it. Or, without a measured maintenance figure, why there is no line.
+ */
+function WeekNotes({ pane }: { pane: CorrelationPane }) {
+  return (
+    <div className="mt-3 space-y-2 text-micro text-muted" data-testid="week-notes">
+      {pane.lagDays !== null ? <p>{t("corr.lagNote", { lag: pane.lagDays })}</p> : null}
+      <p>
+        {pane.reference
+          ? t("corr.expectedNote", { maintenance: formatKcal(pane.reference.maintenanceKcal) })
+          : t("corr.noExpected")}
+      </p>
+    </div>
+  );
+}
+
 function PointTooltip({
   active,
   payload,
   meta,
+  unit,
 }: {
   active?: boolean;
   payload?: { payload: { localDate: string; x: number; y: number } }[];
   meta: PaneMeta;
+  unit: CorrelationPane["unit"];
 }) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
 
   return (
     <div className="rounded-lg border border-edge bg-paper px-3 py-2 text-micro shadow-sm">
-      <p className="text-muted">{formatLongDay(point.localDate, LOCALE)}</p>
+      <p className="text-muted">
+        {unit === "week"
+          ? t("corr.weekOf", { date: formatLongDay(point.localDate, LOCALE) })
+          : formatLongDay(point.localDate, LOCALE)}
+      </p>
       <p className="num mt-1 text-ink">
         {t(meta.xLabel)}: {formatDecimal(point.x, { decimals: meta.xDecimals })}
       </p>

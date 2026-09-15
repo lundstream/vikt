@@ -8439,3 +8439,109 @@ Every migration, 0000 to 0030, was applied to fresh databases in
 
 So what a migration here needs is **ownership of the database**, not superuser.
 Recorded in INFRA.md under "Migrating the database".
+
+---
+
+### D166 — Intake against trend change, one point per week, and the one line D34 now allows
+
+*2026-09-15.*
+
+#### What was wrong with the pane
+
+It put a seven-day mean of intake beside a seven-day change in the trend on
+**every day**. Each point shared six days with its neighbour, so a week of
+eating was drawn as seven overlapping dots, and the change was measured over the
+same seven days as the intake although the trend lags the scale by about nine
+days at a daily cadence (D36). Most of what it plotted as a week's change
+belonged to the week before.
+
+#### What it is now
+
+- **One point per whole calendar week, Monday to Sunday.** A week in progress is
+  not a week. A week needs §4.2's coverage, six of seven days with intake, and
+  its mean is taken over the logged days. Weeks that fall short are counted and
+  shown as dropped, never averaged over seven.
+- **The change is shifted by the lag** at the cadence this person actually
+  weighs in (`trendLagDays`: 9 days daily, 6 weekly), and measured the §4.2 way:
+  between the first and last reading inside the shifted week, over the days
+  between them, stated in kg per week. A week whose shifted end is still in the
+  future has not been answered yet and has no point.
+- **Nothing until four whole weeks.** Below that the pane says "Inte än. N av 4
+  hela veckor." rather than a day count that would promise a chart two days
+  away when it is two weeks away.
+- **One dashed line, in Sten: 7 × (intake − maintenance) / 7700 kg per week**,
+  drawn only when maintenance is **measured** (`source: "adaptive"`). A line from
+  the formula's figure would be a guess about this body wearing a measurement's
+  clothes. The info text under the chart says what the lag is, what the line is,
+  what a point above or below it means, and why a week near a change in intake
+  sits off it.
+
+`calc/weekly-intake.ts` does the arithmetic, the service assembles it, and the
+coach's sheet names the pane in weeks.
+
+#### Reopening D34, on purpose
+
+D34 said this screen draws no line, and that a change adding one "has to reopen
+the decision rather than drift past it". This is that reopening, asked for in
+the brief, and it changes less than it looks:
+
+- **Still no statistic.** No r, no slope, no fit, nothing computed from the
+  points. The line is arithmetic on the maintenance figure and 7700 kcal per kg,
+  and it would be the same line on an empty chart. The response carries its two
+  inputs (`reference: { maintenanceKcal, kcalPerKg }`), and the API test that
+  bans a field named after a coefficient, a slope or a trend line still passes.
+- **The enforcement is tighter than it was.** D34 claimed a fourth guard, "no
+  `<Line>` in `Correlations.tsx`", that existed only as a comment.
+  `samband-weeks.test.tsx` now reads the source: no `<Line>`, no line on a
+  `Scatter`, exactly one `ReferenceLine`, and it is built from
+  `expectedChangeKgPerWeek(x, reference.maintenanceKcal)`.
+- Sleep against energy and movement against sweat are untouched.
+
+#### What the lag shift does and does not do, measured
+
+A probe before the test was written, on a synthetic body that loses and gains
+exactly what 7700 kcal per kg says from a maintenance of 2 500, weighed daily:
+
+| week | off the line, unshifted | off the line, shifted 9 days |
+|---|---|---|
+| right after a change in intake | 0.32 to 0.59 kg/week | 0.13 to 0.23 |
+| two weeks into a level | 0.08 to 0.14 | 0.04 to 0.06 |
+| the last week before the next change | 0.04 to 0.07 | **0.16 to 0.34** |
+
+**The shift does not undo the trend's smoothing, it moves it.** An exponential
+average does not delay a week's change so much as smear it over the following
+ten days, and no shift undoes a smear. Where intake has held for longer than the
+lag, points land within 0.08 kg per week of the line, which the test asserts on
+six-week levels. Right after a change the shift roughly halves the miss, and in
+the week before the next change it makes the miss worse, because its span
+reaches into the new level. Both halves are pinned in `weekly-intake.test.ts`,
+so the first test is not read later as a claim about every week, and the note on
+screen says the weeks nearest a change sit off the line while the trend catches
+up.
+
+**Not done, and the owner's call:** the smoothing can be inverted exactly (for a
+daily series the weight is `trend[t] + (1 − α)/α × (trend[t] − trend[t−1])`), which
+would put every synthetic week on the line. On real data it multiplies the
+scale's day-to-day noise by about ten, which is the noise the trend exists to
+remove. The brief asked for a lag correction, and that is what shipped.
+
+#### Exercised
+
+On `samband@example.test`, seeded by `apps/api/src/scripts/seed-samband-fixture.ts`
+with a body that obeys 7700 kcal per kg over six weeks at 2 000 kcal and six at
+2 800: **12 weekly points, the dashed line drawn, maintenance measured at 2 514
+kcal against the 2 500 the body obeys.** On screen the settled weeks sit on the
+line at about −0.45 and +0.27 kg per week, and the weeks right after the change
+sit between, as the note says. 360 px and desktop, no overflow.
+
+**The development account does not say "inte än", and the brief expected it
+to.** It has **11 whole weeks** with six or more logged days, and 3 more dropped
+for too few, so the pane draws. What it does not draw is the line: its
+maintenance is not measured (68 % coverage over 28 days), and the note says so.
+Its weekly means sit within 2 084 to 2 088 kcal, so the eleven points form a
+column rather than a cloud, which is what that account's logging is.
+
+The API test builds the same kind of body through the database (84 days at a
+constant 2 000 kcal against 2 500): maintenance measured within 60 kcal of the
+truth, every point on a Monday, and the last three weeks within 0.08 kg per week
+of the line.
