@@ -173,6 +173,46 @@ otherwise an unexplainable observation, and this is the explanation.
 
 ---
 
+## Local food search
+
+Taken 2026-09-15 with `apps/api/src/scripts/measure-search.ts`, against the
+development database: PostgreSQL 16.14 on musl, **2 809** rows in `food_items`,
+on the workstation. Local search only (`searchFoodItems`), never the adapters,
+so these are the database's figures and not Open Food Facts'. Three warm-up runs
+per query, then twenty-five; median and 90th percentile.
+
+**Before** is the query as 0004 left it: whole-name trigram similarity above
+0.3, and substring matches on name, brand and brand-and-name. **After** is D165:
+the folded `search_name` from migration 0030, every word in any order, word
+similarity at 0.6, and one trigram index serving all of it.
+
+| query | before, median / p90 | after, median / p90 | first result before | first three after |
+|---|---|---|---|---|
+| banan | 13.8 / 15.0 ms | 13.5 / 15.1 ms | Banan | Banan, Banan torkad, Banan kokbanan |
+| kvarg | 14.2 / 15.2 ms | 14.0 / 15.4 ms | Lindhahls Kvarg | Lindhahls Kvarg, Nestle Kvarg, Lindahls Kvarg |
+| ägg | 13.2 / 14.7 ms | 12.7 / 13.8 ms | Ägg kokt | Ägg rått, Ägg kokt, Ägg stekt |
+| lindahls kvarg | 17.0 / 17.9 ms | 16.5 / 17.9 ms | Nestlé Lindahls Kvarg | Lindahls Kvarg, Lindahls Kvarg, Lindahls Pro+ Kvarg Vanilj |
+| Yogghurt | 13.3 / 14.9 ms | 14.2 / 15.6 ms | Yoghurt vanilje, **and nothing else** | Yoghurt vanilje, Yoghurt naturell fett 10%, Yoghurt mild vanilj fett 2% |
+| frischgöld | 14.5 / 18.0 ms | 14.6 / 16.9 ms | Frischgold Gräddost | Frischgold Gräddost |
+| köttbullar mammas | 17.0 / 19.2 ms | 19.3 / 21.5 ms | Köttbullar frysvara | Köttbullar frysvara, Köttbullar nöt stekta, Köttbullar gris stekta |
+| mammas köttbullar | 17.9 / 18.8 ms | 17.1 / 18.5 ms | Köttbullar frysvara | the same three |
+| zzzqqq | 14.4 / 15.2 ms | 13.9 / 14.5 ms | nothing | nothing |
+
+**Time: unchanged.** Every query is within a millisecond or two of its before
+figure in either direction, and the spread between runs of one query is about
+that wide, so the honest reading is "no measurable cost" rather than faster or
+slower. At this table size the planner scans rather than using either index, so
+the index is paid for at write time and earns its keep only as the cache grows.
+
+**What came back: better where it was wrong.** "Yogghurt" found one yoghurt and
+now finds them all. The development catalogue has no Mammas product, so the
+word-order pair shows only that both orders agree; the fixture in
+`food-search.test.ts` has one and asserts it comes first either way.
+"frischgöld" already reached Frischgold here through the brand-and-name
+substring on a short name; the fixture test asserts it through the fold.
+
+---
+
 ## The human check
 
 ALTCHA proof of work (D112), solved in the browser. Measured with the real

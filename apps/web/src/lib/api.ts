@@ -210,9 +210,15 @@ export const api = {
   lookupBarcode: (barcode: string) =>
     request<BarcodeLookup>(`/food/barcode/${encodeURIComponent(barcode)}`),
 
-  searchFood: (q: string, limit = 12) =>
+  /** One part of a search, or both (D165). */
+  searchFood: (
+    q: string,
+    source: "all" | "local" | "remote" = "all",
+    options: { limit?: number; signal?: AbortSignal } = {},
+  ) =>
     request<FoodSearchResult>(
-      `/food/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+      `/food/search?q=${encodeURIComponent(q)}&limit=${options.limit ?? 12}&source=${source}`,
+      options.signal ? { signal: options.signal } : {},
     ),
 
   createManualFood: (input: { name: string; kcalPer100: number; brand?: string | null }) =>

@@ -65,16 +65,112 @@ export function useTemplates() {
  * searches a minute for the *whole server* (D30), so a per-keystroke search
  * would exhaust a shared budget in one word.
  */
-export function useFoodSearch(query: string, enabled: boolean) {
+export function useFoodSearch(query: string, enabled: boolean): FoodSearchState {
   const trimmed = query.trim();
-  return useQuery({
-    queryKey: ["food", "search", trimmed],
-    queryFn: () => api.searchFood(trimmed),
-    enabled: enabled && trimmed.length >= MIN_SEARCH_LENGTH,
+  const on = enabled && trimmed.length >= MIN_SEARCH_LENGTH;
+
+  /**
+   * Two requests, local first (D165). The cache answers in milliseconds and is
+   * shown at once; the food databases are asked afterwards, only when the cache
+   * has not already answered, and their rows are appended to the list.
+   */
+  const local = useQuery({
+    queryKey: ["food", "search", "local", trimmed],
+    queryFn: () => api.searchFood(trimmed, "local"),
+    enabled: on,
     // A repeated search inside a couple of minutes is answered from here rather
     // than from the network.
     staleTime: 120_000,
   });
+
+  const skipped = local.isSuccess && local.data.enough;
+  const remote = useQuery({
+    queryKey: ["food", "search", "remote", trimmed],
+    queryFn: () =>
+      api.searchFood(trimmed, "remote", { signal: AbortSignal.timeout(REMOTE_CLIENT_TIMEOUT_MS) }),
+    enabled: on && local.isSuccess && !skipped,
+    staleTime: 120_000,
+    // A timeout is an answer, not a fault to retry into the shared budget.
+    retry: false,
+  });
+
+  return combineSearch({
+    query: trimmed,
+    enabled: on,
+    local: { data: local.data, fetching: local.isFetching, failed: local.isError },
+    remote: { data: remote.data, fetching: remote.isFetching, failed: remote.isError, skipped },
+  });
+}
+
+/**
+ * The browser's own limit on the remote part. Longer than the server's eight
+ * seconds, so the server's answer, which carries a reason, normally wins.
+ */
+export const REMOTE_CLIENT_TIMEOUT_MS = 12_000;
+
+type SearchResult = Awaited<ReturnType<typeof api.searchFood>>;
+
+export type FoodSearchState = {
+  query: string;
+  /** What is on screen: local rows, then remote rows not already among them. */
+  items: SearchResult["items"];
+  /** Which part is still running, or null. */
+  searching: "local" | "remote" | null;
+  /** The food databases did not answer in time, on the server or here. */
+  timedOut: boolean;
+  /** A source was unavailable, with the server's sentence about it. */
+  notice: string | null;
+  /** The local part failed outright. */
+  failed: boolean;
+  /**
+   * Every source answered and none had anything. Never true while a part is
+   * running, after a timeout, or when a source was unavailable, because "inget
+   * hittat" is a claim about all of them.
+   */
+  nothingFound: boolean;
+};
+
+/** Pure, so the states above are tested without a network or a query client. */
+export function combineSearch(input: {
+  query: string;
+  enabled: boolean;
+  local: { data?: SearchResult; fetching: boolean; failed: boolean };
+  remote: { data?: SearchResult; fetching: boolean; failed: boolean; skipped: boolean };
+}): FoodSearchState {
+  const { query, enabled, local, remote } = input;
+  const idle: FoodSearchState = {
+    query,
+    items: [],
+    searching: null,
+    timedOut: false,
+    notice: null,
+    failed: false,
+    nothingFound: false,
+  };
+  if (!enabled) return idle;
+
+  if (!local.data) {
+    return { ...idle, searching: local.fetching ? "local" : null, failed: local.failed };
+  }
+
+  const seen = new Set(local.data.items.map((item) => item.id));
+  const appended = (remote.data?.items ?? []).filter((item) => !seen.has(item.id));
+  const items = [...local.data.items, ...appended];
+
+  const searching = !remote.skipped && remote.fetching ? "remote" : null;
+  const timedOut = remote.failed || (remote.data?.timedOut ?? false);
+  const notice = remote.data && !remote.data.timedOut ? remote.data.notice : null;
+  const answered = remote.skipped || (remote.data !== undefined && !remote.fetching);
+
+  return {
+    query,
+    items,
+    searching,
+    timedOut,
+    notice,
+    failed: false,
+    nothingFound: answered && !timedOut && notice === null && items.length === 0,
+  };
 }
 
 export function useBarcodeLookup() {

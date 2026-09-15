@@ -211,6 +211,13 @@
       "when": 1788310204000,
       "tag": "0029_app_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788310205000,
+      "tag": "0030_food_search_fold",
+      "breakpoints": true
     }
   ]
 }

@@ -8331,3 +8331,111 @@ pullable; api healthy on `local/vikt-api:1.1.0`; nothing blocks.
 
 **`deploy --yes` has not run against production.** The owner deploys 1.1.1, and
 that is its first real run. The panel stays documented as the fallback.
+
+---
+
+### D165 — Search says where it is, and a typo inside a long name is still a match
+
+*2026-09-15.*
+
+#### The premise, corrected first
+
+The brief asked for a `pg_trgm` migration. **`pg_trgm` has been installed since
+0004**, which also built a trigram index on the name and matched typos with
+`similarity(name, query) > 0.3`. What was missing was not the extension but the
+kind of similarity, and a fold.
+
+Measured on the development catalogue (2 809 rows) before anything changed:
+
+| query | against | whole-name similarity | word similarity | word similarity, folded |
+|---|---|---|---|---|
+| Yogghurt | Yoghurt naturell fett 3% berikad | 0.18 | 0.70 | 0.70 |
+| frischgöld | brand Frischgold, name Gräddost | 0.00 | 0.00 | 1.00 |
+| köttbullar mammas | Köttbullar frysvara | 0.41 | 0.61 | 0.61 |
+
+A whole-name score punishes a long name for being long, so a misspelt word inside
+one never clears 0.3; "Yogghurt" found one yoghurt of dozens. And ö and o share
+no trigram, so a letter spelled differently on a keyboard than on a label scores
+nothing at all.
+
+#### The matching
+
+**Migration 0030** adds one generated column, `search_name`: brand and name,
+lower-cased, with `åäöéèêëüáàâïîôç` folded to `aaoeeeeuaaaiioc`, and one trigram
+index on it. `lower` and `translate` are immutable, so no extension is needed
+beyond 0004's. The same letters are written in `src/lib/search-fold.ts` for the
+query side, and a test reads the migration to hold the two together and asks the
+database to fold a sample to prove they agree.
+
+The query matches in four ways, and the two thresholds are the cutoff:
+
+- the Swedish `tsvector`, for stems;
+- **every query word present, in any order**, as a substring of `search_name`;
+- `search_name % q`, whole similarity above **0.3**, for a misspelt short name;
+- `q <% search_name`, word similarity at or above **0.6**, for a misspelt word
+  in a long one.
+
+Both thresholds are pg_trgm's own defaults, chosen because they are the defaults
+and not tuned to this catalogue, so they cannot have been fitted to the examples
+that motivated them.
+
+**The ranking no longer depends on word order.** An exact name counts for one
+word; for several, every word present and no other word counts the same, so
+"köttbullar mammas" and "mammas köttbullar" put the same row first. The prefix
+bonus applies only to a single word, and the old brand-and-name phrase bonus is
+replaced by the every-word one. LIKE wildcards in the query are escaped, which
+the old `ILIKE '%' || q || '%'` did not do.
+
+**Cost: none measurable.** Local search was 13 to 18 ms median before and 13 to
+19 ms after, query by query within the run-to-run spread (docs/measurements.md,
+"Local food search"). At this table size the planner scans, and the index is for
+when the cache grows.
+
+#### Search in two parts
+
+`GET /food/search` takes `source=local|remote|all`. **Local** is the cache alone,
+never the network, and says whether it has already answered (`enough`).
+**Remote** is the food databases alone, under an eight-second deadline raced
+against the adapters rather than trusted to them, because a rate limiter can
+queue a request before its fetch sees the signal. **All** is both, as before,
+and is the default, so nothing that predates the split changes.
+
+Mat asks local first and shows its rows at once, then asks remote unless local
+had answered, and appends what comes back without repeating a row. One line
+under the list says where it is:
+
+- "Söker", then "Söker i livsmedelsdatabasen" or "Söker vidare i
+  livsmedelsdatabasen" when there are already rows, **in Sten** while anything
+  is still running;
+- on a timeout, on the server or in the browser at twelve seconds, the local
+  rows stay and the line says the database did not answer in time;
+- a source that was unavailable says so, with the server's sentence;
+- **"Inget hittat" only when every source has answered empty.** Not while one
+  is running, not after a timeout, not when a source was unavailable, because
+  it is a claim about all of them.
+
+The unavailable notice lost its dash (§5) on the way.
+
+#### Exercised
+
+Through the interface on the development account at 360 px and desktop:
+"Yogghurt" showed the local yoghurts, then "Söker vidare i livsmedelsdatabasen"
+in Sten with the list at eighteen rows, and the line cleared at about 300 ms.
+"zzzqqqx" showed "Söker i livsmedelsdatabasen" and then "Inget hittat för
+”zzzqqqx”." once the database had answered. **The local "Söker" state was never
+caught on screen**: the cache answered inside the 60 ms sampling interval, so
+that state is covered by the render test and not by an observation.
+
+#### The role a migration needs, verified in production's image
+
+Every migration, 0000 to 0030, was applied to fresh databases in
+`postgres:16-alpine@sha256:cf78e767…`, the digest the stack runs (16.15):
+
+- as the image's `POSTGRES_USER`, which the image makes a superuser, and which is
+  how production's `vikt` role was made: **31 applied**;
+- as `vikt_owner`, **not** superuser, no CREATEDB, owning only its database:
+  **31 applied**. `pg_trgm` was created and owned by that role, because it is a
+  trusted extension on PostgreSQL 13 and later.
+
+So what a migration here needs is **ownership of the database**, not superuser.
+Recorded in INFRA.md under "Migrating the database".

@@ -118,6 +118,8 @@ async function cache(
 export type FoodDeps = {
   db: Db;
   adapters: FoodAdapter[];
+  /** How long a remote search may take before local results are returned alone. */
+  remoteTimeoutMs?: number;
 };
 
 /**
@@ -171,52 +173,95 @@ export async function lookupBarcode(
 }
 
 /**
- * Search. The local cache is always consulted first and its results are
- * returned even when the network is then queried, so an offline or
- * rate-limited search still answers with everything already known.
+ * How long the food databases get before a search answers without them (D165).
+ *
+ * Eight seconds, under the client's own twelve, so the server's answer, with
+ * the local results and a sentence saying why nothing more came, arrives before
+ * the browser gives up on the request and has nothing to show.
+ */
+export const REMOTE_SEARCH_TIMEOUT_MS = 8_000;
+
+export type SearchSource = "all" | "local" | "remote";
+
+const TIMEOUT_NOTICE =
+  "Livsmedelsdatabasen svarade inte i tid. Visar det som redan finns sparat.";
+
+/**
+ * Search, in up to two parts (D165).
+ *
+ * - **`local`** is the cache alone, always fast, and never touches the network.
+ *   `enough` says whether it has already answered, in which case the client
+ *   does not ask for the second part.
+ * - **`remote`** is the food databases alone, under a timeout. Its rows are
+ *   cached as they arrive, and a client appends them to what `local` showed.
+ * - **`all`** is both in one response, as before, and is what anything that has
+ *   not been taught about the split still gets.
+ *
+ * The split exists so the screen can show what is known at once and say that it
+ * is still looking, rather than showing nothing until the slowest source is
+ * done, and so a timeout costs the remote results and never the local ones.
  */
 export async function searchFood(
   userId: string,
   deps: FoodDeps,
   query: string,
   limit: number,
+  source: SearchSource = "all",
 ): Promise<FoodSearchResult> {
-  const cached = await searchFoodItems(userId, deps.db, query, limit);
+  const cached = source === "remote" ? [] : await searchFoodItems(userId, deps.db, query, limit);
   const byKey = new Map(cached.map((row) => [`${row.source}:${row.sourceRef ?? row.id}`, row]));
-
-  let notice: string | null = null;
-  let reachedNetwork = false;
 
   /**
    * A full page of local hits is not the same as a good one.
    *
    * This used to short-circuit on `cached.length >= limit` alone, which meant a
-   * query matching twelve loose rows never reached the network at all — and
-   * loose is what the local matcher is: substrings, stems and trigrams over a
-   * table with thousands of Livsmedelsverket rows in it. Someone searching for
-   * a named product got twelve generic near-misses and no reason to think
-   * anything else existed.
-   *
-   * So the budget is only saved when the cache has actually **answered**: a row
-   * whose name, or whose brand and name together, matches the query closely.
-   * Anything vaguer is a page of maybes, and a page of maybes is worth a
-   * request.
+   * query matching twelve loose rows never reached the network at all. So the
+   * budget is only saved when the cache has actually **answered**: a row whose
+   * name, or whose brand and name together, matches the query closely.
    */
-  if (cached.length >= limit && cached.some((row) => closeMatch(row, query))) {
+  const enough = cached.length >= limit && cached.some((row) => closeMatch(row, query));
+
+  const respond = async (
+    rows: FoodItemRow[],
+    extra: { cacheOnly: boolean; notice: string | null; timedOut: boolean },
+  ): Promise<FoodSearchResult> => {
     const [stars, last] = await Promise.all([
       favouriteIds(userId, deps.db),
-      lastGramsFor(userId, deps.db, cached.map((row) => row.id)),
+      lastGramsFor(userId, deps.db, rows.map((row) => row.id)),
     ]);
-    return {
-      items: cached.map((row) => toItem(row, stars, last)),
-      cacheOnly: true,
-      notice: null,
-    };
+    return { items: rows.map((row) => toItem(row, stars, last)), enough, ...extra };
+  };
+
+  if (source === "local" || (source === "all" && enough)) {
+    return respond(cached, { cacheOnly: true, notice: null, timedOut: false });
   }
 
+  let notice: string | null = null;
+  let reachedNetwork = false;
+  let timedOut = false;
+
+  /**
+   * One deadline for the whole remote part, not one per adapter, raced rather
+   * than trusted: an adapter's rate limiter can queue a request before its
+   * fetch ever sees the signal, and a timeout that waits for the queue is not
+   * a timeout.
+   */
+  const signal = AbortSignal.timeout(deps.remoteTimeoutMs ?? REMOTE_SEARCH_TIMEOUT_MS);
+  const deadline = new Promise<never>((_, reject) => {
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+  // Nobody may be waiting on it by the time it fires.
+  deadline.catch(() => {});
+
   for (const adapter of deps.adapters) {
+    if (signal.aborted) {
+      timedOut = true;
+      break;
+    }
     try {
-      const results = await adapter.search(query, limit - byKey.size);
+      const pending = adapter.search(query, Math.max(1, limit - byKey.size), signal);
+      pending.catch(() => {});
+      const results = await Promise.race([pending, deadline]);
       reachedNetwork = true;
       for (const result of results) {
         if (!result.ok) continue;
@@ -224,6 +269,10 @@ export async function searchFood(
         byKey.set(`${row.source}:${row.sourceRef ?? row.id}`, row);
       }
     } catch (error) {
+      if (signal.aborted) {
+        timedOut = true;
+        break;
+      }
       if (error instanceof AdapterUnavailable) {
         notice = unavailableNotice(error);
         continue;
@@ -233,16 +282,11 @@ export async function searchFood(
     if (byKey.size >= limit) break;
   }
 
-  const found = [...byKey.values()].slice(0, limit);
-  const [stars, last] = await Promise.all([
-    favouriteIds(userId, deps.db),
-    lastGramsFor(userId, deps.db, found.map((row) => row.id)),
-  ]);
-  return {
-    items: found.map((row) => toItem(row, stars, last)),
+  return respond([...byKey.values()].slice(0, limit), {
     cacheOnly: !reachedNetwork,
-    notice,
-  };
+    notice: timedOut ? TIMEOUT_NOTICE : notice,
+    timedOut,
+  });
 }
 
 /**
@@ -262,7 +306,7 @@ function closeMatch(row: FoodItemRow, query: string): boolean {
 function unavailableNotice(error: AdapterUnavailable): string {
   const seconds = error.retryAfterMs ? Math.ceil(error.retryAfterMs / 1000) : null;
   return seconds
-    ? `Livsmedelsdatabasen är tillfälligt otillgänglig — försök igen om ${seconds} s. Visar det som redan finns sparat.`
+    ? `Livsmedelsdatabasen är tillfälligt otillgänglig. Försök igen om ${seconds} s. Visar det som redan finns sparat.`
     : "Livsmedelsdatabasen är tillfälligt otillgänglig. Visar det som redan finns sparat.";
 }
 

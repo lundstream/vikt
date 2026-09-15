@@ -81,9 +81,14 @@ export const foodRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) =>
       searchFood(
         request.userId!,
-        { db: app.db, adapters: app.foodAdapters },
+        {
+          db: app.db,
+          adapters: app.foodAdapters,
+          remoteTimeoutMs: app.foodRemoteTimeoutMs ?? undefined,
+        },
         request.query.q,
         request.query.limit,
+        request.query.source,
       ),
   );
 

@@ -68,6 +68,14 @@ when it will be down, and its mail goes out.
   no logged food carries the value. Exercised on the development account with a
   partial day (two food rows added on 2026-09-15, "Kvarg med bär" and "Middag
   hos vänner"), shot at 360 px and desktop.
+- **Food search says where it is, and forgives a typo inside a long name**
+  (D165). Mat shows the saved rows at once, says "Söker vidare i
+  livsmedelsdatabasen" in Sten while the database is asked, appends what it
+  finds, keeps the saved rows on a timeout, and says "Inget hittat" only after
+  every source answered. Matching folds å, ä and ö and uses word similarity, so
+  "Yogghurt" finds the yoghurts and word order does not change the first row.
+  Migration 0030. Exercised on the development account at 360 px and desktop;
+  the local "Söker" state was faster than the sampling and was not seen.
 - **The coach sees the data, not a summary of it** (D155). Intake against
   measured maintenance, each macro against the person's own target, alcohol,
   movement, steps, sleep, energy, mood, habits and measurements, all over 7 and

@@ -7,6 +7,7 @@ import {
   mealTemplateItems,
   mealTemplates,
 } from "../db/schema.js";
+import { FOLD_FROM, FOLD_TO, foldForSearch } from "../lib/search-fold.js";
 
 export type FoodItemRow = typeof foodItems.$inferSelect;
 export type FoodEntryRow = typeof foodEntries.$inferSelect;
@@ -73,36 +74,38 @@ export async function findFoodById(
   return row;
 }
 
-/** Cache-first search. Always tried before any adapter touches the network. */
+/** A user's text inside a LIKE pattern matches itself, not a wildcard. */
+const escapeLike = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
+
 /**
  * Local search, ranked by relevance.
  *
- * The previous version was `ILIKE '%query%'` ordered by `fetched_at DESC`,
- * which is import order. Searching "banan" matched forty-odd rows and returned
- * the twelve most recently imported: a chicken gratin, two infant porridges, a
- * Flygande Jakob. The plain "Banan" was in the result set and ranked off the
- * page. The matching was not really the problem; the ordering was.
+ * The version before 0004 was `ILIKE '%query%'` ordered by `fetched_at DESC`,
+ * which is import order: "banan" returned a chicken gratin before the banana.
+ * 0030 added the folded `search_name` and this query moved onto it (D165).
  *
- * Three ways to match, so that stemming, substrings and typos are all covered:
+ * **Four ways to match**, each for a failure the others cannot cover:
  *
- *  - the Swedish `tsvector`, via `websearch_to_tsquery`, which stems ("ägg"
- *    finds "Ägg kokt") and which cannot raise a syntax error on user input the
- *    way `to_tsquery` can;
- *  - a plain substring, for partial words a stemmer will not join up;
- *  - trigram similarity, for typos.
+ *  - the Swedish `tsvector`, which stems ("ägg" finds "Ägg kokt");
+ *  - **every word present, in any order**, as a substring of brand and name
+ *    folded, so "lindahls kvarg", "kvarg lindahls" and "bananch" all match;
+ *  - `search_name % q`, whole-name trigram similarity above 0.3, Postgres's own
+ *    default, which catches a misspelt short name ("banna");
+ *  - `q <% search_name`, **word** similarity at or above 0.6, again the
+ *    default, which catches a misspelt word inside a long name ("Yogghurt"
+ *    against "Yoghurt naturell fett 3% berikad" is 0.70 here and 0.18 as a
+ *    whole-name score). Folding is what makes "frischgöld" reach "Frischgold".
  *
- * The ranking is where the real work is:
+ * The two thresholds are the cutoff: nothing vaguer is a match at all, and both
+ * operators are served by one trigram index.
  *
- *  - an **exact name** dominates everything. Someone typing "banan" wants the
- *    banana;
- *  - then a name that *starts with* the query;
- *  - then `ts_rank` with normalisation 1, which divides by the log of the
- *    document length, so "Banan" beats "Gratäng djungelgratäng m. kyckling
- *    banan mango chutney crème fraiche" for the same matched lexeme;
- *  - then trigram similarity, which carries the near-misses;
- *  - and a **generic bonus** for an unbranded food. For a bare noun the
- *    Livsmedelsverket entry is almost always what was meant; a brand is a
- *    specific request and reads as one ("Marabou", not "choklad").
+ * **The ranking does not depend on word order.** An exact name counts for a
+ * single word; for several words, every word present and no others counts the
+ * same, so "köttbullar mammas" and "mammas köttbullar" put the same row first.
+ * Then a name that starts with a single-word query, then every word present,
+ * then `ts_rank` normalised by document length, then word similarity, and a
+ * small bonus for an unbranded food when the query is one word, because a bare
+ * noun almost always wants the Livsmedelsverket row and a brand is a request.
  */
 export async function searchFoodItems(
   userId: string,
@@ -113,20 +116,16 @@ export async function searchFoodItems(
   const trimmed = query.trim();
   if (trimmed === "") return [];
 
-  /**
-   * Whether to prefer the unbranded row, decided once for the query.
-   *
-   * A bare noun almost always wants the Livsmedelsverket entry: "kvarg" means
-   * the food, not a particular tub of it. More than one word is a *specific*
-   * request — "lindahls kvarg", "star nutrition proteinpulver" — and there the
-   * bonus was actively wrong, demoting the exact product someone had named
-   * behind every generic row that shared a word with it.
-   *
-   * Decided from the query rather than from each row, because it is a fact
-   * about the question and not about the answer, and because the version that
-   * asked the database per row scanned every brand in the table to do it.
-   */
-  const genericBonus = trimmed.split(/\s+/).length === 1 ? "1.5" : "0";
+  const q = foldForSearch(trimmed);
+  const words = q.split(/\s+/).filter((word) => word !== "");
+  const single = sql.raw(words.length === 1 ? "true" : "false");
+  const genericBonus = sql.raw(words.length === 1 ? "1.5" : "0");
+
+  const everyWord = sql.join(
+    words.map((word) => sql`${foodItems.searchName} LIKE ${`%${escapeLike(word)}%`}`),
+    sql` AND `,
+  );
+  const tsQuery = sql`websearch_to_tsquery('swedish', ${trimmed})`;
 
   const rows = await db
     .select()
@@ -134,58 +133,35 @@ export async function searchFoodItems(
     .where(
       and(
         sql`(
-          ${foodItems.searchVector} @@ websearch_to_tsquery('swedish', ${trimmed})
-          OR ${foodItems.name} ILIKE ${"%" + trimmed + "%"}
-          /**
-           * The brand, matched in its own right.
-           *
-           * Only the name was matched here, so "star nutrition" found a product
-           * called that and nothing merely *made* by them, and the combination a
-           * person actually types — brand and product together — matched
-           * neither half. The concatenation is what makes "lindahls kvarg" a hit
-           * on a row whose name is "Kvarg" and whose brand is "Lindahls".
-           */
-          OR ${foodItems.brand} ILIKE ${"%" + trimmed + "%"}
-          OR (${foodItems.brand} || ' ' || ${foodItems.name}) ILIKE ${"%" + trimmed + "%"}
-          OR similarity(${foodItems.name}, ${trimmed}) > ${TRIGRAM_THRESHOLD}
-          OR similarity(coalesce(${foodItems.brand}, '') || ' ' || ${foodItems.name}, ${trimmed})
-             > ${TRIGRAM_THRESHOLD}
+          ${foodItems.searchVector} @@ ${tsQuery}
+          OR (${everyWord})
+          OR ${foodItems.searchName} % ${q}
+          OR ${q} <% ${foodItems.searchName}
         )`,
         visibleTo(userId),
       ),
     )
     .orderBy(
       sql`(
-        CASE WHEN lower(${foodItems.name}) = lower(${trimmed}) THEN 100 ELSE 0 END
-        + CASE WHEN ${foodItems.name} ILIKE ${trimmed + "%"} THEN 10 ELSE 0 END
-        /**
-         * Brand and name together, scored like a name match.
-         *
-         * Someone looking for a specific product types the brand with it, and
-         * before this that phrasing scored *lower* than either word alone.
-         */
+        CASE
+          WHEN ${single} AND (
+            lower(${foodItems.name}) = lower(${trimmed}) OR btrim(${foodItems.searchName}) = ${q}
+          ) THEN 100
+          WHEN NOT ${single} AND (${everyWord})
+            AND array_length(regexp_split_to_array(btrim(${foodItems.searchName}), '\s+'), 1)
+                = ${words.length}
+          THEN 100
+          ELSE 0
+        END
         + CASE
-            WHEN (coalesce(${foodItems.brand}, '') || ' ' || ${foodItems.name})
-                 ILIKE ${"%" + trimmed + "%"} THEN 12 ELSE 0
+            WHEN ${single}
+              AND translate(lower(${foodItems.name}), ${FOLD_FROM}, ${FOLD_TO}) LIKE ${`${escapeLike(q)}%`}
+            THEN 10 ELSE 0
           END
-        + ts_rank(
-            ${foodItems.searchVector},
-            websearch_to_tsquery('swedish', ${trimmed}),
-            1
-          ) * 8
-        + similarity(${foodItems.name}, ${trimmed}) * 4
-        /**
-         * A generic row is preferred only when the query named no brand.
-         *
-         * This bonus used to be unconditional, so every branded product was
-         * demoted against every generic one — which is precisely the wrong way
-         * round for someone searching for a named protein powder, and is the
-         * "plausible match pushed off the page" shape the banana defect had.
-         * It earns its keep for a bare "kvarg", where the Livsmedelsverket row
-         * is the better answer, and it has no business firing for
-         * "lindahls kvarg".
-         */
-        + CASE WHEN ${foodItems.brand} IS NULL THEN ${sql.raw(genericBonus)} ELSE 0 END
+        + CASE WHEN (${everyWord}) THEN 12 ELSE 0 END
+        + ts_rank(${foodItems.searchVector}, ${tsQuery}, 1) * 8
+        + word_similarity(${q}, ${foodItems.searchName}) * 4
+        + CASE WHEN ${foodItems.brand} IS NULL THEN ${genericBonus} ELSE 0 END
       ) DESC, length(${foodItems.name}) ASC`,
     )
     .limit(limit);
@@ -193,13 +169,6 @@ export async function searchFoodItems(
   return rows;
 }
 
-/**
- * How close a trigram match has to be to count as a match at all.
- *
- * 0.3 is Postgres's own default for the `%` operator. Lower admits noise on
- * short queries, where a three-letter word shares trigrams with a great deal.
- */
-const TRIGRAM_THRESHOLD = 0.3;
 
 export type FoodItemInsert = Omit<typeof foodItems.$inferInsert, "id" | "fetchedAt">;
 

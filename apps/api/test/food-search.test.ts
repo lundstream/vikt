@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { auth, createUser, type TestUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
 import { foodItems } from "../src/db/schema.js";
+import { FOLD_FROM, FOLD_TO, foldForSearch } from "../src/lib/search-fold.js";
 
 /**
  * Local food search.
@@ -36,16 +40,24 @@ const CATALOGUE: {
   { name: "Ägg rått", source: "livsmedelsverket" },
   { name: "Ägg kokt", source: "livsmedelsverket" },
   { name: "Ägg stekt", source: "livsmedelsverket" },
+  // D165: a misspelt word inside a long name, a folded letter, and word order.
+  { name: "Yoghurt naturell fett 3% berikad", source: "livsmedelsverket" },
+  { name: "Grekisk yoghurt", source: "livsmedelsverket" },
+  { name: "Gräddost", brand: "Frischgold", source: "openfoodfacts" },
+  { name: "Mammas köttbullar", brand: "Scan", source: "openfoodfacts" },
+  { name: "Köttbullar nöt stekta", source: "livsmedelsverket" },
+  { name: "Köttbullar frysvara", source: "livsmedelsverket" },
 ];
 
 async function search(
   app: FastifyInstance,
   user: TestUser,
   query: string,
+  source: "all" | "local" = "all",
 ): Promise<string[]> {
   const response = await app.inject({
     method: "GET",
-    url: `/api/food/search?q=${encodeURIComponent(query)}&limit=8`,
+    url: `/api/food/search?q=${encodeURIComponent(query)}&limit=8&source=${source}`,
     headers: auth(user),
   });
   if (response.statusCode !== 200) {
@@ -177,5 +189,115 @@ describe("local food search", () => {
     // about this one item rather than about an empty response.
     expect(await search(app, theirs, "banankaka")).not.toContain("Hemlig banankaka");
     expect(await search(app, mine, "banankaka")).toContain("Hemlig banankaka");
+  });
+});
+
+/**
+ * Fuzzy matching on the folded name (D165). Asked with `source=local`, so the
+ * answer is the database's and no fixture adapter can supply the row.
+ */
+describe("fuzzy local food search", () => {
+  async function seed(db: ReturnType<typeof ctx>["db"]) {
+    await db.insert(foodItems).values(
+      CATALOGUE.map((entry, index) => ({
+        source: entry.source,
+        sourceRef: `fuzzy-${index}`,
+        name: entry.name,
+        brand: entry.brand ?? null,
+        visibility: "shared" as const,
+        createdBy: null,
+        kcalPer100: "100.00",
+      })),
+    );
+  }
+
+  /**
+   * 0.18 as a whole-name similarity, which is under 0004's 0.3 cutoff, and 0.70
+   * as a word similarity, which is over 0.6. The case the old matcher missed.
+   */
+  it("finds yoghurt for Yogghurt, a misspelt word inside a long name", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    const results = await search(app, user, "Yogghurt", "local");
+    expect(results).toContain("Yoghurt naturell fett 3% berikad");
+    expect(results[0]?.toLowerCase()).toContain("yoghurt");
+  });
+
+  /** 0.00 unfolded: ö and o share no trigram. 1.00 once both are folded. */
+  it("finds Frischgold for frischgöld, through the folded brand", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    expect((await search(app, user, "frischgöld", "local"))[0]).toBe("Gräddost");
+  });
+
+  it("ranks the same row first for köttbullar mammas as for mammas köttbullar", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    const forwards = await search(app, user, "mammas köttbullar", "local");
+    const backwards = await search(app, user, "köttbullar mammas", "local");
+
+    expect(forwards[0]).toBe("Mammas köttbullar");
+    expect(backwards[0]).toBe("Mammas köttbullar");
+    expect(new Set(backwards)).toEqual(new Set(forwards));
+  });
+
+  it("finds a brand and a product in either order", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    expect((await search(app, user, "scan köttbullar", "local"))[0]).toBe("Mammas köttbullar");
+    expect((await search(app, user, "köttbullar scan", "local"))[0]).toBe("Mammas köttbullar");
+  });
+
+  /** The cutoff: a query that is near nothing matches nothing. */
+  it("still matches nothing for a query close to nothing", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    expect(await search(app, user, "zzzqqq", "local")).toEqual([]);
+  });
+
+  it("treats a LIKE wildcard in the query as a character, not as match-anything", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await seed(db);
+
+    expect(await search(app, user, "%%%", "local")).toEqual([]);
+  });
+});
+
+/**
+ * The fold is written twice, once in SQL in migration 0030 and once in
+ * TypeScript for the query, and the two have to agree or a folded query would
+ * miss the folded column.
+ */
+describe("the fold", () => {
+  it("uses the same letters in the migration as in the query", () => {
+    const migration = readFileSync(
+      path.resolve(import.meta.dirname, "../drizzle/0030_food_search_fold.sql"),
+      "utf8",
+    );
+
+    expect(migration).toContain(`'${FOLD_FROM}', '${FOLD_TO}'`);
+    expect([...FOLD_FROM].length).toBe([...FOLD_TO].length);
+  });
+
+  it("folds a query in TypeScript exactly as the database folds the column", async () => {
+    const { db } = ctx();
+    const sample = "Crème Brûlée ÅÄÖ Frischgöld Ça Über";
+
+    const rows = (await db.execute(
+      sql`select translate(lower(${sample}), ${FOLD_FROM}, ${FOLD_TO}) as folded`,
+    )) as unknown as { folded: string }[];
+
+    expect(foldForSearch(sample)).toBe(rows[0]!.folded);
   });
 });

@@ -62,6 +62,11 @@ declare module "fastify" {
      */
     foodAdapters: FoodAdapter[];
     /**
+     * The remote food search's deadline, or null for the service's own
+     * (D165). Only tests set it, so a timeout can be exercised in milliseconds.
+     */
+    foodRemoteTimeoutMs: number | null;
+    /**
      * The optional LLM layer (§6 phase 8). Decorated once so the client's
      * cached reachability is shared, and always present: `enabled` is false
      * when no host is configured, which is a supported configuration rather
@@ -94,6 +99,8 @@ export type BuildAppOptions = {
   db?: Db;
   /** Replace the ingest adapters. Tests pass fixtures instead of the network. */
   foodAdapters?: FoodAdapter[];
+  /** Shorten the remote food search's deadline. Tests only. */
+  foodRemoteTimeoutMs?: number;
   /**
    * Replace the LLM client. Tests pass a stub, because the real one talks to a
    * workstation that may be off, and a suite whose result depends on that is
@@ -164,6 +171,7 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
     "foodAdapters",
     options.foodAdapters ?? [new OpenFoodFactsAdapter(), new LivsmedelsverketAdapter()],
   );
+  app.decorate("foodRemoteTimeoutMs", options.foodRemoteTimeoutMs ?? null);
 
   /**
    * `request.clientIp` is the address to attribute a request to. Prefer it over

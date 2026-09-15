@@ -24,7 +24,11 @@ const delegating: FoodAdapter = {
   search: (query, limit, signal) => current!.search(query, limit, signal),
 };
 
-const ctx = useTestApp({}, { foodAdapters: [delegating] });
+/**
+ * A short remote deadline, so the timeout case below runs in a fraction of a
+ * second. Every other fake adapter answers at once and never meets it.
+ */
+const ctx = useTestApp({}, { foodAdapters: [delegating], foodRemoteTimeoutMs: 300 });
 
 /** An adapter that answers from memory and counts how often it was consulted. */
 function fakeAdapter(options: {
@@ -232,6 +236,94 @@ describe("search", () => {
     ).json<{ items: unknown[] }>();
 
     expect(body.items.length).toBeGreaterThan(0);
+  });
+
+  /* ------------------------------------------------ in two parts (D165) -- */
+
+  type Body = {
+    items: { name: string }[];
+    cacheOnly: boolean;
+    enough: boolean;
+    timedOut: boolean;
+    notice: string | null;
+  };
+
+  async function searchPart(app: FastifyInstance, user: TestUser, source: string, limit = 5) {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/food/search?q=havregryn&limit=${limit}&source=${source}`,
+      headers: auth(user),
+    });
+    expect(response.statusCode).toBe(200);
+    return response.json<Body>();
+  }
+
+  it("answers the local part from the cache alone, never touching the network", async () => {
+    const adapter = (current = fakeAdapter({ search: [havregryn] }));
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const body = await searchPart(app, user, "local");
+
+    expect(adapter.searches).toBe(0);
+    expect(body.cacheOnly).toBe(true);
+    expect(body.timedOut).toBe(false);
+    expect(body.items).toEqual([]);
+  });
+
+  it("answers the remote part from the adapters, and caches what they found", async () => {
+    const adapter = (current = fakeAdapter({ search: [havregryn] }));
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const remote = await searchPart(app, user, "remote");
+    expect(adapter.searches).toBe(1);
+    expect(remote.items.length).toBeGreaterThan(0);
+    expect(remote.cacheOnly).toBe(false);
+
+    // Cached as it arrived, so the next local part has it.
+    const local = await searchPart(app, user, "local");
+    expect(local.items.map((item) => item.name)).toEqual(remote.items.map((item) => item.name));
+  });
+
+  it("gives up on the network at the deadline, says so, and keeps the local results", async () => {
+    current = fakeAdapter({ search: [havregryn] });
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await searchPart(app, user, "remote");
+
+    // Now an adapter that never answers and ignores its signal.
+    const hanging = {
+      source: "openfoodfacts" as const,
+      supportsBarcode: true,
+      lookups: 0,
+      searches: 0,
+      lookupBarcode: async () => null,
+      search: () => {
+        hanging.searches += 1;
+        return new Promise<never>(() => {});
+      },
+    };
+    current = hanging;
+
+    const started = Date.now();
+    const body = await searchPart(app, user, "all", 20);
+
+    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(hanging.searches).toBe(1);
+    expect(body.timedOut).toBe(true);
+    expect(body.notice).toMatch(/svarade inte i tid/);
+    expect(body.items.length, "the cached row survives the timeout").toBeGreaterThan(0);
+  });
+
+  it("says nothing about a timeout when the network answered", async () => {
+    current = fakeAdapter({ search: [havregryn] });
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+
+    const body = await searchPart(app, user, "remote");
+    expect(body.timedOut).toBe(false);
+    expect(body.notice).toBeNull();
   });
 });
 

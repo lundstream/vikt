@@ -5,6 +5,7 @@ import {
   allPortionUnits,
   resolveDefaultAmount, MIN_SEARCH_LENGTH, formatDecimal, formatKcal, sumOrNull, dayMacros } from "shared";
 import { DayMacroLine } from "../components/DayMacroLine.js";
+import { SearchStatus } from "../components/SearchStatus.js";
 import { useMe } from "../lib/session.js";
 import {
   useDeletePortion,
@@ -556,15 +557,9 @@ export function FoodLog() {
             onSubmit={() => setSearchEnabled(true)}
           />
 
-          {search.data?.notice ? (
-            <p role="status" className="mt-2 text-micro text-muted">
-              {search.data.notice}
-            </p>
-          ) : null}
-
-          {search.data && search.data.items.length > 0 ? (
+          {search.items.length > 0 ? (
             <ul className="mt-3 divide-y divide-edge border-y border-edge">
-              {search.data.items.map((item) => (
+              {search.items.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
@@ -584,6 +579,13 @@ export function FoodLog() {
               ))}
             </ul>
           ) : null}
+
+          {/*
+            Under the list, because the list comes first: local rows appear at
+            once and this line says the databases are still being asked, then
+            what they said (D165).
+          */}
+          <SearchStatus state={search} />
         </section>
 
         {/*

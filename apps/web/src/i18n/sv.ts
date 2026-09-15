@@ -1050,6 +1050,13 @@ export const sv = {
   "food.dayTotal": "{kcal} kcal {day}",
   // Absent is not zero. An empty day says so rather than claiming 0 kcal.
   "food.dayNothingYet": "Inget loggat {day} än",
+  "food.searching": "Söker",
+  "food.searchingRemote": "Söker i livsmedelsdatabasen",
+  "food.searchingMore": "Söker vidare i livsmedelsdatabasen",
+  "food.searchTimeoutWithLocal": "Livsmedelsdatabasen svarade inte i tid. Det som redan fanns sparat visas ovan.",
+  "food.searchTimeoutEmpty": "Livsmedelsdatabasen svarade inte i tid, och inget sparat matchade. Försök igen om en stund.",
+  "food.searchFailed": "Sökningen gick inte att göra. Försök igen.",
+  "food.nothingFound": "Inget hittat för ”{query}”.",
   "food.macroFigure": "{name} {amount} g",
   "food.macroAtLeast": "{name} minst {amount} g",
   "food.macroPartial": "{percent} % av maten {day} har uppgifter",

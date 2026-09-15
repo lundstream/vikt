@@ -65,6 +65,14 @@ export const foodSearchResultSchema = z.object({
   cacheOnly: z.boolean(),
   /** Set when the network was skipped, so the UI can say why. */
   notice: z.string().nullable(),
+  /**
+   * The cache has already answered, so asking the food databases would spend
+   * the shared budget for nothing (D165). A client searching in two parts does
+   * not ask for the second.
+   */
+  enough: z.boolean(),
+  /** The food databases did not answer before the deadline. Local results stand. */
+  timedOut: z.boolean(),
 });
 export type FoodSearchResult = z.infer<typeof foodSearchResultSchema>;
 
@@ -99,6 +107,12 @@ export const MIN_SEARCH_LENGTH = 3;
 export const foodSearchQuerySchema = z.object({
   q: z.string().trim().min(MIN_SEARCH_LENGTH).max(100),
   limit: z.coerce.number().int().min(1).max(24).default(12),
+  /**
+   * Which part of a search (D165): the cache, the food databases, or both in
+   * one response. Both is the default, so a client that predates the split
+   * behaves as it did.
+   */
+  source: z.enum(["all", "local", "remote"]).default("all"),
 });
 
 /* ------------------------------------------------------------ food entries */
