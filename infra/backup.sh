@@ -33,6 +33,20 @@ POSTGRES_DB="${POSTGRES_DB:-vikt}"
 COMPOSE="${COMPOSE:-docker compose}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
+# Where Postgres is (D163).
+#
+# With a compose file beside this script, through compose, as it always was.
+# Without one, by container name: a Portainer-managed host keeps its stack file
+# inside Portainer, and the repository's Portainer file cannot be read by
+# `docker compose` at all unless every stack variable is set, so there is no
+# compose invocation that works there. The container name is the stack's own.
+if [ -f "$HERE/docker-compose.yml" ]; then
+  run() { $COMPOSE -f "$HERE/docker-compose.yml" exec -T postgres "$@"; }
+else
+  POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-vikt-postgres-1}"
+  run() { docker exec -i "$POSTGRES_CONTAINER" "$@"; }
+fi
+
 mkdir -p "$BACKUP_DIR"
 
 echo "[$(date -u +%FT%TZ)] backing up to $BACKUP_DIR"
@@ -47,8 +61,7 @@ echo "[$(date -u +%FT%TZ)] backing up to $BACKUP_DIR"
 # the server. A host pg_dump one major version behind refuses outright, which is
 # the kind of failure that is only discovered during a restore.
 DUMP="$BACKUP_DIR/vikt-$STAMP.dump"
-$COMPOSE -f "$HERE/docker-compose.yml" exec -T postgres \
-  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$DUMP.partial"
+run pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$DUMP.partial"
 
 # Renamed only once it is complete, so an interrupted run never leaves a
 # truncated file that looks like a backup.

@@ -111,6 +111,19 @@ cover the same ground.
 `infra/backup.sh` predates the above and is kept: it runs without the app, which
 is what you want when the app is the thing that is broken.
 
+**It runs on a Portainer-managed host.** Both it and `restore-check.sh` use a
+compose file beside them when there is one, and otherwise reach Postgres by
+container name (`POSTGRES_CONTAINER`, default `vikt-postgres-1`). Until D163 they
+only worked through compose, and a Portainer host has no compose file that
+`docker compose` can read, so the fallback this section promises could not
+actually run there.
+
+**Which version is on the host is checked, not assumed:**
+`node scripts/host-scripts.mjs check` compares the committed files with the
+host's copies by sha256, and `install` copies them. The schedule below is
+reported by that check and never installed by it, because the app has run the
+schedule since D103.
+
 ### What the script backs up
 
 `infra/backup.sh` writes two files per run into `BACKUP_DIR`:

@@ -29,6 +29,8 @@
  * is found now rather than half way through a deploy.
  */
 
+import { pathToFileURL } from "node:url";
+
 /** Where Portainer is. Overridable, because the host is not a constant. */
 const BASE = process.env.PORTAINER_URL ?? "http://192.168.1.20:9000";
 
@@ -47,15 +49,15 @@ const BASE = process.env.PORTAINER_URL ?? "http://192.168.1.20:9000";
  * token shorter than eight characters is not redacted, because splitting on one
  * or two characters would mangle every line and no real token is that short.
  */
-function redact(text) {
+export function redact(text) {
   const value = String(text);
   const token = process.env.PORTAINER_TOKEN?.trim();
   if (!token || token.length < 8) return value;
   return value.split(token).join("<redacted>");
 }
 
-const out = (text) => process.stdout.write(`${redact(text)}\n`);
-const err = (text) => process.stderr.write(redact(text));
+export const out = (text) => process.stdout.write(`${redact(text)}\n`);
+export const err = (text) => process.stderr.write(redact(text));
 
 /**
  * The token, or a refusal.
@@ -99,13 +101,24 @@ export function requireToken() {
  * changing the account's password, and it never has to be exchanged for
  * anything, which is the step that would need the password.
  */
-export async function portainer(path, { method = "GET", body } = {}) {
-  const response = await fetch(BASE + path, {
+/**
+ * A raw request, for callers that send something other than JSON or need the
+ * response itself — a tar into a container, the logs of one (D163). The token
+ * is added here and nowhere else, so every path from this repository to
+ * Portainer still reads it in exactly one place.
+ */
+export async function request(path, { method = "GET", headers = {}, body } = {}) {
+  return fetch(BASE + path, {
     method,
-    headers: {
-      "X-API-Key": requireToken(),
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-    },
+    headers: { "X-API-Key": requireToken(), ...headers },
+    ...(body === undefined ? {} : { body }),
+  });
+}
+
+export async function portainer(path, { method = "GET", body } = {}) {
+  const response = await request(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
@@ -132,7 +145,15 @@ export async function portainer(path, { method = "GET", body } = {}) {
 
 /* ------------------------------------------------------------------ cli -- */
 
-const [command, path] = process.argv.slice(2);
+/**
+ * Only as a command. `scripts/host-scripts.mjs` imports this file, and without
+ * the check `node scripts/host-scripts.mjs check` would also run this file's
+ * own `check`, because the two share an argv.
+ */
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  pathToFileURL(process.argv[1]).href.toLowerCase() === import.meta.url.toLowerCase();
+const [command, path] = invokedDirectly ? process.argv.slice(2) : [];
 
 try {
   if (command === "check") {

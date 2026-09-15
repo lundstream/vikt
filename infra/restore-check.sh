@@ -27,7 +27,19 @@ POSTGRES_DB="${POSTGRES_DB:-vikt}"
 COMPOSE="${COMPOSE:-docker compose}"
 SCRATCH="vikt_restore_$(date -u +%Y%m%d%H%M%S)"
 
-run() { $COMPOSE -f "$HERE/docker-compose.yml" exec -T postgres "$@"; }
+# Where Postgres is (D163).
+#
+# With a compose file beside this script, through compose, as it always was.
+# Without one, by container name: a Portainer-managed host keeps its stack file
+# inside Portainer, and the repository's Portainer file cannot be read by
+# `docker compose` at all unless every stack variable is set, so there is no
+# compose invocation that works there. The container name is the stack's own.
+if [ -f "$HERE/docker-compose.yml" ]; then
+  run() { $COMPOSE -f "$HERE/docker-compose.yml" exec -T postgres "$@"; }
+else
+  POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-vikt-postgres-1}"
+  run() { docker exec -i "$POSTGRES_CONTAINER" "$@"; }
+fi
 
 cleanup() {
   echo "dropping $SCRATCH"
