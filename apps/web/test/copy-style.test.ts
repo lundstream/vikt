@@ -158,10 +158,30 @@ describe("interface copy", () => {
 describe("landing page copy", () => {
   const strings = landingStrings();
 
-  /** If the extractor ever stops finding anything, every check below passes. */
-  it("is actually being read", () => {
-    expect(strings.length).toBeGreaterThan(40);
+  /**
+   * If the extractor ever stops finding anything, every check below passes.
+   *
+   * The rebuilt page (D173) is prose in seven sections rather than a strip of
+   * short labels, so it has fewer and longer strings than the page this floor
+   * was written against. A count alone would have to move every time the copy
+   * does, so what holds the guard honest now is the section list: every heading
+   * the page ships has to be among the strings being checked, and a section
+   * that stopped being read would fail here by name.
+   */
+  it("is actually being read, section by section", () => {
+    expect(strings.length).toBeGreaterThan(25);
     expect(strings).toContain("Gör det lättare");
+
+    for (const heading of [
+      "En dagsvikt är mest brus",
+      "Underhåll mäts, inte räknas",
+      "Det du loggar",
+      "Om AI",
+      "Så ser det ut",
+      "Dina data",
+    ]) {
+      expect(strings, `the landing section "${heading}" is not being read`).toContain(heading);
+    }
   });
 
   it("has no en dashes or em dashes", () => {

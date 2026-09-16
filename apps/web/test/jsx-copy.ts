@@ -68,9 +68,17 @@ export function jsxStrings(file: string): CopyString[] {
     if (isCopy(clean)) found.push({ text: clean, file: relative });
   };
 
-  // Text between tags: `>Öppna appen<`. Braces are excluded so an interpolated
-  // expression is never mistaken for words.
-  for (const match of code.matchAll(/>([^<>{}]+)</g)) add(match[1] ?? "");
+  /*
+    Text between tags: `>Öppna appen<`. Braces are excluded so an interpolated
+    expression is never mistaken for words.
+
+    The lookbehind excludes an arrow function's `>`. Without it, a component
+    with a statement before its `return (` hands this everything between the
+    arrow and the first tag, and the rebuilt landing page did: `useEffect(() =>
+    startLandingMotion(), []); return (` was reported as copy containing a
+    semicolon (D173). `=>` is not a closing tag, and no closing tag ends in `=`.
+  */
+  for (const match of code.matchAll(/(?<!=)>([^<>{}]+)</g)) add(match[1] ?? "");
 
   // String values still standing: `alt="..."`, `label: "..."`, and the messages
   // a handler falls back to.

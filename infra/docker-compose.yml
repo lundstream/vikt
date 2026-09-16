@@ -109,6 +109,9 @@ services:
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       OPERATOR: ${OPERATOR:-}
       REPO_URL: ${REPO_URL:-https://github.com/lundstream/vikt}
+      # The share card's absolute URLs are filled from this at container
+      # start (D173): og:image has to be absolute for a scraper.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       SUPPORT_URL: ${SUPPORT_URL:-}
     ports:
       # Loopback on the Docker host. NPM proxies to it.

@@ -16,11 +16,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>__APP_NAME__ — Gör det lättare</title>
+    <!--
+      The title carries no dash (§5). It said "__APP_NAME__ — Gör det lättare",
+      which is the one piece of interface copy the dash rule had never been
+      applied to, because the guard reads the dictionary and the JSX and nobody
+      had thought of the tab label as copy.
+    -->
+    <title>__APP_NAME__, gör det lättare</title>
     <meta
       name="description"
       content="Vikt är en självhostad vikt- och vanelogg. Trendlinje i stället för dagens våg, och underhållsnivå räknad ur dina egna siffror."
     />
+
+    <!--
+      What a link to this installation looks like when it is pasted somewhere
+      (D173). The image is `docs/landing/hero.png` cropped to 1200 x 630 by
+      `scripts/share-image.mjs`, and it is **not used inside the page**: it
+      exists so a shared link shows the product's own motif rather than a grey
+      box.
+
+      `__PUBLIC_BASE_URL__` because Open Graph wants an absolute URL and only
+      the deployment knows what this installation is called. nginx fills it at
+      container start like every other site fact (D121); the dev server fills it
+      with nothing, which leaves a root-relative path that works locally.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="__APP_NAME__" />
+    <meta property="og:title" content="__APP_NAME__, gör det lättare" />
+    <meta
+      property="og:description"
+      content="Trendvikt i stället för dagsvikt, en underhållsnivå räknad ur din egen data, och ingen siffra som hittas på."
+    />
+    <meta property="og:url" content="__PUBLIC_BASE_URL__/" />
+    <meta property="og:image" content="__PUBLIC_BASE_URL__/share.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="En fallande trendlinje i rött genom ett fält av ljusa punkter, på mörk bakgrund."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="__APP_NAME__, gör det lättare" />
+    <meta
+      name="twitter:description"
+      content="Trendvikt i stället för dagsvikt, en underhållsnivå räknad ur din egen data, och ingen siffra som hittas på."
+    />
+    <meta name="twitter:image" content="__PUBLIC_BASE_URL__/share.png" />
     <meta name="theme-color" content="#16232B" />
     <meta name="color-scheme" content="dark light" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />

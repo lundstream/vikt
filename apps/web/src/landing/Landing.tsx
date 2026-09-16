@@ -1,540 +1,497 @@
-import type { ReactNode } from "react";
-import { HeaderLockup, Mark } from "../components/Wordmark.js";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { HeaderLockup } from "../components/Wordmark.js";
 import { LandingPrimary } from "./LandingPrimary.js";
-import {
-  CalendarIcon,
-  CoinIcon,
-  ForkIcon,
-  GitHubMark,
-  ServerIcon,
-  TapIcon,
-  TrophyIcon,
-} from "./icons.js";
+import { DriftField, HeroGraph, NoiseGraph } from "./TrendDrawing.js";
+import { startLandingMotion } from "./landing-motion.js";
+import { MAINTENANCE, SETTLED_TREND } from "./seeded.js";
 import { LandingFooter } from "./Footer.js";
-import { RuledHeading } from "./PageShell.js";
 import { siteConfig } from "../lib/site-config.js";
 
 /**
- * The public landing page (D90, D97, D99).
+ * The public landing page (D90, D99, D127, D173).
  *
- * Structure borrowed from postliminalsystems.com: a header, a hero with one
- * headline and one action, a row of figure cards, one section per capability
- * with a screenshot, an honest section about cost, and a small footer.
+ * Rebuilt around one idea: **the page draws the product's argument before it
+ * states it.** A cloud of daily readings appears, a trend line draws through
+ * them, and only then does anything say "gör det lättare". Somebody who scrolls
+ * no further has already seen the difference between this and the app that
+ * draws a jagged daily line.
  *
- * The tone is not borrowed. This speaks to one person who has tried the apps
- * that draw a jagged daily line, call a two-kilo water swing progress, and turn
- * a missed Tuesday into a broken streak. Everything below is written to somebody
- * who is tired of that, which is why it says what the app does not do about as
- * often as what it does.
+ * ## The two rules it is built under (§5, D172)
  *
- * ## Two rules the copy follows, and one it inherits
+ * **Motion carries meaning.** Every animation here says something a still frame
+ * cannot: readings arrive one at a time because that is how they are logged, the
+ * line draws because a trend accumulates, the two maintenance figures count
+ * because they were measured rather than chosen, and in "En dagsvikt är mest
+ * brus" the reader draws the trend through the noise with their own scrolling.
+ * Nothing moves because moving is modern, nothing loops except the field behind
+ * the hero, which is background rather than subject and pauses with the tab.
  *
- * **Every paragraph is a bold lead-in and then the sentence.** The lead-in
- * states the point and the sentence supports it, so the page can be read by
- * lead-ins alone and still say the same thing. It began as the shape of the
- * "Så räknar den" section and turned out to be the shape the whole page wanted.
+ * **Restraint is the style.** Natt is matte: no gradients, no glow, no glass.
+ * One three-dimensional move exists on the whole page, the phone frames coming
+ * level as they scroll in, and it flattens and stays flat.
  *
- * **No emphasis anywhere else.** A bold phrase in the middle of a paragraph is
- * a second voice arguing with the first, and once there are two the reader
- * trusts neither. Emphasis is the lead-in's job and nothing else's.
+ * ## Colour
  *
- * The inherited rule is §5's: no en dashes or em dashes, sentence case, no
- * shouting. `copy-style.test.ts` now reads this file as well as the app's
- * dictionary, because the landing page is interface copy too and was the one
- * surface those rules were never checked against.
+ * Lingon appears in exactly two places, and both are the rule rather than an
+ * exception to it: the trend lines in `TrendDrawing.tsx`, and the single
+ * primary action in `LandingPrimary.tsx`, which is profile page 4's own
+ * carve-out for this page. The cards in "Det du loggar" carry the four area
+ * accents, each on the area it names, which is what they are for.
  *
- * It uses the app's tokens and components and nothing that needs a session,
- * and since D127 it touches **no endpoint at all**. The request form moved to
- * the unlinked `/kod`, behind `REQUEST_ENABLED`, which is off by default: this
- * page may be read by anybody, and every code approved from it makes the owner
- * responsible for another person's data.
+ * ## Copy
+ *
+ * The lead-in-and-sentence shape D111 removed is still gone. No emphasis inside
+ * a paragraph, no dashes, no semicolons, sentence case throughout, and
+ * `copy-style.test.ts` reads this file rather than the dictionary, because the
+ * landing bundle ships without one.
  */
 
-
-
 export function Landing() {
+  /**
+   * The behaviour, started once and cleaned up on unmount so the render tests
+   * do not leave observers behind. Everything it does is additive: the page is
+   * complete and readable before it runs, and under reduced motion it does
+   * almost nothing at all.
+   */
+  useEffect(() => startLandingMotion(), []);
+
   return (
-    <div className="min-h-dvh">
-      <TopBar />
+    <div className="min-h-dvh bg-paper">
+      <Header />
+      <span data-scroll-sentinel aria-hidden="true" className="block h-px" />
+
       <main>
         <Hero />
-        <Figures />
-        <Capabilities />
-        <HowItCounts />
-        <Ai />
-        <FreeForever />
+        <Noise />
+        <Maintenance />
+        <WhatYouLog />
+        <AboutAi />
+        <Screens />
+        <YourData />
       </main>
+
       <LandingFooter />
     </div>
   );
 }
 
-/**
- * A section heading, separated from what came before it exactly once (D114).
- *
- * A heading with an icon is already set apart: a tinted square at the start of
- * the line does the whole job. Adding a rule underneath gave those four
- * headings two separators and made the page look like it was trying twice. The
- * three headings with no icon keep the rule, because without it they are body
- * text in a slightly larger size.
- *
- * A rule rather than an underline in either case: an underline on a heading
- * reads as a link, which is the one thing it must not be.
- */
-function Heading({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
-  return (
-    <div className={icon === undefined ? "mb-6" : "mb-4"}>
-      <RuledHeading size="text-metric-sm" icon={icon} rule={icon === undefined}>
-        {children}
-      </RuledHeading>
-    </div>
-  );
-}
+/* ------------------------------------------------------------- the header -- */
 
 /**
- * The tinted square a capability heading's icon sits in.
+ * The lockup at 20 pt, two text links and one filled action.
  *
- * Same treatment as the figure cards, and coloured from the profile's semantic
- * map rather than from what looks good beside the screenshot: the mark itself
- * for the trend section, since Lingon belongs to the trend line and the
- * wordmark and this heading is about the line; Blåbär for food, because Blåbär
- * is nutrition; Gran for the day, because Gran is logging; Honung for
- * milestones, because Honung is the pot and the rewards.
+ * The lockup is the profile's (page 7): mark and wordmark together at 20 pt,
+ * in the header and not repeated in the hero. It never moves, which page 7 also
+ * says and which §5 repeats because this is the page where the temptation is
+ * strongest.
+ *
+ * **Nothing here links to `/kod`** (D127). Asking for a code is a separate
+ * deployment mode at an unlinked path, off by default, and a link to it from
+ * the one page strangers read would undo the whole separation.
+ *
+ * "Logga in" is a filled Snö button rather than a second Lingon one. The page
+ * has one primary action and it is in the hero, in the accent, and a second
+ * button in the same colour would spend the emphasis that makes the first one
+ * mean anything.
  */
-function HeadingIcon({ tint, children }: { tint: string; children: ReactNode }) {
+function Header() {
   return (
-    <span
-      className={`inline-flex size-10 shrink-0 items-center justify-center rounded-lg ${tint}`}
+    <header
+      data-landing-header
+      className="landing-header sticky top-0 z-50 w-full"
     >
-      {children}
-    </span>
-  );
-}
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-5 py-3">
+        <a href="/" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
+          <HeaderLockup />
+          <span className="sr-only">Vikt, till startsidan</span>
+        </a>
 
-/**
- * The header: the lockup and one link.
- *
- * Profile v1.2 settles what D91 and page 7 disagreed about. The compact
- * mark-and-wordmark lockup at 20 pt *is* the header, in the app and here, and
- * the landing page does not repeat it in the hero. So the hero below opens on
- * the slogan rather than on a second copy of the logo, which also means the
- * first thing on the page is the sentence rather than the branding.
- */
-function TopBar() {
-  return (
-    <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
-      <HeaderLockup />
-      <a
-        className="inline-flex items-center gap-2 text-note text-muted transition-colors hover:text-ink"
-        href={siteConfig().repo}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <GitHubMark />
-        GitHub
-      </a>
+        <nav className="flex items-center gap-4 sm:gap-6">
+          <a className="text-note text-muted transition-colors hover:text-ink" href="#sa-funkar-det">
+            Så funkar det
+          </a>
+          <a
+            className="text-note text-muted transition-colors hover:text-ink"
+            href={siteConfig().repo}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Källkod
+          </a>
+          <a
+            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-ink px-4 py-1.5
+                       text-note font-medium text-paper transition-opacity hover:opacity-90"
+            href="/app"
+          >
+            Logga in
+          </a>
+        </nav>
+      </div>
     </header>
   );
 }
 
+/* --------------------------------------------------------------- the hero -- */
+
+/**
+ * A full viewport of Natt, a graph that draws itself, and then the words.
+ *
+ * The sequence runs on load and owes nothing to scrolling: somebody who lands
+ * here and does not move sees the whole argument. Thirty readings arrive over
+ * 1,5 s, the line draws through them over 2 s and ends in its endpoint, and the
+ * tagline follows it. The timings are in `landing.css`, as delays on plain CSS
+ * animations, so there is no timer in JavaScript to drift or to leak.
+ */
 function Hero() {
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 pb-16 pt-10 text-center sm:pt-16">
-      <h1 className="text-figure-sm text-ink">Gör det lättare</h1>
-      <p className="mx-auto mt-4 max-w-prose text-body text-muted">
-        Lättare att logga, och lättare att läsa. En trendlinje i
-        stället för dagens siffra, och en underhållsnivå räknad ur det du
-        faktiskt gjort.
-      </p>
-
-      {/*
-        One primary action, and now genuinely one (D127).
-
-        "Be om en kod" sat beside it as a second button, which made asking for
-        an invitation look like a normal way in. It is not: the request form
-        moved to the unlinked /kod and is off by default, so on most
-        installations that button pointed at a page that does not exist.
-
-        What replaces it is a sentence rather than a control, because there is
-        no action here that is true for every reader. Somebody who already has
-        a code opens the app. Somebody who does not cannot get one from this
-        page. Both can run their own copy, and that is the one thing this page
-        can honestly offer anybody who reads it.
-      */}
-      <div className="mt-8 flex justify-center">
-        <LandingPrimary href="/app">Öppna appen</LandingPrimary>
+    <section
+      data-hero
+      className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden px-5 py-16"
+    >
+      {/* Texture, not content: the field is at an opacity where it reads as
+          grain, and it is the one thing on the page with no end state. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-25">
+        <DriftField />
       </div>
 
-      <p className="mx-auto mt-6 max-w-prose text-note text-muted">
-        Appen kräver en inbjudan, och den här installationen delar inte ut
-        några. Vill du ha en egen kan du köra den på din egen server. Koden
-        är öppen och ligger på{" "}
-        <a
-          className="underline underline-offset-4 hover:text-ink"
-          href={siteConfig().repo}
-          target="_blank"
-          rel="noopener noreferrer"
+      <div className="relative mx-auto w-full max-w-3xl">
+        <HeroGraph />
+
+        <h1 className="hero-tagline mt-10 text-figure text-ink">Gör det lättare</h1>
+
+        <p className="hero-sentence mt-5 max-w-prose text-body text-ink">
+          Trendvikt i stället för dagsvikt, en underhållsnivå räknad ur din egen data, och ingen
+          siffra som hittas på.
+        </p>
+
+        <div className="hero-actions mt-8 flex flex-wrap items-center gap-5">
+          <LandingPrimary href="/app">Logga in</LandingPrimary>
+          <a className="text-note text-muted transition-colors hover:text-ink" href="#sa-funkar-det">
+            Så funkar det
+          </a>
+        </div>
+
+        {/*
+          The sentence that replaced the second button (D127). There is no
+          action here that is true for every reader: somebody with a code opens
+          the app, somebody without one cannot get one from this page, and both
+          can run their own copy. So it is a sentence rather than a control, and
+          it is still the one offer this page can make to anybody at all.
+        */}
+        <p className="hero-actions mt-6 max-w-prose text-note text-muted">
+          Appen kräver en inbjudan, och den här installationen delar inte ut några. Vill du ha en
+          egen kan du köra den på en egen server. Koden är öppen och ligger på{" "}
+          <a
+            className="underline underline-offset-4 hover:text-ink"
+            href={siteConfig().repo}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------- a daily weight is noise -- */
+
+/**
+ * The reader draws the trend through the noise.
+ *
+ * The number flickers through six mornings of the same body and settles on what
+ * the trend says, and the line beside it follows the scroll. Both are the same
+ * sentence said twice, in the two ways a page can say something: a figure that
+ * will not hold still, and a line that does.
+ *
+ * Every figure here is a fixture from `seeded.ts`, never an account.
+ */
+function Noise() {
+  return (
+    <section id="sa-funkar-det" className="noise-section scroll-mt-20 border-y border-edge bg-card">
+      <div className="mx-auto grid w-full max-w-5xl gap-10 px-5 py-16 sm:grid-cols-2 sm:items-center">
+        <div className="reveal">
+          <SectionHeading>En dagsvikt är mest brus</SectionHeading>
+
+          <p className="num mt-6 text-figure tabular-nums text-ink" data-flicker>
+            {SETTLED_TREND.replace(".", ",")}
+            <span className="ml-2 align-baseline text-metric-sm font-normal text-muted">kg</span>
+          </p>
+
+          <p className="mt-5 max-w-prose text-body text-muted">
+            Ett kilo upp eller ner över en natt är salt, sömn och vatten. Linjen är vad veckan
+            säger, och den är den enda av de två som går att fatta ett beslut på.
+          </p>
+        </div>
+
+        <div className="reveal" style={{ "--i": 1 } as CSSProperties}>
+          <NoiseGraph />
+          <p className="mt-3 text-micro text-muted">
+            Fjorton dagar, samma kropp. Punkterna är vägningarna, linjen är trenden.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------- maintenance, measured -- */
+
+/**
+ * Two figures, one Sten and one Snö, and the difference between them is the
+ * product.
+ *
+ * They count up when they are reached because they were arrived at rather than
+ * chosen, and they are tabular so that nothing shifts while they do. The labels
+ * carry the coverage, because a measured figure without the days behind it is
+ * an assertion.
+ */
+function Maintenance() {
+  return (
+    <section className="mx-auto w-full max-w-5xl px-5 py-16">
+      <SectionHeading>Underhåll mäts, inte räknas</SectionHeading>
+
+      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        <figure className="reveal rounded-card border border-edge bg-card p-6">
+          <p className="num text-figure-sm tabular-nums text-uncertain" data-count-to={MAINTENANCE.formula}>
+            {MAINTENANCE.formula.toLocaleString("sv-SE")}
+          </p>
+          <figcaption className="mt-2 text-note text-muted">{MAINTENANCE.formulaLabel}</figcaption>
+        </figure>
+
+        <figure
+          className="reveal rounded-card border border-edge bg-card p-6"
+          style={{ "--i": 1 } as CSSProperties}
         >
-          GitHub
-        </a>
-        .
+          <p className="num text-figure-sm tabular-nums text-ink" data-count-to={MAINTENANCE.measured}>
+            {MAINTENANCE.measured.toLocaleString("sv-SE")}
+          </p>
+          <figcaption className="mt-2 text-note text-muted">{MAINTENANCE.measuredLabel}</figcaption>
+        </figure>
+      </div>
+
+      <p className="mt-6 max-w-prose text-body text-muted">
+        En formel gissar vad en kropp av din storlek gör av med. Appen löser i stället ut den enda
+        siffra som förklarar både vad du ätit och vad trenden gjort under samma period, och räknar
+        om den varje dag. Den säger alltid vilken av de två du tittar på och hur säker den är.
       </p>
     </section>
   );
 }
 
+/* --------------------------------------------------------- what you log -- */
+
 /**
- * Three cards, each with a measured number.
+ * One card per area, each in its own accent, one idea each.
  *
- * The tap figure is the one from STATE.md's fast-path table, taken on the
- * production build under throttling, not an estimate: a landing page that
- * rounds its own measurements down is the same genre of thing as an app that
- * calls a water swing progress. `landing-figures.test.ts` pins it there.
- *
- * The icon colours come from the profile's semantic map and not from what looks
- * good together. Gran is logging, so it carries the taps. Honung is money and
- * rewards, so it carries the price. Is is secondary data, so it carries the one
- * about who sees anything. A fourth card would need a fourth area to belong to,
- * and there is not one, which is the map doing its job.
- *
- * The third card has been wrong twice, in two different ways.
- *
- * It read "100 % av din data ligger på din egen server", which is true when
- * somebody self-hosts and false when they use an instance somebody else runs,
- * and the page cannot know which reader it has (D111). Replacing it with "0
- * tredje parter som ser dina mätvärden" fixed the truth and broke the form: the
- * strip is three number-and-unit pairs, "2 tryck" and "0 kr" read as one, and a
- * bare 0 with a clause after it did not (D114).
- *
- * "1 server" is both. It parses like its neighbours, and it is true whether the
- * server is the reader's own or the owner's, which is the property the first
- * version lacked. `source` pins the claim to the sentence on /integritet it
- * condenses, so the strip cannot go on saying something the privacy page has
- * stopped saying.
+ * The accents come from the profile's table rather than from what looks good in
+ * a row: Blåbär is nutrition, Gran is logging, Honung is the pot and the
+ * rewards, Is is secondary data. The last two cards have no accent, because
+ * reminders and the coach are not areas: profile page 4 says the answer to
+ * "which area is this" being "none" means no accent, and that is usually right.
  */
-function Figures() {
-  const figures = [
+function WhatYouLog() {
+  const cards = [
     {
-      icon: <TapIcon className="size-5" />,
-      tint: "bg-logged/15 text-logged",
-      value: "2",
-      unit: "tryck",
-      label: "för att logga något du ätit förut",
+      title: "Mat",
+      tint: "text-nutrition",
+      body: "Streckkod, en mening eller ett foto. Det du åt i går ligger överst och loggas igen med två tryck.",
     },
     {
-      icon: <CoinIcon className="size-5" />,
-      tint: "bg-reward/15 text-reward",
-      value: "0",
-      unit: "kr",
-      label: "att använda, och källkoden är öppen",
+      title: "Dagen",
+      tint: "text-logged",
+      body: "Energi, humör, sömn och vanor. Hoppa över det du inte vill svara på.",
     },
     {
-      icon: <ServerIcon className="size-5" />,
-      tint: "bg-data/15 text-data",
-      value: "1",
-      unit: "server",
-      label: "Där stannar allt du loggar.",
-      source: "Ingenting annat lämnar servern.",
+      title: "Framsteg",
+      tint: "text-reward",
+      body: "Milstolpar i det du mäter, och en sparpott som räknar ihop det du inte köpte.",
+    },
+    {
+      title: "Samband",
+      tint: "text-data",
+      body: "Dina serier bredvid varandra. Appen räknar inget samband åt dig och påstår ingen orsak.",
+    },
+    {
+      title: "Påminnelser",
+      tint: "text-ink",
+      body: "En knuff på morgonen om du vill ha en, och tystnad om du inte vill.",
+    },
+    {
+      title: "Coachen",
+      tint: "text-uncertain",
+      body: "Ser dina siffror och hittar aldrig på en. Den kan bara berätta vad som står i appen.",
     },
   ];
 
   return (
     <section className="border-y border-edge bg-card">
-      <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-4 px-5 py-12 sm:grid-cols-3">
-        {figures.map((figure) => (
-          <div key={figure.label} className="rounded-card border border-edge bg-paper p-5">
-            <span
-              className={`inline-flex size-10 items-center justify-center rounded-lg ${figure.tint}`}
+      <div className="mx-auto w-full max-w-5xl px-5 py-16">
+        <SectionHeading>Det du loggar</SectionHeading>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card, index) => (
+            <article
+              key={card.title}
+              className="reveal rounded-card border border-edge bg-paper p-5"
+              style={{ "--i": index } as CSSProperties}
             >
-              {figure.icon}
-            </span>
-
-            <p className="num mt-4 text-figure-sm text-ink">
-              {figure.value}
-              {figure.unit === "" ? null : (
-                <span className="ml-2 align-baseline text-metric-sm font-normal text-muted">
-                  {figure.unit}
-                </span>
-              )}
-            </p>
-            <p className="mt-2 max-w-[24ch] text-note text-muted">{figure.label}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/**
- * A phone-shaped frame around a real screenshot.
- *
- * CSS rather than a photograph or a stock mockup: a rounded rectangle with the
- * app's own edge colour and a notch, holding a genuine 360 px capture from
- * `shoot2.mjs`. A device photograph would put someone else's hardware and
- * someone else's lighting between the reader and the thing being shown.
- */
-function Phone({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="mx-auto w-full max-w-[300px]">
-      <div className="relative rounded-[2rem] border border-edge bg-card p-2 shadow-2xl">
-        <div
-          aria-hidden="true"
-          className="absolute left-1/2 top-2 z-10 h-4 w-20 -translate-x-1/2 rounded-full bg-paper"
-        />
-        <img src={src} alt={alt} loading="lazy" className="w-full rounded-[1.6rem]" />
-      </div>
-    </div>
-  );
-}
-
-function Capability({
-  title,
-  icon,
-  children,
-  src,
-  alt,
-  flip = false,
-}: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-  src: string;
-  alt: string;
-  flip?: boolean;
-}) {
-  return (
-    <section className="mx-auto w-full max-w-5xl px-5 py-14">
-      <div
-        className={`flex flex-col items-center gap-10 sm:flex-row ${
-          flip ? "sm:flex-row-reverse" : ""
-        }`}
-      >
-        <div className="min-w-0 flex-1">
-          <Heading icon={icon}>{title}</Heading>
-          <div className="space-y-3 text-body text-muted">{children}</div>
-        </div>
-        <div className="w-full sm:w-auto sm:flex-1">
-          <Phone src={src} alt={alt} />
+              <h3 className={`text-title ${card.tint}`}>{card.title}</h3>
+              <p className="mt-2 text-note text-muted">{card.body}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function Capabilities() {
+/* ---------------------------------------------------------------- about AI -- */
+
+/**
+ * One column, no accent, and the claim that matters said plainly: the model
+ * names, the database prices, and nothing a language model produced becomes a
+ * number in your history (D5, D143).
+ */
+function AboutAi() {
   return (
-    <>
-      <Capability
-        title="Linjen, inte dagens siffra"
-        icon={
-          <HeadingIcon tint="bg-card">
-            <Mark size={24} />
-          </HeadingIcon>
-        }
-        src="/screens/oversikt.png"
-        alt="Översikten med trendlinjen och dagens kalorier"
-      >
-        <p>
-          Vikten svänger. Ett kilo över en natt på salt, sömn och
-          vatten, och en graf över råa vägningar visar just den svängningen.
-        </p>
-        <p>
-          Trenden är det du tittar på. Vikt ritar en utjämnad linje
-          genom alla dina vägningar och lägger de råa punkterna bakom den, blekt.
-          De göms inte, de är bara inte huvudsaken.
-        </p>
-      </Capability>
+    <section className="mx-auto w-full max-w-3xl px-5 py-16">
+      <SectionHeading>Om AI</SectionHeading>
 
-      <Capability
-        title="Logga mat med ett tryck"
-        icon={
-          <HeadingIcon tint="bg-nutrition/15 text-nutrition">
-            <ForkIcon className="size-5" />
-          </HeadingIcon>
-        }
-        src="/screens/mat.png"
-        alt="Matloggen med sökning, skanning och senast loggade rader"
-        flip
-      >
+      <div className="mt-6 space-y-4 text-body text-muted">
         <p>
-          Det du åt i går ligger överst. Ett tryck loggar samma sak
-          igen, i samma portion.
+          Det läser vad du ätit, ur en mening eller ur ett foto av tallriken, och föreslår vad du
+          kan laga av det du har hemma. Coachen ser dina egna siffror och skriver veckans
+          sammanfattning ur dem.
         </p>
         <p>
-          Resten finns också. Streckkod, sökning mot Open Food Facts
-          och Livsmedelsverket, eller skriv in själv när maten inte finns i någon
-          databas, som pizzerian nere på gatan.
+          Det producerar aldrig en siffra. Modellen namnger maten och gissar mängden, och varje
+          kalori och makrovärde kommer ur livsmedelsdatabasen. En språkmodell som ombeds gissa
+          kalorier gissar självsäkert och fel, och den siffran hamnar sedan i underlaget för allt
+          annat appen räknar ut.
         </p>
         <p>
-          Allt sparas lokalt först. Det synkar när du är uppkopplad
-          igen, så en måltid i en butikskällare blir loggad ändå.
+          Lagret kör på hårdvara den som driver servern styr över. Det du loggar lämnar aldrig
+          servern, och vill du inte ha lagret alls stängs det av. Då finns knapparna inte där, de
+          blir inte gråa.
         </p>
-      </Capability>
-
-      <Capability
-        title="Dagen, om du vill"
-        icon={
-          <HeadingIcon tint="bg-logged/15 text-logged">
-            <CalendarIcon className="size-5" />
-          </HeadingIcon>
-        }
-        src="/screens/dag.png"
-        alt="Dagen med energi, humör, sömn och steg"
-      >
-        <p>
-          Sju saker på ett ställe. Energi, humör, sömn, steg,
-          alkohol, rörelse och mått.
-        </p>
-        <p>
-          Hoppa över det du inte vill svara på. En dag utan loggning
-          är ett hål i data, inte ett underkännande.
-        </p>
-        <p>
-          Appen har inget misslyckandetillstånd. Ingenting blir rött
-          för att det gick dåligt.
-        </p>
-      </Capability>
-
-      <Capability
-        title="Milstolpar och sparpott"
-        icon={
-          <HeadingIcon tint="bg-reward/15 text-reward">
-            <TrophyIcon className="size-5" />
-          </HeadingIcon>
-        }
-        src="/screens/framsteg.png"
-        alt="Framsteg med milstolpar, streck och sparpotten"
-        flip
-      >
-        <p>
-          Sätt mål i det du faktiskt mäter. Midjemått, nyktra dagar
-          och dagar i rad med loggning, inte bara kilo.
-        </p>
-        <p>
-          Potten räknar ihop det du inte köpte. En belöning går att
-          ta ut även om potten inte täcker den, för den är en räknare och inte en
-          spärr.
-        </p>
-      </Capability>
-    </>
+      </div>
+    </section>
   );
 }
 
+/* ----------------------------------------------------------------- screens -- */
+
 /**
- * The arithmetic, said plainly.
+ * Three real screens, from the seeded demo account.
  *
- * This is where somebody who has been lied to by a fitness app decides whether
- * to trust this one, so it names its sources and its limits rather than
- * asserting accuracy. The Open Food Facts and Livsmedelsverket attribution
- * lives here rather than in the footer for the same reason: it belongs with the
- * claim it supports.
+ * Captured by `scripts/landing-shots.mjs` at the frame's own size, so they are
+ * regenerated whenever the sweep runs and cannot quietly become a picture of an
+ * older app. A photograph of a phone would put somebody else's hardware and
+ * lighting between the reader and the thing being shown.
+ *
+ * The frames rest at a slight tilt and come level as they scroll in. That is
+ * the only three-dimensional move on the page, it ends flat, and with reduced
+ * motion it never happens.
  */
-function HowItCounts() {
+function Screens() {
+  const screens = [
+    { src: "/screens/oversikt.png", alt: "Översikten med trendlinjen och dagens siffror", tilt: "7deg" },
+    { src: "/screens/mat.png", alt: "Matloggen med sökning och senast loggade rader", tilt: "0deg" },
+    { src: "/screens/framsteg.png", alt: "Framsteg med milstolpar och sparpotten", tilt: "-7deg" },
+  ];
+
   return (
     <section className="border-y border-edge bg-card">
-      <div className="mx-auto w-full max-w-3xl px-5 py-14">
-        <Heading>Så räknar den</Heading>
-        <div className="space-y-4 text-body text-muted">
-          <p>
-            Trendvikt före dagsvikt. Ett exponentiellt glidande
-            medelvärde med tio dagars konstant, räknat per dag och inte per
-            vägning, så en vecka mellan två vägningar inte gör linjen trög.
-          </p>
-          <p>
-            Underhållsnivån räknas ur dina egna siffror. Över de
-            senaste fyra veckorna tas vad du ätit mot vad trenden gjort, och ur
-            det faller den nivå som förklarar båda. En formel används bara de
-            första två veckorna, och appen säger vilken av dem du tittar på och
-            hur säker den är.
-          </p>
-          <p>
-            Makromål från NNR 2023. Så som Livsmedelsverket
-            publicerar dem, jämförda mot ett rullande sjudagarssnitt eftersom det
-            är så rekommendationerna är skrivna. Inte en fördelning som en app
-            hittat på.
-          </p>
-          <p>
-            Ingen siffra hittas på. En dag utan loggning står som
-            "inte än", aldrig som noll. En summa som saknar uppgifter säger
-            "minst". En uppskattning är märkt som uppskattning överallt där den
-            syns.
-          </p>
-        </div>
+      <div className="mx-auto w-full max-w-5xl px-5 py-16">
+        <SectionHeading>Så ser det ut</SectionHeading>
 
-        <p className="mt-6 text-micro text-muted">
-          Livsmedelsdata kommer från Open Food Facts, som är licensierad under
-          ODbL, och från Livsmedelsverket. Båda hämtas när du söker och
-          mellanlagras lokalt.
-        </p>
+        <div className="mt-10 grid gap-8 sm:grid-cols-3">
+          {screens.map((screen) => (
+            <div
+              key={screen.src}
+              className="phone-frame mx-auto w-full max-w-[280px]"
+              style={{ "--tilt": screen.tilt } as CSSProperties}
+            >
+              <div className="relative rounded-[2rem] border border-edge bg-paper p-2">
+                <div
+                  aria-hidden="true"
+                  className="absolute left-1/2 top-3 z-10 h-3.5 w-16 -translate-x-1/2 rounded-full bg-card"
+                />
+                <img
+                  src={screen.src}
+                  alt={screen.alt}
+                  width={360}
+                  height={780}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full rounded-[1.6rem]"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
+
+/* --------------------------------------------------------------- your data -- */
 
 /**
- * The AI section, written to be the reason someone trusts the rest.
- *
- * Every app the reader has tried has an AI feature that guesses calories. This
- * one says, in a lead-in they cannot miss, that it does not. That is the actual
- * difference and it is worth more than any claim about accuracy.
+ * What a reader can do about their own data, with the link to the page that
+ * says it in full (D106). Every right names the thing in the app that fulfils
+ * it, which is the rule that page is built on.
  */
-function Ai() {
+function YourData() {
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 py-14">
-      <Heading>Om AI</Heading>
-      <div className="space-y-3 text-body text-muted">
+    <section className="mx-auto w-full max-w-3xl px-5 py-16">
+      <SectionHeading>Dina data</SectionHeading>
+
+      <div className="mt-6 space-y-4 text-body text-muted">
         <p>
-          Det är valfritt. Lagret kör på hårdvara du själv styr
-          över, hemma eller på din egen server, och ingenting skickas till någon
-          molntjänst.
+          Appen körs på en server. Kör du den själv är det din, och kör någon annan den är det
+          deras, och båda fallen står på integritetssidan. Ingenting säljs, ingenting mäts för
+          annonser, och det finns ingen analysskript på den här sidan heller.
         </p>
         <p>
-          Det gör två saker. Det tolkar vad du skrivit att du ätit,
-          och föreslår vad du kan laga av det du har hemma.
+          Du kan ta med dig allt. Hela kontot som JSON, en fil per tabell som CSV, och en
+          Excel-fil med en rad per dag. Du kan också radera kontot själv, direkt i appen, utan att
+          fråga någon.
         </p>
         <p>
-          Det räknar aldrig ut en kalori eller ett makrovärde själv.{" "}
-          Modellen namnger maten och gissar mängden, och siffrorna kommer ur
-          livsmedelsdatabasen varje gång.
+          Koden är öppen under AGPL. Den som kör en ändrad version åt andra ska släppa sina
+          ändringar, vilket är hela poängen med den licensen.
         </p>
-        <p>
-          Det är skillnaden mot apparna du provat. En språkmodell
-          som ombeds gissa kalorier gissar självsäkert och fel, och den siffran
-          hamnar sedan i underlaget för allt annat appen räknar ut.
-        </p>
-        <p>
-          Vill du inte ha det stänger du av det. Då finns knapparna
-          inte där, de blir inte gråa.
-        </p>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-5 text-note">
+        <a className="text-muted underline underline-offset-4 hover:text-ink" href="/integritet">
+          Integritet
+        </a>
+        <a
+          className="text-muted underline underline-offset-4 hover:text-ink"
+          href={siteConfig().repo}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Källkod
+        </a>
       </div>
     </section>
   );
 }
 
-/** The cost section, and why it can afford to be free. */
-function FreeForever() {
+/* ----------------------------------------------------------------- shared -- */
+
+/**
+ * A section heading: one separator, and it is the rule (D114). An underline
+ * would read as a link, which is the one thing a heading must not be.
+ */
+function SectionHeading({ children }: { children: ReactNode }) {
   return (
-    <section className="border-y border-edge bg-card">
-      <div className="mx-auto w-full max-w-3xl px-5 py-14">
-        <Heading>Gratis</Heading>
-        <div className="space-y-3 text-body text-muted">
-          <p>
-            Det finns ingen betalversion. Ingen prenumeration, och
-            inget som är låst bakom en uppgradering.
-          </p>
-          <p>
-            Det kommer inte heller att dyka upp. Koden är öppen
-            under AGPL, så om det någonsin skulle ske kan vem som helst köra
-            versionen innan.
-          </p>
-          <p>
-            Det går för att appen inte kostar något att driva. En
-            liten server, ingen annonsförsäljning, ingen data att sälja och ingen
-            tillväxtplan. Kör du den själv kostar den dig en container på en
-            maskin du redan har.
-          </p>
-        </div>
-      </div>
-    </section>
+    <h2 className="border-t border-edge pt-4 text-metric-sm text-ink">{children}</h2>
   );
 }

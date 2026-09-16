@@ -5,6 +5,7 @@ import { Privacy } from "./Privacy.js";
 import { Terms } from "./Terms.js";
 import { RequestCode } from "./RequestCode.js";
 import "../styles/index.css";
+import "../styles/landing.css";
 
 /**
  * The public bundle's entry (D90, D106).

@@ -1,0 +1,349 @@
+/**
+ * The landing page's motion, in CSS (D173).
+ *
+ * Imported by the landing entry only, so the app pays nothing for it.
+ *
+ * Everything here answers §5's motion rule: a thing moves to say something a
+ * still frame cannot. The points appear one by one because readings arrive one
+ * by one; the line draws because a trend accumulates; the two figures count
+ * because they were measured rather than chosen; the cards rise once because
+ * they are arriving, and then they are still.
+ *
+ * No library. These are CSS animations, one scroll-driven timeline, and the
+ * handful of Web Animations API calls in `landing-motion.ts`.
+ *
+ * **The whole file is inert under `prefers-reduced-motion: reduce`**, which is
+ * at the bottom in one block rather than scattered through: every animation
+ * here is written so that its *end* state is what the element already looks
+ * like without the animation, so switching them all off renders the finished
+ * page rather than an empty one.
+ */
+
+/* --------------------------------------------------------- secondary text -- */
+
+/**
+ * Sten, one step lighter, on the public pages only (D173).
+ *
+ * The profile's Sten is `#6B7B82`, and on the dark theme's surfaces it measures
+ * **4,22:1 on Natt and 3,65:1 on Skymning**. The brief for this page requires
+ * 4,5:1 and Lighthouse docked the page for exactly these elements, so the
+ * public bundle lightens it to `#7C8C94`: 5,32:1 on Natt and 4,61:1 on
+ * Skymning, which passes on both surfaces the page alternates between.
+ *
+ * This is not a new idea. `tokens.css` already darkens Sten to `#5c6b72` in the
+ * light theme, with a comment saying it is to hold 4,5:1 on Papper: the same
+ * correction, in the other direction. The dark theme never
+ * got the same treatment, which means every meta line on a card in the app is
+ * at 3,65:1 today. That is a finding about the app rather than about this page,
+ * it is recorded in STATE.md, and fixing it is a change to the profile's own
+ * value rather than something to do quietly from here.
+ *
+ * `--sten` rather than `--muted`, so `--uncertain` moves with it: both point at
+ * the same palette name, and a page where the uncertain figure passed and the
+ * meta line did not would be the sort of half-fix this file exists to avoid.
+ */
+:root {
+  --sten: #7c8c94;
+}
+
+/* ------------------------------------------------------------- the hero -- */
+
+/**
+ * A reading arriving. Scale rather than slide: it appeared where it was
+ * measured, it did not travel there from somewhere else.
+ */
+@keyframes reading-arrives {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/** A trend accumulating, left to right, which is the one thing it does. */
+@keyframes line-draws {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes settles-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/**
+ * The field behind the hero. The one thing on this page with no end state,
+ * allowed by §5 only because it is the background rather than the subject, at
+ * an opacity where it reads as texture.
+ *
+ * `landing-motion.ts` pauses it when the tab is hidden: an animation nobody is
+ * looking at is a timer that keeps a phone's compositor awake.
+ */
+@keyframes drifts {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(14px, -22px, 0);
+  }
+}
+
+.hero-reading {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: reading-arrives 260ms ease-out both;
+  /* Thirty of them across 1,5 s: the last one lands as the line starts. */
+  animation-delay: calc(var(--i) * 50ms);
+}
+
+/*
+  One unit long, because the SVG says `pathLength="1"`.
+  This read `var(--len)` and nothing ever defined it, so `stroke-dasharray`
+  computed to `none`, the offset to `0`, and **neither line ever drew**: the
+  animation ran against a dash pattern that did not exist and the finished frame
+  looked exactly like the intended one. Found by asking the browser what it had
+  attached rather than by looking at the page.
+*/
+.hero-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: line-draws 2000ms cubic-bezier(0.33, 0, 0.2, 1) both;
+  animation-delay: 1500ms;
+}
+
+.hero-endpoint {
+  opacity: 0;
+  animation: settles-in 320ms ease-out both;
+  animation-delay: 3400ms;
+}
+
+/* The words, after the line has said the same thing without them. */
+.hero-tagline {
+  opacity: 0;
+  animation: settles-in 420ms ease-out both;
+  animation-delay: 3600ms;
+}
+.hero-sentence {
+  opacity: 0;
+  animation: settles-in 420ms ease-out both;
+  animation-delay: 3900ms;
+}
+.hero-actions {
+  opacity: 0;
+  animation: settles-in 420ms ease-out both;
+  animation-delay: 4150ms;
+}
+
+.drift-point {
+  animation: drifts var(--duration, 30s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+
+.drift-paused .drift-point {
+  animation-play-state: paused;
+}
+
+/* --------------------------------------------------- revealed on scroll -- */
+
+/**
+ * One reveal, once, 12 px, 240 ms, staggered by 60 ms where there is a row of
+ * them. `landing-motion.ts` adds `.revealed` through an IntersectionObserver
+ * and then stops watching, because "everything that moves, stops" includes
+ * moving again when the reader scrolls back up.
+ */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 240ms ease-out,
+    transform 240ms ease-out;
+  transition-delay: calc(var(--i, 0) * 60ms);
+}
+
+.reveal.revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* ------------------------------------------- the line through the noise -- */
+
+/**
+ * The reader draws the trend with the wheel.
+ *
+ * `animation-timeline: view()` ties the dash offset to how far the section has
+ * travelled through the viewport, so the line is exactly as far along as the
+ * reader is. It is the one scroll-driven effect on the page and it moves
+ * nothing but a stroke: §5 rules out a scroll effect that takes the page away
+ * from somebody trying to read it.
+ *
+ * Where it is unsupported the same element gets a time-based draw on reveal,
+ * added by the observer. The two are mutually exclusive by construction: the
+ * `@supports` block sets the timeline, and the fallback class is only applied
+ * when `CSS.supports` says there is none.
+ */
+.noise-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.noise-line.drawn {
+  animation: line-draws 1400ms cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+
+@supports (animation-timeline: view()) {
+  /*
+    The timeline belongs to the **section**, not to the path.
+    `animation-timeline: view()` on the line itself measures the line's own
+    travel through the viewport, and a 150 px tall graph enters and is covered
+    within a flick of the wheel: measured, the stroke was already at zero by the
+    time the section's heading reached a third of the way up. Naming the
+    timeline on the section and referencing it from the descendant makes the
+    draw last as long as the reader is inside the section, which is the whole
+    point of the effect.
+  */
+  .noise-section {
+    view-timeline-name: --noise-section;
+    view-timeline-axis: block;
+  }
+
+  /*
+    Longhands, and `animation-duration: auto`. The `animation` shorthand sets
+    the duration to its initial `0s`, and a scroll-driven animation with a zero
+    duration is finished before it starts: measured, the stroke was at zero at
+    every scroll position. `auto` is what fills the range instead.
+  */
+  .noise-line {
+    animation-name: line-draws;
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: --noise-section;
+    animation-range: entry 15% cover 75%;
+  }
+}
+
+/* ------------------------------------------------------------ the phones -- */
+
+/**
+ * The only three-dimensional move on the page, and it flattens.
+ *
+ * The frames rest at a slight perspective tilt and come level as they scroll
+ * in, which says "this is a screen you will hold" and then gets out of the way.
+ * §5 allows no parallax beyond the hero and no 3D anywhere; this is written
+ * down as the exception in D173 because it is a scroll-linked rotation that
+ * ends flat and stays flat.
+ */
+@keyframes flattens {
+  from {
+    transform: perspective(1200px) rotateY(var(--tilt)) rotateX(3deg);
+  }
+  to {
+    transform: perspective(1200px) rotateY(0deg) rotateX(0deg);
+  }
+}
+
+.phone-frame {
+  transform: perspective(1200px) rotateY(0deg);
+}
+
+@supports (animation-timeline: view()) {
+  .phone-frame {
+    animation-name: flattens;
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: view();
+    animation-range: entry 10% cover 40%;
+  }
+}
+
+/* ------------------------------------------------------------ the header -- */
+
+/**
+ * Natt at high opacity with the scrim behind it, once the page has scrolled.
+ * Before that the header sits on the hero with nothing behind it, because a
+ * bar with a background at the top of an unscrolled page is a bar separating
+ * nothing from nothing.
+ */
+.landing-header {
+  background-color: transparent;
+  transition:
+    background-color 200ms ease-out,
+    border-color 200ms ease-out;
+  border-bottom: 1px solid transparent;
+}
+
+.landing-header.scrolled {
+  background-color: color-mix(in srgb, var(--paper) 92%, transparent);
+  border-bottom-color: var(--edge);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .landing-header.scrolled {
+    background-color: var(--paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ------------------------------------------------------- reduced motion -- */
+
+/**
+ * The final frame, at once, and nothing drifting (§5).
+ *
+ * Every rule above animates *towards* the page's resting state, so this block
+ * is a list of end states rather than a second design. A reader who asks for
+ * less motion sees the graph drawn, the words present, the cards in place and
+ * the phones flat.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .hero-reading,
+  .hero-line,
+  .hero-endpoint,
+  .hero-tagline,
+  .hero-sentence,
+  .hero-actions,
+  .noise-line,
+  .noise-line.drawn,
+  .drift-point,
+  .phone-frame {
+    animation: none !important;
+    animation-timeline: none !important;
+  }
+
+  .hero-reading,
+  .hero-endpoint,
+  .hero-tagline,
+  .hero-sentence,
+  .hero-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-line,
+  .noise-line {
+    stroke-dashoffset: 0;
+  }
+
+  .phone-frame {
+    transform: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

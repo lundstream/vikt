@@ -155,3 +155,9 @@ jobs:
 
       - name: Check the build for unsubstituted placeholders
         run: pnpm --filter web check:placeholders
+
+      # What the landing page costs a stranger (D173). Measured on the build
+      # rather than asserted in a unit test, because the question is what
+      # crosses the network and only the build knows that.
+      - name: Check the landing page's budget
+        run: pnpm --filter web check:bundle

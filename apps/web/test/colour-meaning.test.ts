@@ -100,6 +100,14 @@ describe("Lingon belongs to the trend line and the wordmark", () => {
     "components/TrendChart.tsx",
     "components/Wordmark.tsx",
     "landing/LandingPrimary.tsx",
+    /*
+      The landing page's two graphs (D173). Not a second exception: the lines
+      drawn there **are** trend lines, which is what Lingon means, and the
+      points around them are Is for the same reason they are in the app. It is
+      a file of its own because this list names files, and a 400-line page on
+      the list would permit the accent anywhere on the page.
+    */
+    "landing/TrendDrawing.tsx",
   ];
 
   it("appears in exactly those files", () => {

@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:placeholders": "node scripts/check-placeholders.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest"

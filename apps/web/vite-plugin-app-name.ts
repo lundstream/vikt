@@ -48,7 +48,15 @@ export function appNamePlugin(): Plugin {
     apply: "serve",
 
     transformIndexHtml(html) {
-      return html.replaceAll(APP_NAME_PLACEHOLDER, appName);
+      /*
+        `__PUBLIC_BASE_URL__` goes too (D173). nginx fills it with the
+        installation's own address so the share card's `og:image` is absolute;
+        in development there is no such address, and an empty prefix leaves
+        `/share.png`, which a browser resolves and a scraper never sees here.
+      */
+      return html
+        .replaceAll(APP_NAME_PLACEHOLDER, appName)
+        .replaceAll("__PUBLIC_BASE_URL__", "");
     },
 
     configureServer(server) {

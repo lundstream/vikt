@@ -20,6 +20,12 @@ CONTACT_EMAIL="${CONTACT_EMAIL:-}"
 OPERATOR="${OPERATOR:-}"
 REPO_URL="${REPO_URL:-https://github.com/lundstream/vikt}"
 SUPPORT_URL="${SUPPORT_URL:-}"
+# Where this installation answers, for the share card's absolute URLs (D173).
+# Empty leaves a root-relative path, which is wrong for a scraper and harmless
+# for a browser, and is the right failure for an installation that has not said
+# what it is called.
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
 
 if [ -z "$CONTACT_EMAIL" ]; then
   # Not fatal here: the API refuses to boot without it where a landing page is
@@ -36,4 +42,5 @@ find "$ROOT" -type f -name '*.html' -exec sed -i \
   -e "s|__OPERATOR__|${OPERATOR}|g" \
   -e "s|__REPO_URL__|${REPO_URL}|g" \
   -e "s|__SUPPORT_URL__|${SUPPORT_URL}|g" \
+  -e "s|__PUBLIC_BASE_URL__|${PUBLIC_BASE_URL}|g" \
   {} +

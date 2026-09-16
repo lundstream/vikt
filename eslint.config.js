@@ -336,6 +336,11 @@ export default tseslint.config(
         // Node has had both since 18; a script that talks to the LAN uses them.
         fetch: "readonly",
         AbortSignal: "readonly",
+        // And these, since the screenshot scripts drive Chrome over the
+        // DevTools protocol rather than pulling in a browser library (D173).
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        WebSocket: "readonly",
       },
     },
   },

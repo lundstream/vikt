@@ -9227,3 +9227,118 @@ about restraint.
 reads the landing JSX rather than the dictionary, because the page ships without
 it (D99, D111). The rule is written down now so the next page cannot be built
 exempt.
+
+---
+
+### D173 — The landing page draws the argument before it states it
+
+Built under D172's two rules, which were written first for exactly this reason:
+motion carries meaning, and restraint is the style.
+
+**The page's own argument is that a daily weight is noise and a trend is not.**
+So the page opens by drawing that: about thirty readings arrive one at a time
+over 1,5 s, scattered vertically the way a scale is wrong, and then a Lingon line
+draws through them over 2 s and ends in its endpoint. Only after the picture has
+made the argument does the tagline say it in words. Somebody who lands here and
+never scrolls has already seen the difference between this and the app that
+draws a jagged daily line.
+
+#### The sections, in order
+
+| | what it is |
+|---|---|
+| header | the lockup at 20 pt, "Så funkar det" and "Källkod" as text links, "Logga in" as a filled Snö button. Sticky, and Natt at 92 % with the scrim's blur once the page has scrolled. **Nothing links to `/kod`** (D127) |
+| hero | a full viewport of Natt: the drawn graph, the tagline, one sentence in Snö, the Lingon primary action, a text link to the explanation, and D127's sentence about invitations. A sparse Is field drifts behind it and pauses with the tab |
+| En dagsvikt är mest brus | a figure that flickers through six mornings of the same body and settles on the trend, beside fourteen daily readings the reader draws the trend through by scrolling |
+| Underhåll mäts, inte räknas | the formula's number in Sten and the measured one in Snö, both counting up once when reached, both tabular so nothing moves |
+| Det du loggar | six cards, one per area, each in its own accent: Blåbär for food, Gran for the day, Honung for the pot, Is for Samband, and **no accent** for reminders and the coach, because neither is an area |
+| Om AI | one column, no accent: it reads meals and writes the week's summary, it never produces a figure, and it runs on hardware the operator controls |
+| Så ser det ut | three phone frames holding real captures of the seeded demo account, resting at a slight tilt and coming level as they scroll in |
+| Dina data | self-hosted, AGPL, CSV, JSON and Excel, self-deletion, with the links to `/integritet` and the source |
+
+#### Where the motion rules bit
+
+**The one three-dimensional move on the page is the phone frames**, and §5 says
+no 3D anywhere. It is written down here as the exception because it is
+scroll-linked, it ends flat, and it stays flat: the frames say "this is a screen
+you will hold" and then get out of the way. Reduced motion renders them flat and
+they never tilt at all.
+
+**The drifting field is the other exception**, the one §5 names itself: it may
+drift without an end state only because it is background rather than subject. It
+is at 25 % opacity, and `landing-motion.ts` pauses it when the tab is hidden.
+
+**Everything else stops.** The reveals run once and the observer stops watching,
+because an element that re-animates every time it crosses the viewport is a page
+that will not hold still while somebody reads it.
+
+#### Two bugs the measurements found, which looking would not have
+
+**Neither line ever drew.** Both animate `stroke-dashoffset` from the path's
+length to zero, and the length was `var(--len)`, which nothing defined. An
+undefined custom property makes `stroke-dasharray` compute to `none`, the offset
+to `0`, and the animation then runs against a dash pattern that does not exist.
+The finished frame looks exactly like the intended one, so the page looked
+right in every screenshot. It was found by asking the browser what it had
+attached, not by looking: `pathLength="1"` means the value is `1`.
+
+**The scroll-driven draw was over before it started**, twice. First because
+`animation-timeline: view()` on the line measures *the line's* travel through
+the viewport, and a 150 px graph enters and is covered within a flick of the
+wheel: the timeline now belongs to the section and the line references it by
+name. Then because the `animation` shorthand sets `animation-duration` to its
+initial `0s`, and a scroll-driven animation with a zero duration is finished
+before it begins. `animation-duration: auto` is what fills the range. Measured
+afterwards, the offset moves 0,66 to 0,21 as the reader scrolls the section,
+which is the effect the section is for.
+
+#### Colour
+
+Lingon is in two files and both are the rule rather than an exception to it:
+`TrendDrawing.tsx`, whose lines **are** trend lines, and `LandingPrimary.tsx`,
+which is profile page 4's own carve-out for this page's single action.
+`colour-meaning.test.ts` names both.
+
+**Sten had to be lightened for the public bundle.** The profile's `#6B7B82`
+measures 4,22:1 on Natt and **3,65:1 on Skymning**, and this page is held to
+4,5:1. The public pages use `#7C8C94`, which is 5,32:1 and 4,61:1. The light
+theme has always done the same thing in the other direction, with a comment in
+`tokens.css` saying it is to hold 4,5:1 on Papper. **The dark theme never got
+that correction, so every meta line on a card in the app is at 3,65:1 today.**
+That is a finding about the app and a change to the profile's own value, so it
+is recorded in STATE.md and `docs/measurements.md` rather than made here.
+
+#### The budget, which is not met
+
+| | gzipped |
+|---|---|
+| the landing chunk | 11,7 kB |
+| react and react-dom | 45,9 kB |
+| **everything `/` fetches** | **57,6 kB** |
+
+The brief asked for under 40 kB. React alone is more than that, so no amount of
+work on the page reaches it. What would: **stop shipping React for this page**,
+by prerendering the three static public pages at build time and loading React
+only for `/kod`, which is the one with a form. That is a change to the build
+rather than to the page, it is the obvious next step, and it was not done in the
+same pass as the page. `apps/web/scripts/check-bundle.mjs` runs in CI, holds the
+page at its current weight, and names the 40 kB target in its failure message so
+the gap cannot quietly become the new normal.
+
+#### Measured
+
+Lighthouse 12.8.2, mobile settings, against the production build:
+**performance 98, accessibility 100, cumulative layout shift 0**, LCP 2,2 s,
+TBT 0 ms. Accessibility was 95 before the contrast fix. Zero layout shift with
+this much animation is the number worth keeping: every figure is in the markup
+at its final width before it counts, the screenshots carry `width` and `height`,
+and the reveals move with `transform`.
+
+#### Two scripts, so nothing goes stale
+
+`scripts/landing-shots.mjs` signs into the seeded demo account and captures the
+three phone screens at the frame's own size, and `scripts/share-image.mjs` crops
+the owner's artwork to the 1200 x 630 share card. The old page's screenshots
+were an app three passes old: the colours had moved and the dropdowns had been
+fixed, and the page went on showing the version somebody last remembered to
+save. A screenshot is a claim, and a claim nothing regenerates rots.

@@ -11,6 +11,68 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, rebuilt
+
+Lighthouse 12.8.2 in headless Chrome, **mobile settings** (the default preset:
+Moto G Power emulation, 4x CPU throttling, simulated slow 4G), against the
+production build served by `vite preview` over https. 2026-09-17.
+
+| | |
+|---|---|
+| performance | **98** |
+| accessibility | **100** |
+| largest contentful paint | 2,2 s |
+| cumulative layout shift | **0** |
+| total blocking time | 0 ms |
+| speed index | 1,7 s |
+
+Zero layout shift is the one worth saying twice. The page animates a great deal
+and shifts nothing: every figure is in the markup at its final width before the
+count-up starts, the phone screenshots carry `width` and `height`, and the
+reveals move 12 px with `transform` rather than with layout.
+
+Accessibility was **95 before the contrast fix below** and is 100 after it.
+
+### What the page loads
+
+Measured on the build, gzipped, by `apps/web/scripts/check-bundle.mjs`, which
+runs in CI:
+
+| | gzipped |
+|---|---|
+| the landing chunk: the page, its motion, its fixture | 11,7 kB |
+| the vendor chunk: react and react-dom | 45,9 kB |
+| **everything `/` fetches** | **57,6 kB** |
+
+The brief asked for under 40 kB. **It is not met, and cannot be while the page
+ships React**: the framework alone is more than the whole budget, and the page's
+own code is a quarter of it. The way there is to stop shipping React for this
+page at all, which is a build change rather than a page change (D173). The CI
+check holds the page at its current weight and names the 40 kB target in its
+failure message so the gap stays visible.
+
+### Contrast, dark theme
+
+Measured with the WCAG formula against the theme's own surfaces:
+
+| foreground | on Natt `#0F1418` | on Skymning `#16232B` |
+|---|---|---|
+| Sten `#6B7B82`, the profile's value | 4,22:1 | **3,65:1** |
+| Sten `#7C8C94`, the public pages' value | 5,32:1 | 4,61:1 |
+
+**The profile's Sten does not hold 4,5:1 on either dark surface.** The light
+theme has known this since it was written: `tokens.css` darkens Sten to
+`#5c6b72` there with a comment saying it is to hold 4,5:1 on Papper. The dark
+theme never got the same correction, so every meta line and every "inte än" on a
+card in the app is at 3,65:1 today.
+
+The public bundle lightens it to `#7C8C94` (D173), because this brief holds the
+landing page to 4,5:1 and Lighthouse docked it for exactly those elements. The
+app is unchanged: the same correction there is a change to the profile's own
+value, and that is the owner's call rather than a side effect of a landing page.
+
+---
+
 ## The fast path
 
 Production build, 360x740, 4x CPU throttling, ~80 ms latency on 1.6 Mbps, on the

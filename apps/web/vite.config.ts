@@ -237,7 +237,15 @@ function nginxLikePreviewPlugin(): Plugin {
             chunks.push(Buffer.from(chunk as string | Buffer));
           }
           const body = Buffer.concat(chunks).toString("utf8");
-          const filled = body.replaceAll(APP_NAME_PLACEHOLDER, appName);
+          /*
+            The share card's base URL (D173). nginx fills it with the
+            installation's own address; here it becomes nothing, which leaves
+            `/share.png`, and a root-relative path is right for a browser and
+            never seen by a scraper on a development machine.
+          */
+          const filled = body
+            .replaceAll(APP_NAME_PLACEHOLDER, appName)
+            .replaceAll("__PUBLIC_BASE_URL__", "");
           res.write = write;
           res.end = end;
           res.writeHead = writeHead;

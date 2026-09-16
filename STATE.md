@@ -68,6 +68,16 @@ when it will be down, and its mail goes out.
   no screen had offered before. Exercised on the development account at 360 px
   and desktop: 90 rows, no page overflow, and the downloaded workbook matching
   the table in 2 014 of 2 014 cells.
+- **The landing page draws the argument before it states it** (D173). Thirty
+  readings arrive, a trend line draws through them, and only then does the page
+  say "gör det lättare" in words. Seven sections after it, one scroll-driven:
+  the reader draws a trend through a fortnight of daily weights with the wheel.
+  Three phone frames hold real captures of the seeded demo account, regenerated
+  by `scripts/landing-shots.mjs` rather than saved by hand. Measured on the
+  production build at mobile settings: **Lighthouse performance 98,
+  accessibility 100, zero layout shift**. Shot at 360 px and desktop, with a
+  reduced-motion pass that renders the finished page at once and a mid-scroll
+  shot with the line half drawn.
 - **The backup leaves the container, and the app reads one back** (D168).
   `/backups` is a required bind mount from a host directory (`BACKUP_HOST_DIR`)
   instead of a named volume the API's uid 1000 could not write, which is where
@@ -1056,6 +1066,45 @@ recommends: fine for the runbook, more power than it needs.
 `minio/minio` on Docker Hub answers "pull access denied" as of 2026-09-11, and
 Bitnami's image withdrew its `latest` tag before that. If that step fails again,
 check whether the registry moved before reading the diff.
+
+### For the graphic profile's next version
+
+**It needs a landing page section.** The profile (v1.4) covers the app: colour
+as information, the type scale, the logo and where the lockup goes. The landing
+page is now a designed surface with rules of its own that live only in
+`CLAUDE.md` §5 and D173, and the two documents should not disagree by silence.
+What the next version should say:
+
+- **the page's largest text is words, not a number.** Page 5 says the largest
+  text on a screen is always a figure, and that is right inside the app and
+  wrong on a page whose job is one sentence. The tagline is the exception;
+- **Lingon on the page** is the trend drawing and the single primary action,
+  which page 4 already carves out for the action and should extend to the
+  drawing, because a trend line is what Lingon means;
+- **motion**, which the profile does not mention at all: what may move, that it
+  stops, and that the wordmark never does (D172);
+- **the phone frames**, their tilt, and that it flattens;
+- **Sten on dark surfaces**, below.
+
+### Sten does not hold 4,5:1 in the dark theme
+
+Measured with the WCAG formula, recorded in `docs/measurements.md`:
+
+| | on Natt | on Skymning |
+|---|---|---|
+| Sten `#6B7B82`, the profile's value | 4,22:1 | **3,65:1** |
+
+**Every meta line and every "inte än" on a card in the app is at 3,65:1.** The
+light theme already knows: `tokens.css` darkens Sten to `#5c6b72` there, with a
+comment saying it is to hold 4,5:1 on Papper. The dark theme, which is the
+primary one, never got the same correction.
+
+The public pages lighten it to `#7C8C94` (5,32:1 and 4,61:1) because D173's
+brief holds them to 4,5:1 and Lighthouse docked the page for exactly those
+elements. **The app is unchanged**, because the same correction there is a
+change to the profile's own value on every screen, and that is the owner's call
+rather than a side effect of a landing page. Lightening `--sten` in the dark
+theme block of `tokens.css` is the whole change if you want it.
 
 ## The guards, and what runs them
 

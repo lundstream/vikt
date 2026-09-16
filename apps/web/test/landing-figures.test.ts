@@ -3,27 +3,23 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The landing page's figure strip says something checkable (D97).
+ * The landing page's checkable claims (D97, rebuilt in D173).
  *
- * Three numbers sit at the top of the public page, and the whole argument the
- * page makes is that this app does not round its own measurements. Two of them
- * are facts about the deployment and cannot drift. The third is
- * a measurement, and measurements drift: someone adds a confirmation step, the
- * repeat path becomes three taps, and the landing page goes on saying two
- * because nobody thought of it while doing something else.
+ * The page argues that this app does not round its own measurements, so the
+ * claims it makes about itself are pinned to the places those measurements are
+ * recorded. A page that goes on saying something that was true last month is
+ * the exact failure it is arguing against.
  *
- * So it is pinned to the place the measurement is recorded. If the fast-path
- * table in docs/measurements.md changes and the page does not, this fails, and the failure
- * message is the one worth reading: the page is now claiming something that was
- * true last month.
+ * The figure strip this file was written for is gone with the rebuild. What
+ * replaced it is claims inside prose, which are harder to spot and no less
+ * checkable, so the pinning moved with them rather than being dropped.
  */
 
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const LANDING = readFileSync(path.join(ROOT, "apps/web/src/landing/Landing.tsx"), "utf8");
 const MEASURED = readFileSync(path.join(ROOT, "docs/measurements.md"), "utf8");
-const PRIVACY = readFileSync(path.join(ROOT, "apps/web/src/landing/Privacy.tsx"), "utf8");
 
-/** The row of the fast-path table that the strip quotes. */
+/** The row of the fast-path table the page quotes. */
 function measuredRepeatTaps(): number {
   const row = MEASURED.split("\n").find((line) => line.includes("repeat food, cold open to logged"));
   expect(row, "docs/measurements.md no longer has a repeat-food row in its fast-path table").toBeTruthy();
@@ -35,75 +31,82 @@ function measuredRepeatTaps(): number {
 }
 
 /**
- * The figure strip, as a list of `{ value, unit }` pairs.
+ * Swedish spells a small number in a sentence, and the table counts it.
  *
- * Anchored on the two keys next to each other rather than on the start of the
- * object, because the cards gained an icon and a tint in front of them (D99)
- * and an anchor on `{` silently matched nothing.
+ * The strip could hold a digit beside a unit; a sentence cannot without reading
+ * like a specification. So the test crosses the gap rather than the copy: it
+ * converts the measured figure to the word the page would use, and fails naming
+ * both if the measurement moves.
  */
-function stripFigures(): { value: string; unit: string }[] {
-  return [...LANDING.matchAll(/\bvalue:\s*"([^"]*)",\s*unit:\s*"([^"]*)"/g)].map((m) => ({
-    value: m[1]!,
-    unit: m[2]!,
-  }));
-}
+const WORDS = ["noll", "ett", "två", "tre", "fyra", "fem"];
 
-describe("the landing page's figure strip", () => {
-  it("quotes the tap figure that was actually measured", () => {
-    const claimed = stripFigures().find((figure) => figure.unit === "tryck");
-    expect(claimed, "the strip no longer carries a tap figure").toBeTruthy();
-    expect(Number(claimed!.value)).toBe(measuredRepeatTaps());
-  });
+describe("what the landing page claims about itself", () => {
+  it("says the tap count that was actually measured", () => {
+    const taps = measuredRepeatTaps();
+    const word = WORDS[taps];
+    expect(word, `no Swedish word for ${taps} taps`).toBeTruthy();
 
-  it("carries exactly three figures, and one of them is the price", () => {
-    const figures = stripFigures();
-    expect(figures).toHaveLength(3);
-    expect(figures.map((figure) => `${figure.value} ${figure.unit}`)).toContain("0 kr");
+    expect(
+      LANDING,
+      `docs/measurements.md now says ${taps} taps, so the page should say "${word} tryck"`,
+    ).toContain(`${word} tryck`);
   });
 
   /**
-   * A claim on the strip is a claim the privacy page also makes (D111).
+   * Three screens, and each is a real capture.
    *
-   * The card this exists for used to say "100 % av din data ligger på din egen
-   * server", which is true for a reader who self-hosts and false for a reader
-   * on somebody else's instance. The page cannot tell them apart, so it must
-   * not say it. What replaced it is a claim about third parties, and a claim
-   * about third parties has exactly one authoritative version: the one on
-   * /integritet.
-   *
-   * Each figure that makes such a claim names the sentence it condenses, and
-   * this checks that sentence is still on the page word for word. Reword either
-   * side and this fails, which is the point: a summary that outlives the thing
-   * it summarises is how the old card got there.
+   * A section whose screenshot went missing lays out correctly with a broken
+   * image, which is exactly why this is worth pinning. They are regenerated by
+   * `scripts/landing-shots.mjs` from the seeded demo account, so a stale one is
+   * a run that did not happen rather than a file somebody forgot.
    */
-  it("condenses claims the privacy page actually makes", () => {
-    const sources = [...LANDING.matchAll(/\bsource:\s*"([^"]+)"/g)].map((m) => m[1]!);
-    expect(sources.length, "no figure names a privacy-page sentence").toBeGreaterThan(0);
-
-    for (const sentence of sources) {
-      expect(PRIVACY, `/integritet no longer says: ${sentence}`).toContain(sentence);
-    }
-
-    // And no card claims the data sits on the reader's own hardware, which is
-    // only true of a self-hosted installation. Checked against the card labels
-    // rather than the file: the AI section says the same words about the model
-    // host, where they are conditional and true.
-    const labels = [...LANDING.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]!);
-    expect(labels.join(" | ")).not.toContain("egen server");
-  });
-
-  /**
-   * Not decoration. Each one is a real capture of the running app at 360 px
-   * (D97), and a section whose screenshot went missing would still lay out
-   * correctly with a broken image, which is exactly why this is worth pinning.
-   */
-  it("shows four screenshots, each of which exists", () => {
-    const sources = [...LANDING.matchAll(/src="(\/screens\/[^"]+)"/g)].map((m) => m[1]!);
-    expect(new Set(sources).size).toBe(4);
+  it("shows three screenshots, each of which exists", () => {
+    const sources = [...LANDING.matchAll(/src:\s*"(\/screens\/[^"]+)"/g)].map((m) => m[1]!);
+    expect(new Set(sources).size).toBe(3);
 
     for (const source of sources) {
       const file = path.join(ROOT, "apps/web/public", source);
       expect(() => readFileSync(file), `${source} is referenced but not in public/`).not.toThrow();
     }
+  });
+
+  /**
+   * The claim this file exists for (D111).
+   *
+   * A card once said "100 % av din data ligger på din egen server", which is
+   * true for a reader who self-hosts and false for a reader on somebody else's
+   * instance, and the page cannot tell them apart. The rebuilt page says the
+   * conditional form instead, and this holds it there: the unconditional
+   * sentence must not come back.
+   */
+  it("never tells an unknown reader the data is on their own server", () => {
+    const prose = LANDING
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+    /*
+      The claim, not the words. "kör den på en egen server" is an offer and is
+      true for anybody; "din data ligger på din egen server" is a statement
+      about this reader's data and is false for half of them.
+    */
+    expect(prose).not.toMatch(/ligger på din egen server/);
+    expect(prose).not.toMatch(/100 % av din data/);
+    // And the conditional version is present, so this is not passing by the
+    // sentence having been dropped altogether.
+    expect(prose).toMatch(/Kör du den själv är det din/);
+  });
+
+  /**
+   * The page draws numbers, and none of them is anybody's.
+   *
+   * Every figure on the rebuilt page comes from `seeded.ts`, which generates a
+   * body from a maintenance figure and 7 700 kcal per kilo. A landing page that
+   * illustrated itself with a real account would be publishing the one thing
+   * D9 says belongs to the person who logged it.
+   */
+  it("draws its graphs from the fixture rather than from an account", () => {
+    expect(LANDING).toMatch(/from "\.\/seeded\.js"/);
+    expect(LANDING).not.toMatch(/fetch\(|useQuery|\/api\//);
   });
 });

@@ -147,7 +147,14 @@ async function generatedCss(classNames: readonly string[]): Promise<string> {
   const entry = readFileSync(path.join(SRC, "styles/index.css"), "utf8")
     // The token file is a plain `@import` and postcss is not resolving imports
     // here; the component layer below it is what this test cares about.
-    .replace('@import "./tokens.css";', "");
+    .replace('@import "./tokens.css";', "")
+    /*
+      The landing page's own stylesheet, appended rather than imported for the
+      same reason (D173). It is loaded by the landing entry only, so its classes
+      are defined in a file this test would otherwise never read, and every one
+      of them would be reported as resolving to no rule.
+    */
+    .concat("\n", readFileSync(path.join(SRC, "styles/landing.css"), "utf8"));
 
   const result = await postcss([
     tailwind({ ...config, content: [probe] }),
