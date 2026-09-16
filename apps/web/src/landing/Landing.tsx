@@ -444,7 +444,7 @@ function Screens() {
               src={screen.src}
               alt={screen.alt}
               width={640}
-              height={1261}
+              height={1336}
               loading="lazy"
               decoding="async"
             />

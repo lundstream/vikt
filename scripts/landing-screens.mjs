@@ -10,11 +10,19 @@
  *
  * ## Why a step at all
  *
- * The sources are 1419 x 2796 and about 780 kB each. The page shows them at
- * roughly 280 px wide, so serving the originals would send two and a quarter
- * megabytes to show three thumbnails, on a page measured at mobile settings for
- * a performance score. This resizes them to 640 px wide, which is more than
- * twice what the layout uses.
+ * The sources are a megabyte and a half each, at whatever size the mockup tool
+ * exports. The page shows them a few hundred pixels wide, so serving the
+ * originals would send four megabytes to show three thumbnails, on a page
+ * measured at mobile settings for a performance score. This resizes them to
+ * 640 px wide, which is more than twice what the layout uses.
+ *
+ * **The height follows the source**, read out of the PNG's own header. It was
+ * hardcoded from the first set's 1419 x 2796, so the day the mockup tool
+ * exported a different shape the page would have stretched all three pictures
+ * and nothing would have said so. The script prints the size it wrote, and
+ * `landing-screens.test.ts` holds the page's declared `width`/`height` to the
+ * files on disk, because a wrong pair there is layout shift on the one page
+ * whose score is measured.
  *
  * ## Why they are not generated
  *
@@ -26,7 +34,7 @@
  * Framsteg changes visibly.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +47,18 @@ const TO = path.join(ROOT, "apps/web/public/screens");
 const WIDTH = 640;
 
 const SCREENS = ["oversikt", "mat", "framsteg"];
+
+/**
+ * The size in a PNG's header.
+ *
+ * Eight bytes of signature, then the IHDR chunk's length and type, then width
+ * and height as big-endian 32-bit integers. Every PNG has this and it is the
+ * first chunk, so there is nothing to search for and no library to add.
+ */
+function pngSize(file) {
+  const header = readFileSync(file).subarray(0, 24);
+  return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
+}
 
 const CHROME =
   process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -120,9 +140,11 @@ try {
   mkdirSync(TO, { recursive: true });
 
   for (const name of SCREENS) {
-    const source = path.join(FROM, `${name}-portrait.png`).replaceAll("\\", "/");
-    // 1419 x 2796 is the source; the height follows the width.
-    const height = Math.round((2796 / 1419) * WIDTH);
+    const sourceFile = path.join(FROM, `${name}-portrait.png`);
+    const source = sourceFile.replaceAll("\\", "/");
+    // Whatever the mockup tool exported; the height follows the width.
+    const original = pngSize(sourceFile);
+    const height = Math.round((original.height / original.width) * WIDTH);
     const page = path.join(dir, `${name}.html`);
 
     writeFileSync(

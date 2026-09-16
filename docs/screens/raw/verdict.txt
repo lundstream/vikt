@@ -1,0 +1,7 @@
+phone shots 2026-09-16T22:05:08.549Z origin=https://localhost:5173
+signed-in true
+ok   oversikt 440x956@3x checked=one-decimal,nutrition-token -> docs/screens/raw/oversikt.png
+note mat mat has no kcal total: the seed writes manual intake, not food entries
+ok   mat 440x956@3x checked=lowercase-chip -> docs/screens/raw/mat.png
+ok   framsteg 440x956@3x checked=- -> docs/screens/raw/framsteg.png
+summary screens=3/3 failed=0 complete=true

@@ -37,6 +37,9 @@ export const SEED_EMAIL = process.env.SEED_EMAIL?.trim() || "test@example.test";
  */
 export const SEED_PASSWORD = process.env.SEED_PASSWORD?.trim() ?? "";
 
+/** The zone the seeded profile is in, and therefore the one its dates are in. */
+export const SEED_TIMEZONE = "Europe/Stockholm";
+
 export class SeedRefused extends Error {
   constructor(message: string) {
     super(message);
@@ -100,7 +103,7 @@ export async function seedDevUser(db: Db): Promise<{ userId: string; created: bo
     passwordHash: await hashPassword(SEED_PASSWORD),
     displayName: "Test",
   });
-  await insertProfile(user.id, db, { heightCm: "180.0", timezone: "Europe/Stockholm" });
+  await insertProfile(user.id, db, { heightCm: "180.0", timezone: SEED_TIMEZONE });
 
   return { userId: user.id, created: true };
 }
@@ -110,8 +113,22 @@ export async function seedDevUser(db: Db): Promise<{ userId: string; created: bo
  * without waiting three months. Deliberately noisy: a clean curve would hide
  * exactly the smoothing behaviour the chart exists to show.
  */
+/**
+ * Today, in the zone the seeded profile is in.
+ *
+ * `toISOString().slice(0, 10)` is the UTC date, and every row this script
+ * writes carries a `localDate`, which the app reads as a **local** calendar
+ * date. Between midnight and 02:00 Stockholm the two differ, so the seed wrote
+ * a series whose last day was yesterday and every screen read "inget loggat i
+ * dag än" on an account that had just been seeded. `sv-SE` formats as
+ * `YYYY-MM-DD`, which is the shape the rest of the code expects.
+ */
+function todayInZone(timeZone = SEED_TIMEZONE): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone }).format(new Date());
+}
+
 export async function seedDevSeries(userId: string, db: Db, days: number): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInZone();
   let written = 0;
 
   for (let offset = days - 1; offset >= 0; offset--) {

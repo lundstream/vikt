@@ -341,7 +341,7 @@ export function Dashboard() {
           </p>
 
           {change !== null ? (
-            <p className="num mt-1.5 text-note text-muted">
+            <p className="num mt-1.5 text-note text-muted" data-testid="trend-change">
               {change <= 0 ? "↓" : "↑"}{" "}
               {/*
                 A weight is one decimal (§4.1). This said `decimals: 2` and
