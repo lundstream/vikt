@@ -296,10 +296,21 @@ Three rules follow from it, and they are binding:
   graph, not in the logo. That holds on the landing page too, where the
   temptation is strongest.
 
+**There is exactly one exception, and it is named.** The phone frames on the
+landing page tilt with their own position in the viewport, about twelve degrees
+either way, square on at the middle of the screen. It carries no meaning: it
+tells the reader nothing the still frame does not, and it is written down as
+decoration rather than dressed up as something else. It is allowed because a
+page of pure explanation with no life in it is also a claim, and one piece is
+the budget. **It is the only one**, and a second would have to displace it
+rather than join it: the next animation that cannot answer the question above
+replaces this or is not built. D173 carries the reasoning and what it cost to
+get here, including the pass that removed it and the pass that put it back.
+
 **Restraint is the style.** Natt is a matte, unlit surface. No gradients on it,
-no glow, no glass, no neon, no glitch, no 3D, no parallax anywhere but the hero,
-and no scroll effect that takes the page away from the reader who is trying to
-read it. The product is a notebook that draws one careful line; the pages that
+no glow, no glass, no neon, no glitch, no 3D except the one named above, no
+parallax anywhere but the hero, and no scroll effect that takes the page away
+from the reader who is trying to read it. The product is a notebook that draws one careful line; the pages that
 introduce it are held to the same taste as the pages that are it.
 
 **The public pages are dark only.** The app follows the reader's theme (D117);
