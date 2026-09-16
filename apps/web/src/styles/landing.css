@@ -268,10 +268,22 @@
 /* ------------------------------------------------------------ the phones -- */
 
 /**
- * Each phone frame turns with its own position in the viewport (D178).
+ * Each phone frame turns with its own position in the viewport (D178, D180).
  *
- * Twelve degrees to the right as it comes up from below, square on when it is
- * in the middle, twelve to the left as it leaves upward.
+ * Twenty-two degrees to the right as it comes up from below, **square on
+ * through a band around the middle of the screen**, twenty-two to the left as
+ * it leaves upward.
+ *
+ * It was twelve degrees at a perspective of 1400 px, which at the size these
+ * are drawn is a turn you can measure and cannot see: the frame looked very
+ * slightly crooked rather than turned. Twenty-two at 900 px reads at a glance,
+ * which is the whole of what it is for.
+ *
+ * The flat band is what the extra angle needs. A single midpoint means the
+ * frame is square on for one scroll position and leaning everywhere else, so
+ * the picture a reader stops on is almost never the flat one. Holding it flat
+ * from 40 % to 60 % of the travel gives them a stretch of scroll where it is
+ * simply a photograph of a phone.
  *
  * ## Why this one may run in both directions
  *
@@ -294,13 +306,16 @@
  */
 @keyframes frame-turns {
   from {
-    transform: perspective(1400px) rotateY(12deg);
+    transform: perspective(900px) rotateY(22deg);
   }
-  50% {
-    transform: perspective(1400px) rotateY(0deg);
+  40% {
+    transform: perspective(900px) rotateY(0deg);
+  }
+  60% {
+    transform: perspective(900px) rotateY(0deg);
   }
   to {
-    transform: perspective(1400px) rotateY(-12deg);
+    transform: perspective(900px) rotateY(-22deg);
   }
 }
 

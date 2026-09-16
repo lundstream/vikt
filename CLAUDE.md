@@ -297,8 +297,8 @@ Three rules follow from it, and they are binding:
   temptation is strongest.
 
 **There is exactly one exception, and it is named.** The phone frames on the
-landing page tilt with their own position in the viewport, about twelve degrees
-either way, square on at the middle of the screen. It carries no meaning: it
+landing page tilt with their own position in the viewport, about twenty-two
+degrees either way, square on through a band around the middle of the screen. It carries no meaning: it
 tells the reader nothing the still frame does not, and it is written down as
 decoration rather than dressed up as something else. It is allowed because a
 page of pure explanation with no life in it is also a claim, and one piece is
