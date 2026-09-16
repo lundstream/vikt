@@ -231,7 +231,7 @@ The palette carries Norrland names so it can be spoken about. Dark is the primar
 --gran      #86AE8B   logged, chosen, saved, streaks
 --is        #9FC3CC   raw readings, secondary series, measurements
 --honung    #E2B25A   the pot, rewards, milestones
---blabar    #8C7FD1   nutrition: calories and macros
+--blabar    #5FA8E6   nutrition: calories and macros (profile v1.1 moved it off violet)
 ```
 
 **Lingon still belongs to two things**, exactly as before: the trend line and the wordmark. That is the oldest rule here and the reason the accent means anything — the eye knows red is *your trend* because red is never anything else. `apps/web/test/colour-meaning.test.ts` holds it to the two files that are allowed it.

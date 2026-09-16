@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { sv } from "../src/i18n/sv.js";
 import { markdownToHtml, markdownToText } from "shared";
-import { allJsxStrings, dashPlaceholders, landingStrings } from "./jsx-copy.js";
+import { allJsxStrings, componentFiles, dashPlaceholders, landingStrings } from "./jsx-copy.js";
 
 const LANDING_FILE = path.resolve(import.meta.dirname, "../src/landing/Landing.tsx");
 
@@ -144,6 +144,65 @@ describe("interface copy", () => {
   /** Every value is a non-empty string: a blank one renders as missing copy. */
   it("has no empty strings", () => {
     expect(entries.filter(([, value]) => value.trim() === "").map(([key]) => key)).toEqual([]);
+  });
+});
+
+/**
+ * State chips are lower case (profile, page 6; D176).
+ *
+ * The profile's chips are "loggat", "uppskattning", "importerad" and
+ * "ofullständig": a chip is a state, not a sentence, and it is set in lower
+ * case. The app's estimate chip read "≈ Uppskattad", which is the wrong word
+ * and the wrong case, and it had been that way since the chip was added because
+ * nothing checked the component's own rule.
+ *
+ * The keys are found structurally rather than listed, by reading the `t("...")`
+ * calls inside elements carrying the `tag` class, so a chip added next year is
+ * covered without anybody remembering this test.
+ */
+describe("state chips", () => {
+  const chipKeys = (() => {
+    const found = new Set<string>();
+
+    for (const file of componentFiles()) {
+      const source = readFileSync(file, "utf8");
+      /*
+        A window after each `className="tag …"`, rather than the element.
+
+        Matching to the closing tag looks right and is not: the estimate chip
+        holds a nested `<span aria-hidden>≈</span>`, so a lazy match to
+        `</span>` stops at the inner one and captures everything except the
+        key. Three hundred characters is longer than any chip here and
+        shorter than the distance to the next unrelated string.
+      */
+      for (const element of source.matchAll(/className=(?:"|\{`)tag[^>]*>/g)) {
+        const window = source.slice(element.index, element.index + 300);
+        for (const call of window.matchAll(/\bt\(\s*"([^"]+)"/g)) {
+          found.add(call[1]!);
+      }
+      }
+    }
+
+    return [...found];
+  })();
+
+  it("finds the chips, so the check is not vacuous", () => {
+    expect(chipKeys.length).toBeGreaterThanOrEqual(3);
+    expect(chipKeys).toContain("estimate.badge");
+  });
+
+  it("are written in lower case", () => {
+    const offenders = chipKeys
+      .map((key) => [key, sv[key as keyof typeof sv]] as const)
+      .filter(([, value]) => typeof value === "string" && /^\p{Lu}/u.test(value))
+      .map(([key, value]) => `${key}: ${value}`);
+
+    expect(offenders, "a chip is a state, not a sentence (profile, page 6)").toEqual([]);
+  });
+
+  /** And the estimate chip carries the profile's own word. */
+  it("say what the profile says", () => {
+    expect(sv["estimate.badge"]).toBe("uppskattning");
   });
 });
 

@@ -119,6 +119,68 @@ function findRawNumbers(): Finding[] {
   return findings;
 }
 
+/**
+ * Two decimals have to say why (D176).
+ *
+ * "↓ 4,98 kg på 90 dagar" sat under a trend weight rendered as "86,9", on the
+ * same card, in a screenshot somebody sent in. §4.1 is explicit that a weight is
+ * one decimal, and the second one claims a precision neither the scale nor the
+ * EMA has.
+ *
+ * A grep for `decimals: 2` is not enough on its own, because two of them are
+ * right: a rate in kg per week distinguishes 0,25 from 0,30, and waist over
+ * height lives between 0,40 and 0,60. So the rule is the one this file already
+ * uses for raw numbers: the exception is allowed and has to be written down,
+ * with `allow-two-decimals:` and a reason, on a line above the call.
+ *
+ * A weight cannot be justified that way, and the failure message says so.
+ */
+function twoDecimalCalls(): string[] {
+  const findings: string[] = [];
+
+  for (const file of files) {
+    const source = program.getSourceFile(file);
+    if (!source) continue;
+    /*
+      Comments blanked, newlines kept, so line numbers still point at code.
+      Without this the guard finds the sentence in the comment that explains
+      the defect it was written for, which is what happened on the first run.
+    */
+    const original = source.getFullText();
+    const text = original.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) =>
+      comment.replace(/[^\n]/g, " "),
+    );
+    // The hatch is itself a comment, so it is read from the original lines
+    // while the search runs over the blanked ones.
+    const lines = original.split("\n");
+
+    for (const match of text.matchAll(/decimals:\s*2\b/g)) {
+      const line = text.slice(0, match.index).split("\n").length - 1;
+      const preceding = lines.slice(Math.max(0, line - 3), line);
+      if (preceding.some((row) => row.includes("allow-two-decimals:"))) continue;
+      findings.push(`${path.relative(SRC, file)}:${line + 1}`);
+    }
+  }
+
+  return findings;
+}
+
+describe("two decimals", () => {
+  it("is only written where a line above says why", () => {
+    expect(
+      twoDecimalCalls(),
+      "a weight is one decimal (§4.1); a rate or a ratio needs an allow-two-decimals comment",
+    ).toEqual([]);
+  });
+
+  /** Proved by reintroduction: the guard has to see the shape it is looking for. */
+  it("is what this guard is looking for", () => {
+    const offending = 'formatDecimal(Math.abs(change), { decimals: 2 })';
+    expect(/decimals:\s*2\b/.test(offending)).toBe(true);
+    expect(/decimals:\s*1\b/.test('formatKg(Math.abs(change))')).toBe(false);
+  });
+});
+
 describe("numbers on screen", () => {
   it("has a working TypeScript program, so the check is not vacuous", () => {
     expect(files.length).toBeGreaterThan(10);

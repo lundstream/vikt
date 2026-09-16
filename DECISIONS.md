@@ -9451,3 +9451,72 @@ outlive the fact that justifies it.
 One token in each theme, and the landing page's private override from D173
 deleted: the public pages inherit the corrected Sten like everything else, which
 is what should have happened in the first place.
+
+---
+
+### D176 — Three things a screenshot showed that no test could see
+
+Three defects, found by looking at a photograph of the running app rather than
+by any suite. Each is small; what they have in common is worth more than any of
+them.
+
+#### A weight with two decimals
+
+"↓ 4,98 kg på 90 dagar", directly under a trend weight rendered as "86,9" on the
+same card. §4.1 is explicit that a weight is one decimal, and the second one
+claims a precision neither the scale nor the exponential average has. The call
+site said `decimals: 2`; it says `formatKg` now, and reads "↓ 4,7 kg på 90
+dagar".
+
+**The guard is an allowance rather than a ban**, because two of the three
+`decimals: 2` in this codebase are right: a rate in kg per week distinguishes
+0,25 from 0,30, and waist over height lives between 0,40 and 0,60. So the rule is
+the one `number-formatting.test.ts` already uses for raw numbers: write
+`allow-two-decimals:` above the call with a reason. A weight cannot be justified
+that way, and the failure message says so.
+
+The guard's first run failed on **the comment explaining the fix**, because the
+sentence contains the words it searches for. It blanks comments before searching
+now, keeping the newlines so the line numbers still point at code, and reads the
+allowance from the original text. That is the second time this pass a guard has
+matched prose about the thing it was looking for.
+
+#### A violet that is not in this repository
+
+"Ätit i dag" rendered in **#8878D0**, sampled from the screenshot. The nutrition
+token is `#5FA8E6` and has been since the first commit of this tree; production
+serves `#5FA8E6`; the violet is profile v1.0's Blåbär, from a bundle that
+predates this repository. **Nothing in these sources produces it**, so what the
+screenshot shows is a stale install rather than a defect in the code.
+
+What *was* wrong here is that `CLAUDE.md` documented `--blabar #8C7FD1` long
+after profile v1.1 moved it, which is the only place in the tree that still
+asserted the violet, and is a plausible way for somebody to reintroduce it.
+
+So the fix is the documentation, and the guard is the one that would catch the
+drift next time: Blåbär is named to `colour-meaning.test.ts` the way Lingon is,
+with the four files allowed to use it, a check that the day's eaten figure is
+actually drawn in it, and a check that **the value CLAUDE.md documents is the
+value `tokens.css` carries**. A document that disagrees with the tokens is how
+this started.
+
+#### A chip in sentence case
+
+"≈ Uppskattad", where profile page 6's state chips are "loggat",
+"uppskattning", "importerad" and "ofullständig": lower case, and a state rather
+than a sentence. The estimate chip is `uppskattning` now, and its siblings
+follow the same rule.
+
+The test finds the chips **structurally**, by reading the `t("…")` calls inside
+elements carrying the `tag` class, so a chip added next year is covered without
+anybody remembering. Its first version parsed to the closing tag and found
+nothing: the estimate chip holds a nested `<span aria-hidden>≈</span>`, so a
+lazy match stops at the inner one and captures everything except the key.
+
+#### What the three have in common
+
+Every one was visible in a picture and invisible to 415 tests, because each is a
+property of a rendered result rather than of a value: a decimal place, a
+resolved colour, a capital letter. The suites assert what a function returns.
+The three guards added here assert what the source is allowed to say, which is
+the closest a test gets to looking.

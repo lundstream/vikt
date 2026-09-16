@@ -453,6 +453,8 @@ function ratioDomain(
 
 const roundRatio = (value: number) => Math.round(value * 1000) / 1000;
 
+// allow-two-decimals: waist over height, which lives between 0,40 and 0,60
+// and says nothing at one decimal. Not a weight (§4.4).
 const formatRatio = (value: number) => formatDecimal(value, { decimals: 2 });
 
 function formatDay(localDate: string): string {

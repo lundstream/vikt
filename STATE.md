@@ -68,6 +68,14 @@ when it will be down, and its mail goes out.
   no screen had offered before. Exercised on the development account at 360 px
   and desktop: 90 rows, no page overflow, and the downloaded workbook matching
   the table in 2 014 of 2 014 cells.
+- **Three defects a screenshot showed** (D176). A trend delta rendered
+  "↓ 4,98 kg" where §4.1 says one decimal, and reads "↓ 4,7 kg på 90 dagar"
+  now; the estimate chip is "≈ uppskattning" in the profile's own word and
+  case; and the violet "Ätit i dag" figure in the demo screenshot is **#8878D0,
+  which exists nowhere in this tree** and is profile v1.0's Blåbär from a stale
+  install. The token is and always was `#5FA8E6`. What was wrong here was
+  CLAUDE.md, which documented the violet, and a guard now holds the documented
+  value to the one the stylesheet carries.
 - **Secondary text is readable** (D175). Sten was below AA on every dark
   surface it is used on, worst on Dis at 3,22:1, while the profile promised
   4,5:1. It is `#85949A` in the dark theme and `#55636A` in the light one now,

@@ -343,8 +343,15 @@ export function Dashboard() {
           {change !== null ? (
             <p className="num mt-1.5 text-note text-muted">
               {change <= 0 ? "↓" : "↑"}{" "}
+              {/*
+                A weight is one decimal (§4.1). This said `decimals: 2` and
+                rendered "4,98 kg på 90 dagar", which claims a precision the
+                scale does not have and the trend does not carry: every other
+                weight on this screen is one decimal, including the figure
+                directly above it.
+              */}
               {t("dash.changeOver", {
-                amount: formatDecimal(Math.abs(change), { decimals: 2 }),
+                amount: formatKg(Math.abs(change)),
                 days: points.length,
               })}
             </p>

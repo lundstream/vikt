@@ -163,6 +163,66 @@ describe("Lingon belongs to the trend line and the wordmark", () => {
   });
 });
 
+/**
+ * Blåbär is nutrition, and nutrition only (D176).
+ *
+ * The same shape as the Lingon rule above, for the same reason. A screenshot of
+ * the running app showed "Ätit i dag" in **#8878D0**, a violet, where the token
+ * is `#5FA8E6`. The violet is not in this repository and never has been: it is
+ * profile v1.0's Blåbär, from a bundle that predates this tree, which means the
+ * screenshot came from a stale install rather than from these sources. What
+ * *was* wrong here was CLAUDE.md, which documented `#8C7FD1` as the palette
+ * value long after profile v1.1 moved it.
+ *
+ * So: a list of the files allowed to use the accent, and a check that the
+ * nutrition figures actually use it rather than reaching for something else.
+ * Documentation drifting from the tokens is what this catches next time.
+ */
+describe("Blåbär belongs to nutrition", () => {
+  /**
+   * Named files, as with Lingon. Two components that show what was eaten, the
+   * food screen's own figure, and the landing page's card for the area.
+   */
+  const ALLOWED = [
+    "components/DayCard.tsx",
+    "components/SeriesPanel.tsx",
+    "routes/FoodLog.tsx",
+    "landing/Landing.tsx",
+  ];
+
+  it("appears in exactly those files", () => {
+    const offenders = sourceFiles(SRC)
+      .filter((file) => accentsUsed(readFileSync(file, "utf8"), ["nutrition"]).has("nutrition"))
+      .map((file) => path.relative(SRC, file).replaceAll("\\", "/"))
+      .sort();
+
+    expect(offenders).toEqual([...ALLOWED].sort());
+  });
+
+  /**
+   * And the figure that *is* the nutrition area carries it, rather than the
+   * accent merely being permitted somewhere in the file.
+   */
+  it("is what the day's eaten figure is drawn in", () => {
+    const card = readFileSync(path.join(SRC, "components/DayCard.tsx"), "utf8");
+    const figure = card.slice(card.indexOf('data-testid="day-eaten"') - 400, card.indexOf('data-testid="day-eaten"'));
+    expect(figure).toMatch(/text-nutrition/);
+  });
+
+  /** The token documented in CLAUDE.md is the token in the stylesheet. */
+  it("is documented as the value the tokens actually carry", () => {
+    const tokens = readFileSync(path.join(SRC, "styles/tokens.css"), "utf8");
+    const dark = tokens.slice(tokens.indexOf(".dark {"));
+    const value = dark.match(/--blabar:\s*(#[0-9a-f]{6})/i)?.[1]?.toLowerCase();
+    expect(value, "the dark theme has no --blabar").toBeTruthy();
+
+    const claude = readFileSync(path.resolve(SRC, "../../../CLAUDE.md"), "utf8");
+    const documented = claude.match(/--blabar\s+(#[0-9A-Fa-f]{6})/)?.[1]?.toLowerCase();
+    expect(documented, "CLAUDE.md no longer documents --blabar").toBeTruthy();
+    expect(documented, "CLAUDE.md documents a Blåbär the stylesheet does not have").toBe(value);
+  });
+});
+
 describe("errors, warnings and empty states get no accent", () => {
   /**
    * The components that exist to say something did not happen, or has not

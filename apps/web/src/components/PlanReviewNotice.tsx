@@ -23,6 +23,8 @@ export function PlanReviewNotice({
   targetIntakeKcal: number | null;
   onDismiss: () => void;
 }) {
+  // allow-two-decimals: a rate in kg per week, where 0,25 and 0,3 are
+  // different plans. Weights are one decimal (§4.1); this is not a weight.
   const rate = (value: number) => formatDecimal(Math.abs(value), { decimals: 2 });
 
   return (

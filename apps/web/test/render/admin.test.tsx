@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderRoute } from "./harness.js";
 import { Admin } from "../../src/routes/Admin.js";
+import { sv } from "../../src/i18n/sv.js";
 
 /**
  * Every admin tab renders the data it is for (D100).
@@ -200,7 +201,7 @@ describe("the admin screens", () => {
 
     // The disabled account is marked as such, and the one that has never signed
     // in says so rather than showing an empty date.
-    expect(screen.getByText("Avstängt")).toBeTruthy();
+    expect(screen.getByText(sv["admin.userDisabled"])).toBeTruthy();
     expect(screen.getByText(/Har aldrig loggat in/)).toBeTruthy();
   });
 

@@ -7,6 +7,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderRoute } from "./harness.js";
 import { FoodPhotoEntry } from "../../src/components/FoodPhotoEntry.js";
 import { db } from "../../src/lib/queue/db.js";
+import { sv } from "../../src/i18n/sv.js";
 
 /**
  * The photograph leaves and is not kept (D143), from the browser's side.
@@ -203,7 +204,9 @@ describe("the proposal list", () => {
    */
   it("marks every row from a photograph", async () => {
     await photographTwoRows([]);
-    expect(screen.getAllByText("Uppskattad")).toHaveLength(2);
+    // From the dictionary, not a literal: the chip is the profile's word
+    // and its case, and both belong in one place (D176).
+    expect(screen.getAllByText(sv["estimate.badge"])).toHaveLength(2);
   });
 
   /**

@@ -421,7 +421,7 @@ export const sv = {
   /* --- announcements (D108) ------------------------------------------------ */
   "news.title": "Nyheter",
   "news.empty": "Inget att berätta än.",
-  "news.new": "Ny",
+  "news.new": "ny",
   "news.unread": "Något oläst",
 
   "announce.dismiss": "Uppfattat",
@@ -639,8 +639,8 @@ export const sv = {
   "admin.userCreated": "Skapad {date}",
   "admin.userLastSeen": "Senast inloggad {date}",
   "admin.userNeverSeen": "Har aldrig loggat in",
-  "admin.userDisabled": "Avstängt",
-  "admin.userIsAdmin": "Administratör",
+  "admin.userDisabled": "avstängt",
+  "admin.userIsAdmin": "administratör",
   "admin.disable": "Stäng av",
   "admin.enable": "Slå på igen",
   "admin.disableHint": "Sessioner avslutas direkt.",
@@ -1002,7 +1002,7 @@ export const sv = {
   // ---------------------------------------------------------------- chart
   "chart.trend": "Trend",
   "chart.reading": "Daglig vägning",
-  "chart.imported": "Importerad",
+  "chart.imported": "importerad",
   // ---------------------------------------------- månadskalendern (D145)
   // Two letters, Monday first. The grid is seven columns on a 360 px screen and
   // three-letter days do not fit without shrinking the figures beside them.
@@ -1475,7 +1475,12 @@ export const sv = {
     "Modellen gissar bara när ingen databas har rätten. Du ser intervallet den utgår ifrån och kan ändra siffran innan du sparar.",
   "estimate.range": "Modellen anger {low} till {high} kcal.",
   "estimate.modelUnavailable": "Ingen siffra den här gången. Skriv en själv.",
-  "estimate.badge": "Uppskattad",
+  /*
+    A state chip, lower case, in the profile's own word (page 6: "loggat,
+    uppskattning, importerad, ofullständig"). It read "Uppskattad", which is
+    both the wrong word and the wrong case for this component.
+  */
+  "estimate.badge": "uppskattning",
   "estimate.saved": "Uppskattningen är sparad",
   "llm.notRight": "Det här stämmer inte",
   "llm.tryEstimate":
