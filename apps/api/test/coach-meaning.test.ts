@@ -37,6 +37,7 @@ const noFigures: CoachFacts = {
     drinks: [],
     cm: [],
     count: [],
+    ratio: [],
     scale: [],
   },
   guardrails: { intakeFloorKcal: 1200, maxRateKgWeek: 0.9 },

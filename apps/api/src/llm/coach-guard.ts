@@ -87,6 +87,11 @@ const TOLERANCE: Record<FigureUnit, number> = {
    * digits, and a count that is off by one is a different fact.
    */
   count: 0,
+  /**
+   * Never reached either: waist-to-height carries no unit word. Tight anyway,
+   * because a ratio written to two decimals is precise by construction.
+   */
+  ratio: 0.01,
   /** Never reached: a 1 to 5 rating carries no unit for the pattern to find. */
   scale: 0.1,
 };
@@ -467,6 +472,7 @@ const COMPARABLE: Record<FigureUnit, FigureUnit[]> = {
   drinks: ["drinks"],
   cm: ["cm"],
   count: ["count"],
+  ratio: ["ratio"],
   scale: ["scale"],
 };
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { COACH_QUESTION_MAX, type CoachEvent } from "shared";
+import { COACH_QUESTION_MAX, LOCALE, type CoachEvent } from "shared";
+import { formatLongDay } from "../lib/dates.js";
 import { t } from "../i18n/index.js";
 import { useLlmHealth } from "../lib/food.js";
 import { useMe } from "../lib/session.js";
@@ -210,7 +211,7 @@ export function Coach() {
         {newest ? (
           <article className="panel mt-3">
             <p className="num text-micro text-muted">
-              {t("coach.weekOf", { date: newest.weekStart })}
+              {t("coach.weekOf", { date: formatLongDay(newest.weekStart, LOCALE) })}
             </p>
             <p className="mt-2 whitespace-pre-line text-body text-ink">{newest.body}</p>
           </article>

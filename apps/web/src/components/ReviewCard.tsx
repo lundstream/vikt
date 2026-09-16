@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { LOCALE } from "shared";
+import { formatLongDay } from "../lib/dates.js";
 import { t } from "../i18n/index.js";
 import { useCurrentReview, useDismissReview } from "../lib/coach.js";
 import { useLlmHealth } from "../lib/food.js";
@@ -33,8 +35,13 @@ export function ReviewCard() {
 
   return (
     <section className="panel mb-4" data-testid="review-card">
+      {/*
+        The day, not the row's key. This rendered "Veckan från 2026-09-07": an
+        ISO date is how the week is stored and `formatLongDay` is how every
+        other date on every other screen is written (D179).
+      */}
       <p className="text-micro text-muted">
-        {t("coach.weekOf", { date: review.data.weekStart })}
+        {t("coach.weekOf", { date: formatLongDay(review.data.weekStart, LOCALE) })}
       </p>
 
       {/*

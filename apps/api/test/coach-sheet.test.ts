@@ -16,6 +16,7 @@ import {
 import {
   buildCoachFacts,
   CONTEXT_CHAR_BUDGET,
+  FIGURE_DECIMALS,
   FIGURE_UNITS,
   type CoachFacts,
 } from "../src/llm/coach-context.js";
@@ -428,6 +429,64 @@ describe("the sheet the coach is given", () => {
     for (const unit of ["kcal", "kg", "grams", "minutes", "steps", "hours", "count"] as const) {
       expect(facts.figures[unit].length, `nothing recorded for ${unit}`).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * Every figure at the precision its unit carries (D179).
+ *
+ * The sheet said the trend fell "0,32 kg denna vecka", and the coach quoted
+ * that back into the weekly review on Översikt. §4.1 gives any trend figure one
+ * decimal, and the weekly rate was written with two at all three of its call
+ * sites. The precision is a property of the unit now, in one table, and both
+ * the sheet and the traceable set read it.
+ */
+describe("the sheet's precision belongs to the unit", () => {
+  it("writes a weekly rate with one decimal, like any other weight", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await busyAccount(db, user);
+
+    const facts = await buildCoachFacts(user.userId, db, env, localDate());
+    const rates = [...facts.text.matchAll(/(\d+),(\d+) kg i veckan/g)];
+
+    expect(rates.length, "no weekly rate in the sheet to check").toBeGreaterThan(0);
+    for (const rate of rates) {
+      expect(rate[2]!.length, `"${rate[0]}" is not one decimal`).toBe(1);
+    }
+  });
+
+  /**
+   * The table and the sheet agree, read back off the traceable set. This is the
+   * half that was wrong on its own: a ratio was written with two decimals and
+   * recorded with one, so a reply quoting the sheet exactly would have been
+   * refused for quoting it.
+   */
+  it("records every figure at the precision it stated it", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await busyAccount(db, user);
+
+    const facts = await buildCoachFacts(user.userId, db, env, localDate());
+
+    let seen = 0;
+    for (const unit of FIGURE_UNITS) {
+      for (const value of facts.figures[unit]) {
+        seen += 1;
+        const decimals = (String(value).split(".")[1] ?? "").length;
+        expect(
+          decimals,
+          `${unit} holds ${value}, which is finer than the ${FIGURE_DECIMALS[unit]} it is written at`,
+        ).toBeLessThanOrEqual(FIGURE_DECIMALS[unit]);
+      }
+    }
+    expect(seen, "no figures at all, so this proved nothing").toBeGreaterThan(20);
+  });
+
+  /** Proof by reintroduction: one decimal is not what two decimals looks like. */
+  it("is a check that can tell the two apart", () => {
+    expect(/(\d+),(\d+) kg i veckan/.exec("0,32 kg i veckan")![2]).toHaveLength(2);
+    expect(/(\d+),(\d+) kg i veckan/.exec("0,3 kg i veckan")![2]).toHaveLength(1);
   });
 });
 

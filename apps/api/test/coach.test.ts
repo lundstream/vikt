@@ -80,6 +80,7 @@ const FACTS: CoachFacts = {
     drinks: [4],
     cm: [92.4, 1.2],
     count: [3, 5, 7, 28],
+    ratio: [],
     scale: [3.4],
   },
   guardrails: { intakeFloorKcal: 1500, maxRateKgWeek: 0.84 },

@@ -108,6 +108,15 @@ export type FigureUnit =
   | "cm"
   | "count"
   /**
+   * A dimensionless ratio, which waist-to-height is and a self-rating is not.
+   *
+   * It was filed under `scale` because neither carries a unit word, and the two
+   * then disagreed about precision: the sheet wrote `0,48` and the traceable set
+   * recorded `0,5`, so a reply quoting the sheet exactly would have been
+   * refused. One unit, one precision (D179).
+   */
+  | "ratio"
+  /**
    * The 1 to 5 self-ratings, which carry no unit word at all.
    *
    * In the set anyway. The guard reads digits **next to a unit**, so "3,4 av 5"
@@ -118,6 +127,37 @@ export type FigureUnit =
   | "scale";
 
 export type CoachFigures = Record<FigureUnit, number[]>;
+
+/**
+ * How many decimals each unit is written with, in one place (D179).
+ *
+ * **The precision belongs to the unit, not to the call site.** It used to be an
+ * argument to `num`, and the weekly rate was passed a 2 at all three of its call
+ * sites: the sheet said the weight fell "0,32 kg denna vecka" where §4.1 gives
+ * any trend figure one decimal, and the coach quoted it back into the weekly
+ * review that appears on Översikt. A number that a call site can choose the
+ * shape of is a number that will eventually be the wrong shape somewhere.
+ *
+ * The traceable set is rounded with this same table, which is the other half:
+ * the set has to hold what a reader would read off the page, or a reply quoting
+ * the sheet correctly is refused for it.
+ */
+export const FIGURE_DECIMALS: Record<FigureUnit, number> = {
+  kcal: 0,
+  kg: 1,
+  percent: 0,
+  /* A trend figure, and §4.1 gives those one decimal like any other weight. */
+  kgPerWeek: 1,
+  grams: 0,
+  minutes: 0,
+  steps: 0,
+  hours: 1,
+  drinks: 1,
+  cm: 1,
+  count: 0,
+  ratio: 2,
+  scale: 1,
+};
 
 export const FIGURE_UNITS: FigureUnit[] = [
   "kcal",
@@ -131,6 +171,7 @@ export const FIGURE_UNITS: FigureUnit[] = [
   "drinks",
   "cm",
   "count",
+  "ratio",
   "scale",
 ];
 
@@ -147,7 +188,7 @@ export type CoachFacts = {
 function emptyFigures(): CoachFigures {
   return {
     kcal: [], kg: [], percent: [], kgPerWeek: [], grams: [], minutes: [],
-    steps: [], hours: [], drinks: [], cm: [], count: [], scale: [],
+    steps: [], hours: [], drinks: [], cm: [], count: [], ratio: [], scale: [],
   };
 }
 
@@ -215,16 +256,17 @@ export async function buildCoachFacts(
   /**
    * The only way a number gets into the sheet.
    *
-   * Formats it with the shared Swedish formatter, so the coach's "2 350" is the
-   * app's "2 350", and records it in the traceable set for its unit in the same
-   * breath. Two things that used to be done in two places and could therefore
+   * Formats it with the shared Swedish formatter at the precision its **unit**
+   * carries, so the coach's "2 350" is the app's "2 350" and a weight is one
+   * decimal wherever it appears, and records it in the traceable set for that
+   * unit in the same breath. Two things that used to be done in two places and could therefore
    * be done in one of them: the previous sheet stated several figures with bare
    * interpolation and several more with a formatter, and pushed them onto the
    * allowlist by hand, one `push` per `say`.
    */
-  const num = (value: number, unit: FigureUnit, decimals = 0): string => {
+  const num = (value: number, unit: FigureUnit): string => {
     figures[unit].push(value);
-    return formatDecimal(value, { decimals });
+    return formatDecimal(value, { decimals: FIGURE_DECIMALS[unit] });
   };
 
   /** The window lengths themselves are figures the reply will quote back. */
@@ -244,15 +286,15 @@ export async function buildCoachFacts(
   const windowStart = trend.find((point) => point.localDate >= from)?.trend ?? null;
 
   if (trendNow !== null) {
-    say(`Trendvikt nu: ${num(trendNow, "kg", 1)} kg.`);
+    say(`Trendvikt nu: ${num(trendNow, "kg")} kg.`);
 
     if (windowStart !== null && Math.abs(trendNow - windowStart) >= 0.05) {
       const change = trendNow - windowStart;
       const weekly = Math.abs((change / CONTEXT_WINDOW_DAYS) * 7);
       say(
         `Trendvikten har ${change < 0 ? "gått ner" : "gått upp"} ` +
-          `${num(Math.abs(change), "kg", 1)} kg på ${num(CONTEXT_WINDOW_DAYS, "count")} dagar, ` +
-          `vilket är ${num(weekly, "kgPerWeek", 2)} kg i veckan.`,
+          `${num(Math.abs(change), "kg")} kg på ${num(CONTEXT_WINDOW_DAYS, "count")} dagar, ` +
+          `vilket är ${num(weekly, "kgPerWeek")} kg i veckan.`,
       );
     }
   } else {
@@ -369,12 +411,12 @@ export async function buildCoachFacts(
       `Plan: ${
         plan.goalWeightKg === null
           ? "inget målvikt satt"
-          : `mål ${num(plan.goalWeightKg, "kg", 1)} kg`
+          : `mål ${num(plan.goalWeightKg, "kg")} kg`
       }, dagligt mål ${num(plan.targetIntakeKcal, "kcal")} kcal, ` +
         `golv ${num(plan.intakeFloorKcal, "kcal")} kcal.`,
     );
     if (plan.targetRateKgWeek !== null) {
-      say(`Planerad takt: ${num(Math.abs(plan.targetRateKgWeek), "kgPerWeek", 2)} kg i veckan.`);
+      say(`Planerad takt: ${num(Math.abs(plan.targetRateKgWeek), "kgPerWeek")} kg i veckan.`);
     }
   } else {
     say("Ingen aktiv plan.");
@@ -393,7 +435,7 @@ export async function buildCoachFacts(
     `Spärrar appen räknar med: intaget föreslås aldrig under ${num(floor, "kcal")} kcal per dag` +
       (maxRate === null
         ? "."
-        : `, och takten aldrig snabbare än ${num(maxRate, "kgPerWeek", 2)} kg i veckan, ` +
+        : `, och takten aldrig snabbare än ${num(maxRate, "kgPerWeek")} kg i veckan, ` +
           `vilket är ${num(1, "percent")} procent av kroppsvikten.`),
   );
 
@@ -530,7 +572,7 @@ export async function buildCoachFacts(
           inWindow.length < 4 ? "thin" : total === 0 ? "low" : total >= 7 ? "high" : "steady";
       }
       say(
-        `Alkohol ${num(window, "count")} dagar: ${num(total, "drinks", 1)} standardglas ` +
+        `Alkohol ${num(window, "count")} dagar: ${num(total, "drinks")} standardglas ` +
           `totalt, ifyllt på ${num(inWindow.length, "count")} ${dayWord(inWindow.length)}, varav ` +
           `${num(sober, "count")} ${sober === 1 ? "nykter" : "nyktra"}.`,
       );
@@ -612,9 +654,9 @@ export async function buildCoachFacts(
   say("SÖMN, ENERGI OCH HUMÖR");
 
   const scales = [
-    { key: "sleepHours", label: "Sömn", unit: "hours" as FigureUnit, suffix: " timmar", decimals: 1 },
-    { key: "energy", label: "Energi", unit: "scale" as FigureUnit, suffix: " av 5", decimals: 1 },
-    { key: "mood", label: "Humör", unit: "scale" as FigureUnit, suffix: " av 5", decimals: 1 },
+    { key: "sleepHours", label: "Sömn", unit: "hours" as FigureUnit, suffix: " timmar" },
+    { key: "energy", label: "Energi", unit: "scale" as FigureUnit, suffix: " av 5" },
+    { key: "mood", label: "Humör", unit: "scale" as FigureUnit, suffix: " av 5" },
   ] as const;
 
   let sleepState: MeaningState = "none";
@@ -636,7 +678,7 @@ export async function buildCoachFacts(
         sleepState = values.length < 4 ? "thin" : average < 7 ? "low" : "steady";
       }
       parts.push(
-        `${num(window, "count")} dagar: snitt ${num(average, scale.unit, scale.decimals)}` +
+        `${num(window, "count")} dagar: snitt ${num(average, scale.unit)}` +
           `${scale.suffix} från ${num(values.length, "count")} ${dayWord(values.length)}`,
       );
     }
@@ -720,10 +762,10 @@ export async function buildCoachFacts(
      */
     const change = smoothedChange(series, CONTEXT_WINDOW_DAYS);
     measured.push(
-      `${siteNames[site]}: ${num(last.trend, "cm", 1)} cm` +
+      `${siteNames[site]}: ${num(last.trend, "cm")} cm` +
         (change === null
           ? ""
-          : `, ${change.deltaCm < 0 ? "ner" : "upp"} ${num(Math.abs(change.deltaCm), "cm", 1)} cm ` +
+          : `, ${change.deltaCm < 0 ? "ner" : "upp"} ${num(Math.abs(change.deltaCm), "cm")} cm ` +
             `på ${num(CONTEXT_WINDOW_DAYS, "count")} dagar`),
     );
   }
@@ -753,19 +795,21 @@ export async function buildCoachFacts(
      * on the row; the only reason it was not used is that every milestone
      * anybody had made until now happened to be a weight.
      */
-    const metrics: Record<string, { unit: FigureUnit; suffix: string; decimals: number }> = {
-      weight_kg: { unit: "kg", suffix: " kg", decimals: 1 },
-      waist_cm: { unit: "cm", suffix: " cm", decimals: 1 },
-      chest_cm: { unit: "cm", suffix: " cm", decimals: 1 },
-      whtr: { unit: "scale", suffix: "", decimals: 2 },
-      log_streak_days: { unit: "count", suffix: " dagar", decimals: 0 },
-      sober_days: { unit: "count", suffix: " dagar", decimals: 0 },
+    const metrics: Record<string, { unit: FigureUnit; suffix: string }> = {
+      weight_kg: { unit: "kg", suffix: " kg" },
+      waist_cm: { unit: "cm", suffix: " cm" },
+      chest_cm: { unit: "cm", suffix: " cm" },
+      /* A ratio, not a self-rating: they used to share `scale` and disagree
+         about precision, which the traceable set could not represent. */
+      whtr: { unit: "ratio", suffix: "" },
+      log_streak_days: { unit: "count", suffix: " dagar" },
+      sober_days: { unit: "count", suffix: " dagar" },
     };
 
     for (const row of open) {
-      const shape = metrics[row.metric] ?? { unit: "scale" as FigureUnit, suffix: "", decimals: 1 };
+      const shape = metrics[row.metric] ?? { unit: "scale" as FigureUnit, suffix: "" };
       say(
-        `${row.label}: mål ${num(Number(row.targetValue), shape.unit, shape.decimals)}` +
+        `${row.label}: mål ${num(Number(row.targetValue), shape.unit)}` +
           `${shape.suffix}.`,
       );
     }
@@ -851,28 +895,19 @@ export async function buildCoachFacts(
    *
    * Rounding here rather than at the call site so the set holds what a reader
    * would read off the page: the sheet says "2 350 kcal", so 2 350 is what a
-   * reply may quote.
+   * reply may quote. **From the same table `num` writes with**, which is what
+   * keeps the two halves from disagreeing: they were two lists of numbers and
+   * `scale` said 1 in one and 2 in the other.
    */
-  const dedupe = (values: number[], decimals: number): number[] => [
-    ...new Set(values.map((value) => Number(value.toFixed(decimals)))),
+  const dedupe = (values: number[], unit: FigureUnit): number[] => [
+    ...new Set(values.map((value) => Number(value.toFixed(FIGURE_DECIMALS[unit])))),
   ];
 
   return {
     text,
-    figures: {
-      kcal: dedupe(figures.kcal, 0),
-      kg: dedupe(figures.kg, 1),
-      percent: dedupe(figures.percent, 0),
-      kgPerWeek: dedupe(figures.kgPerWeek, 2),
-      grams: dedupe(figures.grams, 0),
-      minutes: dedupe(figures.minutes, 0),
-      steps: dedupe(figures.steps, 0),
-      hours: dedupe(figures.hours, 1),
-      drinks: dedupe(figures.drinks, 1),
-      cm: dedupe(figures.cm, 1),
-      count: dedupe(figures.count, 0),
-      scale: dedupe(figures.scale, 1),
-    },
+    figures: Object.fromEntries(
+      FIGURE_UNITS.map((unit) => [unit, dedupe(figures[unit], unit)]),
+    ) as CoachFigures,
     guardrails: { intakeFloorKcal: floor, maxRateKgWeek: maxRate },
     chars: text.length,
   };
