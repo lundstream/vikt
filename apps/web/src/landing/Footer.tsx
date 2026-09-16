@@ -1,5 +1,5 @@
 import { BeerIcon, GitHubMark, LicenceIcon, LockIcon, TermsIcon } from "./icons.js";
-import { operatorName, siteConfig } from "../lib/site-config.js";
+import { operatorOrNone, siteConfig } from "../lib/site-config.js";
 
 /**
  * The footer, shared by the landing page and the two text pages (D106).
@@ -17,6 +17,7 @@ const LICENCE = "https://www.gnu.org/licenses/agpl-3.0.html";
 
 export function LandingFooter() {
   const { repo, support } = siteConfig();
+  const operator = operatorOrNone();
 
   /*
     Support is optional and is dropped rather than shown empty (D121). Not every
@@ -36,7 +37,15 @@ export function LandingFooter() {
   return (
     <footer className="border-t border-edge">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-micro text-muted">
-        <span>Vikt körs av den som hostar den. Den här installationen drivs av {operatorName()}.</span>
+        {/*
+          The operator's sentence is dropped when there is no operator to name
+          (D177). It used to fall back to a description of the operator, so an
+          installation that had not set `OPERATOR` said "drivs av den som driver
+          den här installationen", which is a sentence eating its own tail.
+        */}
+        <span>
+          Vikt körs av den som hostar den.{operator === null ? "" : ` Den här installationen drivs av ${operator}.`}
+        </span>
 
         <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
           {links.map((link) => (

@@ -233,10 +233,10 @@ describe("landing page copy", () => {
 
     for (const heading of [
       "En dagsvikt är mest brus",
-      "Underhåll mäts, inte räknas",
-      "Det du loggar",
+      "Förbränning mäts utifrån det du loggar",
+      "Vad appen gör",
       "Om AI",
-      "Så ser det ut",
+      "Appen i telefonen",
       "Dina data",
     ]) {
       expect(strings, `the landing section "${heading}" is not being read`).toContain(heading);

@@ -11,6 +11,71 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, second pass
+
+Same conditions as the first pass: Lighthouse 12.8.2, headless Chrome, **mobile
+settings**, against the production build over https. 2026-09-16, after D177.
+
+| | first pass | second pass |
+|---|---|---|
+| performance | 98 | **98** |
+| accessibility | 100 | **100** |
+| cumulative layout shift | 0 | **0** |
+| largest contentful paint | 2,2 s | 2,2 s |
+| total blocking time | 0 ms | 0 ms |
+
+### What the page loads, against two budgets
+
+| | gzipped | budget |
+|---|---|---|
+| the landing chunk: the page, its motion, its fixture | **12,4 kB** | 15 kB |
+| everything `/` fetches | **58,3 kB** | 60 kB |
+
+Two numbers rather than one (D173's addendum): the page's own code is what moves
+when a section is added, and the total is what a stranger pays. React is 45,9 kB
+of the total and is a decision rather than a number anybody can edit down.
+
+### The hero, sampled on the page's own clock
+
+| at | readings shown | line | endpoint |
+|---|---|---|---|
+| 419 ms | 4 of 30 | not started | hidden |
+| 976 ms | 15 of 30 | not started | hidden |
+| 1 534 ms | 27 of 30 | not started | hidden |
+| 2 095 ms | 30 of 30 | a quarter drawn | hidden |
+| 2 655 ms | 30 of 30 | four fifths | hidden |
+| 3 216 ms | 30 of 30 | all but a trace | hidden |
+| 3 776 ms | 30 of 30 | **drawn** | **appearing** |
+
+The endpoint was timed at 3 400 ms against a line that finishes at 3 500, so it
+arrived before the line reached it. It is 3 500 now, and the table is what
+"after" looks like.
+
+### The fortnight, at four scroll positions
+
+| the section's top at | progress | readings shown |
+|---|---|---|
+| 0,9 of the viewport | 0 | 0 of 14 |
+| 0,6 | 0 | 0 of 14 |
+| 0,35 | **0,769** | 11 of 14 |
+| 0,1 | **1,0** | **14 of 14** |
+| back at the top | **1,0** | 14 of 14 |
+
+The last row is the point: progress is the maximum seen so far, so scrolling back
+up leaves the line drawn. It was `animation-timeline: view()`, which runs
+backwards by design.
+
+**It read 13 of 14 before D177**: the last reading's threshold was exactly 1 and
+never crossed. The thresholds are compressed into 0 to 0,92 now.
+
+### Reduced motion
+
+Captured 900 ms after load with `prefers-reduced-motion: reduce` emulated: 30 of
+30 hero readings present, both lines drawn, the endpoint at full opacity,
+progress 1 and all fourteen readings shown. The finished page, at once.
+
+---
+
 ## The landing page, rebuilt
 
 Lighthouse 12.8.2 in headless Chrome, **mobile settings** (the default preset:

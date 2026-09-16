@@ -9334,6 +9334,28 @@ this much animation is the number worth keeping: every figure is in the markup
 at its final width before it counts, the screenshots carry `width` and `height`,
 and the reveals move with `transform`.
 
+#### Addendum, 2026-09-16: the budget is two numbers, and 40 kB is backlog
+
+**React stays on the public pages.** The page's own code is 12,4 kB gzipped;
+react and react-dom are 45,9. Nothing that can be done to the page reaches 40 kB
+in total, because the framework alone is more than that, and the page's code is
+a quarter of the budget it is being blamed for.
+
+So the budget is **two numbers**, which answer different questions: the page's
+own code at **15 kB**, which moves when a section is added and is the honest
+measure of whether the page is getting heavy, and everything `/` fetches at
+**60 kB**, which is what a stranger on a phone pays. Holding only the total would
+let the page's own code triple unnoticed; holding only the page's code would let
+a dependency arrive unnoticed.
+
+**Prerendering is backlog, not a plan for this pass.** Rendering the three
+static public pages to HTML at build time and loading React only for `/kod`
+would take the total to a few kilobytes. It is a change to the build pipeline
+and to how `/integritet`, `/villkor` and `/kod` are served, it touches nginx and
+the dev server, and it is not something to do in the same pass as the page's
+copy. It is written here so the gap stays visible rather than becoming the new
+normal.
+
 #### Two scripts, so nothing goes stale
 
 `scripts/landing-shots.mjs` signs into the seeded demo account and captures the
@@ -9520,3 +9542,97 @@ property of a rendered result rather than of a value: a decimal place, a
 resolved colour, a capital letter. The suites assert what a function returns.
 The three guards added here assert what the source is allowed to say, which is
 the closest a test gets to looking.
+
+---
+
+### D177 — The landing page's lines are the app's own arithmetic
+
+A second pass over the page D173 built, and one finding runs through most of it:
+**the page was illustrating its own argument with things it had drawn by hand.**
+
+#### The hero was a curve somebody sketched
+
+`M 8 34 C 86 44, 120 96, 180 106 S 268 132, 312 128`. Four control points, chosen
+because they looked like a trend, with thirty readings scattered around them by
+a seeded generator. A page whose whole claim is "this app draws the trend rather
+than the noise" cannot make that claim with a shape drawn to look like one, and
+nothing would have noticed if §4.1 changed underneath it.
+
+Both series are dated readings now, and the trend through each is computed by
+`packages/shared`'s own EMA in `scripts/landing-fixture.mjs`, at build time, into
+`fixture.generated.ts`. `landing-fixture.test.ts` recomputes both from the same
+readings and fails on any vertex that has moved, and asserts the drawn path is
+those vertices and contains no curve command. **The guarantee is the test, not
+the comment.**
+
+Generated rather than computed in the browser because §4.1 and its dependencies
+in a bundle that exists to show a stranger one picture is the wrong trade, and
+the budget below is tight.
+
+**The cadence had to change to make the line read as a trend.** At thirty
+readings across ninety days, §4.1's per-day alpha compounds over the three-day
+gaps into an effective 0,27, and the line chases the noise instead of cutting
+through it: the first render was visibly jagged. Every other day gives 0,19 and
+a line that reads as what it is. That is the smoothing being honest about
+cadence (D36), seen on a marketing page rather than in a test.
+
+#### Scroll progress only increases
+
+The fortnight's line was drawn by `animation-timeline: view()`, which runs
+backwards when the reader scrolls up: the line undrew itself while somebody
+scrolled back to re-read the paragraph beside it. A scroll timeline is the right
+tool for an effect that should reverse, and this is not one.
+
+`landing-motion.ts` computes the section's travel past the viewport's midline and
+keeps the **maximum seen so far**, writes it to `--progress`, and removes its own
+listener once it reaches 1. The line's dash offset and each reading's opacity are
+both functions of that one number, so the readings arrive under the line rather
+than waiting in a cloud for it.
+
+Measured at four scroll positions: 0, 0, 0,769, 1,0, with 0, 0, 11 and 14 of the
+fourteen readings shown; and after scrolling back to the top, still 1,0 and 14.
+
+**One reading never appeared**, at 13 of 14, because the last dot's threshold was
+exactly 1 and the comparison is strict. The positions are compressed into 0 to
+0,92 now. It is the kind of defect that a picture shows and an assertion about a
+number does not.
+
+#### Everything else
+
+- **The endpoint arrives when the line reaches it.** It was timed 3400 ms against
+  a line that finishes at 3500, which is a full stop at the end of a sentence
+  still being written.
+- **Natt across the whole page.** The sections alternated Natt and Skymning,
+  which made the page read as bands rather than as one surface; cards stay
+  Skymning, as page 6 says.
+- **One container.** The page mixed `max-w-3xl` and `max-w-5xl`, so paragraphs
+  changed width between sections for no reason a reader could see.
+- **Units are back on the figures**, smaller and in Sten, which page 5 requires
+  and the maintenance figures had lost.
+- **The header carries two items**, "Källkod" and "Logga in". "Så funkar det" was
+  in the header and in the hero; the header is not where somebody decides to read
+  an explanation.
+- **The phone pictures are made by hand** and the sweep that produced them is
+  deleted. They are framed, composed images of the demo account, which a
+  screenshot script cannot produce. `scripts/landing-screens.mjs` resizes them
+  from 780 kB to about 180 kB each; **they go stale silently**, so the rule to
+  regenerate them lives in STATE.md and in the release runbook.
+- **The 3D exception is withdrawn.** D173 wrote one for the phone frames' tilt.
+  The pictures are of framed phones already, and tilting a picture of a tilted
+  thing says nothing the still frame does not, so §5's rule stands unqualified
+  again.
+- **The footer's operator sentence is dropped when there is no operator.** It
+  fell back to a description, so an installation that had not set `OPERATOR`
+  read "Den här installationen drivs av den som driver den här installationen":
+  a sentence eating its own tail, which is worse than no sentence because it
+  looks like an answer.
+
+#### Measured again, all of it
+
+Lighthouse 12.8.2, mobile, on the production build: **performance 98,
+accessibility 100, cumulative layout shift 0**. The hero: 4 of 30 readings at
+419 ms, all 30 by 2,1 s with the line a quarter drawn, the line finished by
+3,2 s, the endpoint appearing only after that. Reduced motion, 900 ms after
+load: every reading present, both lines drawn, progress 1. 360 px with no page
+overflow, and a mid-scroll shot with the line a third drawn and five of the
+fourteen readings arrived.

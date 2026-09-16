@@ -34,11 +34,23 @@ import path from "node:path";
 const WEB = path.resolve(import.meta.dirname, "..");
 const DIST = path.resolve(process.argv[2] ?? path.join(WEB, "dist"));
 
-/** What the page costs today, plus a little room, in gzipped bytes. */
-const BUDGET = 62 * 1024;
-
-/** Where this is meant to end up, named in the failure so the gap stays visible. */
-const TARGET = 40 * 1024;
+/**
+ * Two numbers, because they answer different questions (D177).
+ *
+ * **The landing's own code**, 15 kB: everything this page's authors write. It
+ * is the number that moves when a section is added, and the one that says
+ * whether the page is getting heavy.
+ *
+ * **Everything `/` fetches**, 60 kB: what a stranger on a phone actually pays.
+ * Most of it is react and react-dom, which is a decision (D173's addendum)
+ * rather than a number anybody can work down by editing the page.
+ *
+ * Holding only the total would let the page's own code triple while the total
+ * stayed flat; holding only the page's code would let a dependency arrive
+ * unnoticed. Neither alone is the budget.
+ */
+const OWN_BUDGET = 15 * 1024;
+const TOTAL_BUDGET = 60 * 1024;
 
 const html = path.join(DIST, "index.html");
 if (!existsSync(html)) {
@@ -60,28 +72,42 @@ if (references.length === 0) {
 }
 
 let total = 0;
+let own = 0;
 const rows = [];
 for (const reference of new Set(references)) {
   const file = path.join(DIST, reference.replace(/^\//, ""));
   const gzipped = gzipSync(readFileSync(file), { level: 9 }).length;
   total += gzipped;
-  rows.push(`  ${reference.padEnd(40)} ${(gzipped / 1024).toFixed(1)} kB`);
+  // The entry chunk is this page's own code; everything preloaded beside it is
+  // the vendor code it depends on.
+  const mine = /landing-[^/]*\.js$/.test(reference);
+  if (mine) own += gzipped;
+  rows.push(`  ${reference.padEnd(40)} ${(gzipped / 1024).toFixed(1)} kB${mine ? "  (the page's own)" : ""}`);
 }
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} kB`;
 
 process.stdout.write(`the landing page loads ${kb(total)} of JavaScript, gzipped:\n`);
 for (const row of rows) process.stdout.write(`${row}\n`);
+process.stdout.write(`  ${"its own code".padEnd(40)} ${kb(own)}\n`);
 
-if (total > BUDGET) {
+const failures = [];
+if (own > OWN_BUDGET) {
+  failures.push(`the page's own code is ${kb(own)}, over its ${kb(OWN_BUDGET)} budget`);
+}
+if (total > TOTAL_BUDGET) {
+  failures.push(`the page loads ${kb(total)} in total, over its ${kb(TOTAL_BUDGET)} budget`);
+}
+
+if (failures.length > 0) {
+  for (const failure of failures) process.stderr.write(`\nover budget: ${failure}.\n`);
   process.stderr.write(
-    `\nover budget: ${kb(total)} against ${kb(BUDGET)}.\n` +
-      `The page is meant to reach ${kb(TARGET)}, which needs React off this page\n` +
-      `entirely (D173). Whatever was just added, it is not the way there.\n`,
+    "React on the public pages is a decision, not an accident (D173 addendum).\n" +
+      "If the total is what grew, look at what was imported rather than at the copy.\n",
   );
   process.exit(1);
 }
 
 process.stdout.write(
-  `within ${kb(BUDGET)}. The target is ${kb(TARGET)}, which needs React off this page (D173).\n`,
+  `within budget: own ${kb(own)} of ${kb(OWN_BUDGET)}, total ${kb(total)} of ${kb(TOTAL_BUDGET)}.\n`,
 );

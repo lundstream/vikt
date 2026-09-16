@@ -82,16 +82,34 @@ when it will be down, and its mail goes out.
   and a guard computes every body-text token against every surface in both
   themes from the tokens themselves, because the audit that reported "zero
   failures" walked screens and a token is not a pair.
-- **The landing page draws the argument before it states it** (D173). Thirty
-  readings arrive, a trend line draws through them, and only then does the page
-  say "gör det lättare" in words. Seven sections after it, one scroll-driven:
-  the reader draws a trend through a fortnight of daily weights with the wheel.
-  Three phone frames hold real captures of the seeded demo account, regenerated
-  by `scripts/landing-shots.mjs` rather than saved by hand. Measured on the
-  production build at mobile settings: **Lighthouse performance 98,
-  accessibility 100, zero layout shift**. Shot at 360 px and desktop, with a
+- **The landing page's lines are the app's own arithmetic** (D173, D177).
+  Thirty readings arrive, a trend line draws through them, and only then does
+  the page say "gör det lättare" in words; seven sections after it, one
+  scroll-driven, where the reader draws a trend through a fortnight of daily
+  weights with the wheel. **Both lines are computed by `packages/shared`'s EMA**
+  over dated fixtures at build time, and a test recomputes every vertex, because
+  the hero used to be a cubic somebody sketched to look like a trend. Scroll
+  progress is the maximum seen so far, so scrolling back up leaves the line
+  drawn: nothing on the page animates in reverse. Measured again on the
+  production build at mobile settings: **Lighthouse performance 98, accessibility
+  100, zero layout shift**, the page's own code 12,4 kB gzipped of a 15 kB
+  budget and 58,3 kB of 60 in total. Shot at 360 px and desktop, with a
   reduced-motion pass that renders the finished page at once and a mid-scroll
-  shot with the line half drawn.
+  shot with the line a third drawn and five of fourteen readings arrived.
+- **The landing page's three phone pictures are made by hand, and nothing in CI
+  notices when they go stale** (D177). `docs/screens/{oversikt,mat,framsteg}-portrait.png`
+  are composed, framed shots of the demo account taken by the owner;
+  `scripts/landing-screens.mjs` only resizes them into `public/screens/`. The
+  sweep that used to generate them is deleted, because a raw capture is not a
+  framed picture. **So they must be taken again whenever Översikt, Mat or
+  Framsteg changes in a way a stranger would see**, and that is step 2b of the
+  release runbook as well as this line.
+
+  **README's three screenshots came from that same deleted sweep** and are now
+  hand-maintained too: `docs/screens/{oversikt,mat,framsteg}.png`, which nothing
+  regenerates. They are current as of the sweep that last ran, and the same rule
+  applies to them. Pointing README at the framed portraits instead would leave
+  one set rather than two, and is worth doing next time README is touched.
 - **The backup leaves the container, and the app reads one back** (D168).
   `/backups` is a required bind mount from a host directory (`BACKUP_HOST_DIR`)
   instead of a named volume the API's uid 1000 could not write, which is where
@@ -288,7 +306,9 @@ deploy needs that it did not before, and the one command that does it.
 | **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
 | **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
 | **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
-| **A new landing page** (D173) | the public page is rebuilt: a drawn hero, a scroll-driven section, real screenshots, and a share card |
+| **A new landing page** (D173, D177) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic, a scroll-driven section, three phone pictures, and a share card |
+| **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
+| **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
 
 #### What the deploy needs that 1.1.1 did not
 
@@ -380,8 +400,18 @@ då hinner trendvikten inte med.
 ditt mål, med appens egna ord och märkt som allmänt när det är allmänt. Den
 hittar fortfarande aldrig på en siffra.
 
-**Startsidan** är ombyggd. Inget av det du har loggat påverkas, och inga
-siffror räknas om.
+**Läsbarhet.** Den gråa texten, alltså etiketter, enheter och förklaringar, har
+blivit ljusare i mörkt tema och mörkare i ljust. Den ligger nu över gränsen för
+läsbar kontrast överallt där den används, i stället för bara på de flesta
+ställen.
+
+**Rättat.** Skillnaden på Översikt står med en decimal, som alla andra vikter i
+appen, i stället för två. Märkningen för uppskattat värde står med liten
+begynnelsebokstav, som appens övriga märkningar.
+
+**Startsidan** är ombyggd. Kurvan där är ritad av appens egen uträkning, samma
+som ritar din trend. Inget av det du har loggat påverkas, och inga siffror
+räknas om.
 ```
 
 </details>
@@ -628,14 +658,18 @@ All three items are done on `dev`. **One requirement inside item 1 is not met an
 is not going to be met by this page**, so it is written here rather than left in
 a commit message:
 
-- **The landing bundle is 57,6 kB of JavaScript gzipped, against the 40 kB the
+- **The landing bundle is 58,3 kB of JavaScript gzipped, against the 40 kB the
   brief asked for.** 45,9 kB of that is react and react-dom, so the page's own
   code is a quarter of the budget and no amount of work on it reaches the
   number. What does: prerender the three static public pages at build time and
   load React only for `/kod`, the one with a form. That is a change to the build
-  pipeline and it was not made in the same pass as the page. CI holds the page
-  at its current weight and names the target when it fails
-  (`apps/web/scripts/check-bundle.mjs`, D173).
+  pipeline and it was not made in the same pass as the page.
+
+  **The second pass settled how this is held** (D177, D173's addendum): two
+  budgets rather than one, the page's own code at **15 kB** and everything `/`
+  fetches at **60 kB**, both asserted by `apps/web/scripts/check-bundle.mjs`.
+  Prerendering is backlog, written down so the gap stays visible rather than
+  becoming the new normal.
 
 ### The 2026-09-15 brief: all eleven done
 

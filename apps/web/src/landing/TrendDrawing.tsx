@@ -1,44 +1,27 @@
 import type { CSSProperties } from "react";
 import {
   driftField,
-  FORTNIGHT,
   fortnightGeometry,
+  heroGeometry,
   HERO_BOX,
-  heroPath,
-  heroPoints,
   NOISE_BOX,
 } from "./seeded.js";
 
 /**
- * The landing page's two graphs (D173).
+ * The landing page's two graphs (D173, D177).
  *
  * ## Why this file exists at all
  *
  * `colour-meaning.test.ts` names the files allowed to use Lingon, and the rule
  * behind the list is that Lingon means **your trend line** and the wordmark.
- * The lines drawn here are trend lines: the hero's is the shape the whole
- * product is about, and the second is a trend drawn through a fortnight of
- * daily readings. So this is not an exception to the rule the way
- * `LandingPrimary.tsx` is (profile page 4's one carve-out for the landing
- * page's single action). It is the rule, on a page where the trend happens to
- * be a drawing rather than somebody's data.
+ * The lines drawn here are trend lines, computed by the app's own EMA over
+ * dated fixtures (`seeded.ts`), so this is not an exception to the rule. It is
+ * the rule, on a page where the trend belongs to nobody.
  *
- * It is still a file of its own, because the guard's list is a list of files
- * and a 400-line page in it would permit the accent anywhere on the page.
+ * ## What the marks mean
  *
- * ## Why the points are Is and the line is Lingon
- *
- * The same reason they are in the app (profile page 4): the raw readings are
- * secondary data behind the trend, and the trend is the thing. Somebody who has
- * used the app for a week should recognise this picture, because it is the same
- * picture.
- *
- * ## pathLength
- *
- * Both lines animate `stroke-dashoffset` from the path's length to zero, and
- * the length is `pathLength={1}`: SVG then treats the path as one unit long
- * whatever its real geometry, so the CSS needs no measurement and no
- * `getTotalLength()` call on load. Changing the curve cannot break the draw.
+ * The same as in the app (profile, page 6): Is for the raw readings, Lingon for
+ * the trend, and the endpoint is the mark itself (page 7).
  */
 
 const LINE = {
@@ -49,15 +32,20 @@ const LINE = {
 } as const;
 
 /**
- * The hero: about thirty readings arrive, then the trend draws through them and
- * ends in its endpoint, which stays.
+ * The hero: thirty readings arrive, then the trend draws through them and ends
+ * in its endpoint.
  *
- * Decorative to a screen reader. The section around it carries the sentence
- * that says what it means, and a description of a drawing of a line would be a
- * second, worse copy of that sentence.
+ * **The endpoint appears when the line reaches it**, not before. It used to be
+ * timed a hundred milliseconds early, which put a full stop at the end of a
+ * sentence still being written; the timings live together in `landing.css` so
+ * the two cannot drift apart again.
+ *
+ * Decorative to a screen reader: the section around it carries the sentence
+ * that says what it means.
  */
 export function HeroGraph() {
-  const points = heroPoints();
+  const { points, vertices, path } = heroGeometry();
+  const end = vertices.at(-1)!;
 
   return (
     <svg
@@ -77,10 +65,9 @@ export function HeroGraph() {
         />
       ))}
 
-      <path className="hero-line stroke-trend" d={heroPath()} pathLength={1} {...LINE} />
+      <path className="hero-line stroke-trend" d={path} pathLength={1} {...LINE} />
 
-      {/* The endpoint, which is the mark itself (profile page 7). */}
-      <circle className="hero-endpoint fill-trend" cx={312} cy={128} r={4.5} />
+      <circle className="hero-endpoint fill-trend" cx={end.x} cy={end.y} r={4.5} />
     </svg>
   );
 }
@@ -88,9 +75,6 @@ export function HeroGraph() {
 /**
  * The field behind the hero: sparse, slow, and at an opacity where it is
  * texture rather than content.
- *
- * Percentages rather than a viewBox, so it fills whatever the section is
- * without a second coordinate system to keep in step with the first.
  */
 export function DriftField() {
   return (
@@ -112,34 +96,43 @@ export function DriftField() {
 }
 
 /**
- * A fortnight of daily readings in Is, with the trend drawn through them as the
+ * A fortnight of daily readings, with the trend drawn through them as the
  * reader scrolls.
  *
- * The scroll timeline is in `landing.css`; what this file decides is that the
- * fourteen dots are the noise and the one line is the answer, which is the
- * section's whole argument made as a picture.
+ * **Each reading appears as the line reaches it.** Every dot carries the
+ * fraction of the line's length at which it sits, and `landing.css` turns the
+ * section's scroll progress into its opacity, so the readings arrive under the
+ * line rather than waiting in a cloud for it.
+ *
+ * **Progress only ever increases** (`landing-motion.ts`), so scrolling back up
+ * leaves the line drawn. Nothing on this page animates in reverse.
  */
 export function NoiseGraph() {
-  const { points, path } = fortnightGeometry();
+  const { points, vertices, path } = fortnightGeometry();
+  const first = vertices[0]!.x;
+  const span = vertices.at(-1)!.x - first;
 
   return (
     <svg
       viewBox={`0 0 ${NOISE_BOX.width} ${NOISE_BOX.height}`}
       className="h-auto w-full"
       role="img"
-      aria-label={`Fjorton dagliga vägningar mellan ${Math.min(...FORTNIGHT.readings)
-        .toFixed(1)
-        .replace(".", ",")} och ${Math.max(...FORTNIGHT.readings)
-        .toFixed(1)
-        .replace(".", ",")} kilo, med en trendlinje som faller jämnt genom dem.`}
+      aria-label="Fjorton dagliga vägningar med en trendlinje som faller jämnt genom dem."
     >
       {points.map((point) => (
         <circle
           key={`${point.x}-${point.y}`}
-          className="fill-data"
+          className="noise-reading fill-data"
           cx={point.x}
           cy={point.y}
           r={3}
+          /*
+            Where the dot sits along the line, compressed into 0 to 0,92.
+            At the full 0 to 1 the last reading's threshold is exactly 1, so it
+            never crossed it and the fourteenth dot never appeared: measured,
+            13 of 14 at the end of the scroll.
+          */
+          style={{ "--at": (((point.x - first) / span) * 0.92).toFixed(3) } as CSSProperties}
         />
       ))}
 

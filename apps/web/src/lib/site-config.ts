@@ -89,3 +89,20 @@ export function siteConfig(): SiteConfig {
 export function operatorName(): string {
   return siteConfig().operator || "den som driver den här installationen";
 }
+
+/**
+ * The operator's name, or nothing (D177).
+ *
+ * `operatorName()` has a fallback, and on an installation that has not set
+ * `OPERATOR` the footer read **"Den här installationen drivs av den som driver
+ * den här installationen"**: a sentence filled with itself, which is worse than
+ * no sentence, because it looks like an answer.
+ *
+ * A caller that can drop its whole sentence should use this and drop it. A
+ * caller that cannot, such as a paragraph of policy on /integritet, keeps the
+ * fallback, where the phrase is at least a true description of somebody.
+ */
+export function operatorOrNone(): string | null {
+  const name = siteConfig().operator.trim();
+  return name === "" ? null : name;
+}
