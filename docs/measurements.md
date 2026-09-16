@@ -46,10 +46,69 @@ is what found it: `animation-fill-mode: both` applies the first keyframe during
 the delay. Measured at 145 ms, two and a half seconds before the line reaches
 the endpoint. It is `forwards` now.
 
+### Lighthouse
+
+| | fourth | fifth |
+|---|---|---|
+| performance | 98 | **98** |
+| accessibility | 100 | **100** |
+| cumulative layout shift | 0 | **0** |
+| largest contentful paint | 2,2 s | 2,3 s |
+| total blocking time | 0 ms | 0 ms |
+| speed index | 1,7 s | 1,7 s |
+
+No accessibility audit failed, in the run that produced these numbers or in the
+two before it. The pair that made the fourth pass's score flicker is held by a
+test now.
+
+### What the page loads
+
+| | gzipped | budget |
+|---|---|---|
+| the landing chunk | **12,8 kB** | 15 kB |
+| everything `/` fetches | **58,8 kB** | 60 kB |
+
+### The two cards
+
+The left one cycles and the right one holds:
+
+| at | left | right |
+|---|---|---|
+| 9 697 ms | 84,6 | 83,3 (counting) |
+| 10 162 ms | 84,4 | **84,5** |
+| 11 066 ms | 84,6 | 84,5 |
+| 11 984 ms | 84,4 | 84,5 |
+| 12 435 ms | 84,4 | 84,5 |
+
+**Scrolled away it stops**: 84,4 before, 84,4 after 2,7 seconds off screen. The
+right figure counts up once to the trend and then never changes again.
+
+### A phone frame, across its travel
+
+| where its centre is | angle |
+|---|---|
+| below the fold | **+22,0°** |
+| entering (0,95) | +9,8° |
+| 0,62 | **0,0°** |
+| centred (0,50) | **0,0°** |
+| 0,38 | **0,0°** |
+| leaving (0,05) | -9,8° |
+| gone above | **-22,0°** |
+
+`box-shadow: none` at every one. The three zeroes are the flat band: about a
+quarter of a viewport's worth of scroll where the frame is square on, rather
+than the single position a midpoint keyframe gives.
+
 ### Reduced motion
 
-The ring is `display: none`, the line is drawn, and all three words are at full
-opacity 900 ms after load.
+900 ms after load: the ring is `display: none`, the line is drawn, all three
+words are at full opacity, the frames are square at 0,0°, and the left card
+holds one reading, unchanged after 2,7 seconds.
+
+### Both widths
+
+360 px: `scrollWidth` 360 against `clientWidth` 360, no overflow, 6 345 px tall.
+Desktop 1 280: 4 925 px tall.
 
 ---
 

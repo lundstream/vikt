@@ -9972,3 +9972,102 @@ carve-out for this page's single action). It is held now, with the headroom
 asserted as well as the floor, so a change that makes it worse while still
 passing fails in a test rather than in whichever Lighthouse run happens to catch
 the fade.
+
+---
+
+### D180 — The page reads at a talking pace, and says each thing once
+
+The fifth pass and the last before 1.2.0. Four passes made the page true; this
+one makes it legible, which turned out to be mostly about **time**.
+
+#### The words arrive 700 ms apart, not 120
+
+At 120 ms the three words of "Gör det lättare." read as one movement with a
+stutter in it: a transition dressed up as a sentence. At 700 each word is on
+screen long enough to be read before the next arrives, which is the pace
+somebody says it at. The page is explaining rather than revealing, and the tempo
+is part of the argument.
+
+The gap is one custom property and the sentence's delay is a multiple of it, so
+a rhythm cannot drift apart into four numbers that used to agree.
+
+#### The line lands
+
+When the trend reaches today, one ring in Lingon expands out of the endpoint and
+fades over half a second. Then 300 ms of nothing, and only then the first word.
+
+**This is motion that carries meaning**, and the meaning is the page's oldest
+one: a reading arriving. The hero says it thirty times while the line is drawn;
+the ring says it once more for the reading the line ends on, which is the one
+the reader would have taken this morning. It does not spend the tilt's
+decoration budget because it stops: one run, ending at opacity 0, and nothing
+pulses at rest. Recorded under D177, which is where the hero's sequence lives.
+
+The beat of silence is the other half. Without it the ring reads as a lead-in to
+the words; with it, the picture has finished saying its part and the words are
+the next sentence.
+
+**It was visible from the first paint** at nine tenths opacity, for two and a
+half seconds before the line reached the endpoint, because
+`animation-fill-mode: both` applies the first keyframe *during the delay* and the
+element's own `opacity: 0` cannot win against it. Every screenshot taken after
+three seconds looked right. The measurement caught it at 145 ms.
+
+#### "Trendvikt, inte dagsvikt" is two figures, not fourteen
+
+D179 replaced a second graph with the fourteen readings stated as figures, seven
+across and two down. That is a **table**: a reader counts it rather than taking
+the point, and the point is that any one morning is noise.
+
+So the section takes exactly the shape of the maintenance section below it,
+which makes the same kind of comparison: one figure against another, in two
+cards. The left cycles through the fourteen readings at 900 ms each with a short
+crossfade; the right holds the trend and counts up to it once.
+
+**The left card loops, and §5 says everything that moves stops.** It needs its
+own reasoning rather than the drifting field's, because it is the subject rather
+than the background: what it says has no end state. A trend settles and a line
+finishes drawing; a daily weight does not, and a card that showed one reading
+and stopped would make the opposite point to the one beside it. What keeps it
+honest is that it runs **only while it is on screen** — measured, no change
+across 2,7 s scrolled away — so a reader who has passed it pays nothing, and
+neither does a hidden tab.
+
+Under reduced motion it keeps the one reading React rendered, which is the
+finished state of a thing whose whole content is that it changes.
+
+**The count-up formatted every figure as whole.** It had only ever been pointed
+at kilocalories, so 84,5 counted up and landed on "84": a weight written the way
+this app never writes one, on the figure whose entire job is to be the trend. It
+reads the decimals off the target now.
+
+#### The frames turn enough to see
+
+Twelve degrees at a perspective of 1400 px is a turn you can measure and cannot
+see: at the size these are drawn the frame looked slightly crooked rather than
+turned, which is the worst of both, a decoration that costs the same and says
+less. Twenty-two at 900 px reads at a glance.
+
+The extra angle needs a **flat band**. A single midpoint means the frame is
+square on for one scroll position and leaning everywhere else, so the picture a
+reader stops on is almost never the flat one. It holds flat from 40 % to 60 % of
+its travel, about a quarter of a viewport's worth of scroll. §5 names the angle,
+so §5 changed with it.
+
+#### Din data, and Om AI last
+
+"Dina data" reads as a list of things; "Din data" is the subject the section is
+about.
+
+Om AI moves below Din data, above the footer. It answers a question a reader
+only has once they know what the app does, and it is the one section whose
+subject is a component rather than something the reader gets: a page that
+explains its language model before it has shown its screens is a page about the
+model.
+
+**The copy guard checks the order now, and its first version was wrong in an
+instructive way.** It scanned the file for `<SectionHeading>` and got the order
+the components are *defined* in, which is not the order they are rendered, so it
+failed against a page that was already correct. A check that reads the wrong
+thing fails and passes for the same bad reason; it reads the list out of
+`<main>` and looks each component's heading up now.

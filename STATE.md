@@ -82,6 +82,16 @@ when it will be down, and its mail goes out.
   and a guard computes every body-text token against every surface in both
   themes from the tokens themselves, because the audit that reported "zero
   failures" walked screens and a token is not a pair.
+- **The landing page reads at a talking pace** (D180). The line draws, lands in
+  one Lingon ring at the endpoint, holds still for a beat, and then "Gör",
+  "det", "lättare." arrive 700 ms apart. "Trendvikt, inte dagsvikt" is two
+  cards in the maintenance section's own shape: a daily weight cycling through
+  the fixture's fourteen readings beside the one trend they make, and the
+  cycling stops while the card is off screen. The phone frames turn 22 degrees
+  rather than 12 and hold flat through a band at the centre, so the turn reads
+  at a glance. Om AI moved below Din data, at the bottom. Measured again:
+  **performance 98, accessibility 100, zero layout shift**, 12,8 kB of 15 and
+  58,8 of 60.
 - **The landing page says it once, in a picture and then in words** (D179).
   The hero draws the trend through thirty readings and then the claim arrives a
   word at a time, "Gör", "det", "lättare.", 120 ms apart. "En dagsvikt är mest
@@ -319,7 +329,7 @@ deploy needs that it did not before, and the one command that does it.
 | **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
 | **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
 | **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
-| **A new landing page** (D173, D177, D178, D179) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve, a fortnight stated in figures, three phone screens one to a row, and a share card |
+| **A new landing page** (D173, D177, D178, D179, D180) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve and landing in a ring, a claim that arrives a word at a time, a daily weight cycling beside the trend it makes, three phone screens one to a row, and a share card |
 | **Two formatting fixes** (D179) | the weekly review card names the day in Swedish instead of showing an ISO date, and the weekly trend change in it reads one decimal like every other weight |
 | **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
 | **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
@@ -439,8 +449,10 @@ för 2026-09-07, och viktförändringen i den står med en decimal som alla andr
 vikter. Sammanfattningar som redan är skrivna ändras inte, men nästa gör det.
 
 **Startsidan** är ombyggd. Kurvan där är ritad av appens egen uträkning och med
-samma mjuka kurva som din egen graf, inte en bild någon har ritat för hand.
-Inget av det du har loggat påverkas, och inga siffror räknas om.
+samma mjuka kurva som din egen graf, inte en bild någon har ritat för hand. Den
+visar också skillnaden mellan en dagsvikt och en trendvikt med två siffror i
+stället för ett andra diagram. Inget av det du har loggat påverkas, och inga
+siffror räknas om.
 ```
 
 </details>
@@ -676,6 +688,12 @@ tag, and production runs it.** Everything below is `1.2.0`:
 | `cbb7315` | The hero is the only centred block |
 | `61f93d4` | §5 carries the one exception it has |
 | `ab8eaa2` | An ISO date and a two-decimal weight, both fixed at their source |
+| `1e0cffe` | Record the fourth pass, and hold the pair a flickering score circled |
+| `0ef40dc` | The three words arrive at a reading pace |
+| `de9b4c0` | The line lands, once |
+| `0b54372` | Trendvikt, inte dagsvikt: two figures, not a table |
+| `d32f4b1` | The frames turn enough to see |
+| `c73fc83` | Din data, and Om AI last |
 
 Two migrations are among them, `0030_food_search_fold` and
 `0031_restore_checks`, and the compose file changed. "Inför nästa deploy" above
