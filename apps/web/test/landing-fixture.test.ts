@@ -8,10 +8,11 @@ import {
   HERO_SOURCE,
 } from "../src/landing/fixture.source.generated.js";
 import {
-  fortnightGeometry,
   heroGeometry,
   HERO_BOX,
-  NOISE_BOX,
+  MORNINGS,
+  SETTLED_TREND,
+  SETTLED_TREND_DATE,
   type Geometry,
 } from "../src/landing/seeded.js";
 
@@ -45,6 +46,14 @@ import {
  * over the **whole** series and looks up each drawn vertex by its own date,
  * which is also what proves the warm-up is real: the first drawn vertex is not
  * the first reading, because it was not seeded on it.
+ *
+ * ## The fortnight is a value now, not a line (D179)
+ *
+ * "En dagsvikt är mest brus" no longer draws a graph: it states the fourteen
+ * readings as figures and the trend as one number. So its check is on that
+ * number, recomputed the same way and formatted the way the page formats it.
+ * It is a smaller claim than a line of vertices and it is the whole claim the
+ * section makes.
  */
 
 /**
@@ -54,13 +63,18 @@ import {
  */
 const SERIES = [
   { name: "the hero", fixture: HERO, source: HERO_SOURCE, geometry: heroGeometry() },
-  {
-    name: "the fortnight",
-    fixture: FORTNIGHT,
-    source: FORTNIGHT_SOURCE,
-    geometry: fortnightGeometry(),
-  },
 ] as const;
+
+/** §4.1 over a whole series, by date, which is what the page's figures claim. */
+const trendByDate = (readings: readonly { localDate: string; weightKg: number }[]) =>
+  new Map(
+    computeTrend(
+      readings.map((reading) => ({
+        localDate: reading.localDate,
+        weightKg: reading.weightKg,
+      })),
+    ).map((point) => [point.localDate, point.trend]),
+  );
 
 /** The end point of every command in a path, which is its last coordinate pair. */
 function anchors(path: string): { x: number; y: number }[] {
@@ -237,10 +251,9 @@ describe("the geometry", () => {
       (point) => point.x >= 0 && point.x <= box.width && point.y >= 0 && point.y <= box.height,
     );
 
-  /* The boxes the components draw into, not numbers copied into a test. */
+  /* The box the component draws into, not a number copied into a test. */
   it("stays inside its own viewBox", () => {
     expect(inBox(heroGeometry(), HERO_BOX)).toBe(true);
-    expect(inBox(fortnightGeometry(), NOISE_BOX)).toBe(true);
   });
 
   /**
@@ -250,7 +263,6 @@ describe("the geometry", () => {
    */
   it("puts a reading on the page for every reading it draws", () => {
     expect(heroGeometry().points).toHaveLength(HERO.shown);
-    expect(fortnightGeometry().points).toHaveLength(FORTNIGHT.shown);
   });
 
   /**
@@ -285,9 +297,54 @@ describe("the geometry", () => {
    * and there is no dot at its start.
    */
   it("enters at the left edge, with no reading on it", () => {
-    for (const geometry of [heroGeometry(), fortnightGeometry()]) {
-      expect(geometry.vertices[0]!.x).toBe(0);
-      expect(geometry.points.every((point) => point.x > 0)).toBe(true);
+    const geometry = heroGeometry();
+    expect(geometry.vertices[0]!.x).toBe(0);
+    expect(geometry.points.every((point) => point.x > 0)).toBe(true);
+  });
+});
+
+/**
+ * "En dagsvikt är mest brus", which is figures rather than a graph (D179).
+ *
+ * The section makes one arithmetic claim: those fourteen mornings, and this
+ * trend. So that is what is checked, recomputed over the whole series by §4.1
+ * and formatted the way the page formats it, rather than compared as a float
+ * nobody sees.
+ */
+describe("fourteen mornings, one figure", () => {
+  it("shows every reading the fixture has, in order", () => {
+    expect(MORNINGS).toHaveLength(FORTNIGHT.shown);
+    expect(MORNINGS.map((morning) => morning.localDate)).toEqual(
+      FORTNIGHT.readings.map((reading) => reading.localDate),
+    );
+
+    /* One decimal, a comma, the way a weight is written everywhere else (§4.1). */
+    for (const morning of MORNINGS) {
+      expect(morning.reading, `${morning.localDate} is not written as a weight`).toMatch(
+        /^\d{2,3},\d$/,
+      );
     }
+  });
+
+  it("settles on what the calc says for the fourteenth morning", () => {
+    const computed = trendByDate(FORTNIGHT_SOURCE.readings);
+    const expected = computed.get(SETTLED_TREND_DATE);
+
+    expect(expected, `${SETTLED_TREND_DATE} is not in the computed trend`).toBeDefined();
+    expect(SETTLED_TREND).toBe(expected!.toFixed(1).replace(".", ","));
+  });
+
+  it("settles on the last morning shown, not some other day", () => {
+    expect(SETTLED_TREND_DATE).toBe(MORNINGS.at(-1)!.localDate);
+    expect(SETTLED_TREND_DATE).toBe(FORTNIGHT_SOURCE.readings.at(-1)!.localDate);
+  });
+
+  /**
+   * The trend is not one of the readings. If it were, the section would be
+   * showing fourteen numbers and then one of them again, and the argument it
+   * makes is that the fourteenth morning's figure is not the answer.
+   */
+  it("is a figure none of the mornings gave", () => {
+    expect(MORNINGS.map((morning) => morning.reading)).not.toContain(SETTLED_TREND);
   });
 });

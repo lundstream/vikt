@@ -1,4 +1,4 @@
-import { FLICKER_READINGS, SETTLED_TREND } from "./seeded.js";
+import { FLICKER_READINGS, MORNING_STEP_MS, MORNINGS, SETTLED_TREND } from "./seeded.js";
 
 /**
  * The landing page's behaviour (D173).
@@ -82,7 +82,13 @@ function flicker(element: HTMLElement): void {
   const readings = [...FLICKER_READINGS];
   let index = 0;
   const every = 110;
-  const ticks = Math.round(1000 / every);
+  /*
+    It settles when the last of the fourteen mornings has landed, which is what
+    the two together are saying: those readings, this figure. Derived from the
+    step rather than typed as a round number next to it, so moving one moves
+    both (D179).
+  */
+  const ticks = Math.max(1, Math.round((MORNINGS.length - 1) * MORNING_STEP_MS) / every);
 
   const id = window.setInterval(() => {
     digits.textContent = readings[index % readings.length]!;
@@ -127,9 +133,13 @@ function revealOnce(onReveal: (element: HTMLElement) => void): IntersectionObser
  */
 function renderFinalFrame(root: ParentNode): void {
   for (const element of root.querySelectorAll(".reveal")) element.classList.add("revealed");
-  for (const element of root.querySelectorAll<HTMLElement>("[data-progress-section]")) {
-    element.style.setProperty("--progress", "1");
-  }
+  /*
+    The fourteen mornings carry their own delay off `.revealed`, and the rule
+    for reduced motion zeroes it, so revealing their list is enough. They are
+    marked as well as the list, because the list is what the observer watches
+    and a reader with no `IntersectionObserver` gets neither otherwise.
+  */
+  for (const element of root.querySelectorAll(".morning")) element.classList.add("revealed");
 }
 
 export function startLandingMotion(root: ParentNode = document): () => void {
@@ -177,57 +187,19 @@ export function startLandingMotion(root: ParentNode = document): () => void {
   for (const element of root.querySelectorAll(".reveal")) reveals.observe(element);
   cleanups.push(() => reveals.disconnect());
 
-  /* ------------------------------------------ the line through the noise -- */
+  /*
+    There is no scroll-driven anything on this page any more (D179).
 
-  /**
-   * Scroll progress, as the **maximum** seen so far.
-   *
-   * The section's own travel past the viewport's midline, from 0 to 1, written
-   * to `--progress`. Two properties matter and both are deliberate:
-   *
-   * - **it only increases.** Scrolling back up leaves the line drawn, because a
-   *   line that undraws itself while somebody scrolls back to re-read the
-   *   paragraph beside it is motion without meaning (§5);
-   * - **it stops.** Once it reaches 1 the listener removes itself, so a reader
-   *   who has passed the section pays nothing for it.
-   *
-   * This was `animation-timeline: view()`, which is four lines of CSS and runs
-   * backwards by design.
-   */
-  const section = root.querySelector<HTMLElement>("[data-progress-section]");
-  if (section) {
-    let highest = 0;
-    let queued = false;
+    "En dagsvikt är mest brus" used to draw a second trend line with the
+    reader's wheel: a listener measured the section's travel past the viewport's
+    midline, kept the **maximum** seen so far so the line never undrew itself,
+    wrote it to `--progress` and removed itself at 1. All of that was correct,
+    and all of it was in service of drawing the page's thesis a second time. The
+    section states it in figures now, so the driver has nothing left to drive.
 
-    const measure = () => {
-      queued = false;
-      const box = section.getBoundingClientRect();
-      const midline = window.innerHeight * 0.55;
-      const travel = Math.max(1, box.height * 0.75);
-      const seen = Math.min(1, Math.max(0, (midline - box.top) / travel));
-
-      if (seen <= highest) return;
-      highest = seen;
-      section.style.setProperty("--progress", seen.toFixed(4));
-      if (highest >= 1) stop();
-    };
-
-    const onScroll = () => {
-      if (queued) return;
-      queued = true;
-      requestAnimationFrame(measure);
-    };
-
-    const stop = () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    measure();
-    cleanups.push(stop);
-  }
+    What remains that is scroll-linked is the phone frames' tilt, and that is
+    CSS with no JavaScript behind it (D173's addendum).
+  */
 
   /* ------------------------------------------------------- the figures -- */
 

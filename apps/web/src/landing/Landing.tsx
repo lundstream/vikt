@@ -1,9 +1,9 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { HeaderLockup } from "../components/Wordmark.js";
 import { LandingPrimary } from "./LandingPrimary.js";
-import { HeroGraph, NoiseGraph } from "./TrendDrawing.js";
+import { HeroGraph } from "./TrendDrawing.js";
 import { startLandingMotion } from "./landing-motion.js";
-import { MAINTENANCE, SETTLED_TREND } from "./seeded.js";
+import { MAINTENANCE, MORNINGS, SETTLED_TREND } from "./seeded.js";
 import { LandingFooter } from "./Footer.js";
 import { siteConfig } from "../lib/site-config.js";
 
@@ -20,11 +20,11 @@ import { siteConfig } from "../lib/site-config.js";
  * **Motion carries meaning.** Readings arrive one at a time because that is how
  * they are logged, and the line draws through them as they arrive because a
  * trend accumulates; the two maintenance figures count because they were
- * measured rather than chosen; and in "En dagsvikt är mest brus" the reader
- * draws the trend through the noise by scrolling. Nothing moves in reverse and
- * nothing loops: the drifting field that was the one exception is gone (D178),
- * because at hero size it read as dust rather than as noise, and the graph's own
- * points are the noise the page is about.
+ * measured rather than chosen; and the fourteen mornings land one after another
+ * because that is fourteen days passing. Nothing moves in reverse and nothing
+ * loops: the drifting field that was the one exception is gone (D178), because
+ * at hero size it read as dust rather than as noise, and the graph's own points
+ * are the noise the page is about.
  *
  * **Restraint is the style.** Natt across the whole page, Skymning on the cards,
  * and no gradient, glow, glass or third dimension anywhere: D177 withdrew the
@@ -263,46 +263,59 @@ function Tagline() {
 /* -------------------------------------------------- a daily weight is noise -- */
 
 /**
- * The reader draws the trend through the noise.
+ * Fourteen mornings, and the one figure the app makes of them (D179).
  *
- * The number flickers through six mornings of the same body and settles on what
- * the trend says. Beside it, fourteen readings arrive one at a time as the line
- * reaches them, driven by how far the reader has scrolled and never running
- * backwards (D177).
+ * **No second graph.** This section used to draw the same picture as the hero,
+ * with the same marks, by scrolling: noise and a trend line through it. A page
+ * that draws its thesis twice has made the second drawing decoration, and §5's
+ * question for any motion is what it tells the reader that the finished state
+ * does not. So the argument is stated in figures here instead, which is also
+ * the form it takes on a bathroom scale.
+ *
+ * **Nothing in it responds to scroll.** The fourteen readings arrive when the
+ * section is reached and the figure settles when the last of them has landed,
+ * and that is the whole of it. The monotonic scroll driver that used to power
+ * the line is gone with the line.
  *
  * Every figure is a fixture whose trend is computed by the app's own EMA, and
  * never an account.
  */
 function Noise() {
   return (
-    <section id="sa-funkar-det" data-progress-section className="noise-section scroll-mt-20 pt-16">
+    <section id="sa-funkar-det" className="scroll-mt-20 pt-16">
       <Container>
-        {/*
-          The heading sits above the grid, not inside its first column, so its
-          rule runs the width of the container like every other section's. It
-          used to be inside, which drew a rule across half the page and made
-          this the one section that looked like a card (D178).
-        */}
         <SectionHeading>En dagsvikt är mest brus</SectionHeading>
 
         <div className="mt-10 grid gap-10 sm:grid-cols-2 sm:items-center">
+          {/*
+            Seven across and two down, which is a fortnight the way a calendar
+            shows one. Tabular figures, so fourteen numbers in a grid line up
+            instead of jittering column to column.
+          */}
+          <ol className="reveal grid grid-cols-7 gap-x-2 gap-y-3 sm:gap-x-3">
+            {MORNINGS.map((morning, index) => (
+              <li
+                key={morning.localDate}
+                className="morning num tabular-nums text-center text-note text-muted sm:text-metric-sm"
+                style={{ "--i": index } as CSSProperties}
+              >
+                {morning.reading}
+              </li>
+            ))}
+          </ol>
+
           <div className="reveal">
             <Figure value={SETTLED_TREND} unit="kg" className="text-figure text-ink" flicker />
-
-            <p className="mt-5 max-w-prose text-body text-muted">
-              Ett kilo upp eller ner över en natt kan bero på salt, sömn och vatten. Linjen visar i
-              stället vad som hänt under veckan och ger dig en bättre fingervisning som du kan fatta
-              beslut på.
-            </p>
-          </div>
-
-          <div className="reveal" style={{ "--i": 1 } as CSSProperties}>
-            <NoiseGraph />
-            <p className="mt-3 text-micro text-muted">
-              Fjorton dagar, samma kropp. Punkterna är vägningarna, linjen är trenden.
-            </p>
           </div>
         </div>
+
+        <p className="mt-6 text-micro text-muted">Fjorton morgnar, en siffra.</p>
+
+        <p className="mt-6 max-w-prose text-body text-muted">
+          Ett kilo upp eller ner över en natt kan bero på salt, sömn och vatten. Trenden visar i
+          stället vad som hänt under veckan och ger dig en bättre fingervisning som du kan fatta
+          beslut på.
+        </p>
       </Container>
     </section>
   );

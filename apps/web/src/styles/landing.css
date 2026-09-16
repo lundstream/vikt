@@ -179,38 +179,35 @@
   transform: none;
 }
 
-/* ------------------------------------------- the line through the noise -- */
+/* --------------------------------------------- fourteen mornings, in figures -- */
 
 /**
- * The reader draws the trend through the noise with the wheel.
+ * The fourteen readings land one after another when the section is reached
+ * (D179), 80 ms apart, and the trend figure beside them settles as the last one
+ * arrives.
  *
- * `--progress` is set by `landing-motion.ts` as the **maximum** fraction of the
- * section seen so far, so scrolling back up leaves the line drawn: §5 says
- * everything that moves stops, and a line that undraws itself when somebody
- * scrolls back to re-read a sentence is the opposite of stopping.
+ * **Nothing here responds to scroll.** This section used to draw a second trend
+ * line, with the reader's wheel driving it through a `--progress` custom
+ * property that a listener in `landing-motion.ts` kept at the maximum seen so
+ * far. Both are gone: the hero already draws that picture, and a page that
+ * draws its thesis twice has made the second one decoration.
  *
- * It was `animation-timeline: view()`, which is fewer lines and runs backwards
- * by design. A scroll timeline is the right tool for an effect that should
- * reverse, and this is not one.
+ * The delay is on a transition rather than an animation, so it runs off the
+ * `.revealed` class the same observer adds to everything else on the page.
  */
-.noise-section {
-  --progress: 0;
+.morning {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 260ms ease-out,
+    transform 260ms ease-out;
+  transition-delay: calc(var(--i) * 80ms);
 }
 
-.noise-line {
-  stroke-dasharray: 1;
-  stroke-dashoffset: calc(1 - var(--progress));
-}
-
-/**
- * Each reading appears as the line reaches it.
- *
- * `--at` is where the dot sits along the line, from 0 to 1. The multiplier turns
- * the crossing into a short fade rather than a blink, and the browser clamps the
- * result into range, so no comparison is needed in CSS.
- */
-.noise-reading {
-  opacity: clamp(0, (var(--progress) - var(--at)) * 12, 1);
+.reveal.revealed .morning,
+.revealed.morning {
+  opacity: 1;
+  transform: none;
 }
 
 /* ------------------------------------------------------------ the phones -- */
@@ -333,11 +330,6 @@
     transform: none;
   }
 
-  /* The finished graph: the line drawn and every reading present. */
-  .noise-section {
-    --progress: 1;
-  }
-
   /* The drawn line and all three words at once, which is the finished frame. */
   .hero-reading,
   .hero-endpoint,
@@ -352,7 +344,9 @@
     stroke-dashoffset: 0;
   }
 
-  .reveal {
+  /* Every reveal in place, the fourteen mornings included. */
+  .reveal,
+  .morning {
     opacity: 1;
     transform: none;
     transition: none;

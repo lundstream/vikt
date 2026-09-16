@@ -104,7 +104,6 @@ export const FORTNIGHT = {
     { localDate: "2026-09-06", weightKg: 84.2 },
   ],
   trend: [
-    { localDate: "2026-08-23", trendKg: 84.866 },
     { localDate: "2026-08-24", trendKg: 84.84 },
     { localDate: "2026-08-25", trendKg: 84.796 },
     { localDate: "2026-08-26", trendKg: 84.776 },

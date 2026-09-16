@@ -1,15 +1,8 @@
 import type { CSSProperties } from "react";
-import {
-  fortnightGeometry,
-  heroGeometry,
-  HERO_BOX,
-  MARKS,
-  NOISE_BOX,
-  type Reading,
-} from "./seeded.js";
+import { heroGeometry, HERO_BOX, MARKS, type Reading } from "./seeded.js";
 
 /**
- * The landing page's two graphs (D173, D177, D178).
+ * The landing page's graph (D173, D177, D178, D179).
  *
  * ## Why this file is allowed Lingon
  *
@@ -30,11 +23,17 @@ import {
  * ## The points and the line advance together
  *
  * Each reading knows where it sits along the line and when the line gets there
- * (`seeded.ts`). The hero uses the second as a delay across the same two
- * seconds the line takes; the fortnight uses the first as a scroll threshold.
- * Either way a reading appears just before the line reaches it, left to right,
- * which is the order the readings happened in. Both used to arrive as a cloud
- * and then be crossed out by a line.
+ * (`seeded.ts`); the hero delays each dot by the second of those, across the
+ * same two seconds the line takes, so a reading appears just before the line
+ * reaches it, left to right, in the order the readings happened. They used to
+ * arrive as a cloud and then be crossed out by a line.
+ *
+ * ## There is one graph, not two
+ *
+ * "En dagsvikt är mest brus" had a second one, drawn by scrolling. It made the
+ * same argument as the hero with the same marks, and a page that draws its
+ * thesis twice has made the second drawing decoration. That section carries the
+ * fourteen readings as figures now (D179), so this file has one export.
  */
 
 const LINE = {
@@ -55,15 +54,13 @@ const LEAD = 0.05;
 
 /**
  * The hero times its dots against the clock, so it wants **when** the line
- * arrives; the fortnight times its dots against how far the reader has
- * scrolled, so it wants **where**. `seeded.ts` computes both, because the line
- * draws on an ease-out and the two are not the same number.
+ * arrives rather than where the dot sits along it. `seeded.ts` computes both,
+ * because the line draws on an ease-out and the two are not the same number;
+ * the second reader of that pair was the fortnight's scroll-driven line, and
+ * that is gone (D179).
  */
 const arrives = (point: Reading) =>
   ({ "--enters": Math.max(0, point.enters - LEAD).toFixed(4) }) as CSSProperties;
-
-const passedBy = (point: Reading) =>
-  ({ "--at": Math.max(0, point.at - LEAD).toFixed(4) }) as CSSProperties;
 
 /**
  * The hero: thirty readings and the trend through them, drawn together over two
@@ -111,44 +108,6 @@ export function HeroGraph() {
         cy={end.y}
         r={MARKS.endpointRadius}
       />
-    </svg>
-  );
-}
-
-/**
- * A fortnight of daily readings, with the trend drawn through them as the
- * reader scrolls.
- *
- * **Each reading appears as the line reaches it.** Every dot carries the
- * fraction of the line's length at which it sits, and `landing.css` turns the
- * section's scroll progress into its opacity, so the readings arrive under the
- * line rather than waiting in a cloud for it.
- *
- * **Progress only ever increases** (`landing-motion.ts`), so scrolling back up
- * leaves the line drawn. Nothing on this page animates in reverse.
- */
-export function NoiseGraph() {
-  const { points, path } = fortnightGeometry();
-
-  return (
-    <svg
-      viewBox={`0 0 ${NOISE_BOX.width} ${NOISE_BOX.height}`}
-      className="h-auto w-full"
-      role="img"
-      aria-label="Fjorton dagliga vägningar med en trendlinje som faller jämnt genom dem."
-    >
-      {points.map((point) => (
-        <circle
-          key={point.localDate}
-          className="noise-reading fill-data"
-          cx={point.x}
-          cy={point.y}
-          r={MARKS.readingRadius}
-          style={passedBy(point)}
-        />
-      ))}
-
-      <path className="noise-line stroke-trend" d={path} pathLength={1} {...LINE} />
     </svg>
   );
 }

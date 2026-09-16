@@ -171,10 +171,15 @@ const reading = (r) => `    { localDate: "${r.localDate}", weightKg: ${r.weightK
 const vertex = (t) => `    { localDate: "${t.localDate}", trendKg: ${t.trendKg} },`;
 
 /**
- * The window the page draws: the last `shown` readings, and the trend from one
- * vertex before them, which is what puts the line's start at the left edge.
+ * The window the page draws.
+ *
+ * `lead` is how many trend vertices before the first shown reading to carry.
+ * The hero draws a line and takes one, which is what puts its start at the left
+ * edge of the box rather than on a point. The fortnight draws no line any more
+ * (D179): it states its readings as figures and its trend as one number, so it
+ * takes none.
  */
-const drawn = (name, readings, trend, shown) =>
+const drawn = (name, readings, trend, shown, lead) =>
   `export const ${name} = {
   /** How many readings this window holds, which is what the page draws. */
   shown: ${shown},
@@ -182,7 +187,7 @@ const drawn = (name, readings, trend, shown) =>
 ${rows(readings.slice(-shown), reading)}
   ],
   trend: [
-${rows(trend.slice(-(shown + 1)), vertex)}
+${rows(trend.slice(-(shown + lead)), vertex)}
   ],
 } as const;`;
 
@@ -222,9 +227,9 @@ writeFileSync(
 ${BELONGS}
  */
 
-${drawn("HERO", hero, heroTrend, HERO_SHOWN)}
+${drawn("HERO", hero, heroTrend, HERO_SHOWN, 1)}
 
-${drawn("FORTNIGHT", fortnight, fortnightTrend, FORTNIGHT_SHOWN)}
+${drawn("FORTNIGHT", fortnight, fortnightTrend, FORTNIGHT_SHOWN, 0)}
 `,
   "utf8",
 );

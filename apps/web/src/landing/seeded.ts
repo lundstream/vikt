@@ -97,7 +97,6 @@ export type Geometry = {
  * together, which keeps the relationship between the line and its points.
  */
 export const HERO_BOX = { width: 640, height: 240 } as const;
-export const NOISE_BOX = { width: 640, height: 250 } as const;
 
 /** The app's chart's own numbers (`TrendChart.tsx`), used unchanged. */
 export const MARKS = {
@@ -328,18 +327,43 @@ function layout(series: Series, box: { width: number; height: number }): Geometr
 }
 
 export const heroGeometry = (): Geometry => layout(HERO, HERO_BOX);
-export const fortnightGeometry = (): Geometry => layout(FORTNIGHT, NOISE_BOX);
 
 /* ------------------------------------------------------------- the figures -- */
 
 const swedish = (value: number, decimals: number) => value.toFixed(decimals).replace(".", ",");
 
-/** The readings the hero number flickers through before it settles. */
+/* ---------------------------------------------- fourteen mornings, one figure -- */
+
+/**
+ * The fortnight, as figures rather than as a second graph (D179).
+ *
+ * The hero already shows noise and trend as a picture, and drawing the same
+ * argument twice makes the second one decoration. This section states it in
+ * numbers instead: fourteen mornings of the same body, and the one figure the
+ * app would give you for them.
+ */
+export const MORNINGS = FORTNIGHT.readings.map((reading) => ({
+  localDate: reading.localDate,
+  reading: swedish(reading.weightKg, 1),
+}));
+
+/** How far apart the fourteen arrive, and therefore when the figure settles. */
+export const MORNING_STEP_MS = 80;
+
+/** The readings the trend figure flickers through before it settles. */
 export const FLICKER_READINGS = FORTNIGHT.readings
   .slice(-6)
   .map((reading) => swedish(reading.weightKg, 1));
 
-/** What the trend says at the end of the fortnight, which is what it settles on. */
+/**
+ * What the trend says on the fourteenth morning, which is what it settles on.
+ *
+ * `landing-fixture.test.ts` recomputes §4.1 over the whole series and fails if
+ * this string is not what the calc says for `SETTLED_TREND_DATE`. That check
+ * used to be on the vertices of a drawn line; the line is gone and the value
+ * is what is left to be right.
+ */
+export const SETTLED_TREND_DATE = FORTNIGHT.trend.at(-1)!.localDate;
 export const SETTLED_TREND = swedish(FORTNIGHT.trend.at(-1)!.trendKg, 1);
 
 /**
