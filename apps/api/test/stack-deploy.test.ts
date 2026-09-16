@@ -7,6 +7,19 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
+ * The merge and its guard, imported rather than driven (D174).
+ *
+ * Every other test here runs the script as a subprocess, which is right for
+ * behaviour that involves Portainer. These two are pure functions, and the case
+ * worth testing for `assertNothingDropped` is one the CLI cannot produce: it
+ * exists to catch a future bug in the merge, so the test has to hand it a list
+ * that has already lost something. `scripts/stack.d.mts` declares just those.
+ */
+import { assertNothingDropped, nextVariables, type StackVariable } from "../../../scripts/stack.mjs";
+
+type Variable = StackVariable;
+
+/**
  * `scripts/stack.mjs` deploys a version and prints nothing it should not (D164).
  *
  * Portainer returns every stack variable's value in every stack response,
@@ -38,7 +51,6 @@ const COMPOSE = execFileSync("git", ["show", "HEAD:infra/docker-compose.portaine
 /** Every variable the compose refuses to start without, so the fake stack sets them all. */
 const REQUIRED = [...COMPOSE.matchAll(/\$\{([A-Z][A-Z0-9_]*):\?/g)].map((m) => m[1] as string);
 
-type Variable = { name: string; value: string };
 type Container = { Id: string; service: string; image: string };
 
 let server: Server;
@@ -171,7 +183,7 @@ beforeEach(reset);
 type Run = { code: number | null; stdout: string; stderr: string };
 
 /** Asynchronous, because the fake server lives in this process (see secrets-echo.test.ts). */
-function run(args: string[]): Promise<Run> {
+function run(args: string[], extraEnv: Record<string, string> = {}): Promise<Run> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [SCRIPT, ...args], {
       cwd: ROOT,
@@ -182,6 +194,7 @@ function run(args: string[]): Promise<Run> {
         REGISTRY_URL: base,
         STACK_POLL_MS: "20",
         STACK_WAIT_MS: "2000",
+        ...extraEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -307,5 +320,151 @@ describe("stack.mjs deploy", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("local/vikt-api:1.1.0 present on the host");
     expect(leaked(result)).toEqual([]);
+  });
+});
+
+/**
+ * Setting stack variables from the script (D174).
+ *
+ * The runbook used to say "set the variable in the panel", which means a second
+ * update and therefore a second restart, the first of which runs the new image
+ * without the variable it was given. These all check the same property from
+ * different sides: **one update carries the file, the tag and the variables**,
+ * and nothing else about the stack changes.
+ */
+describe("stack.mjs variables", () => {
+  const HOST_DIR = "/var/backups/vikt/app";
+
+  it("sets a variable and the compose file in the same update", async () => {
+    const before = structuredClone(state.vars);
+    const result = await run([
+      "deploy",
+      "1.1.1",
+      "--ref",
+      "HEAD",
+      "--yes",
+      "--release-file",
+      "--set",
+      `BACKUP_HOST_DIR=${HOST_DIR}`,
+    ]);
+
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+
+    // One update. Not one for the file and another for the variable.
+    expect(state.puts).toHaveLength(1);
+    const put = state.puts[0] as { body: Record<string, unknown> };
+    expect(put.body.stackFileContent).toBe(COMPOSE);
+
+    const sent = new Map((put.body.env as Variable[]).map((v) => [v.name, v.value]));
+    expect(sent.get("BACKUP_HOST_DIR")).toBe(HOST_DIR);
+    expect(sent.get("IMAGE_TAG")).toBe("1.1.1");
+
+    // And every variable the stack already had is still there, untouched
+    // except the one this run was asked to change.
+    for (const { name, value } of before) {
+      if (["IMAGE_TAG", "IMAGE_REPO", "BACKUP_HOST_DIR"].includes(name)) continue;
+      expect(sent.get(name), `${name} was dropped`).toBe(value);
+    }
+    expect(leaked(result)).toEqual([]);
+  });
+
+  it("refuses a secret given on the command line, and says what to use", async () => {
+    const result = await run(["plan", "1.1.1", "--ref", "HEAD", "--set", "SECRET_KEY=hunter2"]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/looks like a secret/);
+    expect(result.stderr).toMatch(/--set-from-env SECRET_KEY/);
+    // The value it refused is not echoed back in the refusal.
+    expect(result.stdout + result.stderr).not.toContain("hunter2");
+    expect(state.puts).toHaveLength(0);
+  });
+
+  it("takes a secret from this shell instead, and never prints it", async () => {
+    const secret = `sk_${"a1b2c3d4".repeat(2)}`;
+    const result = await run(
+      ["deploy", "1.1.1", "--ref", "HEAD", "--yes", "--set-from-env", "NEW_SECRET_KEY"],
+      { NEW_SECRET_KEY: secret },
+    );
+
+    expect(result.code).toBe(0);
+    const sent = new Map(
+      ((state.puts[0] as { body: Record<string, unknown> }).body.env as Variable[]).map((v) => [
+        v.name,
+        v.value,
+      ]),
+    );
+    expect(sent.get("NEW_SECRET_KEY")).toBe(secret);
+    expect(result.stdout + result.stderr).not.toContain(secret);
+    // The name is fine to print, and is how the operator knows it happened.
+    expect(result.stdout).toMatch(/NEW_SECRET_KEY \(new\)/);
+  });
+
+  it("says nothing about a value in the plan, only the name and whether it moves", async () => {
+    const result = await run([
+      "plan",
+      "1.1.1",
+      "--ref",
+      "HEAD",
+      "--set",
+      `BACKUP_HOST_DIR=${HOST_DIR}`,
+    ]);
+
+    // The compose already requires it, so the stack has it and this is a change
+    // rather than an addition. Either way the value is not printed.
+    expect(result.stdout).toMatch(/setting: BACKUP_HOST_DIR \(changed\)/);
+    expect(result.stdout + result.stderr).not.toContain(HOST_DIR);
+    expect(state.puts).toHaveLength(0);
+  });
+
+  it("refuses to send a list that has lost a variable the stack had", () => {
+    const current = [
+      { name: "SECRET_KEY", value: "x" },
+      { name: "IMAGE_TAG", value: "1.1.0" },
+    ];
+
+    // The guard, not the merge: this is what stands between a future bug in
+    // `nextVariables` and Portainer deleting the environment it was sent.
+    expect(() => assertNothingDropped(current, [{ name: "IMAGE_TAG", value: "1.1.1" }], [])).toThrow(
+      /would drop SECRET_KEY/,
+    );
+
+    // Named to --unset, the same removal is allowed.
+    expect(() =>
+      assertNothingDropped(current, [{ name: "IMAGE_TAG", value: "1.1.1" }], ["SECRET_KEY"]),
+    ).not.toThrow();
+  });
+
+  it("removes a variable only when --unset names it", async () => {
+    state.vars.push({ name: "OLD_THING", value: "leftover" });
+
+    const result = await run(["deploy", "1.1.1", "--ref", "HEAD", "--yes", "--unset", "OLD_THING"]);
+
+    expect(result.code).toBe(0);
+    const sent = (state.puts[0] as { body: Record<string, unknown> }).body.env as Variable[];
+    expect(sent.some((v) => v.name === "OLD_THING")).toBe(false);
+    expect(result.stdout).toMatch(/unsetting: OLD_THING/);
+  });
+
+  it("merges without touching anything it was not asked about", () => {
+    const current = [
+      { name: "SECRET_KEY", value: "keep" },
+      { name: "IMAGE_TAG", value: "1.1.0" },
+      { name: "IMAGE_REPO", value: "local/" },
+    ];
+
+    const next = nextVariables(current, {
+      repo: "ghcr.io/lundstream/",
+      version: "1.2.0",
+      set: { BACKUP_HOST_DIR: "/var/backups/vikt/app" },
+      unset: [],
+    });
+
+    expect(next).toEqual([
+      { name: "SECRET_KEY", value: "keep" },
+      { name: "IMAGE_TAG", value: "1.2.0" },
+      { name: "IMAGE_REPO", value: "ghcr.io/lundstream/" },
+      { name: "BACKUP_HOST_DIR", value: "/var/backups/vikt/app" },
+    ]);
   });
 });

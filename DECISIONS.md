@@ -9342,3 +9342,56 @@ the owner's artwork to the 1200 x 630 share card. The old page's screenshots
 were an app three passes old: the colours had moved and the dropdowns had been
 fixed, and the page went on showing the version somebody last remembered to
 save. A screenshot is a claim, and a claim nothing regenerates rots.
+
+---
+
+### D174 — A stack variable is set by the deploy, not beside it
+
+D164 took the deploy out of the panel: `stack.mjs` reads the stack, checks what
+it can check, and updates the tag without anybody typing a password. What it
+could not do was set a **variable**, so the runbook still said "Portainer,
+Stacks, vikt, Editor, the variables panel underneath" for anything new.
+
+That is a second update, and therefore a second restart. Worse, it is a restart
+in the wrong order: the deploy brings up the new image, which needs the new
+variable, and the variable arrives afterwards. 1.2.0 makes this concrete, because
+`BACKUP_HOST_DIR` is `${BACKUP_HOST_DIR:?...}` and the stack refuses to start
+without it (D168).
+
+So `--set NAME=value`, `--set-from-env NAME` and `--unset NAME`, merged into
+what the stack already has and sent **in the same update** as the compose file
+and the tag.
+
+#### Three properties, and a test for each
+
+**Nothing is dropped.** Portainer's stack update replaces the environment
+wholesale: what the script sends is what the stack will have, and a name missing
+from the list is deleted. `assertNothingDropped` compares the list about to be
+sent with the one just read and refuses if anything the stack had has gone
+without being named to `--unset`. It is a guard against a future bug in the
+merge, and the failure it prevents is deleting `SECRET_KEY` and the database
+password and then restarting the stack on top of the loss.
+
+**A secret is never an argument.** A name containing SECRET, PASS, KEY or TOKEN
+is refused on the command line and has to come through `--set-from-env`, which
+reads it from the shell and never prints it. An argument is in the shell's
+history, in the process list while it runs, and in whatever is recording the
+session, which is §7's rule about why a tool reads credentials from the
+environment. The refusal names the flag to use instead, and does not echo the
+value it refused.
+
+**The plan says names, never values.** `--set` on `plan` prints
+`setting: BACKUP_HOST_DIR (changed)` and nothing about what it would become.
+There is no list of variables whose values are safe to print: today's is a
+host directory and tomorrow's is whatever somebody passes to `--set-from-env`.
+
+`stack-deploy.test.ts` runs all of it against the stack double: the one update
+carrying both the release file and the variable, the refusal, the value never
+reaching the output, the plan's names-only line, `--unset` removing a variable,
+and the guard refusing a list that lost one.
+
+#### The panel stays documented
+
+Not as the way to do it, as the fallback for when the token is not to hand. The
+same reasoning as D164's: the panel is not wrong, it is just a place where the
+ordering mistake above is the default rather than an accident.

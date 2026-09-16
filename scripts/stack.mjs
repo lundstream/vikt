@@ -7,6 +7,9 @@
  *   node scripts/stack.mjs deploy 1.1.1            # the same, then stops
  *   node scripts/stack.mjs deploy 1.1.1 --yes      # sets the tag, pulls, redeploys, waits
  *
+ *   --set NAME=value     set a stack variable in the same update as the deploy
+ *   --set-from-env NAME  the same, with the value read from this shell
+ *   --unset NAME         remove a stack variable
  *   --repo local/        a workstation build loaded onto the host (INFRA.md)
  *   --ref v1.1.1         which commit's compose file to compare with (default v<version>)
  *   --keep-file          the stack file differs from the release's: deploy with it anyway
@@ -24,6 +27,26 @@
  * - **No variable the release requires is unset**, and any it adds are named.
  * - **The images exist where the stack will look**: anonymously on GHCR, the way
  *   the Docker host pulls (D160), or on the host for a local build.
+ *
+ * ## Setting variables (D174)
+ *
+ * Until this existed, "set `BACKUP_HOST_DIR`" was a step in the runbook that
+ * meant opening the panel, typing into it, and updating the stack a second
+ * time. Two updates means two restarts, and the first of them runs the new
+ * image without the variable it needs.
+ *
+ * `--set` merges into what the stack already has and the whole list goes back
+ * in the **same** update as the compose file and the tag, so a variable is
+ * never set in a restart of its own. Nothing is dropped unless `--unset` names
+ * it, and the script refuses to send a list that has lost a variable the stack
+ * had: Portainer's update replaces the environment wholesale, so a merge bug
+ * would silently delete `SECRET_KEY`.
+ *
+ * **A secret is never an argument.** A name containing SECRET, PASS, KEY or
+ * TOKEN is refused on the command line and has to come through
+ * `--set-from-env`, which reads it from this shell and never prints it: an
+ * argument is in the shell history, in the process list, and in whatever is
+ * recording the session (§7).
  *
  * **No stack variable's value is ever printed except `IMAGE_REPO` and
  * `IMAGE_TAG`.** The stack holds `SECRET_KEY`, `SESSION_SECRET`, the database
@@ -164,18 +187,99 @@ async function containers(endpoint) {
 /* ---------------------------------------------------------- the plan -- */
 
 /**
- * The variables the update sends: every existing one with its value untouched,
- * in its order, and the two this script owns set.
+ * Names that may not be given a value on the command line (D174).
+ *
+ * An argument lives in the shell's history, in the process list while it runs,
+ * and in whatever is recording the session. §7's rule is that a credential is
+ * read from the environment and never typed where something can keep it, so
+ * these come through `--set-from-env`.
  */
-export function nextVariables(current, { repo, version }) {
-  const wanted = { IMAGE_REPO: repo, IMAGE_TAG: version };
-  const next = current.map(({ name, value }) =>
-    name in wanted ? { name, value: wanted[name] } : { name, value },
-  );
+const SECRET_NAME = /SECRET|PASS|KEY|TOKEN/i;
+
+export function isSecretName(name) {
+  return SECRET_NAME.test(name);
+}
+
+/**
+ * The variables the update sends: every existing one with its value untouched,
+ * in its order, the two this script owns set, and whatever `--set` and
+ * `--unset` asked for.
+ *
+ * **Portainer's stack update replaces the environment wholesale.** What this
+ * returns is the complete list, so anything missing from it is deleted from the
+ * stack, which is why `assertNothingDropped` exists below rather than a comment
+ * asking the next person to be careful.
+ */
+export function nextVariables(current, { repo, version, set = {}, unset = [] }) {
+  const removing = new Set(unset);
+  const wanted = { IMAGE_REPO: repo, IMAGE_TAG: version, ...set };
+
+  const next = current
+    .filter(({ name }) => !removing.has(name))
+    .map(({ name, value }) => (name in wanted ? { name, value: wanted[name] } : { name, value }));
+
   for (const [name, value] of Object.entries(wanted)) {
+    if (removing.has(name)) continue;
     if (!next.some((entry) => entry.name === name)) next.push({ name, value });
   }
+
   return next;
+}
+
+/**
+ * Nothing the stack has may vanish from the list being sent, unless it was
+ * named to `--unset`.
+ *
+ * The failure this prevents is the worst one available here: the update sends
+ * the whole environment, so a list built wrongly does not fail, it deletes
+ * `SECRET_KEY` and the database password and then restarts the stack.
+ */
+export function assertNothingDropped(current, next, unset = []) {
+  const removing = new Set(unset);
+  const have = new Set(next.map((entry) => entry.name));
+  const lost = current
+    .map((entry) => entry.name)
+    .filter((name) => !have.has(name) && !removing.has(name));
+
+  if (lost.length > 0) {
+    throw new Error(
+      `the update would drop ${lost.join(", ")} from the stack. ` +
+        "Portainer replaces the whole environment, so this would delete them. " +
+        "Name them to --unset if that is what you meant.",
+    );
+  }
+  return next;
+}
+
+/**
+ * What `--set`, `--set-from-env` and `--unset` add up to, with the values
+ * resolved and never printed.
+ */
+export function resolveVariables(options, env = process.env) {
+  const set = {};
+
+  for (const pair of options.set ?? []) {
+    const at = pair.indexOf("=");
+    if (at < 1) throw new Error(`--set wants NAME=value, got ${pair}`);
+    const name = pair.slice(0, at);
+    if (isSecretName(name)) {
+      throw new Error(
+        `${name} looks like a secret, so it cannot be given on the command line. ` +
+          `Put it in this shell and use --set-from-env ${name}.`,
+      );
+    }
+    set[name] = pair.slice(at + 1);
+  }
+
+  for (const name of options.fromEnv ?? []) {
+    const value = env[name];
+    if (value === undefined || value === "") {
+      throw new Error(`${name} is not set in this shell, so --set-from-env ${name} has nothing to send.`);
+    }
+    set[name] = value;
+  }
+
+  return { set, unset: options.unset ?? [] };
 }
 
 async function plan(version, options) {
@@ -227,6 +331,36 @@ async function plan(version, options) {
   if (missingRequired.length > 0) blockers.push(`set ${missingRequired.join(", ")} first`);
 
   const repo = options.repo ?? REGISTRY_REPO;
+
+  /**
+   * The variables this run is asked to change, by name (D174).
+   *
+   * Names only, and that is the whole reporting rule: the values are a host
+   * directory today and could be anything tomorrow, and a plan that printed
+   * them would print whatever somebody passed to `--set-from-env`.
+   */
+  const { set, unset } = resolveVariables(options);
+  const known = new Map(stack.vars.map((entry) => [entry.name, entry.value]));
+  const changing = Object.keys(set).map((name) =>
+    !known.has(name)
+      ? `${name} (new)`
+      : known.get(name) === set[name]
+        ? `${name} (unchanged)`
+        : `${name} (changed)`,
+  );
+  const removing = unset.filter((name) => known.has(name));
+  const absent = unset.filter((name) => !known.has(name));
+
+  if (changing.length > 0) out(`           setting: ${changing.join(", ")}`);
+  if (removing.length > 0) out(`           unsetting: ${removing.join(", ")}`);
+  for (const name of absent) out(`           ${name} is not set in the stack; --unset does nothing`);
+
+  const nextVars = assertNothingDropped(
+    stack.vars,
+    nextVariables(stack.vars, { repo, version, set, unset }),
+    unset,
+  );
+
   out("change");
   for (const [name, value] of Object.entries({ IMAGE_REPO: repo, IMAGE_TAG: version })) {
     if (!SHOWN.has(name)) continue;
@@ -261,6 +395,8 @@ async function plan(version, options) {
     blockers,
     repo,
     fileToSend,
+    // Computed here so `deploy` sends exactly what `plan` described (D174).
+    nextVars,
     previous: valueOf("IMAGE_TAG"),
     previousRepo: valueOf("IMAGE_REPO"),
   };
@@ -309,7 +445,9 @@ async function deploy(version, options) {
     method: "PUT",
     body: {
       stackFileContent: planned.fileToSend,
-      env: nextVariables(stack.vars, { repo, version }),
+      // The compose file, the tag and every variable in one update: a
+      // variable set in a second update is a restart that ran without it.
+      env: planned.nextVars,
       prune: false,
       pullImage: true,
     },
@@ -378,7 +516,7 @@ async function deploy(version, options) {
 
 function parse(argv) {
   const [command, version, ...rest] = argv;
-  const options = { yes: false, keepFile: false, releaseFile: false };
+  const options = { yes: false, keepFile: false, releaseFile: false, set: [], fromEnv: [], unset: [] };
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === "--yes") options.yes = true;
@@ -386,12 +524,17 @@ function parse(argv) {
     else if (arg === "--release-file") options.releaseFile = true;
     else if (arg === "--repo") options.repo = rest[(i += 1)];
     else if (arg === "--ref") options.ref = rest[(i += 1)];
+    else if (arg === "--set") options.set.push(rest[(i += 1)]);
+    else if (arg === "--set-from-env") options.fromEnv.push(rest[(i += 1)]);
+    else if (arg === "--unset") options.unset.push(rest[(i += 1)]);
     else throw new Error(`unknown option ${arg}`);
   }
   return { command, version, options };
 }
 
-const USAGE = "usage: stack.mjs plan|deploy <x.y.z> [--yes] [--repo local/] [--ref v1.2.3] [--keep-file|--release-file]\n";
+const USAGE =
+  "usage: stack.mjs plan|deploy <x.y.z> [--yes] [--repo local/] [--ref v1.2.3]\n" +
+  "       [--keep-file|--release-file] [--set NAME=value] [--set-from-env NAME] [--unset NAME]\n";
 
 try {
   const { command, version, options } = parse(process.argv.slice(2));
