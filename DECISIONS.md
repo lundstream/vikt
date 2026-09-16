@@ -9264,6 +9264,10 @@ scroll-linked, it ends flat, and it stays flat: the frames say "this is a screen
 you will hold" and then get out of the way. Reduced motion renders them flat and
 they never tilt at all.
 
+**Withdrawn by D177.** The frames are photographs of framed phones now, made by
+hand, and tilting a picture of a tilted thing says nothing the still one does
+not. There is no 3D on the page and §5's rule stands unqualified again.
+
 **The drifting field is the other exception**, the one §5 names itself: it may
 drift without an end state only because it is background rather than subject. It
 is at 25 % opacity, and `landing-motion.ts` pauses it when the tab is hidden.

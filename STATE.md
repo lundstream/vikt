@@ -633,6 +633,11 @@ tag, and production runs it.** Everything below is `1.2.0`:
 | `2d846d9` | Record the pass: six items of seventeen, and what was exercised |
 | `9bccce6` | The landing page draws the argument before it states it |
 | `d99b4ee` | A stack variable is set by the deploy, not beside it |
+| `155982e` | Prepare 1.2.0: what it needs, and the one command that does it |
+| `9b0f4d9` | Record what the landing page was exercised against |
+| `3fb6870` | Sten is lighter, because the profile's value never held 4,5:1 |
+| `d38abf1` | Three things a screenshot showed that no test could see |
+| `fe76d1f` | The landing page's lines are the app's own arithmetic |
 
 Two migrations are among them, `0030_food_search_fold` and
 `0031_restore_checks`, and the compose file changed. "Inför nästa deploy" above
@@ -651,6 +656,19 @@ exist. §7 now carries the rule, including that `pkill -f vite` does nothing on
 Windows and the kill has to be by port.
 
 ## Still open from the briefs
+
+### The second landing brief: the page's polish, Sten, and three defects
+
+**All four items are done on `dev`**, and nothing inside one was left half
+finished. What each one was and what it turned into is D177 (the page), D175
+(Sten) and D176 (the three defects); the 1.2.0 preparation above carries the
+rest.
+
+**One requirement was met by deviating from the value the brief named.** The
+brief asked for the nearest Sten passing 4,5:1 **on Skymning**. Skymning is not
+the worst surface Sten sits on: Dis is, and a value chosen against Skymning
+still fails there. The token is chosen against Dis instead, so it passes
+everywhere rather than on the surface that was measured (D175).
 
 ### The 2026-09-17 brief: the landing page, the variables, the release
 
@@ -758,7 +776,8 @@ Administration, Förfrågningar, Besvarade, "Ta bort".
 
 ## Verified
 
-**1848 tests**, counted on 2026-09-16 after item 8: 510 shared, 375 web, 963 api. **Nine more run in CI**, and they
+**1963 tests**, counted on 2026-09-16 after the landing page's second pass:
+522 shared, 422 web, 1019 api. **Nine more run in CI**, and they
 are the same nine every time: the S3 destination's live suite in
 `backup-s3-live.test.ts`, which needs a real S3 server and `pg_dump`. CI starts
 MinIO and sets `S3_TEST_ENDPOINT`; a workstation has neither, so they skip here
@@ -767,7 +786,7 @@ endpoint *is* configured nothing is half-skipped, so a CI box that lost
 `pg_dump` fails rather than quietly covering less (§7). Lint clean, all three packages
 typecheck, both bundles build, and the placeholder guard passes.
 
-**In CI the api suite runs 972 with none skipped**, and that is checked rather
+**In CI the api suite runs 1028 with none skipped**, and that is checked rather
 than read: `pnpm test:skips` reads the reports and names anything skipped outside
 the allowlist. What matters is the nine: the nine S3 tests execute against a real MinIO with default settings
 rather than skipping. Locally they skip unless `S3_TEST_ENDPOINT` is set, and
@@ -786,11 +805,58 @@ late-is-worse-than-never rule outside a test harness.
 
 **Still open, and only the owner can close it** (see the section below).
 
+**The full sweep, 2026-09-16, after the landing page's second pass**:
+`shoot2.mjs` over every finished screen at 360 px and desktop against the
+development server, **40 of 40, none failed** (signed in, no horizontal overflow,
+no blank screen, no transform left on the section track), verdict in the set's
+`verdict.txt`. CI green on `dev` for `fe76d1f`, the head of this pass.
+
+**The sweep's two landing rows prove less than the others, and it is the
+method.** The hero is `min-h-[100svh]`, and `shoot2.mjs` measures a page at a
+normal viewport and then re-navigates with the viewport set to that whole height
+so charts measure once against what is captured. On this one page that makes the
+hero alone as tall as the capture, and everything below it falls outside the
+image. The rows are still worth their `overflow=0` and `text=2804` — the copy is
+all in the document at both widths — but the page's own evidence is the
+measurement pass below, taken at a real viewport and scrolled.
+
 **The full sweep, 2026-09-16, after item 8**: `shoot2.mjs` over every finished
 screen at 360 px and desktop against the development server, **40 of 40, none
 failed** (signed in, no horizontal overflow, no blank screen, no transform left
 on the section track), verdict in the set's `verdict.txt`. CI green on `dev`
 for every commit this pass, the last being `5a61902`.
+
+**Exercised through the interface on 2026-09-16**, the landing page's second
+pass (D177), against the **production build** served by `vite preview`:
+
+- **The hero, sampled on the page's own clock**: 4 of 30 readings at 419 ms, all
+  30 by 2,1 s with the line a quarter drawn, the line finished by 3,2 s, and the
+  **endpoint appearing only after that**. It used to arrive at 3 400 ms against a
+  line that finishes at 3 500;
+- **the scroll-driven section at four positions**: progress 0, 0, 0,769 and
+  1,0, with 0, 0, 11 and **14 of 14** readings shown. It read 13 of 14 before
+  this pass, because the last dot's threshold was exactly 1 and the comparison
+  is strict, which no assertion about a number would have found;
+- **and then back to the top**: progress stays 1,0 and all fourteen readings
+  stay. Nothing on the page animates in reverse now;
+- **a mid-scroll shot on a fresh load**: the line a third drawn with five of the
+  fourteen readings arrived, so the readings really do appear under the line
+  rather than waiting in a cloud for it;
+- **reduced motion**, emulated, 900 ms after load: 30 of 30 hero readings, both
+  lines drawn, the endpoint at full opacity, progress 1, 14 of 14. The finished
+  page at once;
+- **Lighthouse at mobile settings**: performance 98, accessibility 100, zero
+  layout shift, and the two budgets met at 12,4 kB of 15 and 58,3 of 60;
+- **the footer with `SUPPORT_URL` set**, because it is empty on `dev` and an
+  absent link there proves nothing: five links, the last being "Bjud på en öl"
+  to `https://buymeacoffee.com/lundstream`, and the operator sentence naming
+  Lundstream rather than describing itself;
+- **360 px and desktop**, full page, `scrollWidth` equal to `clientWidth`.
+
+**Also seen in the sweep's own images**, which is where the three defects came
+from in the first place: Översikt reads **"↓ 4,7 kg på 90 dagar"** at one
+decimal, its trend weight is "86,9" with a smaller Sten "kg", and Mat's saved
+favourite carries **"≈ uppskattning"** in lowercase.
 
 **Exercised through the interface on 2026-09-17**, the rebuilt landing page
 (D173), against the **production build** served by `vite preview` rather than a
