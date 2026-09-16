@@ -189,6 +189,43 @@ describe("the accents", () => {
   });
 });
 
+/**
+ * The landing page's one action, which is text **on** an accent (D179).
+ *
+ * Everything above checks text on a surface or an accent drawn on one. The
+ * primary button is neither: Natt set on Lingon, the one place the profile lets
+ * this page use the accent (D99). Nothing was holding that pair, and it is the
+ * tightest one in the tree.
+ *
+ * It was found by a Lighthouse run that scored accessibility 93 with a contrast
+ * failure naming `#c43e55`, a colour that is in no stylesheet: axe had sampled
+ * the button **part way through its fade in**, so the background it measured
+ * was Lingon at 86 % over Natt. Two more runs scored 100. The audit was
+ * flickering, and what it was flickering around is a pair with 0,08 of headroom
+ * over the floor, which is why it is written down here rather than left to the
+ * next run's timing.
+ */
+describe("the landing page's primary action", () => {
+  it("is readable at rest, which is the only state it is really in", () => {
+    const ratio = contrast(resolve("--paper", dark), resolve("--trend", dark));
+    expect(
+      Number(ratio.toFixed(2)),
+      `Natt on Lingon is ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  /**
+   * And it is worth knowing how little room there is. This is not a second
+   * assertion of the same thing: it fails if somebody makes the pair *worse*
+   * while still passing, which is the change that would put the next audit back
+   * into the flicker above.
+   */
+  it("has as much headroom as it had when this was written", () => {
+    const ratio = contrast(resolve("--paper", dark), resolve("--trend", dark));
+    expect(Number(ratio.toFixed(2))).toBeGreaterThanOrEqual(4.57);
+  });
+});
+
 describe("the check itself", () => {
   /** Proved by reintroduction, like the colour and copy guards. */
   it("is what it is looking for", () => {

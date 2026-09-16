@@ -82,6 +82,19 @@ when it will be down, and its mail goes out.
   and a guard computes every body-text token against every surface in both
   themes from the tokens themselves, because the audit that reported "zero
   failures" walked screens and a token is not a pair.
+- **The landing page says it once, in a picture and then in words** (D179).
+  The hero draws the trend through thirty readings and then the claim arrives a
+  word at a time, "Gör", "det", "lättare.", 120 ms apart. "En dagsvikt är mest
+  brus" no longer draws a second graph of the same argument: it states the
+  fourteen mornings as figures, seven across and two down, with the one figure
+  the app makes of them beside it, and **nothing in the section responds to
+  scroll**. The three phone pictures keep their transparency now, which they had
+  been losing to a headless capture for three passes, and the rows carry the
+  profile's own two type sizes. Measured again: **Lighthouse performance 98,
+  accessibility 100, zero layout shift**, 12,8 kB of a 15 kB budget and 58,7 of
+  60. One run in three scored accessibility 93 on a contrast failure that was
+  axe sampling the primary button mid-fade; the pair it circles has 0,08 of
+  headroom and is held by a test now.
 - **The landing page's lines are the app's own arithmetic** (D173, D177).
   Thirty readings arrive, a trend line draws through them, and only then does
   the page say "gör det lättare" in words; seven sections after it, one
@@ -306,7 +319,8 @@ deploy needs that it did not before, and the one command that does it.
 | **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
 | **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
 | **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
-| **A new landing page** (D173, D177, D178) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve, a scroll-driven section, three phone screens one to a row, and a share card |
+| **A new landing page** (D173, D177, D178, D179) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve, a fortnight stated in figures, three phone screens one to a row, and a share card |
+| **Two formatting fixes** (D179) | the weekly review card names the day in Swedish instead of showing an ISO date, and the weekly trend change in it reads one decimal like every other weight |
 | **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
 | **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
 
@@ -419,7 +433,10 @@ ställen.
 
 **Rättat.** Skillnaden på Översikt står med en decimal, som alla andra vikter i
 appen, i stället för två. Märkningen för uppskattat värde står med liten
-begynnelsebokstav, som appens övriga märkningar.
+begynnelsebokstav, som appens övriga märkningar. Veckosammanfattningen säger
+vilken dag veckan började med ord, till exempel "måndag 7 september", i stället
+för 2026-09-07, och viktförändringen i den står med en decimal som alla andra
+vikter. Sammanfattningar som redan är skrivna ändras inte, men nästa gör det.
 
 **Startsidan** är ombyggd. Kurvan där är ritad av appens egen uträkning och med
 samma mjuka kurva som din egen graf, inte en bild någon har ritat för hand.
@@ -650,6 +667,15 @@ tag, and production runs it.** Everything below is `1.2.0`:
 | `3fb6870` | Sten is lighter, because the profile's value never held 4,5:1 |
 | `d38abf1` | Three things a screenshot showed that no test could see |
 | `fe76d1f` | The landing page's lines are the app's own arithmetic |
+| `de20f26` | Record the pass: four items, and what the sweep can and cannot show |
+| `f4a37ff` | Raw phone screenshots are a command, not an afternoon |
+| `5fc6707` | The page draws the app's curve, and the frames turn with the scroll |
+| `c386d43` | The claim arrives a word at a time |
+| `ba3e0d5` | One graph, and a fortnight stated in figures |
+| `cdb2753` | The phone pictures keep their transparency, and the rows use the profile's sizes |
+| `cbb7315` | The hero is the only centred block |
+| `61f93d4` | §5 carries the one exception it has |
+| `ab8eaa2` | An ISO date and a two-decimal weight, both fixed at their source |
 
 Two migrations are among them, `0030_food_search_fold` and
 `0031_restore_checks`, and the compose file changed. "Inför nästa deploy" above

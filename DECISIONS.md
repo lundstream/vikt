@@ -9291,6 +9291,11 @@ Measured across a frame's whole travel: +12,0°, +6,7°, 0,0°, -6,7°, -12,0°,
 `box-shadow: none` at every one. Where scroll-driven animations do not exist,
 and under reduced motion, the frames stand square.
 
+**§5 carries it now** (D179). This addendum was the only place that said so,
+while §5 said "no 3D" flatly, which left the document and the code disagreeing
+with the reasoning filed somewhere else. The motion subsection names the
+exception, says it is decoration, and says a second would have to displace it.
+
 **The drifting field is the other exception**, the one §5 names itself: it may
 drift without an end state only because it is background rather than subject. It
 is at 25 % opacity, and `landing-motion.ts` pauses it when the tab is hidden.
@@ -9801,3 +9806,132 @@ page is measured at the nominal viewport and again at a taller one, and if its
 height moved with the window it is captured with `captureBeyondViewport` at the
 normal height instead. The verdict line names which was used, so a shot is never
 read as proving more than it does.
+
+---
+
+### D179 — The page says it in words and figures, not in two pictures
+
+A fourth pass. The through line is that the page had started **drawing the same
+argument twice**, and that a page which repeats itself in pictures has made the
+second picture decoration, which is the question §5 asks of any motion.
+
+#### The second graph is gone
+
+"En dagsvikt är mest brus" drew a trend line through fourteen daily readings,
+with the same marks as the hero, driven by the reader's wheel. The hero already
+shows noise and trend as a picture; this said it again, more slowly, and
+required a scroll listener to say it.
+
+The section states it in figures now, which is also the form it takes on a
+bathroom scale: fourteen mornings as small tabular numbers in Sten, seven across
+and two down the way a calendar shows a fortnight, and beside them the one
+figure the app makes of them, in Snö. The readings land 80 ms apart when the
+section is reached and the figure stops flickering on the frame the fourteenth
+lands, with that timing **derived from the step** rather than typed as a round
+number beside it.
+
+**Nothing in the section responds to scroll.** The monotonic progress driver
+went with the line it drove: it measured the section's travel past the midline,
+kept the maximum seen so far so the line never undrew itself, and removed itself
+at 1. All correct, and all in service of the second drawing.
+
+**The check followed the claim.** A vertex test over a line the page no longer
+draws would be a test of nothing, so it is a value test: the figure equals what
+§4.1 says for the fourteenth morning, formatted the way the page formats it.
+With three smaller ones the argument depends on: every morning is written as a
+weight, the figure is the last morning's rather than some other day's, and it is
+**not one of the fourteen readings**, because the whole point is that none of
+them was the answer.
+
+#### The claim arrives a word at a time
+
+After the line has drawn: "Gör", "det", "lättare." each fade in and rise eight
+pixels, 120 ms apart. No scale and no bounce, because a word that overshoots and
+settles is a word performing. The full stop is part of the last word, and
+`copy-style.test.ts` now holds that there is **no exclamation mark anywhere on
+the page**: an exclamation mark is the punctuation of a page that is selling,
+and this one is explaining.
+
+Two things about how the guards see it. The words are written out in the JSX
+rather than mapped over an array, because the copy guards read strings out of
+the file and copy in a JavaScript array is copy they cannot see. And they are
+single words, which `jsxStrings` drops on purpose, so the tagline is read back
+out of the markup and checked as the sentence it makes, while the
+exclamation-mark rule reads every text node instead of the extracted strings:
+the loudest thing on a page is usually one word long.
+
+#### The frames' tilt is in §5 now
+
+D173's addendum has said since it was reinstated that the tilt is the one motion
+on the page carrying no meaning. §5 is where the rule lives, and §5 said "no 3D"
+with no qualification, so the code and the binding document disagreed and only
+`DECISIONS.md` knew why. The motion subsection names it, says one piece is the
+budget, and says the next animation that cannot answer §5's question **replaces
+this or is not built**.
+
+#### Two defects, both fixed at their source
+
+**An ISO date in the interface.** The weekly review card read "Veckan från
+2026-09-07". That is D26's raw number with the type changed: the value is a
+`string`, so nothing that looks at types can see it, and it went out to the one
+card on Översikt that a reader stops and reads.
+
+The guard is extended by **name**, since a string is not a date to a compiler:
+an interpolation of `localDate`, `weekStart`, `weekEnd`, `achievedAt` or
+`startedAt` into rendered text, or into a value handed to the dictionary, fails
+unless it is inside one of `lib/dates.ts`'s formatters. The first draft also
+listed `day`, `from` and `to` and caught sixteen call sites that were already
+correct, because those names hold something formatted a few lines earlier; one
+of them was an email address. **The list has to stay short**, and that is the
+reason why.
+
+**A two-decimal weight in the sheet.** It said the trend fell "0,32 kg denna
+vecka" and the coach quoted that into the same card. §4.1 gives any trend figure
+one decimal, and the weekly rate was passed a `2` at each of its three call
+sites.
+
+Precision is a property of the **unit** now, in one table that both the sheet
+and the traceable set read. They were two lists of numbers, and they already
+disagreed: a ratio was written with two decimals and recorded with one, so a
+reply quoting the sheet exactly would have been refused for quoting it. That
+also gave waist-to-height its own unit, since it was filed with the 1-to-5
+self-ratings because neither carries a unit word, which is what let them
+disagree in the first place.
+
+#### The pictures keep their transparency
+
+The framed sources are phones cut out of their background. `landing-screens.mjs`
+resized them through a headless page and captured it, and **a captured page is
+opaque**: Chrome paints its own white behind anything transparent unless it is
+told not to. The delivered files were RGB with a white rectangle baked in behind
+a black phone, invisible on Natt, through three passes.
+
+`setDefaultBackgroundColorOverride` at zero alpha keeps it, and the test reads
+the files back: colour type 6, eight bits a channel, not interlaced, and the
+pixel at 0,0 fully transparent. That corner is the strongest single check, since
+0,0 is outside the frame on every one of them.
+
+#### Alignment, measured rather than assumed
+
+Every section's heading and text already sat on the same left edge, and the two
+text-only sections already ran to a 65ch measure with nothing beside them. Two
+smaller blocks did not: the fourteen mornings were centred in their grid cells,
+so the first column did not start where its heading does, and each phone picture
+was centred in its column. Both are left aligned now, except on a phone, where
+the row is a single column and centring the picture is right.
+
+#### And a score that was flickering
+
+A Lighthouse run scored accessibility **93** with a contrast failure naming
+`#c43e55`, a colour in no stylesheet: axe had sampled the primary button part
+way through its fade in, so the background it measured was Lingon at 86 % over
+Natt. Two runs after it scored 100.
+
+The fade is not the finding. Natt on Lingon measures **4,58:1** against a 4,5
+floor, so any compositing at all drops it under, and **nothing was holding that
+pair**: the contrast guard checks text on a surface and accents drawn on one,
+and this is the one place in the tree that is text *on* an accent (D99's
+carve-out for this page's single action). It is held now, with the headroom
+asserted as well as the floor, so a change that makes it worse while still
+passing fails in a test rather than in whichever Lighthouse run happens to catch
+the fade.

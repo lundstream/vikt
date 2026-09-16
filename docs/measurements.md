@@ -11,6 +11,99 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, fourth pass
+
+Lighthouse 12.8.2, headless Chrome, **mobile settings**, against the production
+build over https. 2026-09-17, after D179.
+
+| | first | second | third | fourth |
+|---|---|---|---|---|
+| performance | 98 | 98 | 98 | **98** |
+| accessibility | 100 | 100 | 100 | **100** |
+| cumulative layout shift | 0 | 0 | 0 | **0** |
+| largest contentful paint | 2,2 s | 2,2 s | 2,2 s | 2,2 s |
+| total blocking time | 0 ms | 0 ms | 0 ms | 0 ms |
+| speed index | 1,7 s | 1,7 s | 1,7 s | 1,7 s |
+
+**One run in three scored accessibility 93**, with a contrast failure naming a
+background of `#c43e55` that appears in no stylesheet. That colour is Lingon at
+86 % over Natt: axe had sampled the primary button **part way through its fade
+in**. The two runs after it scored 100 and the audit passed.
+
+The fade is not the finding. What the flicker circles is that Natt on Lingon
+measures **4,58:1** against a 4,5 floor, so any compositing at all drops it
+under, and nothing was holding that pair: the contrast guard checks text on a
+surface and accents drawn on one, and this is text **on** an accent. It is held
+now (`contrast.test.ts`), with the headroom asserted as well as the floor, so a
+change that makes it worse while still passing fails there instead of surfacing
+as a flickering score.
+
+### What the page loads
+
+| | gzipped | budget |
+|---|---|---|
+| the landing chunk | **12,8 kB** | 15 kB |
+| everything `/` fetches | **58,7 kB** | 60 kB |
+
+### The hero: the line, then the words
+
+| at | readings | line | endpoint | words | sentence |
+|---|---|---|---|---|---|
+| 326 ms | 0 of 30 | not started | | | |
+| 903 ms | 8 of 30 | 26 % | | | |
+| 1 198 ms | 18 of 30 | 61 % | | | |
+| 1 493 ms | 24 of 30 | 81 % | | | |
+| 2 069 ms | 29 of 30 | 98 % | | | |
+| 2 350 ms | 29 of 30 | **drawn** | | | |
+| 2 647 ms | 30 of 30 | drawn | 0,91 | **0,22** · 0 · 0 | |
+| 2 928 ms | 30 of 30 | drawn | 1,00 | 1,00 · **0,81** · **0,39** | |
+| 3 224 ms | 30 of 30 | drawn | 1,00 | 1,00 · 1,00 · 1,00 | **0,14** |
+| 3 800 ms | 30 of 30 | drawn | 1,00 | 1,00 · 1,00 · 1,00 | **1,00** |
+
+The readings and the line still advance together: 26 % drawn at 8 of 30, 61 % at
+18, 81 % at 24. Then "Gör", "det", "lättare." arrive 120 ms apart, each rising
+8 px, and the sentence follows once the third has landed.
+
+### Fourteen mornings, and one figure
+
+| at | readings shown | the figure |
+|---|---|---|
+| 4 738 ms | 1 of 14 | 84,8 |
+| 4 923 ms | 3 of 14 | 84,6 |
+| 5 110 ms | 6 of 14 | 84,3 |
+| 5 297 ms | 8 of 14 | 84,2 |
+| 5 484 ms | 10 of 14 | 84,8 |
+| 5 671 ms | 13 of 14 | 84,0 |
+| 5 858 ms | **14 of 14** | **84,5** |
+
+80 ms apart, and the figure stops flickering on the same frame the fourteenth
+reading lands. The section holds **0 progress sections and 0 graphs**: nothing
+in it responds to scroll any more.
+
+### A phone frame, across its travel
+
+| where its centre is | angle |
+|---|---|
+| below the fold | **+12,0°** |
+| entering | +6,7° |
+| centred | **0,0°** |
+| leaving | -6,7° |
+| gone above | **-12,0°** |
+
+### Reduced motion
+
+900 ms after load, with `prefers-reduced-motion: reduce` emulated: 30 of 30 hero
+readings, the line drawn, the endpoint at 1,00, **all three words at 1,00**, the
+sentence at 1,00, 14 of 14 mornings with the figure already at 84,5, and the
+frames square at 0,0°.
+
+### Both widths
+
+360 px: `scrollWidth` 360 against `clientWidth` 360, no overflow, 6 272 px tall.
+Desktop 1 280: 4 914 px tall.
+
+---
+
 ## The landing page, third pass
 
 Lighthouse 12.8.2, headless Chrome, **mobile settings**, against the production
