@@ -9629,6 +9629,36 @@ exactly 1 and the comparison is strict. The positions are compressed into 0 to
 0,92 now. It is the kind of defect that a picture shows and an assertion about a
 number does not.
 
+#### Addendum, 2026-09-17 (D180): the line lands
+
+One ring in Lingon expands out of the endpoint and fades, over about half a
+second, at the moment the line reaches today. Then the page holds still for
+300 ms, and only then does the first word arrive.
+
+**This is motion that carries meaning, and the meaning is the oldest one on the
+page: a reading arriving.** Every dot in the hero says it thirty times while the
+line is being drawn; the ring says it once more, for the reading the trend line
+actually ends on, which is the one the reader would have taken this morning. The
+still frame cannot say "this is today" because the endpoint is already drawn by
+then, and §5's question is what the movement tells the reader that the finished
+state does not.
+
+It is not the tilt's kind of motion and does not spend that budget: **it stops.**
+One run, ending at opacity 0, and nothing on the page pulses at rest. The beat of
+silence after it is part of the same sentence: the picture has finished saying
+its part, and the words that follow are the next one.
+
+Under reduced motion there is no ring at all. An arrival is a thing that
+happens, and when nothing is allowed to happen the reader is shown what the
+sequence was going to say: a drawn line with its endpoint on it.
+
+**One thing about how it is written, because it cost a measurement.** The fill
+mode is `forwards`, not `both`. `both` includes the backwards fill, which
+applies the first keyframe *during the delay*, so the ring sat at nine tenths
+opacity from the first paint, two and a half seconds before the line reached it,
+and the `opacity: 0` rule on the element could not win against it. The page
+looked right in every screenshot taken after three seconds.
+
 #### Everything else
 
 - **The endpoint arrives when the line reaches it.** It was timed 3400 ms against

@@ -75,6 +75,12 @@ const arrives = (point: Reading) =>
  * sentence still being written; the timings live together in `landing.css` so
  * the two cannot drift apart again.
  *
+ * **And the line lands.** One ring expands out of the endpoint and fades, once,
+ * which is what a reading arriving looks like on this page and in the app. Then
+ * the page holds still for a beat before the first word, because the picture has
+ * finished saying its part and the words are the next sentence, not the same
+ * one.
+ *
  * Decorative to a screen reader: the section around it carries the sentence
  * that says what it means.
  */
@@ -101,6 +107,23 @@ export function HeroGraph() {
       ))}
 
       <path className="hero-line stroke-trend" d={path} pathLength={1} {...LINE} />
+
+      {/*
+        The ring the line lands with (D180). It expands out of the endpoint once
+        and fades, the way a reading arriving looks, and then the page is still.
+
+        Drawn before the endpoint so it passes under it rather than over: the
+        endpoint is the mark and the ring is the arrival, and a ring drawn on
+        top would briefly replace the thing it is announcing.
+      */}
+      <circle
+        className="hero-ring stroke-trend"
+        cx={end.x}
+        cy={end.y}
+        r={MARKS.endpointRadius}
+        fill="none"
+        strokeWidth={2}
+      />
 
       <circle
         className="hero-endpoint fill-trend"

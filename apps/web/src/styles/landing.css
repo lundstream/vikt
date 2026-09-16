@@ -85,6 +85,23 @@
    * revealing, and the tempo is part of that.
    */
   --hero-word-gap: 700ms;
+
+  /**
+   * The ring at the end of the line, and the beat of silence after it (D180).
+   *
+   * The ring is a reading arriving, which is the one thing this page's motion
+   * has always meant, said once at the moment the trend reaches today. The
+   * silence is what makes it a full stop rather than a lead-in: the picture has
+   * finished, and the words that follow are the next sentence.
+   */
+  --hero-ring-duration: 500ms;
+  --hero-after-ring: 300ms;
+
+  /** When the words begin: the line, then the ring, then the beat. */
+  --hero-words-start: calc(
+    var(--hero-line-start) + var(--hero-line-duration) + var(--hero-ring-duration) +
+      var(--hero-after-ring)
+  );
 }
 
 .hero-reading {
@@ -130,6 +147,43 @@
 }
 
 /**
+ * The ring, once.
+ *
+ * Scaled about its own centre rather than drawn at a growing radius, so it is a
+ * transform the compositor can carry rather than a repaint of the SVG every
+ * frame. `transform-box: fill-box` is what makes 50 % mean the circle's centre
+ * instead of the whole drawing's.
+ *
+ * It ends at opacity 0 and never runs again: §5's "everything that moves,
+ * stops", said by an animation that is over in half a second.
+ */
+@keyframes ring-arrives {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(4.5);
+  }
+}
+
+.hero-ring {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  /*
+    `forwards`, not `both`. `both` includes the backwards fill, which applies
+    the first keyframe **during the delay**: the ring sat at nine tenths opacity
+    from the first paint, two and a half seconds before the line reached it, and
+    the rule above could not win against it. Measured at 145 ms, which is what
+    caught it.
+  */
+  animation: ring-arrives var(--hero-ring-duration) ease-out forwards;
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration));
+}
+
+/**
  * The words, after the line has said the same thing without them, and one at a
  * time (D179).
  *
@@ -153,24 +207,18 @@
   display: inline-block;
   opacity: 0;
   animation: word-arrives 320ms ease-out both;
-  animation-delay: calc(
-    var(--hero-line-start) + var(--hero-line-duration) + 150ms + var(--i) * var(--hero-word-gap)
-  );
+  animation-delay: calc(var(--hero-words-start) + var(--i) * var(--hero-word-gap));
 }
 /* One more beat of the same length after the third word starts arriving. */
 .hero-sentence {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(
-    var(--hero-line-start) + var(--hero-line-duration) + 150ms + 3 * var(--hero-word-gap)
-  );
+  animation-delay: calc(var(--hero-words-start) + 3 * var(--hero-word-gap));
 }
 .hero-actions {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(
-    var(--hero-line-start) + var(--hero-line-duration) + 550ms + 3 * var(--hero-word-gap)
-  );
+  animation-delay: calc(var(--hero-words-start) + 400ms + 3 * var(--hero-word-gap));
 }
 
 /* --------------------------------------------------- revealed on scroll -- */
@@ -334,11 +382,21 @@
   .hero-reading,
   .hero-line,
   .hero-endpoint,
+  .hero-ring,
   .hero-word,
   .hero-sentence,
   .hero-actions,
   .phone-frame {
     animation: none !important;
+  }
+
+  /*
+    No ring at all. It is an arrival, and under reduced motion nothing arrives:
+    the reader is shown what the sequence was going to say, which is a drawn
+    line with its endpoint on it.
+  */
+  .hero-ring {
+    display: none;
   }
 
   /* Square on, which is what the frames look like when they are not turning. */

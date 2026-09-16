@@ -11,6 +11,48 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, fifth pass
+
+2026-09-17, after D180.
+
+### The hero, end to end
+
+Milestones rather than samples: each is the first frame on which a thing is
+true, read off the page's own clock by a `requestAnimationFrame` watcher.
+
+| | nominal | measured |
+|---|---|---|
+| the line completes | 2 300 ms | **2 380 ms** |
+| the ring starts | 2 300 ms | 2 466 ms |
+| the ring has gone | 2 800 ms | 2 910 ms |
+| "Gör" | 3 100 ms | **3 270 ms** |
+| "det" | 3 800 ms | 3 970 ms |
+| "lättare." | 4 500 ms | **4 670 ms** |
+| the sentence | 5 200 ms | 5 372 ms |
+
+The measured column runs 80 to 170 ms behind the nominal one throughout, and
+that gap is the watcher rather than the page: a thing is recorded when it
+crosses 2 % opacity, which is a frame or two after its delay expires. What the
+table is for is the **intervals**, and those are exact: 700 ms between each
+word, and 702 between the last word and the sentence.
+
+The ring is read as gone at 2 910 rather than at its full 2 880 because it eases
+out and drops under 2 % before it formally ends. Sampled through its run: 0,66
+opacity at scale 1,93; 0,28 at 3,40; 0 at 4,5, where it stays. It does not run
+again, and at six seconds it is still at 0.
+
+**The ring was visible from the first paint** at nine tenths opacity, and this
+is what found it: `animation-fill-mode: both` applies the first keyframe during
+the delay. Measured at 145 ms, two and a half seconds before the line reaches
+the endpoint. It is `forwards` now.
+
+### Reduced motion
+
+The ring is `display: none`, the line is drawn, and all three words are at full
+opacity 900 ms after load.
+
+---
+
 ## The landing page, fourth pass
 
 Lighthouse 12.8.2, headless Chrome, **mobile settings**, against the production
