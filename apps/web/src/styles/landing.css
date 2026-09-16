@@ -73,6 +73,18 @@
 :root {
   --hero-line-start: 300ms;
   --hero-line-duration: 2000ms;
+
+  /**
+   * How far apart the three words arrive, and how long after the last one the
+   * sentence follows (D180).
+   *
+   * 700 ms, not 120. At 120 the three words read as one movement with a stutter
+   * in it, which is a transition dressed up as a sentence; at 700 each word is
+   * long enough to be read before the next arrives, which is the pace somebody
+   * actually says "gör det lättare" at. The page is explaining rather than
+   * revealing, and the tempo is part of that.
+   */
+  --hero-word-gap: 700ms;
 }
 
 .hero-reading {
@@ -142,19 +154,23 @@
   opacity: 0;
   animation: word-arrives 320ms ease-out both;
   animation-delay: calc(
-    var(--hero-line-start) + var(--hero-line-duration) + 150ms + var(--i) * 120ms
+    var(--hero-line-start) + var(--hero-line-duration) + 150ms + var(--i) * var(--hero-word-gap)
   );
 }
-/* After the third word has finished arriving: 150 + two steps of 120 + 320. */
+/* One more beat of the same length after the third word starts arriving. */
 .hero-sentence {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 730ms);
+  animation-delay: calc(
+    var(--hero-line-start) + var(--hero-line-duration) + 150ms + 3 * var(--hero-word-gap)
+  );
 }
 .hero-actions {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 980ms);
+  animation-delay: calc(
+    var(--hero-line-start) + var(--hero-line-duration) + 550ms + 3 * var(--hero-word-gap)
+  );
 }
 
 /* --------------------------------------------------- revealed on scroll -- */
