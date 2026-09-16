@@ -267,6 +267,53 @@ meta            Inter 400 · 12/16 · Sten
 
 The wordmark is the app's name in Archivo bold at about 112% width, in Lingon. The mark is the trend line with its endpoint and two raw readings in Is behind it. Auth screens get both, centred; the app icon is the mark alone on Skymning, maskable; the header gets the wordmark alone at 20 pt, never the mark, because it would compete with the graph beneath it. No shadow, tilt, outline or animation: the line moves in the graph, not in the logo.
 
+### Motion
+
+**Motion carries meaning, or it does not happen.** A thing moves to say something
+that a still frame cannot: a line drawing itself says the trend accumulates, a
+figure counting up says it was measured rather than chosen, a point appearing
+says a reading arrived. Decoration that moves because moving is modern is the
+same mistake as a colour chosen because it is pretty, and §5 has an answer for
+that one already. Every animation in this app has to survive the question "what
+does this tell the reader that the finished state does not", and most answers
+are "nothing", which is the right answer and means no animation.
+
+Three rules follow from it, and they are binding:
+
+- **Everything that moves, stops.** No loop that runs forever, nothing that
+  breathes, pulses or drifts without end. Motion has a beginning and an end
+  because it is saying something, and a sentence that never finishes is noise.
+  A drifting field with no end state is the exception that proves it: it may
+  drift only while it is also the background, never while it is the subject, and
+  it pauses when the tab is hidden.
+- **Reduced motion gets the final frame, not a broken page.** `prefers-reduced-
+  motion: reduce` means the reader sees what the animation was going to say,
+  arrived at instantly. Not a stripped page, not an empty box where a drawing
+  would have been. This is already in the quality floor; it is repeated here
+  because an animation written without it is the common way the floor is
+  breached.
+- **The wordmark never moves.** The logo section says it: the line moves in the
+  graph, not in the logo. That holds on the landing page too, where the
+  temptation is strongest.
+
+**Restraint is the style.** Natt is a matte, unlit surface. No gradients on it,
+no glow, no glass, no neon, no glitch, no 3D, no parallax anywhere but the hero,
+and no scroll effect that takes the page away from the reader who is trying to
+read it. The product is a notebook that draws one careful line; the pages that
+introduce it are held to the same taste as the pages that are it.
+
+**The public pages are dark only.** The app follows the reader's theme (D117);
+the landing page does not offer one, because a marketing page that changes its
+mind about its own colours has nothing to say about restraint. Natt, Skymning,
+Sten, Snö, and Lingon on exactly the two things Lingon is ever on.
+
+**Every guard in this section applies to the landing page**, and the ones that
+read `i18n/sv.ts` have a second half that reads the landing JSX, because the
+landing page ships without the dictionary: `copy-style.test.ts` for dashes,
+shouting and emphasis, `colour-meaning.test.ts` for the accents,
+`class-names.test.ts` for the transforms. A page that a stranger reads before
+anything else is the last page that should be exempt from the house rules.
+
 ### Everything else
 
 Dark mode is required, the phone gets used in the morning before the lights are on.
