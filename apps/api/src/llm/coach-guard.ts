@@ -1,4 +1,5 @@
 import { FIGURE_UNITS, type CoachFacts, type CoachFigures, type FigureUnit } from "./coach-context.js";
+import { isMarkedGeneral } from "./coach-meaning.js";
 
 /**
  * What the coach is allowed to say, checked on the reply (D139).
@@ -53,6 +54,8 @@ export type RefusalReason =
   | "untraceable"
   | "blame"
   | "instruction"
+  /** One thing said to affect another, outside a sentence marked as general. */
+  | "causal"
   | "empty";
 
 export type GuardVerdict = { ok: true } | { ok: false; reason: RefusalReason; detail: string };
@@ -195,6 +198,36 @@ const INSTRUCTION = [
   /\bdet\s+(är\s+)?viktigt\s+att\s+du\b/i,
   /\bse\s+till\s+att\s+du\b/i,
 ];
+
+/**
+ * One thing affecting another, which this app does not compute (D171).
+ *
+ * D155 put the rule in the prompt: two series may sit side by side, never
+ * joined by a cause, because Samband draws pairs and calculates no relation at
+ * all (D34). The live runs since have produced "kan påverka" twice from a model
+ * that had been told not to, which is what a prompt-only rule looks like at the
+ * margin.
+ *
+ * So it is a words-level check now, in the same shape as BLAME and INSTRUCTION.
+ * Narrow in exactly one way: a sentence carrying one of the sheet's own general
+ * markers passes. That is the sentence the app itself writes — "protein hjälper
+ * i regel de flesta att behålla muskler" — and refusing the coach for repeating
+ * the app's own interpretation would be the check working against the sheet it
+ * is there to protect. Without a marker, "det påverkar din energi" is a claim
+ * about this person's data, and nothing here computed it.
+ */
+const CAUSAL = [/\bpåverka(r|s|t|de|n)?\b/i, /\bleder till\b/i];
+
+function causalIn(sentence: string): string | null {
+  if (isMarkedGeneral(sentence)) return null;
+
+  for (const pattern of CAUSAL) {
+    const found = pattern.exec(sentence);
+    if (found) return found[0];
+  }
+
+  return null;
+}
 
 /**
  * The one instruction this app does want.
@@ -480,6 +513,16 @@ export function checkSentence(sentence: string, facts: CoachFacts): GuardVerdict
   const instruction = instructionIn(sentence);
   if (instruction !== null) {
     return { ok: false, reason: "instruction", detail: instruction };
+  }
+
+  /**
+   * Then the causal rule (D171), for the same reason: a sentence joining two
+   * series with a cause is refused whether or not it names a figure, unless it
+   * is marked as general, which is how the sheet's own interpretations read.
+   */
+  const causal = causalIn(sentence);
+  if (causal !== null) {
+    return { ok: false, reason: "causal", detail: causal };
   }
 
   const prescriptive = isPrescriptive(sentence);

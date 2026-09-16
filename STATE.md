@@ -102,6 +102,15 @@ when it will be down, and its mail goes out.
   fixture uses: 400 kcal is where the week of a change first lands more than
   0,1 kg from the line. Exercised on `samband@example.test` at 360 px and
   desktop: twelve weeks, eleven filled points and one ring, no page overflow.
+- **The app writes what a number means, and the coach conveys it** (D171). Every
+  domain block of the coach's sheet ends with a `Vad det betyder:` line from a
+  closed, reviewed set, chosen by the state that domain is in; COACH_RULES says
+  to carry it and add none. The rule used to ask the model to write that
+  sentence and it did so in one live reply of six. Rerun against the same model
+  with the same question, **the interpretation is in all six**. Saying one thing
+  affects another is a words-level check now, exempt only for a sentence
+  carrying the sheet's own general marker, and it refused exactly one live
+  sentence, of the shape the prompt has forbidden since D155.
 - **An incomplete sum says "minst", at every span** (D55, addendum 2026-09-15).
   Below the coverage gate a macro is the known sum after "minst", in Sten, with
   the share of the food carrying it on the line under it: on Översikt's day card

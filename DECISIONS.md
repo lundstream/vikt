@@ -7746,6 +7746,96 @@ this entry has described since 2026-09-13; the second probably wants the macro
 sentence placed in the sheet's macro block, beside the targets, where the model
 reads it with the figures, rather than in a rule it reads before them.
 
+#### Addendum, 2026-09-17: the interpretation moved into the sheet, and the six ran again
+
+The entry above ends by saying what to do if the missing meaning sentence
+recurred: put it **in the sheet's own blocks, beside the figures, rather than in
+a rule the model reads before them**. It recurred, so that is what D171 does, and
+these are the same six cases run again against the same model with the same
+question.
+
+**The interpretation is in all six replies now**, against one of six before. The
+counts are sentences carrying one of the sheet's general markers, out of the
+sentences in the reply:
+
+| Account | Tone | Marked | Sentences | Model |
+|---|---|---|---|---|
+| the development account | Torr | 4 | 10 | qwen3.6:27b, 51557 ms, 993 chars |
+| the development account | Peppig | 1 | 4 | qwen3.6:27b, 3376 ms, 567 chars |
+| the development account | Saklig | 2 | 5 | qwen3.6:27b, 5072 ms, 899 chars |
+| the alcohol fixture | Torr | 5 | 6 | qwen3.6:27b, 4542 ms, 778 chars |
+| the alcohol fixture | Peppig | 5 | 8 | qwen3.6:27b, 4974 ms, 958 chars |
+| the alcohol fixture | Saklig | 5 | 7 | qwen3.6:27b, 5874 ms, 1129 chars |
+
+**One sentence was refused, by the check this pass added**, which is the first
+time the causal rule has been enforced rather than requested:
+
+```
+REFUSE [causal: påverkar] Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre, eller fundera på att lägga in mer protein i matloggen för att se hur det påverkar snittet.
+```
+
+That is the shape D155 named on 2026-09-13 and the prompt has forbidden since:
+an invitation to change something in order to see what it does to something
+else. It carries no general marker, so it is a claim about this person's data,
+and nothing in the app computed it. The cost is real and worth stating: in the
+live path a refused sentence means **that reply is not shown at all**, so the
+reader of that one turn got a refusal instead of an answer.
+
+The replies, verbatim.
+
+**The development account, Torr.**
+
+> Trendvikten har gått ner 1,0 kg på 28 dagar, vilket är 0,25 kg i veckan. En trend som går ner betyder i regel att energin under perioden legat under det kroppen gjort av med.
+> 
+> Matintaget är ifyllt på 18 av 28 dagar, men snittet blir osäkert när de dagar som saknas kan ligga var som helst. Alkohol har inte fyllts i på någon av de senaste sju dagarna, och utan uppgift står den i regel utanför energin.
+> 
+> Rörelse är inte loggad den senaste veckan, och rörelse som inte loggas står i regel utanför både energin och sammanställningen här. Steg har ifyllts på 12 dagar med ett snitt på 9 870 per dag.
+> 
+> Sömnen ligger på 7,5 timmar i snitt från 12 dagar, och humöret på 4,0 av 5. Midjan har ökat 0,6 cm på 28 dagar, och mått rör sig i regel långsammare än vikten.
+> 
+> Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre, eller om intaget och trendförändringen syns mot varandra under Samband. Appen ritar dem mot varandra men räknar inget samband och påstår ingen orsak.
+
+**The development account, Peppig.**
+
+> Trendvikten har gått ner 1,0 kg på 28 dagar, vilket betyder i regel att energin under perioden legat under det kroppen gjort av med. Det är bara två dagar som har mat loggade de senaste sju dagarna, så snittet för intaget är osäkert eftersom de dagar som saknas kan ligga var som helst. Alkoholuppgiften är inte ifylld på någon av dagarna, och rörelse är inte loggad alls under denna period. Om du vill kan du titta på om energin ser annorlunda ut de veckor du dricker mindre, eller fundera på att lägga in mer protein i matloggen för att se hur det påverkar snittet.
+
+**The development account, Saklig.**
+
+> Trendvikten har minskat med 1,0 kg på 28 dagar, vilket motsvarar den planerade takten och i regel tyder på att energin legat under det kroppen gjort av med. Matintaget är loggat för två av de senaste sju dagarna, varvid filmjölk, havregrynsgröt, middag hos vänner och kvarg noterats, medan intaget för övriga dagar saknas och därmed inte ingår i beräkningarna. Alkohol har ifyllts på en av de 28 dagarna med två standardglas totalt, och rörelse är loggad som fem pass under perioden medan stegantalet visar ett snitt på 9 870 från tolv dagar. Sömnen ligger på ett genomsnittligt värde på 7,5 timmar från tolv ifyllda dagar, och midjemåttet har ökat något trots viktnedgången, vilket är ovanligt då mått i regel rör sig långsammare än vikten. Du kan titta på om sömn eller energi ser annorlunda ut de veckor du loggar mer mat, eller om du vill fylla i fler dagar för att få en säkrare underhållsnivå.
+
+**The alcohol fixture, Torr.**
+
+> Trendvikten har gått ner 0,6 kg på 28 dagar, vilket betyder i regel att energin under perioden legat under det kroppen gjort av med. Intaget har legat i snitt 190 kcal under underhållsnivån de senaste sju dagarna, och ett snitt under underhållsnivån ger i regel en nedgång över tid. Du äter rotfruktsgratäng, kycklingfilé, havregrynsgröt, grekisk yoghurt och laxfilé med potatis, men inga mängder eller kalorier per rätt finns här. Alkohol har legat på 9,0 standardglas de senaste sju dagarna, och alkohol bidrar i regel med energi utan att mätta. Rörelsen ligger på 270 minuter totalt under veckan, och rörelse bidrar i regel mindre till energin än maten gör. Sömnen har legat på ett snitt på 7,0 timmar, och jämn sömn gör det i regel lättare att orka med både mat och rörelse.
+
+**The alcohol fixture, Peppig.**
+
+> Trendvikten har sjunkit 0,6 kg på de senaste 28 dagarna, vilket i regel betyder att energin legat under det kroppen gjort av med. Intaget ligger i snitt drygt hundra kaloriunder underhållsnivån, och storleken på den skillnaden avgjer oftast takten för nedgången. Du har loggat mat sex av sju dagar de senaste veckan, medan intaget är ofyllt idag. Alkoholintaget ligger på nio glas de senaste sju dagarna, och eftersom alkohol bidrar med energi utan att mätta ligger den energin oftast utöver det som loggas som mat. Rörelsen består av sex pass och cirka 9 000 steg per dag, vilket i regel bidrar mer till hur kroppen mår än till själva energibalansen. Sömnen ligger på sju timmar i snitt, och jämn sömn gör det i regel lättare att orka med både mat och rörelse. Utan en aktiv plan finns inga makromål härleda, så du kan titta på om du vill justera något där. Om du vill kan du också fundera på om du vill lägga upp vanor för att få mer struktur i loggningen.
+
+**The alcohol fixture, Saklig.**
+
+> Trendvikten har minskat med 0,6 kg över 28 dagar, vilket i regel innebär att energin legat under det kroppen gjort av med. Intaget ligger i snitt 166 kcal under den adaptiva underhållsnivån på 2 540 kcal, och en skillnad av den storleken ger i regel en nedgång över tid där takten avgörs av gapet. De senaste sju dagarna har maten bestått av rotfruktsgratäng, kycklingfilé, havregrynsgröt, grekisk yoghurt och laxfilé med potatis, men inga makromål är ställda eftersom det inte finns någon aktiv plan. Alkoholintaget ligger på 9,0 standardglas de senaste sju dagarna, och alkohol bidrar i regel med energi utan att mätta, varvid den energin oftast ligger utöver det som loggas som mat. Rörelsen omfattar 6 pass under veckan och snittet ligger på 9 167 steg per dag, och rörelse bidrar i regel mindre till energibalansen än maten gör men mer till hur kroppen mår. Sömnen ligger på ett snitt på 7,0 timmar, och jämn sömn gör det i regel lättare att orka med både mat och rörelse. Om du vill kan du titta på om energin ser annorliden ut de veckor du dricker mindre alkohol, eller överväga att sätta en plan för att få fram makromål.
+
+**What is different, read against the run above.** Every reply opens on the
+trend and then says what a falling trend means, in the sheet's own words. The
+alcohol fixture's three all reach alcohol, movement and sleep with the meaning
+attached to each, which is the thing the old rule asked for and got once. The
+development account's Peppig reply is the thinnest, with one marked sentence out
+of four, and it is also the one that was refused.
+
+**What the model still adds.** Saklig on the development account writes "vilket
+är ovanligt" about a waist that grew while the weight fell, which is a small
+interpretation of its own wrapped around the sheet's line. The same reply says
+the rate "motsvarar den planerade takten", which is true of the figures in front
+of it but is not a sentence the sheet wrote. Neither is refused by anything here,
+and neither is recorded as solved: the rule says convey the sheet's
+interpretation and add none, and a model that adds a clause is a model that
+added a clause.
+
+**Model typos, left as found**: "kaloriunder" and "avgjer" in Peppig on the
+fixture, "annorliden" in Saklig. They are the model's, in a reply nobody edits,
+and recording them is the point of a verbatim record.
+
+
 ### D156 — Where the image comes from is a variable, because this installation has used both
 
 *2026-09-13.*
@@ -9006,3 +9096,83 @@ the calc uses rather than a number retyped into the copy.
 - **Through the interface**, on `samband@example.test` at desktop and 360 px:
   twelve weeks, **eleven filled points and one ring**, the ring note naming
   400 kcal, and no page overflow at 360.
+
+---
+
+### D171 — The app writes what a number means, and the coach conveys it
+
+D155 added a rule to the prompt: for every area the coach raises, say in one
+sentence what it means for the person's goal, marked as general when it is
+general. Across six live replies **it did so once**, and the entry recorded that
+without tuning the prompt around it, saying what to do if it recurred. It
+recurred.
+
+#### The sentence is the app's now
+
+`coach-meaning.ts` holds a closed set of interpretations, keyed by domain and by
+the state that domain is in, and every domain block of the sheet ends with a
+`Vad det betyder:` line chosen from it. COACH_RULES no longer asks for an
+interpretation; it says to carry the sheet's and add none.
+
+Why this works where the rule did not: the model was being asked to produce a
+sentence it had no data for, at the end of a reply that was already at its
+length limit, from general knowledge it was told to mark as general. Every one
+of those is a reason to drop it. Reading a sentence that is already there,
+in a block it is already quoting figures from, is a different task.
+
+Each line in the set:
+
+- **carries its own general marker** (`i regel`, `för de flesta`, `oftast`,
+  `brukar`), so the claim arrives marked wherever the model puts it;
+- **states no figure**, because a number typed into a fixed string would be
+  quotable without being anybody's data. A test greps them for digits;
+- **is about what the data means, never about conduct** (§3);
+- **was reviewed once, in one file**, which is the point of a closed set: it can
+  be read in a sitting by somebody deciding whether the app should say it.
+
+The state comes off what the section just said rather than being recomputed, so
+the line and the figures above it cannot disagree. Ten domains carry one: weight,
+intake, protein, fibre, alcohol, movement, steps, sleep, habits and
+measurements. **Carbohydrate and fat carry none**, and that is the set being
+closed rather than complete: this app has no general claim about them it is
+willing to make, and inventing one to fill the table would be the opposite of
+reviewed.
+
+#### The causal rule became a check
+
+D155 put "two series may sit side by side, never joined by a cause" in the
+prompt, because Samband draws pairs and computes no relation at all (D34). Live
+replies broke it anyway. It is a words-level check now, beside BLAME and
+INSTRUCTION: `påverkar` and `leder till` refuse a sentence **unless it carries
+one of the sheet's general markers**.
+
+The exemption is the whole design. The app's own interpretation says one thing
+affects another in general, and a coach repeating it must not be refused for
+doing what it was told; a sentence saying the same thing about this person's
+week, unmarked, is a claim nothing computed. One marker separates them, and it
+is the same list the sheet writes with, shared between the two files so they
+cannot drift.
+
+#### One thing this cost
+
+The first draft of the measurements line read "förändringar som vågen missar".
+The reply guard refused it: `missar` is a reproach word in BLAME whatever its
+subject is. The guard is deliberately blunt there and the app's copy is the
+cheaper thing to change, so the line was reworded. Worth recording because the
+test that caught it is the one that runs the reply guard over the app's own
+sentences, and this is the second time it has earned its place.
+
+#### Verified
+
+- `coach-meaning.test.ts` (11): every line in every state carries a marker,
+  states no digit, passes the reply guard and tells nobody what they should have
+  done; the causal check refuses four unmarked sentences and allows three marked
+  ones; an ordinary sentence is untouched.
+- `coach-sheet.test.ts` (12) holds that a busy account's sheet carries exactly
+  ten such lines and that each is one of the reviewed strings.
+- `coach-tones.test.ts` (19) holds the new rule verbatim in all three tones.
+- The api suite: **69 files, 1 011 passing, 9 skipped**, lint and typecheck clean.
+- **Six live replies**, three tones on two accounts, recorded verbatim under
+  D155: the interpretation appears in **all six** (against one of six before),
+  and the new check refused exactly one sentence, of exactly the shape it exists
+  for.

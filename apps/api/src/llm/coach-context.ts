@@ -3,6 +3,7 @@ import {
   buildActivityIndex,
   buildLoggedDays,
   computeMeasurementSeries,
+  COVERAGE_GATE,
   currentStreak,
   dayMacros,
   windowMacroTotal,
@@ -23,6 +24,7 @@ import { getHabitsForDay } from "../services/habit.service.js";
 import { getActivePlan } from "../services/plan.service.js";
 import { getCorrelations } from "../services/correlation.service.js";
 import { listMilestones } from "../repositories/progress.repo.js";
+import { meaningFor, type MeaningState } from "./coach-meaning.js";
 
 /**
  * What the coach is allowed to see (D139, D155), §6 phase 8b rule 1.
@@ -265,6 +267,28 @@ export async function buildCoachFacts(
     say(`Inga vägningar är loggade de senaste ${num(CONTEXT_WINDOW_DAYS, "count")} dagarna.`);
   }
 
+  /**
+   * What the domain means, from the closed set (D171).
+   *
+   * The state is read off what this section just said, never recomputed: the
+   * line and the figures above it have to agree, and choosing the line from the
+   * same values is the only way to be sure of that.
+   */
+  say(
+    meaningFor(
+      "weight",
+      trendNow === null
+        ? "none"
+        : weights.length < 3
+          ? "thin"
+          : windowStart === null || Math.abs(trendNow - windowStart) < 0.05
+            ? "steady"
+            : trendNow < windowStart
+              ? "low"
+              : "high",
+    ),
+  );
+
   /* ------------------------------------------------- underhåll och intag */
 
   say("");
@@ -287,6 +311,9 @@ export async function buildCoachFacts(
   } else {
     say("Ingen underhållsnivå än. Den kräver fler dagar med både vikt och mat.");
   }
+
+  /** Set from the 7-day window below, so the line matches the week's figures. */
+  let intakeState: MeaningState = "none";
 
   for (const window of WINDOWS) {
     const inWindow = windowDays(window);
@@ -312,7 +339,25 @@ export async function buildCoachFacts(
         `${num(logged.length, "count")} av ${num(inWindow.length, "count")} dagar loggade ` +
         `(${num(coverage, "percent")} procent täckning).${against}`,
     );
+
+    if (window === 7) {
+      /**
+       * Below §4.2's coverage gate the mean is thin, and with no measured
+       * maintenance there is nothing to be above or below: the same uncertainty
+       * said about the other missing half.
+       */
+      intakeState =
+        logged.length < Math.ceil(COVERAGE_GATE * inWindow.length) || maintenance.tdee === null
+          ? "thin"
+          : Math.abs(average - maintenance.tdee) < 100
+            ? "steady"
+            : average < maintenance.tdee
+              ? "low"
+              : "high";
+    }
   }
+
+  say(meaningFor("intake", intakeState));
 
   /* --------------------------------------------------------------- plan */
 
@@ -384,6 +429,8 @@ export async function buildCoachFacts(
        */
       const perWindow: string[] = [];
       let tracked = false;
+      /** Fewer than four logged days in the week is a mean worth doubting. */
+      let macroThin = false;
 
       /**
        * The same rule as the dashboard (D55, addendum 2026-09-15): every logged
@@ -397,6 +444,7 @@ export async function buildCoachFacts(
         const total = windowMacroTotal(dayTotals, key);
         if (total.meanG === null) continue;
         tracked = true;
+        if (window === 7 && total.days < 4) macroThin = true;
 
         // Under the target is only known for a complete day. A partial day
         // under it may not be, so it is not counted either way.
@@ -425,6 +473,7 @@ export async function buildCoachFacts(
           `${macroNames[key]}: mål ${num(target, "grams")} g per dag (${source}). ` +
             `Ingen loggad mat har uppgift om ${macroNames[key].toLowerCase()}, så det finns inget snitt.`,
         );
+        if (key === "protein" || key === "fiber") say(meaningFor(key, "none"));
         continue;
       }
 
@@ -433,6 +482,16 @@ export async function buildCoachFacts(
           perWindow.join(". ") +
           ".",
       );
+
+      /**
+       * Protein and fibre only (D171). Each answers a question somebody
+       * actually asks; carbohydrate and fat have no general claim this app is
+       * willing to make, and inventing one to fill the table would be the
+       * opposite of a reviewed set.
+       */
+      if (key === "protein" || key === "fiber") {
+        say(meaningFor(key, macroThin ? "thin" : "low"));
+      }
     }
   } else {
     say("Inga makromål: de härleds ur en aktiv plan, och det finns ingen.");
@@ -449,6 +508,8 @@ export async function buildCoachFacts(
       .map((row) => [row.localDate, row.alcoholUnits!] as const),
   );
 
+  let alcoholState: MeaningState = "none";
+
   if (alcoholByDay.size === 0) {
     say("Alkohol är inte ifylld på någon dag i fönstret.");
   } else {
@@ -464,6 +525,10 @@ export async function buildCoachFacts(
 
       const total = inWindow.reduce((sum, value) => sum + value, 0);
       const sober = inWindow.filter((value) => value === 0).length;
+      if (window === 7) {
+        alcoholState =
+          inWindow.length < 4 ? "thin" : total === 0 ? "low" : total >= 7 ? "high" : "steady";
+      }
       say(
         `Alkohol ${num(window, "count")} dagar: ${num(total, "drinks", 1)} standardglas ` +
           `totalt, ifyllt på ${num(inWindow.length, "count")} ${dayWord(inWindow.length)}, varav ` +
@@ -471,6 +536,8 @@ export async function buildCoachFacts(
       );
     }
   }
+
+  say(meaningFor("alcohol", alcoholState));
 
   /* ------------------------------------------------------------ rörelse */
 
@@ -484,6 +551,8 @@ export async function buildCoachFacts(
       kcalEstimate: row.kcalEstimate,
     })),
   );
+
+  let activityState: MeaningState = "none";
 
   if (activities.length === 0) {
     say(`Ingen rörelse är loggad de senaste ${num(CONTEXT_WINDOW_DAYS, "count")} dagarna.`);
@@ -500,6 +569,7 @@ export async function buildCoachFacts(
         continue;
       }
 
+      if (window === 7) activityState = sessions.length < 2 ? "thin" : "steady";
       say(
         `Rörelse ${num(window, "count")} dagar: ${num(sessions.length, "count")} pass, ` +
           `${num(minutes, "minutes")} minuter totalt.`,
@@ -507,7 +577,11 @@ export async function buildCoachFacts(
     }
   }
 
+  say(meaningFor("activity", activityState));
+
   const stepsByDay = dailyLogs.filter((row) => row.steps !== null);
+  let stepsState: MeaningState = "none";
+
   if (stepsByDay.length === 0) {
     say("Steg är inte ifyllda på någon dag i fönstret.");
   } else {
@@ -522,12 +596,15 @@ export async function buildCoachFacts(
         say(`Steg ${num(window, "count")} dagar: inte ifyllda på någon av dagarna.`);
         continue;
       }
+      if (window === 7) stepsState = values.length < 4 ? "thin" : "steady";
       say(
         `Steg ${num(window, "count")} dagar: i snitt ${num(average, "steps")} per dag ` +
           `från ${num(values.length, "count")} ${dayWord(values.length)}.`,
       );
     }
   }
+
+  say(meaningFor("steps", stepsState));
 
   /* --------------------------------------------- sömn, energi och humör */
 
@@ -539,6 +616,8 @@ export async function buildCoachFacts(
     { key: "energy", label: "Energi", unit: "scale" as FigureUnit, suffix: " av 5", decimals: 1 },
     { key: "mood", label: "Humör", unit: "scale" as FigureUnit, suffix: " av 5", decimals: 1 },
   ] as const;
+
+  let sleepState: MeaningState = "none";
 
   for (const scale of scales) {
     const rows = dailyLogs.filter((row) => row[scale.key] !== null);
@@ -553,6 +632,9 @@ export async function buildCoachFacts(
       const values = rows.filter((row) => inWindow.has(row.localDate)).map((row) => row[scale.key]!);
       const average = mean(values);
       if (average === null) continue;
+      if (scale.key === "sleepHours" && window === 7) {
+        sleepState = values.length < 4 ? "thin" : average < 7 ? "low" : "steady";
+      }
       parts.push(
         `${num(window, "count")} dagar: snitt ${num(average, scale.unit, scale.decimals)}` +
           `${scale.suffix} från ${num(values.length, "count")} ${dayWord(values.length)}`,
@@ -565,6 +647,8 @@ export async function buildCoachFacts(
         : `${scale.label}, ${parts.join(". ")}.`,
     );
   }
+
+  say(meaningFor("sleep", sleepState));
 
   /* ------------------------------------------------------------- vanor */
 
@@ -596,6 +680,7 @@ export async function buildCoachFacts(
       ? "Loggningsstreck: ingen dag i rad är loggad just nu."
       : `Loggningsstreck: ${num(streak.days, "count")} ${dayWord(streak.days)} i rad.`,
   );
+  say(meaningFor("habits", habits.length === 0 ? "none" : "steady"));
 
   /* --------------------------------------------------------------- mått */
 
@@ -648,6 +733,13 @@ export async function buildCoachFacts(
   } else {
     for (const line of measured) say(`${line}.`);
   }
+
+  say(
+    meaningFor(
+      "measurements",
+      measured.length === 0 ? "none" : readings.length < 3 ? "thin" : "steady",
+    ),
+  );
 
   /* ---------------------------------------------------------- milstolpar */
 

@@ -20,6 +20,7 @@ import {
   type CoachFacts,
 } from "../src/llm/coach-context.js";
 import { checkSentence, figuresIn } from "../src/llm/coach-guard.js";
+import { INTERPRETATIONS, MEANING_PREFIX } from "../src/llm/coach-meaning.js";
 
 /**
  * The data sheet (D155).
@@ -328,6 +329,35 @@ describe("the sheet the coach is given", () => {
     // The names of what was eaten, and nothing else about it.
     expect(facts.text).toContain("Havregrynsgröt");
     expect(facts.text).toContain("bara namnen");
+  });
+
+  /**
+   * Every domain says what it means, and the app is the one saying it (D171).
+   *
+   * The rule used to ask the model for this sentence and it produced one in six
+   * live replies. The line is written here now, chosen from a closed set by the
+   * state the domain is in, so what a test can check is that no domain is left
+   * without one for the model to fill in.
+   */
+  it("says what each domain means, from its own closed set", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await busyAccount(db, user);
+
+    const facts = await buildCoachFacts(user.userId, db, env, localDate());
+    const lines = facts.text.split("\n").filter((line) => line.startsWith(MEANING_PREFIX));
+
+    // Ten domains carry one: weight, intake, protein, fibre, alcohol, activity,
+    // steps, sleep, habits and measurements.
+    expect(lines.length).toBe(10);
+
+    // Each is one of the reviewed strings, not something assembled at runtime.
+    const known = new Set(
+      Object.values(INTERPRETATIONS).flatMap((domain) => Object.values(domain)),
+    );
+    for (const line of lines) {
+      expect(known.has(line.slice(MEANING_PREFIX.length).trim()), line).toBe(true);
+    }
   });
 
   /**
