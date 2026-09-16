@@ -243,35 +243,26 @@
   transform: none;
 }
 
-/* --------------------------------------------- fourteen mornings, in figures -- */
+/* ------------------------------------------------- the daily figure, cycling -- */
 
 /**
- * The fourteen readings land one after another when the section is reached
- * (D179), 80 ms apart, and the trend figure beside them settles as the last one
- * arrives.
+ * The left card's crossfade (D180).
  *
- * **Nothing here responds to scroll.** This section used to draw a second trend
- * line, with the reader's wheel driving it through a `--progress` custom
- * property that a listener in `landing-motion.ts` kept at the maximum seen so
- * far. Both are gone: the hero already draws that picture, and a page that
- * draws its thesis twice has made the second one decoration.
+ * `landing-motion.ts` adds this class, waits for the fade, swaps the digits and
+ * takes it off again, so the change reads as a **new reading** rather than as
+ * digits rolling over. The figure is tabular, so nothing shifts while it does.
  *
- * The delay is on a transition rather than an animation, so it runs off the
- * `.revealed` class the same observer adds to everything else on the page.
+ * This section used to state all fourteen readings at once in a grid, which is
+ * a table: a reader counts it instead of taking the point. One at a time, and
+ * the point is that it keeps changing.
  */
-.morning {
+.figure-fading [data-figure-value] {
   opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 260ms ease-out,
-    transform 260ms ease-out;
-  transition-delay: calc(var(--i) * 80ms);
 }
 
-.reveal.revealed .morning,
-.revealed.morning {
-  opacity: 1;
-  transform: none;
+[data-cycle] [data-figure-value] {
+  display: inline-block;
+  transition: opacity 160ms ease-out;
 }
 
 /* ------------------------------------------------------------ the phones -- */
@@ -418,11 +409,15 @@
     stroke-dashoffset: 0;
   }
 
-  /* Every reveal in place, the fourteen mornings included. */
-  .reveal,
-  .morning {
+  .reveal {
     opacity: 1;
     transform: none;
+    transition: none;
+  }
+
+  /* No crossfade either: the card keeps the one reading it was rendered with. */
+  [data-cycle] [data-figure-value] {
+    opacity: 1;
     transition: none;
   }
 }

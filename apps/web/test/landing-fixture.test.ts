@@ -10,9 +10,11 @@ import {
 import {
   heroGeometry,
   HERO_BOX,
-  MORNINGS,
+  MORNING_CYCLE_MS,
+  MORNING_READINGS,
   SETTLED_TREND,
   SETTLED_TREND_DATE,
+  SETTLED_TREND_KG,
   type Geometry,
 } from "../src/landing/seeded.js";
 
@@ -47,13 +49,13 @@ import {
  * which is also what proves the warm-up is real: the first drawn vertex is not
  * the first reading, because it was not seeded on it.
  *
- * ## The fortnight is a value now, not a line (D179)
+ * ## The fortnight is a value now, not a line (D179, D180)
  *
- * "En dagsvikt är mest brus" no longer draws a graph: it states the fourteen
- * readings as figures and the trend as one number. So its check is on that
- * number, recomputed the same way and formatted the way the page formats it.
- * It is a smaller claim than a line of vertices and it is the whole claim the
- * section makes.
+ * "Trendvikt, inte dagsvikt" draws no graph: it puts one card that cycles
+ * through the fourteen readings beside one card holding the trend. So its check
+ * is on that number, recomputed the same way and formatted the way the page
+ * formats it. It is a smaller claim than a line of vertices and it is the whole
+ * claim the section makes.
  */
 
 /**
@@ -311,40 +313,55 @@ describe("the geometry", () => {
  * and formatted the way the page formats it, rather than compared as a float
  * nobody sees.
  */
-describe("fourteen mornings, one figure", () => {
-  it("shows every reading the fixture has, in order", () => {
-    expect(MORNINGS).toHaveLength(FORTNIGHT.shown);
-    expect(MORNINGS.map((morning) => morning.localDate)).toEqual(
-      FORTNIGHT.readings.map((reading) => reading.localDate),
+describe("trendvikt, inte dagsvikt", () => {
+  it("cycles through every reading the fixture has, in order", () => {
+    expect(MORNING_READINGS).toHaveLength(FORTNIGHT.shown);
+    expect(MORNING_READINGS).toEqual(
+      FORTNIGHT.readings.map((reading) => reading.weightKg.toFixed(1).replace(".", ",")),
     );
 
     /* One decimal, a comma, the way a weight is written everywhere else (§4.1). */
-    for (const morning of MORNINGS) {
-      expect(morning.reading, `${morning.localDate} is not written as a weight`).toMatch(
-        /^\d{2,3},\d$/,
-      );
+    for (const reading of MORNING_READINGS) {
+      expect(reading, `${reading} is not written as a weight`).toMatch(/^\d{2,3},\d$/);
     }
   });
 
-  it("settles on what the calc says for the fourteenth morning", () => {
+  /**
+   * And they are not all the same number, which is the left card's whole
+   * argument. A fixture that had been flattened would cycle through fourteen
+   * identical figures and look like a card that had stopped working.
+   */
+  it("gives a different reading to look at", () => {
+    expect(new Set(MORNING_READINGS).size).toBeGreaterThan(4);
+  });
+
+  it("holds the trend the calc gives for the fourteenth morning", () => {
     const computed = trendByDate(FORTNIGHT_SOURCE.readings);
     const expected = computed.get(SETTLED_TREND_DATE);
 
     expect(expected, `${SETTLED_TREND_DATE} is not in the computed trend`).toBeDefined();
     expect(SETTLED_TREND).toBe(expected!.toFixed(1).replace(".", ","));
+    /* The number the card counts up to is the same one it displays. */
+    expect(SETTLED_TREND_KG.toFixed(1).replace(".", ",")).toBe(SETTLED_TREND);
   });
 
-  it("settles on the last morning shown, not some other day", () => {
-    expect(SETTLED_TREND_DATE).toBe(MORNINGS.at(-1)!.localDate);
+  it("holds the last morning's trend, not some other day's", () => {
+    expect(SETTLED_TREND_DATE).toBe(FORTNIGHT.readings.at(-1)!.localDate);
     expect(SETTLED_TREND_DATE).toBe(FORTNIGHT_SOURCE.readings.at(-1)!.localDate);
   });
 
   /**
    * The trend is not one of the readings. If it were, the section would be
-   * showing fourteen numbers and then one of them again, and the argument it
-   * makes is that the fourteenth morning's figure is not the answer.
+   * cycling through fourteen numbers and then showing one of them again, and
+   * the argument it makes is that no single morning was the answer.
    */
   it("is a figure none of the mornings gave", () => {
-    expect(MORNINGS.map((morning) => morning.reading)).not.toContain(SETTLED_TREND);
+    expect(MORNING_READINGS).not.toContain(SETTLED_TREND);
+  });
+
+  /** Slow enough to read a figure and see that it changed. */
+  it("cycles at a pace somebody can read", () => {
+    expect(MORNING_CYCLE_MS).toBeGreaterThanOrEqual(600);
+    expect(MORNING_CYCLE_MS).toBeLessThanOrEqual(1500);
   });
 });

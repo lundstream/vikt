@@ -1,4 +1,4 @@
-import { FLICKER_READINGS, MORNING_STEP_MS, MORNINGS, SETTLED_TREND } from "./seeded.js";
+import { MORNING_CYCLE_MS, MORNING_READINGS } from "./seeded.js";
 
 /**
  * The landing page's behaviour (D173).
@@ -25,9 +25,21 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia?.(REDUCED).matches ?? false;
 }
 
-/** Swedish figures: space as the thousands separator, no decimals. */
-function formatKcal(value: number): string {
-  return Math.round(value).toLocaleString("sv-SE");
+/**
+ * Swedish figures: space as the thousands separator, a comma for the decimal.
+ *
+ * `shared`'s `formatDecimal` says the same thing and is the one every screen in
+ * the app goes through. It is not imported here: this page's budget is 15 kB of
+ * its own code, and both of these figures are also rendered by React into the
+ * markup before this runs, from `seeded.ts`, which does go through the shared
+ * rules. So what this produces has to match a string already on the page, and
+ * a disagreement about a comma would be visible the moment the count-up ends.
+ */
+function swedish(value: number, decimals: number): string {
+  return value.toLocaleString("sv-SE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }
 
 /**
@@ -51,53 +63,95 @@ function digitsOf(element: HTMLElement): HTMLElement {
 }
 
 function countTo(element: HTMLElement, target: number): void {
-  const from = Math.round(target * 0.6);
   const start = performance.now();
   const duration = 900;
-
   const digits = digitsOf(element);
+
+  /*
+    A weight is one decimal and a kilocalorie is none (§4.1), and this counted
+    every figure as whole. It was only ever pointed at kcal until the trend card
+    started using it, and then 84,5 counted up and landed on "84": a weight
+    written the way this app never writes one, on the figure whose whole job is
+    to be the trend.
+
+    Read off the target rather than passed in, because the target is the value
+    the page is showing and its shape is the answer.
+  */
+  const decimals = Number.isInteger(target) ? 0 : 1;
+  const write = (value: number) => swedish(value, decimals);
+
+  /* Far enough back to read as counting, near enough not to be a different number. */
+  const from = Number((target * 0.6).toFixed(decimals));
 
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / duration);
     // Ease out: a measurement arriving, slowing as it settles.
     const eased = 1 - (1 - t) ** 3;
-    digits.textContent = formatKcal(from + (target - from) * eased);
+    digits.textContent = write(from + (target - from) * eased);
     if (t < 1) requestAnimationFrame(step);
-    else digits.textContent = formatKcal(target);
+    else digits.textContent = write(target);
   };
 
   requestAnimationFrame(step);
 }
 
-/**
- * The daily number, flickering through plausible readings before it settles on
- * what the trend says.
- *
- * This is the section's argument in one element: the same body, weighed on six
- * different mornings, is six different numbers, and the seventh is the only one
- * that means anything. It runs once, for about a second, and then stops.
- */
-function flicker(element: HTMLElement): void {
-  const digits = digitsOf(element);
-  const readings = [...FLICKER_READINGS];
-  let index = 0;
-  const every = 110;
-  /*
-    It settles when the last of the fourteen mornings has landed, which is what
-    the two together are saying: those readings, this figure. Derived from the
-    step rather than typed as a round number next to it, so moving one moves
-    both (D179).
-  */
-  const ticks = Math.max(1, Math.round((MORNINGS.length - 1) * MORNING_STEP_MS) / every);
+/** Half the crossfade: how long the old figure takes to go before the new one. */
+const FADE_MS = 160;
 
-  const id = window.setInterval(() => {
-    digits.textContent = readings[index % readings.length]!;
-    index += 1;
-    if (index >= ticks) {
-      window.clearInterval(id);
-      digits.textContent = SETTLED_TREND;
-    }
-  }, every);
+/**
+ * The daily number, stepping through the fixture's readings (D180).
+ *
+ * The left card's whole content is that **this number is different every
+ * morning**, so it keeps changing: one reading at a time, with a short
+ * crossfade so a change reads as a new reading rather than as digits rolling.
+ * Tabular figures, so nothing shifts while it does.
+ *
+ * ## Why it loops, where §5 says everything that moves stops
+ *
+ * Because what it says has no end state. A trend settles and a line finishes
+ * drawing; a daily weight does not, and a card that showed one reading and
+ * stopped would be making the opposite point to the one beside it. §5's
+ * exception for a thing with no end state is written for the **background**,
+ * and this is the subject, so it is not covered by it: D180 carries its own
+ * reasoning.
+ *
+ * What keeps it honest is that it runs **only while it is on screen**. An
+ * observer starts and stops it, so a reader who has scrolled past pays nothing
+ * for it, and neither does a tab nobody is looking at.
+ */
+function cycleReadings(element: HTMLElement): () => void {
+  const digits = digitsOf(element);
+  let index = 0;
+  let timer: number | null = null;
+  let fade: number | null = null;
+
+  const step = () => {
+    index = (index + 1) % MORNING_READINGS.length;
+    element.classList.add("figure-fading");
+    fade = window.setTimeout(() => {
+      digits.textContent = MORNING_READINGS[index]!;
+      element.classList.remove("figure-fading");
+    }, FADE_MS);
+  };
+
+  const watcher = new IntersectionObserver(
+    ([entry]) => {
+      const onScreen = entry?.isIntersecting === true;
+      if (onScreen && timer === null) timer = window.setInterval(step, MORNING_CYCLE_MS);
+      else if (!onScreen && timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    },
+    { threshold: 0.2 },
+  );
+  watcher.observe(element);
+
+  return () => {
+    watcher.disconnect();
+    if (timer !== null) window.clearInterval(timer);
+    if (fade !== null) window.clearTimeout(fade);
+  };
 }
 
 /**
@@ -133,13 +187,6 @@ function revealOnce(onReveal: (element: HTMLElement) => void): IntersectionObser
  */
 function renderFinalFrame(root: ParentNode): void {
   for (const element of root.querySelectorAll(".reveal")) element.classList.add("revealed");
-  /*
-    The fourteen mornings carry their own delay off `.revealed`, and the rule
-    for reduced motion zeroes it, so revealing their list is enough. They are
-    marked as well as the list, because the list is what the observer watches
-    and a reader with no `IntersectionObserver` gets neither otherwise.
-  */
-  for (const element of root.querySelectorAll(".morning")) element.classList.add("revealed");
 }
 
 export function startLandingMotion(root: ParentNode = document): () => void {
@@ -214,11 +261,17 @@ export function startLandingMotion(root: ParentNode = document): () => void {
 
   /* -------------------------------------------------- the daily reading -- */
 
-  const flickers = revealOnce((element) => flicker(element));
-  for (const element of root.querySelectorAll<HTMLElement>("[data-flicker]")) {
-    flickers.observe(element);
+  /*
+    Only where motion is wanted. Under reduced motion the card keeps the one
+    reading React rendered, which is the finished state of a thing whose whole
+    content is that it changes: there is no better still frame of "this number
+    is different every day" than one of them.
+  */
+  if (!prefersReducedMotion()) {
+    for (const element of root.querySelectorAll<HTMLElement>("[data-cycle]")) {
+      cleanups.push(cycleReadings(element));
+    }
   }
-  cleanups.push(() => flickers.disconnect());
 
   return () => {
     for (const clean of cleanups) clean();

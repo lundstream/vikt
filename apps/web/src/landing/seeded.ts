@@ -335,36 +335,42 @@ const swedish = (value: number, decimals: number) => value.toFixed(decimals).rep
 /* ---------------------------------------------- fourteen mornings, one figure -- */
 
 /**
- * The fortnight, as figures rather than as a second graph (D179).
+ * The fortnight, as two figures rather than as a graph or a table (D179, D180).
  *
  * The hero already shows noise and trend as a picture, and drawing the same
- * argument twice makes the second one decoration. This section states it in
- * numbers instead: fourteen mornings of the same body, and the one figure the
- * app would give you for them.
+ * argument twice makes the second one decoration. Stating all fourteen readings
+ * at once made a **table**, which is the other way to lose the argument: a
+ * reader counts the numbers instead of seeing the point.
+ *
+ * So the section is two figures side by side, in the same cards the maintenance
+ * section uses. The left one cycles through these readings, one at a time, the
+ * way a scale gives you a different number every morning; the right one holds
+ * still, because that is what the trend does.
  */
-export const MORNINGS = FORTNIGHT.readings.map((reading) => ({
-  localDate: reading.localDate,
-  reading: swedish(reading.weightKg, 1),
-}));
-
-/** How far apart the fourteen arrive, and therefore when the figure settles. */
-export const MORNING_STEP_MS = 80;
-
-/** The readings the trend figure flickers through before it settles. */
-export const FLICKER_READINGS = FORTNIGHT.readings
-  .slice(-6)
-  .map((reading) => swedish(reading.weightKg, 1));
+export const MORNING_READINGS = FORTNIGHT.readings.map((reading) =>
+  swedish(reading.weightKg, 1),
+);
 
 /**
- * What the trend says on the fourteenth morning, which is what it settles on.
+ * How long each reading is shown.
+ *
+ * Slow enough to read the figure and notice it is different from the last one,
+ * which is the whole content of the left card. Faster and it is a slot machine.
+ */
+export const MORNING_CYCLE_MS = 900;
+
+/**
+ * What the trend says on the fourteenth morning, which is what the right card
+ * counts up to.
  *
  * `landing-fixture.test.ts` recomputes §4.1 over the whole series and fails if
- * this string is not what the calc says for `SETTLED_TREND_DATE`. That check
- * used to be on the vertices of a drawn line; the line is gone and the value
- * is what is left to be right.
+ * this is not what the calc says for `SETTLED_TREND_DATE`. That check used to be
+ * on the vertices of a drawn line; the line is gone and the value is what is
+ * left to be right.
  */
 export const SETTLED_TREND_DATE = FORTNIGHT.trend.at(-1)!.localDate;
-export const SETTLED_TREND = swedish(FORTNIGHT.trend.at(-1)!.trendKg, 1);
+export const SETTLED_TREND_KG = FORTNIGHT.trend.at(-1)!.trendKg;
+export const SETTLED_TREND = swedish(SETTLED_TREND_KG, 1);
 
 /**
  * The formula's guess and the measured figure.

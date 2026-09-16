@@ -3,7 +3,12 @@ import { HeaderLockup } from "../components/Wordmark.js";
 import { LandingPrimary } from "./LandingPrimary.js";
 import { HeroGraph } from "./TrendDrawing.js";
 import { startLandingMotion } from "./landing-motion.js";
-import { MAINTENANCE, MORNINGS, SETTLED_TREND } from "./seeded.js";
+import {
+  MAINTENANCE,
+  MORNING_READINGS,
+  SETTLED_TREND,
+  SETTLED_TREND_KG,
+} from "./seeded.js";
 import { LandingFooter } from "./Footer.js";
 import { siteConfig } from "../lib/site-config.js";
 
@@ -88,19 +93,20 @@ function Figure({
   value,
   unit,
   className = "",
-  flicker = false,
+  cycle = false,
   countTo,
 }: {
   value: string;
   unit: string;
   className?: string;
-  flicker?: boolean;
+  /** Step through the fixture's readings while the card is in view (D180). */
+  cycle?: boolean;
   countTo?: number;
 }) {
   return (
     <p
       className={`num tabular-nums ${className}`}
-      {...(flicker ? { "data-flicker": "" } : {})}
+      {...(cycle ? { "data-cycle": "" } : {})}
       {...(countTo === undefined ? {} : { "data-count-to": countTo })}
     >
       <span data-figure-value>{value}</span>
@@ -263,55 +269,57 @@ function Tagline() {
 /* -------------------------------------------------- a daily weight is noise -- */
 
 /**
- * Fourteen mornings, and the one figure the app makes of them (D179).
+ * Two figures: the one a scale gives you, and the one the app makes of them
+ * (D179, D180).
  *
- * **No second graph.** This section used to draw the same picture as the hero,
- * with the same marks, by scrolling: noise and a trend line through it. A page
- * that draws its thesis twice has made the second drawing decoration, and §5's
- * question for any motion is what it tells the reader that the finished state
- * does not. So the argument is stated in figures here instead, which is also
- * the form it takes on a bathroom scale.
+ * **Not a table.** This stated all fourteen readings at once, in a grid, and a
+ * grid of fourteen numbers is something a reader counts rather than a point a
+ * reader takes. The argument is that *any one morning* is noise, and the way to
+ * say that is to show one morning at a time and let it keep changing.
  *
- * **Nothing in it responds to scroll.** The fourteen readings arrive when the
- * section is reached and the figure settles when the last of them has landed,
- * and that is the whole of it. The monotonic scroll driver that used to power
- * the line is gone with the line.
+ * So the section takes exactly the shape of the maintenance section below it,
+ * which makes the same kind of comparison: same rule, same container, same two
+ * cards, same figure size. The left card cycles; the right one counts up once
+ * and then holds still, because that is what a trend does.
  *
- * Every figure is a fixture whose trend is computed by the app's own EMA, and
- * never an account.
+ * Under reduced motion the left card shows one reading and stops, which is the
+ * finished state of a thing whose whole content is that it changes: there is no
+ * better still frame of "this number is different every day" than one of them.
  */
 function Noise() {
   return (
     <section id="sa-funkar-det" className="scroll-mt-20 pt-16">
       <Container>
-        <SectionHeading>En dagsvikt är mest brus</SectionHeading>
+        <SectionHeading>Trendvikt, inte dagsvikt</SectionHeading>
 
-        <div className="mt-10 grid gap-10 sm:grid-cols-2 sm:items-center">
-          {/*
-            Seven across and two down, which is a fortnight the way a calendar
-            shows one. Tabular figures, so fourteen numbers in a grid line up
-            instead of jittering column to column, and left aligned like
-            everything else outside the hero: the first column then starts on
-            the same edge as the heading above it.
-          */}
-          <ol className="reveal grid grid-cols-7 gap-x-2 gap-y-3 sm:gap-x-3">
-            {MORNINGS.map((morning, index) => (
-              <li
-                key={morning.localDate}
-                className="morning num tabular-nums text-note text-muted sm:text-metric-sm"
-                style={{ "--i": index } as CSSProperties}
-              >
-                {morning.reading}
-              </li>
-            ))}
-          </ol>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <figure className="reveal rounded-card border border-edge bg-card p-6">
+            <Figure
+              value={MORNING_READINGS[0]!}
+              unit="kg"
+              className="text-figure-sm text-ink"
+              cycle
+            />
+            <figcaption className="mt-2 text-note text-muted">
+              En dagsvikt är mest brus
+            </figcaption>
+          </figure>
 
-          <div className="reveal">
-            <Figure value={SETTLED_TREND} unit="kg" className="text-figure text-ink" flicker />
-          </div>
+          <figure
+            className="reveal rounded-card border border-edge bg-card p-6"
+            style={{ "--i": 1 } as CSSProperties}
+          >
+            <Figure
+              value={SETTLED_TREND}
+              unit="kg"
+              className="text-figure-sm text-ink"
+              countTo={SETTLED_TREND_KG}
+            />
+            <figcaption className="mt-2 text-note text-muted">
+              Fjorton morgnar, en siffra.
+            </figcaption>
+          </figure>
         </div>
-
-        <p className="mt-6 text-micro text-muted">Fjorton morgnar, en siffra.</p>
 
         <p className="mt-6 max-w-prose text-body text-muted">
           Ett kilo upp eller ner över en natt kan bero på salt, sömn och vatten. Trenden visar i
