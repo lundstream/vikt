@@ -744,6 +744,31 @@ failed** (signed in, no horizontal overflow, no blank screen, no transform left
 on the section track), verdict in the set's `verdict.txt`. CI green on `dev`
 for every commit this pass, the last being `5a61902`.
 
+**Exercised through the interface on 2026-09-17**, the rebuilt landing page
+(D173), against the **production build** served by `vite preview` rather than a
+development server:
+
+- **The hero sequence, sampled over time** rather than looked at: 14 of 30
+  readings present at 0,9 s, all 30 by 2,3 s with the line at 69 % undrawn, the
+  line complete by 3,5 s, the tagline fading in after it. That sampling is what
+  found that **neither line ever drew**: the dash length was an undefined custom
+  property, so `stroke-dasharray` computed to `none` and the finished frame
+  looked exactly like the intended one;
+- **the scroll-driven section**, measured at four scroll positions: the stroke
+  offset moves 0,66 to 0,21 as the reader scrolls, so the trend really is drawn
+  by the wheel. A mid-scroll shot with the line half drawn is the proof;
+- **reduced motion**, emulated: captured 900 ms after load with the tagline at
+  opacity 1, both lines drawn, the drift animation `none`, and every reveal
+  already in place. The finished page at once, not a stripped one;
+- **360 px and desktop**, full page, with `scrollWidth` equal to `clientWidth` at
+  360;
+- **Lighthouse at mobile settings**: performance 98, accessibility 100, zero
+  layout shift. Accessibility was 95 until Sten was lightened for the public
+  bundle, which is the contrast finding recorded above;
+- **the three phone screenshots** were regenerated from the seeded demo account
+  by `scripts/landing-shots.mjs`, and the share card by
+  `scripts/share-image.mjs` from the owner's artwork.
+
 **Exercised through the interface on 2026-09-16 and 17**, at 360 px and desktop,
 on the development server, driven through Chrome over CDP:
 
