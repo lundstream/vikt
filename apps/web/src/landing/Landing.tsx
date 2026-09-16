@@ -290,13 +290,15 @@ function Noise() {
           {/*
             Seven across and two down, which is a fortnight the way a calendar
             shows one. Tabular figures, so fourteen numbers in a grid line up
-            instead of jittering column to column.
+            instead of jittering column to column, and left aligned like
+            everything else outside the hero: the first column then starts on
+            the same edge as the heading above it.
           */}
           <ol className="reveal grid grid-cols-7 gap-x-2 gap-y-3 sm:gap-x-3">
             {MORNINGS.map((morning, index) => (
               <li
                 key={morning.localDate}
-                className="morning num tabular-nums text-center text-note text-muted sm:text-metric-sm"
+                className="morning num tabular-nums text-note text-muted sm:text-metric-sm"
                 style={{ "--i": index } as CSSProperties}
               >
                 {morning.reading}
@@ -542,10 +544,14 @@ function Screens() {
                 reads picture then sentence throughout. On two columns the odd
                 rows send it to the second column instead, which alternates the
                 side without reordering anything a screen reader follows.
+
+                Centred only on a phone, where the row is a single column.
+                Beside a column of text it starts at that column's own edge,
+                because the hero is the one centred block on this page.
               */}
               <div className={index % 2 === 1 ? "sm:order-2" : ""}>
                 <img
-                  className="phone-frame mx-auto w-full max-w-[268px]"
+                  className="phone-frame mx-auto w-full max-w-[268px] sm:mx-0"
                   src={screen.src}
                   alt={screen.alt}
                   width={640}
