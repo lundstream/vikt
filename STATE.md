@@ -709,6 +709,41 @@ failed** (signed in, no horizontal overflow, no blank screen, no transform left
 on the section track), verdict in the set's `verdict.txt`. CI green on `dev`
 for every commit this pass, the last being `5a61902`.
 
+**Exercised through the interface on 2026-09-16 and 17**, at 360 px and desktop,
+on the development server, driven through Chrome over CDP:
+
+- **The restore check on Administration, Backup** (D168), against the API image
+  built from this tree and run with the development database and a host
+  directory bound at `/backups`, because the workstation has no `pg_dump` and
+  because that is the arrangement production will have. Migration
+  `0031_restore_checks` applied on the way up (1 applied, 32 recorded), `id`
+  inside the container is uid 1000 writing the bound directory, and the
+  destination and a time were set **on the screen**. The scheduler then wrote
+  `vikt-20260915T232635Z.dump.enc`, 336 112 bytes, on the host side of the
+  mount, and the check it triggers read it back: **ok, 46 tables, 3 912 rows, 32
+  migrations**, then the same from `docker exec … node dist/restore-check.js`,
+  exit 0, and **zero** `vikt_restorecheck%` databases left behind. The screen
+  reads "Senaste återställningstest: tisdag 15 september, gick att läsa in: 46
+  tabeller, 3 912 rader", in Sten (`rgb(107, 123, 130)`), with no page overflow
+  at 360 px;
+- **Samband's rings** (D170) on `samband@example.test`: twelve weekly points,
+  **eleven filled and one hollow**, the ring on the week the intake moved, the
+  note naming the same 400 kcal the calc uses, and `scrollWidth` equal to
+  `clientWidth` at 360 px. The pane's two scatter groups are visibly different
+  marks: one `fill` set, one `fill="none"`;
+- **The coach, live, in three tones on two accounts** (D171), through
+  `coach-probe.ts` against `qwen3.6:27b` on the LAN: all six replies are in D155
+  verbatim. The sheet's interpretation appears in **all six** (4, 1, 2, 5, 5 and
+  5 marked sentences out of 10, 4, 5, 6, 8 and 7), against one of six before,
+  and the new causal check refused exactly one sentence, of exactly the shape
+  the prompt has forbidden since D155.
+
+**One thing this pass did not exercise**, because it has no interface: the
+release workflow's trigger change (D169). What it has instead is
+`release-workflow.test.ts` over the committed file and the two runs it was
+diagnosed from, `35031311942` (branch, failed) beside `35031311925` (tag, green).
+The first real proof is the next release, and the runbook says so.
+
 **Exercised through the interface on 2026-09-15 and 16**, at 360 px and desktop,
 on the **development server**, not a production build. Driven through Edge over
 CDP, with each screen's measurements written to a verdict file beside its

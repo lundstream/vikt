@@ -9007,7 +9007,16 @@ did the pull quietly do nothing?**
 
 The API now writes `api build` with the version and the short commit as the
 first line after it binds, and `scripts/stack.mjs` includes it in the excerpt it
-prints. That excerpt is described in the script as "the lines INFRA.md step 6
+prints.
+
+**Two documents had been saying it already.** STATE.md has described the version
+as sitting "as the first line of the boot log" since D151, and the runbook reads
+step 6 as a list of lines to compare against. Both were describing a line that
+was never written: the version reached `/api/health` and the footer of
+Inställningar and stopped there. This is the same class of thing D160 found in
+the registry and D163 found on the host, and it is worth naming as a class:
+**a document can assert a behaviour into existence in everybody's head and
+nowhere else**, and the fix is never to soften the document. That excerpt is described in the script as "the lines INFRA.md step 6
 reads", and it had every line in that list except the one worth reading first.
 
 #### The migrator opened every boot with a notice
