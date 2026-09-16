@@ -260,68 +260,73 @@ phase 3.
 
 ## Inför nästa deploy
 
-**The next deploy is `1.1.1`, and it is cut from the commit "Prepare 1.1.1: a
-deploy is a command that asks its questions first", not from the tip of
-`dev`.** What `dev` gains after that commit (the "minst" sums, search, Samband,
-the coach's interpretation rules, the day table and Excel export, the landing
-copy) is `1.2.0`, and waits until Fredrik has deployed `1.1.1`. INFRA.md step 3
-has the release-branch commands for exactly this.
+**The next deploy is `1.2.0`, and it is everything on `dev` since `1.1.1`.**
+Production runs `1.1.1`. This section is the handover: what changes, what the
+deploy needs that it did not before, and the one command that does it.
 
-**Production runs `1.1.0`**: images built on the workstation from `62dde4f`,
-loaded onto the host as `local/vikt-api:1.1.0` and `local/vikt-web:1.1.0`. The
-`v1.1.0` tag is `0a546a7`, and `apps/*/src` and `packages/shared/src` are
-identical between the two, so "since 1.1.0" means the same from either.
+#### What 1.2.0 changes
 
-#### What `1.1.1` changes in the app
+| | what a user sees |
+|---|---|
+| **"minst" at every span** (D55) | an incomplete macro sum says "minst" with the share of the food behind it, on Översikt, Mat and in the coach's sheet |
+| **Search on Mat** (D165) | a typo inside a long name still finds the food, and the screen says whether it is still looking |
+| **Samband per week** (D166, D170) | intake against trend change, one point per whole week, with the expected line drawn from measured maintenance, and a ring on a week where the eating changed |
+| **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
+| **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
+| **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
+| **A new landing page** (D173) | the public page is rebuilt: a drawn hero, a scroll-driven section, real screenshots, and a share card |
 
-- **The `.select` cascade (D162).** Four duplicate `.select` blocks were
-  winning over the one written on purpose, since the repository's first commit.
-  Removing them changes every dropdown in four measured ways, all towards what
-  `.field` already does: **corner radius** `6px` to `8px`; **surface in the dark
-  theme** from Natt, the page colour, to Skymning, the card colour; **padding**
-  `8px` to `10px`; **font size** `16px` to `15px` (`text-body`). A fifth line in
-  D162's table is the light theme's **chevron**, `#6B7B82` to `#5c6b72`, which
-  had been drawing the dark theme's grey. A stylelint rule now fails the build
-  on a duplicate selector.
-- **Coach rules: none.** `COACH_RULES` and the tone blocks are byte-identical to
-  `1.1.0`. The alcohol pass (`cf6ffc0`) tested the coach against a thick
-  fixture and changed no prompt text; the fixture seeder is a development
-  script and does nothing in production.
-- **Nothing else in `apps/*/src` or `packages/shared/src`.** The rest since
-  `1.1.0` is tooling, tests, the host-side scripts and the runbook.
+#### What the deploy needs that 1.1.1 did not
 
-#### What it does not change
+- **Two migrations, `0030_food_search_fold` and `0031_restore_checks`.** Both
+  additive. `0030` adds a generated column and a trigram index to `food_items`
+  and needs ownership of that table; it rewrites the table, so on a large
+  catalogue it is the slow one. `0031` adds a table and needs ownership of the
+  database. **Neither needs superuser**, and `0031` is not the same as the
+  `CREATEDB` the restore check needs at runtime. Step 6 should report
+  `Migrations: 2 applied, 32 recorded in total`.
+- **`BACKUP_HOST_DIR`, and the directory behind it** (D168). The compose reads
+  `${BACKUP_HOST_DIR:?...}`, so the stack **refuses to start without it**. On the
+  Docker host, before the deploy:
 
-- **No migration.** `apps/api/drizzle` is untouched since `v1.1.0`: 30 files at
-  both. Step 6 expects `Migrations: 0 applied, 30 recorded in total`.
-- **No new variables.** `infra/docker-compose.portainer.yml`,
-  `apps/api/src/env.ts` and `infra/.env.example` are unchanged since `v1.1.0`,
-  and `node scripts/stack.mjs plan` reports "new in the release and not set:
-  none".
+  ```sh
+  sudo mkdir -p /var/backups/vikt/app
+  sudo chown 1000:1000 /var/backups/vikt/app
+  sudo chmod 700 /var/backups/vikt/app
+  ```
 
-#### How it is deployed, and what is new about that
+- **The compose file changed**, so the deploy replaces it: `--release-file`.
+- **`PUBLIC_BASE_URL` reaches the web container now** (D173), for the share
+  card's absolute URLs. It is already a stack variable, so nothing to set.
+- **The release workflow changed** (D169): `release.yml` builds on a tag, a
+  published release or a manual run, not on a push to `main`. `gh release create`
+  is still the command, and it now starts **one** run rather than two of which
+  one always failed.
 
-**The first pull-based deploy of this installation, and the first with no
-password anywhere** (D164). The one stack change besides the tag is
-`IMAGE_REPO`, from `local/` to `ghcr.io/lundstream/`, and the script sets it:
+#### The deploy, as one command
 
 ```sh
-node scripts/stack.mjs plan 1.1.1
-node scripts/stack.mjs deploy 1.1.1 --yes
+node scripts/stack.mjs plan 1.2.0 --release-file \
+  --set BACKUP_HOST_DIR=/var/backups/vikt/app
+
+node scripts/stack.mjs deploy 1.2.0 --release-file \
+  --set BACKUP_HOST_DIR=/var/backups/vikt/app --yes
 ```
 
-`plan` has run read only against production (for `1.1.0`: nothing blocks).
-`deploy --yes` has run only against the test's fake Portainer, so this deploy
-is its first real run. Rollback, with no migration to cross, is
-`node scripts/stack.mjs deploy 1.1.0 --repo local/ --keep-file --yes`; the
-`local/` images are still on the host.
+`plan` first, with the same arguments, and it has to end "nothing blocks this
+deploy". The variable rides in the same update as the compose file and the tag
+(D174), so there is no second restart and no window where the new image is up
+without the directory it writes to.
 
-**Take a backup first (step 1).** Production still has no scheduled backup.
-`backup.sh` is on the host now and equal to the repository (D163), so
-`/srv/vikt/infra/backup.sh` on the host gives a dump in `/var/backups/vikt/`.
-From 1.2.0 the stack also needs `BACKUP_HOST_DIR` and the host directory behind
-it before it will deploy at all (D168), and the compose file changed, so the
-deploy is `--release-file`.
+Rollback is `node scripts/stack.mjs deploy 1.1.1 --keep-file --yes`, and it
+crosses two migrations: both are additive, so `1.1.1` runs against the newer
+schema, and the rollback dump below is what covers anything that is not.
+
+**Take a backup first (step 1), as always.** Production still has no scheduled
+backup configured, so the only copy is the one you take: `/srv/vikt/infra/backup.sh`
+on the host puts a dump in `/var/backups/vikt/`. The host is snapshotted by PBS
+every 24 hours, and a snapshot is crash consistent rather than application
+consistent, which is not the same as a dump (INFRA.md).
 
 The runbook lives in `INFRA.md`, "Deploying a version, in order", because it is
 about **this installation** and this file is public (D119).
@@ -334,6 +339,38 @@ into the runbook; anything a user will see goes into the news post below.
 
 **Färdig text, klistra in som den är** under Administration, Meddelanden. Inga
 tankstreck (§5), och registret är appens eget: du, inte "användaren".
+
+<details>
+<summary>1.2.0</summary>
+
+```markdown
+## Version 1.2.0
+
+**Mat och makron.** En summa som bygger på mat där uppgiften saknas står som
+"minst" i stället för att se komplett ut, och under den står hur stor del av
+energin som faktiskt har uppgiften. Sökningen hittar dig även när du stavar fel
+inuti ett långt namn, och säger när den letar vidare i livsmedelsdatabasen.
+
+**Data.** Under Data finns Dagar: en rad per dag med vikt, trend, intag,
+makron, alkohol, rörelse, steg, sömn, energi, humör, midja och den uppmätta
+underhållsnivån den dagen. Sortera på vilken kolumn du vill. Under
+Inställningar kan du nu ta med dig allt som en Excel-fil, som JSON, eller som
+en CSV-fil per tabell.
+
+**Samband.** Intag mot trendförändring ritas en hel vecka i taget i stället för
+en gång per dag, med en streckad linje för vad 7 700 kcal per kilo säger att
+veckan borde ge. Veckor där snittintaget ändrats mycket ritas som ringar, för
+då hinner trendvikten inte med.
+
+**Coachen.** För varje område den tar upp säger den vad området betyder för
+ditt mål, med appens egna ord och märkt som allmänt när det är allmänt. Den
+hittar fortfarande aldrig på en siffra.
+
+**Startsidan** är ombyggd. Inget av det du har loggat påverkas, och inga
+siffror räknas om.
+```
+
+</details>
 
 <details>
 <summary>1.1.1</summary>
@@ -532,40 +569,34 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. `main` is `0a546a7`, the `v1.1.0`
-tag. **Everything below goes into `1.1.1`**, together with the commit that
-prepares it:
+between what is built and what is running. **`main` is `12a9daa`, the `v1.1.1`
+tag, and production runs it.** Everything below is `1.2.0`:
 
 | | |
 |---|---|
-| `3009d64` | Record the host-side scripts: none were there, now both are equal |
-| `23fd109` | Host-side scripts get a check and an install, and run without compose |
-| `c903b81` | The environment is never listed, and a server can echo the token |
-| `6d55d6f` | The rollback dump is on the host, and production has no backup |
-| `cea4b47` | Record the pass: seven items, one blocked, and three things I got wrong |
-| `cf6ffc0` | Alcohol in the coach when there is something to say about it |
-| `801f597` | Four duplicate blocks were the rule actually in force |
-| `a06151a` | The verdict goes in a file, and the cause was not what I said it was |
-| `04b5d87` | Ask the registry the question the deploy will ask |
-| `30414de` | The retention job would have deleted the rollback dump |
-| `4bac1ae` | No step that asks for a password |
-| `c4bc2dd` | Derive the negative control instead of naming it |
-
-**And these are 1.2.0, not 1.1.1.** They come after the release commit
-`12a9daa`, so a pull request cut from `dev` would ship them; INFRA.md step 3
-cuts the release branch at `12a9daa` instead. 1.2.0 is not prepared yet (item 11
-above), and migration 0030 is among these:
-
-| | |
-|---|---|
-| `5a61902` | The coach says whether something shows, and what each area means |
-| `7533032` | Samband puts intake against trend change one week at a time |
-| `08b17b4` | Search says where it is, and a typo inside a long name is still a match |
 | `472dc6f` | Incomplete sums say "minst", at every span |
+| `08b17b4` | Search says where it is, and a typo inside a long name is still a match |
+| `7533032` | Samband puts intake against trend change one week at a time |
+| `5a61902` | The coach says whether something shows, and what each area means |
+| `0d702d4` | Record the pass: eight items of eleven, and what stays open |
+| `48e5ba2` | A table of days, and the whole account as a real spreadsheet |
+| `8e58952` | The backup leaves the container, and the app reads one back |
+| `1de88b9` | A release builds once, and the log says which build it is |
+| `7803714` | A week where the eating changed is drawn as a ring |
+| `8f1d80b` | The app writes what a number means, and the coach conveys it |
+| `aff770c` | Two rules for §5: motion carries meaning, restraint is the style |
+| `be78245` | Write D172 down, since the commit before it cites one |
+| `2d846d9` | Record the pass: six items of seventeen, and what was exercised |
+| `9bccce6` | The landing page draws the argument before it states it |
+| `d99b4ee` | A stack variable is set by the deploy, not beside it |
 
-**Merging is a deploy**, and "Inför nästa deploy" above is the handover. `main`
-takes these through a pull request when the owner decides to update production,
-not when the suite goes green.
+Two migrations are among them, `0030_food_search_fold` and
+`0031_restore_checks`, and the compose file changed. "Inför nästa deploy" above
+has what that means for the command.
+
+**Merging is a deploy**, and that section is the handover. `main` takes these
+through a pull request when the owner decides to update production, not when the
+suite goes green.
 
 ### Before the next redeploy
 
@@ -577,32 +608,26 @@ Windows and the kill has to be by port.
 
 ## Still open from the briefs
 
-### The 2026-09-15 brief: eight of eleven done, three not started
+### The 2026-09-17 brief: the landing page, the variables, the release
 
-Stopped after a completed item, as the brief allows. **Items 1 to 8 are finished
-on `dev`**: the rollback dump on the host (D159), the environment never listed
-(D158), the host-side scripts (D163), 1.1.1 prepared with `scripts/stack.mjs`
-(D164), "minst" at every span (D55), search feedback and fuzzy matching (D165),
-Samband per week (D166), and the coach's two interpretation rules (D155).
+All three items are done on `dev`. **One requirement inside item 1 is not met and
+is not going to be met by this page**, so it is written here rather than left in
+a commit message:
 
-**Not started, in the brief's order:**
+- **The landing bundle is 57,6 kB of JavaScript gzipped, against the 40 kB the
+  brief asked for.** 45,9 kB of that is react and react-dom, so the page's own
+  code is a quarter of the budget and no amount of work on it reaches the
+  number. What does: prerender the three static public pages at build time and
+  load React only for `/kod`, the one with a form. That is a change to the build
+  pipeline and it was not made in the same pass as the page. CI holds the page
+  at its current weight and names the target when it fails
+  (`apps/web/scripts/check-bundle.mjs`, D173).
 
-- **9. The day table under Data, and the Excel export.** One row per day with
-  weight, trend, intake with coverage, the four macros with "minst", alcohol,
-  activity minutes, steps, sleep, energy, mood, waist, measured maintenance as of
-  the day with its source, and intake minus maintenance; sortable, scrolling
-  sideways on a phone, from a shared calc and formatter. "Exportera till Excel"
-  as a real .xlsx built on the API with a pinned, testable library: the table
-  first, one sheet per raw entity, Swedish headers, decimal comma, dates as
-  dates. A test that the workbook opens and its first sheet equals the table,
-  beside the CSV and JSON export and the same round trip.
-- **10. Landing copy that is no longer true.** "Logga mat på ett tryck", the
-  offline sentence's "butikskällare", "Om AI", and new screenshots from a seeded
-  demo account at phone frame sizes, with no redesign.
-- **11. Prepare v1.2.0.** "Inför nästa deploy" covering items 5 to 10: migration
-  0030 and the role it needs (INFRA.md, "What role a migration needs"), a Nyheter
-  row per user-visible change, and the runbook step. It depends on 9 and 10, so
-  it is last for a reason.
+### The 2026-09-15 brief: all eleven done
+
+Items 1 to 8 landed that pass; 9 (the day table and the Excel export, D167), 10
+(the landing page, which the 2026-09-17 brief replaced with a rebuild rather
+than a copy fix, D173) and 11 (this section, for 1.2.0) landed after it.
 
 **Finished on `dev` the pass before.** Each was a numbered item and each is whole:
 
