@@ -1,16 +1,17 @@
 import type { CSSProperties } from "react";
 import {
-  driftField,
   fortnightGeometry,
   heroGeometry,
   HERO_BOX,
+  MARKS,
   NOISE_BOX,
+  type Reading,
 } from "./seeded.js";
 
 /**
- * The landing page's two graphs (D173, D177).
+ * The landing page's two graphs (D173, D177, D178).
  *
- * ## Why this file exists at all
+ * ## Why this file is allowed Lingon
  *
  * `colour-meaning.test.ts` names the files allowed to use Lingon, and the rule
  * behind the list is that Lingon means **your trend line** and the wordmark.
@@ -18,22 +19,59 @@ import {
  * dated fixtures (`seeded.ts`), so this is not an exception to the rule. It is
  * the rule, on a page where the trend belongs to nobody.
  *
- * ## What the marks mean
+ * ## The marks are the app's marks
  *
- * The same as in the app (profile, page 6): Is for the raw readings, Lingon for
- * the trend, and the endpoint is the mark itself (page 7).
+ * Is for the raw readings, Lingon for the trend, and the endpoint is the mark
+ * itself (profile, pages 6 and 7). The stroke width, the reading radius and the
+ * endpoint radius are `TrendChart.tsx`'s own numbers, and the curve is the same
+ * monotone interpolation, so what a stranger sees here is the line they will
+ * see in the app rather than a drawing of one.
+ *
+ * ## The points and the line advance together
+ *
+ * Each reading knows where it sits along the line and when the line gets there
+ * (`seeded.ts`). The hero uses the second as a delay across the same two
+ * seconds the line takes; the fortnight uses the first as a scroll threshold.
+ * Either way a reading appears just before the line reaches it, left to right,
+ * which is the order the readings happened in. Both used to arrive as a cloud
+ * and then be crossed out by a line.
  */
 
 const LINE = {
   fill: "none",
-  strokeWidth: 3,
+  strokeWidth: MARKS.strokeWidth,
   strokeLinecap: "round",
   strokeLinejoin: "round",
 } as const;
 
 /**
- * The hero: thirty readings arrive, then the trend draws through them and ends
- * in its endpoint.
+ * How far ahead of the line each reading appears, as a fraction of the run.
+ *
+ * Just ahead rather than exactly at it: a dot that appears under the line's cap
+ * is hidden by it at the moment it arrives, and the point of the sequence is
+ * that the reading comes first and the trend follows.
+ */
+const LEAD = 0.05;
+
+/**
+ * The hero times its dots against the clock, so it wants **when** the line
+ * arrives; the fortnight times its dots against how far the reader has
+ * scrolled, so it wants **where**. `seeded.ts` computes both, because the line
+ * draws on an ease-out and the two are not the same number.
+ */
+const arrives = (point: Reading) =>
+  ({ "--enters": Math.max(0, point.enters - LEAD).toFixed(4) }) as CSSProperties;
+
+const passedBy = (point: Reading) =>
+  ({ "--at": Math.max(0, point.at - LEAD).toFixed(4) }) as CSSProperties;
+
+/**
+ * The hero: thirty readings and the trend through them, drawn together over two
+ * seconds, ending in the endpoint.
+ *
+ * **The line enters from the left edge already settled.** It is drawn from the
+ * vertex before the window (`seeded.ts`), so nothing marks where it starts; it
+ * was computed over twice the history the picture shows.
  *
  * **The endpoint appears when the line reaches it**, not before. It used to be
  * timed a hundred milliseconds early, which put a full stop at the end of a
@@ -54,43 +92,25 @@ export function HeroGraph() {
       aria-hidden="true"
       focusable="false"
     >
-      {points.map((point, index) => (
+      {points.map((point) => (
         <circle
-          key={`${point.x}-${point.y}`}
+          key={point.localDate}
           className="hero-reading fill-data"
           cx={point.x}
           cy={point.y}
-          r={2.6}
-          style={{ "--i": index } as CSSProperties}
+          r={MARKS.readingRadius}
+          style={arrives(point)}
         />
       ))}
 
       <path className="hero-line stroke-trend" d={path} pathLength={1} {...LINE} />
 
-      <circle className="hero-endpoint fill-trend" cx={end.x} cy={end.y} r={4.5} />
-    </svg>
-  );
-}
-
-/**
- * The field behind the hero: sparse, slow, and at an opacity where it is
- * texture rather than content.
- */
-export function DriftField() {
-  return (
-    <svg className="h-full w-full" aria-hidden="true" focusable="false" preserveAspectRatio="none">
-      {driftField().map((point) => (
-        <circle
-          key={`${point.x}-${point.y}`}
-          className="drift-point fill-data"
-          cx={`${point.x}%`}
-          cy={`${point.y}%`}
-          r={1.6}
-          style={
-            { "--delay": `${point.delay}s`, "--duration": `${point.duration}s` } as CSSProperties
-          }
-        />
-      ))}
+      <circle
+        className="hero-endpoint fill-trend"
+        cx={end.x}
+        cy={end.y}
+        r={MARKS.endpointRadius}
+      />
     </svg>
   );
 }
@@ -108,9 +128,7 @@ export function DriftField() {
  * leaves the line drawn. Nothing on this page animates in reverse.
  */
 export function NoiseGraph() {
-  const { points, vertices, path } = fortnightGeometry();
-  const first = vertices[0]!.x;
-  const span = vertices.at(-1)!.x - first;
+  const { points, path } = fortnightGeometry();
 
   return (
     <svg
@@ -121,18 +139,12 @@ export function NoiseGraph() {
     >
       {points.map((point) => (
         <circle
-          key={`${point.x}-${point.y}`}
+          key={point.localDate}
           className="noise-reading fill-data"
           cx={point.x}
           cy={point.y}
-          r={3}
-          /*
-            Where the dot sits along the line, compressed into 0 to 0,92.
-            At the full 0 to 1 the last reading's threshold is exactly 1, so it
-            never crossed it and the fourteenth dot never appeared: measured,
-            13 of 14 at the end of the scroll.
-          */
-          style={{ "--at": (((point.x - first) / span) * 0.92).toFixed(3) } as CSSProperties}
+          r={MARKS.readingRadius}
+          style={passedBy(point)}
         />
       ))}
 

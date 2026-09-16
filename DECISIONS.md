@@ -9268,6 +9268,29 @@ they never tilt at all.
 hand, and tilting a picture of a tilted thing says nothing the still one does
 not. There is no 3D on the page and §5's rule stands unqualified again.
 
+**Addendum, 2026-09-17 (D178): reinstated, and named for what it is.** The
+frames turn again, about twelve degrees either way, driven by their own position
+in the viewport. Three things are different from the version D177 withdrew, and
+they are the reason it is allowed back:
+
+- **It is a position, not a drawing.** The frame faces wherever it is on the
+  screen, the way an object on a shelf does, so it follows the scroll in both
+  directions. Everything else on this page draws, and a drawing that undraws
+  itself when the reader scrolls back to re-read a sentence is the opposite of
+  "everything that moves, stops". That distinction is also why this uses
+  `animation-timeline: view()` and the fortnight's line does not.
+- **It carries no meaning, and that is written down rather than dressed up.**
+  §5 asks every animation "what does this tell the reader that the finished
+  state does not", and the honest answer here is nothing. It is decoration.
+  **It is the only decoration on the page and it stays the only one**: the next
+  one has to displace this, not join it.
+- **No shadow.** Natt is a matte, unlit surface; a turning object with a drop
+  shadow is a lit one.
+
+Measured across a frame's whole travel: +12,0°, +6,7°, 0,0°, -6,7°, -12,0°, and
+`box-shadow: none` at every one. Where scroll-driven animations do not exist,
+and under reduced motion, the frames stand square.
+
 **The drifting field is the other exception**, the one §5 names itself: it may
 drift without an end state only because it is background rather than subject. It
 is at 25 % opacity, and `landing-motion.ts` pauses it when the tab is hidden.
@@ -9640,3 +9663,141 @@ accessibility 100, cumulative layout shift 0**. The hero: 4 of 30 readings at
 load: every reading present, both lines drawn, progress 1. 360 px with no page
 overflow, and a mid-scroll shot with the line a third drawn and five of the
 fourteen readings arrived.
+
+---
+
+### D178 — The page draws the app's curve, and the screenshots are a command
+
+A third pass over the landing page. D177 made both lines the app's own
+arithmetic; this one makes them look like the app, and turns the one part of the
+page that was still hand work into something repeatable.
+
+#### The raw screenshots are `pnpm shots:phone`
+
+The three phone pictures are framed by hand in a mockup tool, and D177 recorded
+that as a rule to remember: take them again when Översikt, Mat or Framsteg
+changes visibly. A rule to remember is a rule that will be forgotten, and the
+part of the job that actually takes the time is not the framing.
+
+So the **raw** captures are a command now. `scripts/phone-shots.mjs` renders the
+three screens for the seeded demo account at 440 x 956 CSS px, device scale
+factor 3, dark theme, scrolled to the top, into `docs/screens/raw/`. Framing
+stays manual, because a composed picture is not a capture; everything before it
+is a script.
+
+**It asserts before it writes.** These images are a stranger's first sight of
+the app, and D176 fixed three things a screenshot showed and no test could see.
+A screenshot script is exactly where those come back unnoticed, so each is
+checked in the DOM before the file is written: the trend delta at one decimal,
+the day's kcal figure carrying the nutrition token, the estimate chip lowercase.
+A failed assertion writes no file, because **a raw shot of a defect becomes a
+framed picture of it**.
+
+**And a check that never ran is a failure too.** The run ends by asking whether
+each of the three was exercised anywhere, and names the ones that were not. That
+is the same reason `check-skips.mjs` exists: a check that passed because its
+subject was absent is silence, and this project has been caught by silence twice.
+
+Running it found two things that had nothing to do with screenshots:
+
+- **`seed:dev` computed its dates in UTC** while every row it writes carries a
+  `localDate`, which the app reads as a local calendar date. Between midnight
+  and 02:00 Stockholm the seed wrote a series whose last day was yesterday, so a
+  freshly seeded account read "inget loggat i dag än" on every screen and the
+  maintenance figure fell below its coverage gate. It uses the profile's own
+  zone now.
+- **`landing-screens.mjs` hardcoded the first set's aspect ratio**, 1419 x 2796.
+  The next framed set was 1839 x 3840, which would have stretched all three
+  pictures on the page with nothing to say so. The height is read out of the
+  source PNG's header now, and `landing-screens.test.ts` holds the page's
+  declared `width`/`height` to the files on disk, because a wrong pair there is
+  layout shift on the one page whose score anybody measures.
+
+#### The curve is the app's curve
+
+Both lines were straight segments between daily values. On a fortnight of daily
+readings that is a polyline of fourteen corners where the app draws one
+continuous curve, so the page was illustrating the product with something the
+product does not do.
+
+`seeded.ts` implements the monotone cubic d3 uses and Recharts' `type="monotone"`
+selects, over the same vertices, with `TrendChart.tsx`'s own stroke width, dot
+radius and endpoint radius. The viewBox is 640 wide because that is roughly the
+width the page draws it at, so those three numbers are the app's numbers rather
+than the app's numbers times an arbitrary scale.
+
+Monotone rather than a natural cubic for the reason the chart already gives: a
+natural cubic overshoots and draws a weight nobody recorded. The test samples
+every segment and fails on an overshoot, so that property is checked rather than
+inherited.
+
+#### The line is warmed up before the picture starts
+
+§4.1 seeds the trend on the first reading: `trend[0] = weight[0]`. A line
+computed over exactly the readings on screen therefore **starts on a point**, at
+whatever that morning's water weight was, and spends its first week walking back
+to where the body actually is. That is an artefact of where the picture was
+cropped, and the page was showing it twice.
+
+Each series is computed over more readings than it draws: sixty for the hero,
+forty-two days for the fortnight, of which the last thirty and fourteen are
+shown, with the line drawn from **one vertex before** the window so it enters at
+the left edge rather than beginning inside the picture. There is no dot on its
+start. It is what the app's own chart shows for any window of a longer history.
+
+**The warm-up is not shipped.** An array literal cannot be tree-shaken element
+by element, so the first version sent a hundred numbers to a stranger's phone
+for a picture that does not contain them, and took the page to 59,6 kB of a
+60 kB budget. `fixture.generated.ts` now holds the drawn window and
+`fixture.source.generated.ts` the whole series; only the test imports the
+second, and a test fails if anything that ships starts importing it.
+
+#### The points and the line advance together
+
+Thirty readings used to arrive as a cloud over 1,5 s and then have a line drawn
+through them, which says the trend was fitted to the data afterwards rather than
+accumulated as it came. Now each reading carries where it sits along the line,
+and appears just before the line reaches its date: in the hero across the same
+two seconds, in the fortnight as the scroll passes it.
+
+**That needed two numbers, not one.** The line draws on an ease-out and covers
+two fifths of its length in the first quarter of its time, so dots delayed by
+their position fell behind in the middle and were overtaken by the line they
+were meant to precede. `seeded.ts` inverts the easing, so each dot carries both
+where the line reaches it and when. Measured: 40 % drawn at 12 of 30 readings,
+73 % at 22, 90 % at 27.
+
+#### Everything else
+
+- **The drifting field is gone.** It was the one thing on the page with no end
+  state, allowed by §5 only as background. At hero size it read as dust on the
+  lens, and the graph's own readings are the noise the page is about. Nothing on
+  the page runs without an end now, so nothing pauses with the tab either.
+- **The hero's scatter is the fortnight's scatter**, about 0,8 kg from the
+  trend. It was twice as wide, which between the two pictures said the noise
+  gets smaller the longer you look at it, and the page argues the opposite.
+- **The hero block is centred** and every other section is left aligned. It is
+  the one section that is a single column with nothing beside it to align to.
+- **"En dagsvikt är mest brus" has the rule the other sections have.** Its
+  heading sat inside the first column of a two-column grid, so the rule ran
+  across half the page and the section read as a card.
+- **The phone pictures are one to a row**, each with a sentence beside it, sides
+  alternating. At a third of the container a phone is 280 px wide and its
+  content is unreadable, which makes the picture decoration.
+- **README shows the same three files as the page**, so there is one
+  hand-maintained set rather than two. The pair that used to be README's own
+  came from the sweep D177 deleted and nothing regenerated them.
+
+#### The sweep can see the landing page again
+
+`shoot2.mjs` measures a page, sets the viewport to that height and captures it
+whole, which keeps Recharts from re-measuring mid-shot. The landing page's hero
+is `min-h-[100svh]`, so that makes the hero alone fill the capture and
+everything below it falls outside: two sweeps in a row produced a landing shot
+of one stretched hero and recorded "ok" against it.
+
+The strategy is **chosen by measuring** now, not by a list of page names: the
+page is measured at the nominal viewport and again at a taller one, and if its
+height moved with the window it is captured with `captureBeyondViewport` at the
+normal height instead. The verdict line names which was used, so a shot is never
+read as proving more than it does.

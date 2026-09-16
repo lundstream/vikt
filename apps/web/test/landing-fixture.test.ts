@@ -1,7 +1,19 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { computeTrend } from "shared";
 import { FORTNIGHT, HERO } from "../src/landing/fixture.generated.js";
-import { fortnightGeometry, heroGeometry, type Geometry } from "../src/landing/seeded.js";
+import {
+  FORTNIGHT_SOURCE,
+  HERO_SOURCE,
+} from "../src/landing/fixture.source.generated.js";
+import {
+  fortnightGeometry,
+  heroGeometry,
+  HERO_BOX,
+  NOISE_BOX,
+  type Geometry,
+} from "../src/landing/seeded.js";
 
 /**
  * The landing page's lines are the app's own arithmetic (D177).
@@ -16,26 +28,79 @@ import { fortnightGeometry, heroGeometry, type Geometry } from "../src/landing/s
  * this recomputes it here: every vertex the page draws has to equal the calc's
  * value for that date. It is the shape of the app's own chart test, pointed at
  * the marketing page.
+ *
+ * ## What changed with the curve (D178)
+ *
+ * The path is a monotone cubic now, the same interpolation `TrendChart.tsx`
+ * uses, so it is no longer a list of straight segments between the vertices.
+ * The check is therefore on the **end points** of those cubics: every segment
+ * has to land exactly on a computed vertex, in order, so the curve passes
+ * through every value the calc produced and the control points only decide how
+ * it travels between them.
+ *
+ * ## And with the warm-up
+ *
+ * Each series is longer than the picture, and the page draws the last `shown`
+ * readings plus the one trend vertex before them. The comparison recomputes
+ * over the **whole** series and looks up each drawn vertex by its own date,
+ * which is also what proves the warm-up is real: the first drawn vertex is not
+ * the first reading, because it was not seeded on it.
  */
 
+/**
+ * Each series twice over: the window the page ships, and the whole series it was
+ * computed from. The comparison is between them, which is what makes this a
+ * check on the page rather than on the generator talking to itself.
+ */
 const SERIES = [
-  { name: "the hero", fixture: HERO, geometry: heroGeometry() },
-  { name: "the fortnight", fixture: FORTNIGHT, geometry: fortnightGeometry() },
+  { name: "the hero", fixture: HERO, source: HERO_SOURCE, geometry: heroGeometry() },
+  {
+    name: "the fortnight",
+    fixture: FORTNIGHT,
+    source: FORTNIGHT_SOURCE,
+    geometry: fortnightGeometry(),
+  },
 ] as const;
+
+/** The end point of every command in a path, which is its last coordinate pair. */
+function anchors(path: string): { x: number; y: number }[] {
+  const command = /[ML]\s+(-?[\d.]+)\s+(-?[\d.]+)|C(?:\s+-?[\d.]+){4}\s+(-?[\d.]+)\s+(-?[\d.]+)/g;
+  return [...path.matchAll(command)].map((match) => ({
+    x: Number(match[1] ?? match[3]),
+    y: Number(match[2] ?? match[4]),
+  }));
+}
+
+/** The four control coordinates of each cubic, in order. */
+function cubics(path: string): number[][] {
+  return path
+    .split(" C ")
+    .slice(1)
+    .map((segment) => segment.trim().split(/\s+/).map(Number));
+}
 
 describe("every trend vertex is what the calc says for that date", () => {
   for (const series of SERIES) {
     it(`${series.name}`, () => {
+      /*
+        Recomputed over the **whole** series, warm-up included, which is the
+        only way the drawn values can be checked at all: a trend computed over
+        just the window would be a different line, seeded on the first reading
+        the page happens to show.
+      */
       const computed = new Map(
         computeTrend(
-          series.fixture.readings.map((reading) => ({
+          series.source.readings.map((reading) => ({
             localDate: reading.localDate,
             weightKg: reading.weightKg,
           })),
         ).map((point) => [point.localDate, point.trend]),
       );
 
-      expect(series.geometry.vertices.length).toBe(series.fixture.readings.length);
+      /* One vertex per drawn reading, plus the one before the window. */
+      expect(series.geometry.vertices.length).toBe(series.fixture.shown + 1);
+      expect(series.geometry.points.length).toBe(series.fixture.shown);
+      expect(series.fixture.readings.length).toBe(series.fixture.shown);
 
       for (const vertex of series.geometry.vertices) {
         const expected = computed.get(vertex.localDate);
@@ -51,21 +116,47 @@ describe("every trend vertex is what the calc says for that date", () => {
   }
 
   /**
-   * And the drawn path is those vertices, in order: a path that had been
-   * smoothed, resampled or hand-adjusted would pass the check above and still
+   * And the drawn curve passes through those vertices, in order: a path that
+   * had been resampled or hand-adjusted would pass the check above and still
    * not be the trend.
    */
   for (const series of SERIES) {
-    it(`${series.name}: the path is the vertices and nothing else`, () => {
-      const drawn = [...series.geometry.path.matchAll(/[ML]\s+(-?[\d.]+)\s+(-?[\d.]+)/g)].map(
-        (match) => ({ x: Number(match[1]), y: Number(match[2]) }),
-      );
-
-      expect(drawn).toEqual(
+    it(`${series.name}: the curve passes through every vertex`, () => {
+      expect(anchors(series.geometry.path)).toEqual(
         series.geometry.vertices.map((vertex) => ({ x: vertex.x, y: vertex.y })),
       );
-      // No curve commands: straight segments between computed points.
-      expect(series.geometry.path).not.toMatch(/[CSQTA]/);
+    });
+
+    /**
+     * Monotone, which is the property the app's chart chose it for: between two
+     * readings the curve may not leave the interval they bound, so it never
+     * draws a weight nobody recorded. Sampled along each cubic, because an
+     * overshoot lives between the end points rather than at them.
+     */
+    it(`${series.name}: the curve never leaves the values it joins`, () => {
+      const vertices = series.geometry.vertices;
+
+      for (const [index, control] of cubics(series.geometry.path).entries()) {
+        const from = vertices[index]!;
+        const to = vertices[index + 1]!;
+        const low = Math.min(from.y, to.y);
+        const high = Math.max(from.y, to.y);
+
+        for (let step = 1; step < 32; step += 1) {
+          const t = step / 32;
+          const u = 1 - t;
+          const y =
+            u * u * u * from.y +
+            3 * u * u * t * control[1]! +
+            3 * u * t * t * control[3]! +
+            t * t * t * to.y;
+          expect(
+            y,
+            `${series.name} overshoots between ${from.localDate} and ${to.localDate}`,
+          ).toBeGreaterThanOrEqual(low - 0.01);
+          expect(y).toBeLessThanOrEqual(high + 0.01);
+        }
+      }
     });
   }
 
@@ -74,16 +165,70 @@ describe("every trend vertex is what the calc says for that date", () => {
     const weights = HERO.readings.map((r) => r.weightKg);
     expect(Math.min(...weights)).toBeGreaterThan(60);
     expect(Math.max(...weights)).toBeLessThan(140);
-
-    /*
-      The fortnight's scatter is what a daily swing actually looks like: about
-      0,8 kg either side of the trend. It was 1,7, which draws a cloud nobody
-      recognises from their own bathroom scale.
-    */
-    const trend = new Map(FORTNIGHT.trend.map((t) => [t.localDate, t.trendKg]));
-    const spread = FORTNIGHT.readings.map((r) => Math.abs(r.weightKg - trend.get(r.localDate)!));
-    expect(Math.max(...spread)).toBeLessThan(0.85);
   });
+
+  /**
+   * Both series scatter by about 0,8 kg from the trend, which is what a day to
+   * day swing actually looks like. The fortnight was once 1,7 and the hero
+   * twice the fortnight, which between them said the noise gets smaller the
+   * longer you look at it, and the page argues the opposite.
+   */
+  for (const series of SERIES) {
+    it(`${series.name}: the readings scatter like a real scale`, () => {
+      const trend = new Map(series.fixture.trend.map((t) => [t.localDate, t.trendKg]));
+      const spread = series.fixture.readings.map((r) =>
+        Math.abs(r.weightKg - trend.get(r.localDate)!),
+      );
+      expect(Math.max(...spread)).toBeLessThan(0.85);
+    });
+  }
+
+  /**
+   * The warm-up, asserted rather than described: the first drawn vertex must
+   * **not** be the first reading of the series. §4.1 seeds on the first
+   * reading, so a trend computed over only what is shown would start exactly on
+   * a point, and the picture would open with an artefact of where it was
+   * cropped rather than with the app's own line.
+   */
+  for (const series of SERIES) {
+    it(`${series.name}: the line is warmed up before the picture starts`, () => {
+      expect(series.source.readings.length).toBeGreaterThan(series.fixture.shown);
+
+      const firstDrawn = series.geometry.vertices[0]!;
+      const seeded = series.source.readings[0]!;
+      expect(firstDrawn.localDate).not.toBe(seeded.localDate);
+      expect(firstDrawn.trendKg).not.toBe(seeded.weightKg);
+
+      /*
+        And the drawn window really is the end of the series, rather than a
+        second fixture that happens to look similar.
+      */
+      expect(series.fixture.readings.at(-1)!.localDate).toBe(
+        series.source.readings.at(-1)!.localDate,
+      );
+      expect(series.fixture.readings[0]!.localDate).toBe(
+        series.source.readings.at(-series.fixture.shown)!.localDate,
+      );
+    });
+  }
+
+  /**
+   * Each reading knows where it sits along the line, which is what lets the
+   * points and the line advance together instead of a cloud being crossed out
+   * by a curve. The fractions have to run forward, start after the line has
+   * entered, and reach the end.
+   */
+  for (const series of SERIES) {
+    it(`${series.name}: every reading is placed along the line`, () => {
+      const places = series.geometry.points.map((point) => point.at);
+
+      expect(places.every((value) => value >= 0 && value <= 1)).toBe(true);
+      expect([...places].sort((a, b) => a - b)).toEqual(places);
+      // The first reading is one vertex in, and the last is the end of the line.
+      expect(places[0]).toBeGreaterThan(0);
+      expect(places.at(-1)).toBeCloseTo(1, 5);
+    });
+  }
 });
 
 describe("the geometry", () => {
@@ -92,13 +237,57 @@ describe("the geometry", () => {
       (point) => point.x >= 0 && point.x <= box.width && point.y >= 0 && point.y <= box.height,
     );
 
+  /* The boxes the components draw into, not numbers copied into a test. */
   it("stays inside its own viewBox", () => {
-    expect(inBox(heroGeometry(), { width: 320, height: 150 })).toBe(true);
-    expect(inBox(fortnightGeometry(), { width: 320, height: 150 })).toBe(true);
+    expect(inBox(heroGeometry(), HERO_BOX)).toBe(true);
+    expect(inBox(fortnightGeometry(), NOISE_BOX)).toBe(true);
   });
 
-  it("puts a reading on the page for every reading in the fixture", () => {
-    expect(heroGeometry().points).toHaveLength(HERO.readings.length);
-    expect(fortnightGeometry().points).toHaveLength(FORTNIGHT.readings.length);
+  /**
+   * A dot per **drawn** reading. The rest of each series is the warm-up: it is
+   * computed and never displayed, and a picture that showed all sixty would be
+   * showing the thing the window exists to crop.
+   */
+  it("puts a reading on the page for every reading it draws", () => {
+    expect(heroGeometry().points).toHaveLength(HERO.shown);
+    expect(fortnightGeometry().points).toHaveLength(FORTNIGHT.shown);
+  });
+
+  /**
+   * The page never imports the warm-up. It is a hundred numbers that exist to
+   * make the line right at build time, and the budget for everything `/` loads
+   * is 60 kB, which the whole series had already taken to 59,6.
+   */
+  it("ships only the window it draws", () => {
+    const src = path.join(import.meta.dirname, "../src");
+    const offenders = readdirSync(src, { recursive: true, encoding: "utf8" })
+      .filter((entry) => /\.(ts|tsx)$/.test(entry))
+      /*
+        An import, not a mention: two comments point at the source file to
+        explain why it exists, and a check that cannot tell those from an import
+        is a check that fails for being right.
+      */
+      .filter((entry) =>
+        /from\s+["'][^"']*fixture\.source|import\(\s*["'][^"']*fixture\.source/.test(
+          readFileSync(path.join(src, entry), "utf8"),
+        ),
+      );
+
+    expect(
+      offenders,
+      "the warm-up series is imported by something that ships, which puts it in the bundle",
+    ).toEqual([]);
+  });
+
+  /**
+   * The line starts at the left edge. Its first vertex is the one before the
+   * window, so the curve enters the picture rather than beginning inside it,
+   * and there is no dot at its start.
+   */
+  it("enters at the left edge, with no reading on it", () => {
+    for (const geometry of [heroGeometry(), fortnightGeometry()]) {
+      expect(geometry.vertices[0]!.x).toBe(0);
+      expect(geometry.points.every((point) => point.x > 0)).toBe(true);
+    }
   });
 });

@@ -55,20 +55,24 @@
 }
 
 /**
- * The field behind the hero. The one thing on this page with no end state,
- * allowed by §5 only because it is the background rather than the subject, at
- * an opacity where it reads as texture.
+ * The hero's sequence, in one place, because the three timings below only mean
+ * anything together (D178).
  *
- * `landing-motion.ts` pauses it when the tab is hidden: an animation nobody is
- * looking at is a timer that keeps a phone's compositor awake.
+ * The line takes two seconds, and **the readings advance with it**: each dot's
+ * delay is where it sits along the line, so the picture builds left to right in
+ * the order the readings happened. It used to be thirty dots arriving as a
+ * cloud over 1,5 s and then a line drawn through them afterwards, which says
+ * the trend was fitted to the data at the end rather than accumulated as it
+ * came.
+ *
+ * The drifting field that used to sit behind all this is gone. It was the one
+ * thing on the page with no end state, allowed by §5 only as background, and at
+ * hero size it read as dust on the lens. The graph's own points are the noise;
+ * the page does not need a second, meaningless kind.
  */
-@keyframes drifts {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(14px, -22px, 0);
-  }
+:root {
+  --hero-line-start: 300ms;
+  --hero-line-duration: 2000ms;
 }
 
 .hero-reading {
@@ -76,8 +80,14 @@
   transform-box: fill-box;
   transform-origin: center;
   animation: reading-arrives 260ms ease-out both;
-  /* Thirty of them across 1,5 s: the last one lands as the line starts. */
-  animation-delay: calc(var(--i) * 50ms);
+  /*
+    When the line reaches this reading, as a fraction of its two seconds.
+    `--enters` is not where the dot sits along the line: the line eases out and
+    covers two fifths of its length in the first quarter of its time, so dots
+    delayed by position fell behind in the middle and were overtaken by the line
+    they were meant to precede. `seeded.ts` inverts the easing below.
+  */
+  animation-delay: calc(var(--hero-line-start) + var(--enters) * var(--hero-line-duration));
 }
 
 /*
@@ -91,45 +101,37 @@
 .hero-line {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: line-draws 2000ms cubic-bezier(0.33, 0, 0.2, 1) both;
-  animation-delay: 1500ms;
+  /* The same four numbers as `LINE_EASING` in `seeded.ts`, which inverts them. */
+  animation: line-draws var(--hero-line-duration) cubic-bezier(0.33, 0, 0.2, 1) both;
+  animation-delay: var(--hero-line-start);
 }
 
 /*
-  The endpoint arrives when the line reaches it: 1500 ms of readings plus 2000 ms
-  of drawing. It was 3400 ms, a hundred early, which is a full stop at the end of
-  a sentence still being written. The three numbers are next to each other so
-  they cannot drift apart again.
+  The endpoint arrives when the line reaches it, which is the start plus the
+  duration and not a number typed next to them. It was once a hundred
+  milliseconds early, a full stop at the end of a sentence still being written.
 */
 .hero-endpoint {
   opacity: 0;
   animation: settles-in 260ms ease-out both;
-  animation-delay: 3500ms;
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration));
 }
 
 /* The words, after the line has said the same thing without them. */
 .hero-tagline {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: 3600ms;
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 150ms);
 }
 .hero-sentence {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: 3900ms;
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 450ms);
 }
 .hero-actions {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: 4150ms;
-}
-
-.drift-point {
-  animation: drifts var(--duration, 30s) ease-in-out var(--delay, 0s) infinite alternate;
-}
-
-.drift-paused .drift-point {
-  animation-play-state: paused;
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 700ms);
 }
 
 /* --------------------------------------------------- revealed on scroll -- */
@@ -191,14 +193,65 @@
 /* ------------------------------------------------------------ the phones -- */
 
 /**
- * The phone frames reveal like the cards do, and that is all (D177).
+ * Each phone frame turns with its own position in the viewport (D178).
  *
- * They used to rest at a perspective tilt and come level on scroll, which was
- * the only three-dimensional move on the page and needed D173 to write down an
- * exception for it. The exception is withdrawn: the images are photographs of a
- * framed phone already, and tilting a picture of a tilted thing is decoration
- * that says nothing the still frame does not. §5 gets its rule back.
+ * Twelve degrees to the right as it comes up from below, square on when it is
+ * in the middle, twelve to the left as it leaves upward.
+ *
+ * ## Why this one may run in both directions
+ *
+ * Everything else on this page draws, and a drawing that undraws itself when
+ * the reader scrolls back to re-read a sentence is the opposite of §5's
+ * "everything that moves, stops". A **position** is not a drawing: the frame is
+ * facing wherever it is on the screen, the way a real object would be, so
+ * following the scroll backwards is the correct behaviour rather than a bug.
+ * That is what `animation-timeline: view()` is for, and it is why the
+ * fortnight's line does not use it and this does.
+ *
+ * ## What it says, which is nothing
+ *
+ * It is decoration, and D173's addendum records it as the one piece on this
+ * page rather than pretending it carries meaning. §5 says no 3D; the exception
+ * is written down, it is the only one, and it stays the only one.
+ *
+ * No shadow: Natt is a matte, unlit surface, and a turning object with a
+ * drop shadow is a lit one.
  */
+@keyframes frame-turns {
+  from {
+    transform: perspective(1400px) rotateY(12deg);
+  }
+  50% {
+    transform: perspective(1400px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(1400px) rotateY(-12deg);
+  }
+}
+
+/*
+  Only where scroll-driven animations exist. Everywhere else the frames stand
+  straight, which is the finished state and a perfectly good page.
+*/
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .phone-frame {
+      animation-name: frame-turns;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      /*
+        `auto`, and not from the `animation` shorthand, which would set the
+        duration to its initial `0s`. A scroll-driven animation with a zero
+        duration is finished before it begins: that cost this page a whole pass
+        once already (D173).
+      */
+      animation-duration: auto;
+      animation-timeline: view();
+      /* The frame's whole travel across the viewport, entering to gone. */
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
 
 /* ------------------------------------------------------------ the header -- */
 
@@ -234,7 +287,7 @@
 /* ------------------------------------------------------- reduced motion -- */
 
 /**
- * The final frame, at once, and nothing drifting (§5).
+ * The final frame, at once (§5).
  *
  * Every rule above animates *towards* the page's resting state, so this block
  * is a list of end states rather than a second design. A reader who asks for
@@ -248,8 +301,13 @@
   .hero-tagline,
   .hero-sentence,
   .hero-actions,
-  .drift-point {
+  .phone-frame {
     animation: none !important;
+  }
+
+  /* Square on, which is what the frames look like when they are not turning. */
+  .phone-frame {
+    transform: none;
   }
 
   /* The finished graph: the line drawn and every reading present. */

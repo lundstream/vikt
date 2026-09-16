@@ -9,9 +9,9 @@ data instead of a formula.
 Swedish interface. AGPL-3.0. Runs on one small server.
 
 <p align="center">
-  <img src="docs/screens/oversikt.png" alt="The dashboard: trend line, today's calories, macros" width="30%">
-  <img src="docs/screens/mat.png" alt="The food log: search, scan, recent entries" width="30%">
-  <img src="docs/screens/framsteg.png" alt="Progress: milestones, streak, savings pot" width="30%">
+  <img src="docs/screens/oversikt-portrait.png" alt="The dashboard: trend line, today's calories, macros" width="30%">
+  <img src="docs/screens/mat-portrait.png" alt="The food log: search, scan, recent entries" width="30%">
+  <img src="docs/screens/framsteg-portrait.png" alt="Progress: milestones, streak, savings pot" width="30%">
 </p>
 
 ## The thesis

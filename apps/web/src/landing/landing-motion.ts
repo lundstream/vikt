@@ -156,19 +156,13 @@ export function startLandingMotion(root: ParentNode = document): () => void {
     cleanups.push(() => watcher.disconnect());
   }
 
-  /* ------------------------------------------------- the drifting field -- */
-
-  /**
-   * Paused when the tab is hidden (§5). An animation nobody is looking at is a
-   * timer keeping a phone's compositor awake.
-   */
-  const hero = root.querySelector<HTMLElement>("[data-hero]");
-  if (hero) {
-    const sync = () => hero.classList.toggle("drift-paused", document.hidden);
-    document.addEventListener("visibilitychange", sync);
-    sync();
-    cleanups.push(() => document.removeEventListener("visibilitychange", sync));
-  }
+  /*
+    There is no longer anything on this page that runs without an end, so
+    nothing here pauses with the tab (D178). The drifting field behind the hero
+    was the one exception §5 allowed, and it is gone: at hero size it read as
+    dust on the lens, and the graph's own readings are the noise the page is
+    actually about.
+  */
 
   if (!canObserve || prefersReducedMotion()) {
     renderFinalFrame(root);

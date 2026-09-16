@@ -11,6 +11,105 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, third pass
+
+Lighthouse 12.8.2, headless Chrome, **mobile settings**, against the production
+build over https. 2026-09-17, after D178.
+
+| | first | second | third |
+|---|---|---|---|
+| performance | 98 | 98 | **98** |
+| accessibility | 100 | 100 | **100** |
+| cumulative layout shift | 0 | 0 | **0** |
+| largest contentful paint | 2,2 s | 2,2 s | 2,2 s |
+| total blocking time | 0 ms | 0 ms | 0 ms |
+| speed index | 1,7 s | 1,7 s | 1,7 s |
+
+No accessibility audit failed.
+
+### What the page loads
+
+| | gzipped | budget |
+|---|---|---|
+| the landing chunk | **13,0 kB** | 15 kB |
+| everything `/` fetches | **59,0 kB** | 60 kB |
+
+The fixture grew: the trend is computed over sixty readings and forty-two days
+rather than thirty and fourteen. **Shipping the warm-up took the total to 59,6
+of 60**, so the generator writes two files and the page imports only the window
+it draws (D178). A test fails if anything that ships starts importing the other.
+
+### The hero: the points and the line advance together
+
+| at | readings shown | line drawn |
+|---|---|---|
+| 317 ms | 0 of 30 | not started |
+| 659 ms | 1 of 30 | 5 % |
+| 1 003 ms | 12 of 30 | 40 % |
+| 1 344 ms | 22 of 30 | 73 % |
+| 1 687 ms | 27 of 30 | 90 % |
+| 2 029 ms | 29 of 30 | 97 % |
+| 2 713 ms | **30 of 30** | **drawn**, endpoint at 1,00 |
+
+The two columns track each other, which is the point: 40 % of the line against
+12 of 30 readings, 73 % against 22, 90 % against 27. Delaying each dot by its
+**position** along the line did not do this, because the line eases out and
+covers two fifths of its length in the first quarter of its time; the dots fell
+behind in the middle and the line overtook them. The delays are the inverse of
+the easing (D178).
+
+The endpoint still appears only after the line has arrived.
+
+### The fortnight, at four scroll positions
+
+| the section's top at | progress | readings shown |
+|---|---|---|
+| 0,9 of the viewport | 0 | 0 of 14 |
+| 0,6 | 0 | 0 of 14 |
+| 0,35 | **0,671** | 9 of 14 |
+| 0,1 | **1,0** | **14 of 14** |
+| back at the top | **1,0** | 14 of 14 |
+
+Progress is the maximum seen so far, so scrolling back up leaves the line drawn.
+A mid-scroll shot on a fresh load: progress 0,336 with 4 of 14 readings arrived.
+
+### A phone frame, across its whole travel
+
+The one piece of motion on the page that carries no meaning (D173's addendum).
+Angles read out of the computed matrix:
+
+| where its centre is | angle | shadow |
+|---|---|---|
+| below the fold (1,6 of the viewport) | **+12,0°** | none |
+| entering (0,95) | +6,7° | none |
+| centred (0,50) | **0,0°** | none |
+| leaving (0,05) | -6,7° | none |
+| gone above (-0,6) | **-12,0°** | none |
+
+It follows the scroll in both directions, which is correct for a position rather
+than a drawing, and it is the reason this uses `animation-timeline: view()`
+where the fortnight's line must not.
+
+**A measurement that read zero at every position was the measurement's fault**,
+not the page's: the angle was taken by matching numbers in the whole
+`matrix3d(...)` string, and the 3 in "matrix3d" became the first value and
+shifted every index by one. Read from inside the parentheses instead.
+
+### Reduced motion
+
+Captured 900 ms after load with `prefers-reduced-motion: reduce` emulated: 30 of
+30 hero readings, the line drawn, the endpoint at 1,00, progress 1 with all
+fourteen readings, and the phone frames square at 0,0°. The finished page, at
+once.
+
+### Both widths
+
+360 px: `scrollWidth` 360 against `clientWidth` 360, no overflow, 6 339 px tall
+with the phone rows stacked. Desktop 1 280: 4 932 px tall, the rows two columns
+with the picture alternating sides.
+
+---
+
 ## The landing page, second pass
 
 Same conditions as the first pass: Lighthouse 12.8.2, headless Chrome, **mobile

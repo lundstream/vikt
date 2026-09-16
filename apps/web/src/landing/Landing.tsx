@@ -1,7 +1,7 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { HeaderLockup } from "../components/Wordmark.js";
 import { LandingPrimary } from "./LandingPrimary.js";
-import { DriftField, HeroGraph, NoiseGraph } from "./TrendDrawing.js";
+import { HeroGraph, NoiseGraph } from "./TrendDrawing.js";
 import { startLandingMotion } from "./landing-motion.js";
 import { MAINTENANCE, SETTLED_TREND } from "./seeded.js";
 import { LandingFooter } from "./Footer.js";
@@ -18,11 +18,13 @@ import { siteConfig } from "../lib/site-config.js";
  * ## The rules it is built under (§5, D172)
  *
  * **Motion carries meaning.** Readings arrive one at a time because that is how
- * they are logged; the line draws because a trend accumulates; the two
- * maintenance figures count because they were measured rather than chosen; and
- * in "En dagsvikt är mest brus" the reader draws the trend through the noise by
- * scrolling. Nothing moves in reverse and nothing loops, except the field behind
- * the hero, which is background rather than subject and pauses with the tab.
+ * they are logged, and the line draws through them as they arrive because a
+ * trend accumulates; the two maintenance figures count because they were
+ * measured rather than chosen; and in "En dagsvikt är mest brus" the reader
+ * draws the trend through the noise by scrolling. Nothing moves in reverse and
+ * nothing loops: the drifting field that was the one exception is gone (D178),
+ * because at hero size it read as dust rather than as noise, and the graph's own
+ * points are the noise the page is about.
  *
  * **Restraint is the style.** Natt across the whole page, Skymning on the cards,
  * and no gradient, glow, glass or third dimension anywhere: D177 withdrew the
@@ -160,9 +162,15 @@ function Header() {
 /**
  * A full viewport of Natt, a graph that draws itself, and then the words.
  *
- * The sequence runs on load and owes nothing to scrolling. Thirty readings
- * arrive over 1,5 s, the line draws through them over 2 s, and the endpoint
- * lands **when the line reaches it** rather than a moment before (D177).
+ * The sequence runs on load and owes nothing to scrolling: the readings and the
+ * line advance together, left to right, across two seconds, and the endpoint
+ * lands **when the line reaches it** rather than a moment before (D177, D178).
+ *
+ * **The hero block is centred and the rest of the page is not.** It is the one
+ * section that is a single column of its own: a picture, a claim, a sentence and
+ * one action, with nothing beside it to align to. Every section below has a
+ * heading with a rule across the container, and a centred heading over a
+ * left-aligned paragraph is the shape of a page that has not decided.
  */
 function Hero() {
   return (
@@ -170,12 +178,8 @@ function Hero() {
       data-hero
       className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden py-16"
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-25">
-        <DriftField />
-      </div>
-
       <Container className="relative">
-        <div className="max-w-3xl">
+        <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           <HeroGraph />
 
           <h1 className="hero-tagline mt-10 text-figure text-ink">Gör det lättare</h1>
@@ -185,7 +189,7 @@ function Hero() {
             siffra som hittas på.
           </p>
 
-          <div className="hero-actions mt-8 flex flex-wrap items-center gap-5">
+          <div className="hero-actions mt-8 flex flex-wrap items-center justify-center gap-5">
             <LandingPrimary href="/app">Logga in</LandingPrimary>
             <a className="text-note text-muted transition-colors hover:text-ink" href="#sa-funkar-det">
               Så funkar det
@@ -234,11 +238,17 @@ function Noise() {
   return (
     <section id="sa-funkar-det" data-progress-section className="noise-section scroll-mt-20 pt-16">
       <Container>
-        <div className="grid gap-10 sm:grid-cols-2 sm:items-center">
-          <div className="reveal">
-            <SectionHeading>En dagsvikt är mest brus</SectionHeading>
+        {/*
+          The heading sits above the grid, not inside its first column, so its
+          rule runs the width of the container like every other section's. It
+          used to be inside, which drew a rule across half the page and made
+          this the one section that looked like a card (D178).
+        */}
+        <SectionHeading>En dagsvikt är mest brus</SectionHeading>
 
-            <Figure value={SETTLED_TREND} unit="kg" className="mt-6 text-figure text-ink" flicker />
+        <div className="mt-10 grid gap-10 sm:grid-cols-2 sm:items-center">
+          <div className="reveal">
+            <Figure value={SETTLED_TREND} unit="kg" className="text-figure text-ink" flicker />
 
             <p className="mt-5 max-w-prose text-body text-muted">
               Ett kilo upp eller ner över en natt kan bero på salt, sömn och vatten. Linjen visar i
@@ -413,21 +423,55 @@ function AboutAi() {
 /* ----------------------------------------------------------------- screens -- */
 
 /**
- * Three pictures of the app on a phone.
+ * Three pictures of the app on a phone, one screen to a row.
  *
  * **Made by hand** (D177): framed screenshots of the demo account, produced by
- * the owner and kept in `docs/screens`. `scripts/landing-screens.mjs` resizes
- * them for the web. A sweep cannot produce a composed picture, and the cost is
- * that they go stale silently, so the rule to regenerate them whenever Översikt,
- * Mat or Framsteg changes visibly is written in STATE.md and in the runbook.
+ * the owner from `pnpm shots:phone`'s raw captures and kept in `docs/screens`.
+ * `scripts/landing-screens.mjs` resizes them for the web, and the README shows
+ * the same three files, so there is one hand-maintained set rather than two
+ * (D178). They go stale silently, so the rule to take them again whenever
+ * Översikt, Mat or Framsteg changes visibly is in STATE.md and in the runbook.
  *
- * They reveal like the cards: a fade and twelve pixels, staggered, once.
+ * ## The layout
+ *
+ * A row each rather than three abreast: at a third of the container a phone is
+ * 280 px wide and its content is unreadable, which makes the pictures
+ * decoration. One to a row gives each a sentence beside it saying what the
+ * screen is for, and the side alternates so the eye has somewhere to go.
+ *
+ * ## The one movement that means nothing
+ *
+ * Each frame turns with its own position in the viewport: about twelve degrees
+ * to the right as it comes up from below, square on at the middle, twelve to
+ * the left as it leaves. It is a **position**, not a drawing, so unlike
+ * everything else here it follows the scroll in both directions, which is
+ * exactly what `animation-timeline: view()` is for and why the fortnight's line
+ * does not use it.
+ *
+ * This is decoration, and D173's addendum says so rather than dressing it up:
+ * it tells the reader nothing the still frame does not. It is the only one on
+ * the page and it stays the only one.
  */
 function Screens() {
   const screens = [
-    { src: "/screens/oversikt.png", alt: "Översikten med trendlinjen och dagens siffror" },
-    { src: "/screens/mat.png", alt: "Matloggen med sökning och senast loggade rader" },
-    { src: "/screens/framsteg.png", alt: "Framsteg med milstolpar och sparpotten" },
+    {
+      src: "/screens/oversikt.png",
+      alt: "Översikten med trendlinjen och dagens siffror",
+      title: "Trenden och dagens siffror på ett ställe.",
+      meta: "Trendvikt, senaste vägningen, ätit i dag och den uppmätta underhållsnivån.",
+    },
+    {
+      src: "/screens/mat.png",
+      alt: "Matloggen med sökning och senast loggade rader",
+      title: "Mat loggas med streckkod, en mening eller ett foto.",
+      meta: "Sökning i livsmedelsdatabasen, sparade måltider och favoriter du använder ofta.",
+    },
+    {
+      src: "/screens/framsteg.png",
+      alt: "Framsteg med milstolpar och sparpotten",
+      title: "Milstolpar, streck och potten du fyller på.",
+      meta: "Sparregler du sätter själv, nykterhetsräknare och belöningar du valt i förväg.",
+    },
   ];
 
   return (
@@ -435,19 +479,35 @@ function Screens() {
       <Container>
         <SectionHeading>Appen i telefonen</SectionHeading>
 
-        <div className="mt-10 grid gap-8 sm:grid-cols-3">
+        <div className="mt-10 space-y-16">
           {screens.map((screen, index) => (
-            <img
+            <div
               key={screen.src}
-              className="reveal mx-auto w-full max-w-[280px]"
-              style={{ "--i": index } as CSSProperties}
-              src={screen.src}
-              alt={screen.alt}
-              width={640}
-              height={1336}
-              loading="lazy"
-              decoding="async"
-            />
+              className="grid items-center gap-8 sm:grid-cols-2 sm:gap-12"
+            >
+              {/*
+                The picture comes first in the document on every row, so a phone
+                reads picture then sentence throughout. On two columns the odd
+                rows send it to the second column instead, which alternates the
+                side without reordering anything a screen reader follows.
+              */}
+              <div className={index % 2 === 1 ? "sm:order-2" : ""}>
+                <img
+                  className="phone-frame mx-auto w-full max-w-[268px]"
+                  src={screen.src}
+                  alt={screen.alt}
+                  width={640}
+                  height={1336}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+
+              <div className="max-w-prose">
+                <p className="text-body text-ink">{screen.title}</p>
+                <p className="mt-3 text-micro text-muted">{screen.meta}</p>
+              </div>
+            </div>
           ))}
         </div>
       </Container>

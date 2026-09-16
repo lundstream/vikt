@@ -306,7 +306,7 @@ deploy needs that it did not before, and the one command that does it.
 | **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
 | **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
 | **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
-| **A new landing page** (D173, D177) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic, a scroll-driven section, three phone pictures, and a share card |
+| **A new landing page** (D173, D177, D178) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve, a scroll-driven section, three phone screens one to a row, and a share card |
 | **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
 | **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
 
@@ -332,6 +332,18 @@ deploy needs that it did not before, and the one command that does it.
 - **The compose file changed**, so the deploy replaces it: `--release-file`.
 - **`PUBLIC_BASE_URL` reaches the web container now** (D173), for the share
   card's absolute URLs. It is already a stack variable, so nothing to set.
+- **`SUPPORT_URL`, if the support link is wanted.** The footer's "Bjud på en öl"
+  is dropped rather than shown empty when it is unset (D121), which is why it is
+  absent on `dev` and why nothing is broken there. Production has it in the
+  variables table in INFRA.md; set it in the same panel as the others if it is
+  not there yet:
+
+  | Variable | Value |
+  |---|---|
+  | `SUPPORT_URL` | `https://buymeacoffee.com/lundstream` |
+
+  Verified against the production build with the value set: five footer links,
+  the last being "Bjud på en öl" to that address.
 - **The release workflow changed** (D169): `release.yml` builds on a tag, a
   published release or a manual run, not on a push to `main`. `gh release create`
   is still the command, and it now starts **one** run rather than two of which
@@ -409,9 +421,9 @@ ställen.
 appen, i stället för två. Märkningen för uppskattat värde står med liten
 begynnelsebokstav, som appens övriga märkningar.
 
-**Startsidan** är ombyggd. Kurvan där är ritad av appens egen uträkning, samma
-som ritar din trend. Inget av det du har loggat påverkas, och inga siffror
-räknas om.
+**Startsidan** är ombyggd. Kurvan där är ritad av appens egen uträkning och med
+samma mjuka kurva som din egen graf, inte en bild någon har ritat för hand.
+Inget av det du har loggat påverkas, och inga siffror räknas om.
 ```
 
 </details>
