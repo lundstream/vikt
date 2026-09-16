@@ -85,6 +85,15 @@ export default {
         title: ["1.125rem", { lineHeight: "1.3", letterSpacing: "-0.01em" }],
         body: ["0.9375rem", { lineHeight: "1.5" }],
         note: ["0.8125rem", { lineHeight: "1.45" }],
+        /**
+         * The profile's own `meta` row: Inter 400, 12/16, Sten.
+         *
+         * Between `note`, which is a sentence, and `micro`, which is a label.
+         * The scale had rounded it away into those two, and a line that the
+         * profile specifies to the pixel is a line worth having at that size:
+         * the phone rows on the landing page use it (D179).
+         */
+        meta: ["0.75rem", { lineHeight: "1rem" }],
         micro: ["0.6875rem", { lineHeight: "1.35", letterSpacing: "0.02em" }],
       },
     },

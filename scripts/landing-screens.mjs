@@ -8,6 +8,21 @@
  * hand**: framed screenshots of the demo account, produced by the owner. Writes
  * `apps/web/public/screens/*.png` at a width the page actually displays.
  *
+ * ## The alpha channel survives
+ *
+ * The sources are phones cut out of their background, so every corner of the
+ * image is transparent and the rounded frame has a soft edge. This resized them
+ * through a headless page and captured that, and **a captured page is opaque**:
+ * Chrome paints its own white behind anything transparent unless it is told not
+ * to. The delivered files came out RGB with the page's background baked in,
+ * which on Natt is a white rectangle behind a black phone, hidden only because
+ * the corner happened to be dark.
+ *
+ * `Emulation.setDefaultBackgroundColorOverride` with a zero alpha is what keeps
+ * it, and `landing-screens.test.ts` reads the colour type and the corner pixel
+ * back out of the files, because "it looks right on Natt" is exactly how this
+ * went unnoticed.
+ *
  * ## Why a step at all
  *
  * The sources are a megabyte and a half each, at whatever size the mockup tool
@@ -137,6 +152,13 @@ const client = await connect();
 
 try {
   await client.send("Page.enable");
+  /*
+    No page background at all, so what is transparent in the source is
+    transparent in the capture rather than white.
+  */
+  await client.send("Emulation.setDefaultBackgroundColorOverride", {
+    color: { r: 0, g: 0, b: 0, a: 0 },
+  });
   mkdirSync(TO, { recursive: true });
 
   for (const name of SCREENS) {
@@ -170,8 +192,17 @@ try {
       captureBeyondViewport: true,
     });
     const file = path.join(TO, `${name}.png`);
-    writeFileSync(file, Buffer.from(shot.data, "base64"));
-    process.stdout.write(`wrote ${path.relative(ROOT, file)} (${WIDTH}x${height})\n`);
+    const bytes = Buffer.from(shot.data, "base64");
+    writeFileSync(file, bytes);
+
+    /* Colour type 6 is RGBA. Said here as well as in the test, because a run
+       that silently flattened would otherwise look like a successful run. */
+    const colourType = bytes.readUInt8(25);
+    process.stdout.write(
+      `wrote ${path.relative(ROOT, file)} (${WIDTH}x${height}, ` +
+        `${colourType === 6 ? "with alpha" : `NO ALPHA, colour type ${colourType}`})\n`,
+    );
+    if (colourType !== 6) process.exitCode = 1;
   }
 } finally {
   client.close();

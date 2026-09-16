@@ -556,8 +556,9 @@ function Screens() {
               </div>
 
               <div className="max-w-prose">
+                {/* The profile's own two rows: body 15/22 in Snö, meta 12/16 in Sten. */}
                 <p className="text-body text-ink">{screen.title}</p>
-                <p className="mt-3 text-micro text-muted">{screen.meta}</p>
+                <p className="mt-3 text-meta text-muted">{screen.meta}</p>
               </div>
             </div>
           ))}

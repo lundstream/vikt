@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +20,15 @@ import { describe, expect, it } from "vitest";
  *
  * So the size is read out of the files and compared with what the page claims.
  * Both halves come from disk; neither is a number typed into a test.
+ *
+ * ## And the transparency (D179)
+ *
+ * The sources are phones cut out of their background: every corner is empty and
+ * the frame's edge is soft. The resize ran them through a headless page and
+ * captured it, and a captured page is opaque unless Chrome is told otherwise,
+ * so the delivered files were RGB with a white rectangle baked in behind a
+ * black phone. On Natt that is invisible, which is exactly why it needs a test
+ * rather than a look.
  */
 
 const WEB = path.resolve(import.meta.dirname, "..");
@@ -28,6 +38,39 @@ const SCREENS = ["oversikt", "mat", "framsteg"] as const;
 function pngSize(file: string): { width: number; height: number } {
   const header = readFileSync(file).subarray(0, 24);
   return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
+}
+
+/** IHDR's colour type: 6 is RGBA, 4 is grey with alpha, 2 and 0 carry none. */
+const pngColourType = (file: string) => readFileSync(file).readUInt8(25);
+
+/** IHDR's interlace method. Anything but 0 changes how the rows below are laid out. */
+const pngInterlace = (file: string) => readFileSync(file).readUInt8(28);
+
+/**
+ * The alpha of the pixel at 0,0.
+ *
+ * The scanlines are the concatenated IDAT chunks, inflated. Each row begins
+ * with a filter byte, and for the **first** pixel of the first row every filter
+ * predicts from pixels that do not exist, so all five reduce to the stored
+ * value: no un-filtering is needed to read this one pixel. Depth is asserted at
+ * eight bits below, which is what Chrome writes.
+ */
+function firstPixelAlpha(file: string): number {
+  const bytes = readFileSync(file);
+  const parts: Buffer[] = [];
+
+  let at = 8; // past the signature
+  while (at + 8 <= bytes.length) {
+    const length = bytes.readUInt32BE(at);
+    const type = bytes.toString("ascii", at + 4, at + 8);
+    if (type === "IDAT") parts.push(bytes.subarray(at + 8, at + 8 + length));
+    if (type === "IEND") break;
+    at += 12 + length;
+  }
+
+  const scanlines = inflateSync(Buffer.concat(parts));
+  // filter byte, then R G B A of the first pixel.
+  return scanlines.readUInt8(4);
 }
 
 describe("the landing page's phone pictures", () => {
@@ -68,6 +111,33 @@ describe("the landing page's phone pictures", () => {
         `${name}.png is ${actual.height} px tall, the page says ${height}. ` +
           "Run node scripts/landing-screens.mjs and update the img in Landing.tsx.",
       ).toBeLessThanOrEqual(1);
+    });
+  }
+
+  /**
+   * Delivered with their transparency, and empty in the corner.
+   *
+   * The corner is the strongest single check: these are cut-out phones, so 0,0
+   * is outside the frame on every one of them. A file that had been flattened
+   * would have the page's own background there instead, and on Natt nobody
+   * would see it.
+   */
+  for (const name of SCREENS) {
+    it(`${name}.png keeps its alpha channel`, () => {
+      const file = path.join(WEB, "public/screens", `${name}.png`);
+
+      expect(
+        pngColourType(file),
+        `${name}.png is colour type ${pngColourType(file)}; 6 is RGBA. ` +
+          "Run node scripts/landing-screens.mjs, which keeps the alpha.",
+      ).toBe(6);
+      expect(pngInterlace(file), "an interlaced PNG is read differently").toBe(0);
+      expect(readFileSync(file).readUInt8(24), "eight bits a channel").toBe(8);
+
+      expect(
+        firstPixelAlpha(file),
+        `${name}.png has something painted in its top left corner, so it was flattened`,
+      ).toBe(0);
     });
   }
 
