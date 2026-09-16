@@ -117,21 +117,44 @@
   animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration));
 }
 
-/* The words, after the line has said the same thing without them. */
-.hero-tagline {
-  opacity: 0;
-  animation: settles-in 420ms ease-out both;
-  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 150ms);
+/**
+ * The words, after the line has said the same thing without them, and one at a
+ * time (D179).
+ *
+ * Eight pixels and a fade, 120 ms apart, no scale and no bounce. `inline-block`
+ * because a transform does nothing to an inline box, and the spaces between the
+ * words are in the markup rather than in a margin, so the heading still reads as
+ * one sentence when it is copied or read aloud.
+ */
+@keyframes word-arrives {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
+
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  animation: word-arrives 320ms ease-out both;
+  animation-delay: calc(
+    var(--hero-line-start) + var(--hero-line-duration) + 150ms + var(--i) * 120ms
+  );
+}
+/* After the third word has finished arriving: 150 + two steps of 120 + 320. */
 .hero-sentence {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 450ms);
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 730ms);
 }
 .hero-actions {
   opacity: 0;
   animation: settles-in 420ms ease-out both;
-  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 700ms);
+  animation-delay: calc(var(--hero-line-start) + var(--hero-line-duration) + 980ms);
 }
 
 /* --------------------------------------------------- revealed on scroll -- */
@@ -298,7 +321,7 @@
   .hero-reading,
   .hero-line,
   .hero-endpoint,
-  .hero-tagline,
+  .hero-word,
   .hero-sentence,
   .hero-actions,
   .phone-frame {
@@ -315,9 +338,10 @@
     --progress: 1;
   }
 
+  /* The drawn line and all three words at once, which is the finished frame. */
   .hero-reading,
   .hero-endpoint,
-  .hero-tagline,
+  .hero-word,
   .hero-sentence,
   .hero-actions {
     opacity: 1;

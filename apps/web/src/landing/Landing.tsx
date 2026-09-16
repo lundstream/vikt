@@ -182,11 +182,12 @@ function Hero() {
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           <HeroGraph />
 
-          <h1 className="hero-tagline mt-10 text-figure text-ink">Gör det lättare</h1>
+          <Tagline />
 
           <p className="hero-sentence mt-5 max-w-prose text-body text-ink">
-            Trendvikt i stället för dagsvikt, en underhållsnivå räknad ur din egen data, och ingen
-            siffra som hittas på.
+            Lättare att reglera din vikt, lättare att ta bra beslut, lättare att se vad du får i
+            dig. Appen använder trendvikt i stället för dagsvikt, en underhållsnivå räknad ur din
+            egen data och ingen siffra som hittas på.
           </p>
 
           <div className="hero-actions mt-8 flex flex-wrap items-center justify-center gap-5">
@@ -218,6 +219,44 @@ function Hero() {
         </div>
       </Container>
     </section>
+  );
+}
+
+/**
+ * The claim, a word at a time, once the line has finished drawing (D179).
+ *
+ * Each word fades in and rises eight pixels, 120 ms after the one before it. No
+ * scale and no bounce: a word that overshoots and settles is a word performing,
+ * and §5's question is what the movement tells the reader that the finished
+ * state does not. What this one says is that the sentence is being said, after
+ * the picture has already made the same point without words.
+ *
+ * **The full stop is part of the last word**, so the sentence ends the way a
+ * sentence does. There is no exclamation mark on this page and
+ * `copy-style.test.ts` holds that.
+ *
+ * One `<h1>` with three spans inside it, so a screen reader reads one heading
+ * and the page has one first-level heading rather than three.
+ */
+function Tagline() {
+  return (
+    <h1 className="mt-10 text-figure text-ink">
+      {/*
+        Written out rather than mapped over an array. `copy-style.test.ts` reads
+        the strings out of this file's JSX, and copy that lives in a JavaScript
+        array is copy the guards cannot see: the page would have kept its rules
+        about dashes, shouting and exclamation marks only by luck.
+      */}
+      <span className="hero-word" style={{ "--i": 0 } as CSSProperties}>
+        Gör
+      </span>{" "}
+      <span className="hero-word" style={{ "--i": 1 } as CSSProperties}>
+        det
+      </span>{" "}
+      <span className="hero-word" style={{ "--i": 2 } as CSSProperties}>
+        lättare.
+      </span>
+    </h1>
   );
 }
 

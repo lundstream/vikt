@@ -214,6 +214,29 @@ describe("state chips", () => {
  * to. The strings are read out of the JSX by `jsx-copy.ts`, because the
  * landing page deliberately ships without the dictionary.
  */
+/**
+ * Every text node in the landing page's JSX, comments removed, including the
+ * single words `jsxStrings` filters out.
+ */
+function landingTextNodes(): string[] {
+  const source = readFileSync(LANDING_FILE, "utf8")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  return [...source.matchAll(/(?<!=)>([^<>{}]+)</g)]
+    .map((match) => (match[1] ?? "").replace(/\s+/g, " ").trim())
+    .filter((text) => text.length > 0);
+}
+
+/** The tagline, a word to a span, in the order the page says them. */
+function taglineWords(): string[] {
+  const source = readFileSync(LANDING_FILE, "utf8");
+  return [...source.matchAll(/className="hero-word"[^>]*>\s*([^<\s][^<]*?)\s*<\/span>/g)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
 describe("landing page copy", () => {
   const strings = landingStrings();
 
@@ -229,7 +252,15 @@ describe("landing page copy", () => {
    */
   it("is actually being read, section by section", () => {
     expect(strings.length).toBeGreaterThan(25);
-    expect(strings).toContain("Gör det lättare");
+
+    /*
+      The tagline is one word per span now, because it arrives a word at a time
+      (D179), and `jsxStrings` drops anything without a space in it: a single
+      word is usually a class fragment rather than copy. So it is read out of
+      the markup instead, and checked as the sentence the words make, which is
+      what a reader sees.
+    */
+    expect(taglineWords().join(" ")).toBe("Gör det lättare.");
 
     for (const heading of [
       "En dagsvikt är mest brus",
@@ -255,6 +286,23 @@ describe("landing page copy", () => {
 
   it("has no doubled spaces", () => {
     expect(strings.filter((value) => /\s{2,}/.test(value))).toEqual([]);
+  });
+
+  /**
+   * No exclamation mark, anywhere on the page.
+   *
+   * The tagline ends in a full stop on purpose (D179). An exclamation mark is
+   * the punctuation of a page that is selling, and this one is explaining: it
+   * would be the first thing a stranger reads, and it would be the one piece of
+   * the page raising its voice. §5 already refuses all-caps for the same reason,
+   * and this is the same rule in the other direction.
+   *
+   * Read off **every** text node rather than off `strings`, because the extractor
+   * drops single words and the loudest thing on a page is usually one word long.
+   */
+  it("never raises its voice", () => {
+    const shouting = landingTextNodes().filter((value) => value.includes("!"));
+    expect(shouting).toEqual([]);
   });
 
   /**
