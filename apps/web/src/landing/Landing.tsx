@@ -58,13 +58,20 @@ export function Landing() {
       <span data-scroll-sentinel aria-hidden="true" className="block h-px" />
 
       <main>
+        {/*
+          Om AI sits last, above the footer (D180). It answers a question a
+          reader has only once they know what the app does, and it is the one
+          section whose subject is a component rather than a thing they get: a
+          page that explains its language model before it has shown its screens
+          is a page about the model.
+        */}
         <Hero />
         <Noise />
         <Maintenance />
         <WhatItDoes />
-        <AboutAi />
         <Screens />
         <YourData />
+        <AboutAi />
       </main>
 
       <LandingFooter />
@@ -593,7 +600,7 @@ function YourData() {
   return (
     <section className="py-16">
       <Container>
-        <SectionHeading>Dina data</SectionHeading>
+        <SectionHeading>Din data</SectionHeading>
 
         <div className="mt-6 max-w-prose space-y-4 text-body text-muted">
           <p>

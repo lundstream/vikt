@@ -237,6 +237,16 @@ function taglineWords(): string[] {
   );
 }
 
+/** Every section heading the page ships, top to bottom. */
+const PAGE_SECTIONS = [
+  "Trendvikt, inte dagsvikt",
+  "Förbränning mäts utifrån det du loggar",
+  "Vad appen gör",
+  "Appen i telefonen",
+  "Din data",
+  "Om AI",
+];
+
 describe("landing page copy", () => {
   const strings = landingStrings();
 
@@ -262,16 +272,40 @@ describe("landing page copy", () => {
     */
     expect(taglineWords().join(" ")).toBe("Gör det lättare.");
 
-    for (const heading of [
-      "En dagsvikt är mest brus",
-      "Förbränning mäts utifrån det du loggar",
-      "Vad appen gör",
-      "Om AI",
-      "Appen i telefonen",
-      "Dina data",
-    ]) {
+    for (const heading of PAGE_SECTIONS) {
       expect(strings, `the landing section "${heading}" is not being read`).toContain(heading);
     }
+  });
+
+  /**
+   * And in that order, which is a claim the page makes about itself.
+   *
+   * Om AI moved to the bottom (D180), and a list of headings that does not care
+   * where they are would have passed either way.
+   *
+   * **Read from `<main>`, not from the order the functions are written in.**
+   * The first version of this scanned the file for `<SectionHeading>` and got
+   * the order the components are *defined*, which is not the order they are
+   * rendered: it failed against a page that was already correct, which is the
+   * same defect as a check that passes against one that is not.
+   */
+  it("says them in the order the page is built in", () => {
+    const source = readFileSync(LANDING_FILE, "utf8");
+
+    const main = source.slice(source.indexOf("<main>"), source.indexOf("</main>"));
+    const rendered = [...main.matchAll(/<([A-Z]\w*)\s*\/>/g)].map((match) => match[1]!);
+    expect(rendered.length, "no sections found in <main>").toBeGreaterThan(4);
+
+    /** The heading each of those components renders, or nothing if it has none. */
+    const headingOf = (component: string): string | null => {
+      const at = source.indexOf(`function ${component}(`);
+      if (at < 0) return null;
+      const body = source.slice(at, source.indexOf("\n}", at));
+      return body.match(/<SectionHeading>([^<]+)<\/SectionHeading>/)?.[1]?.trim() ?? null;
+    };
+
+    const found = rendered.map(headingOf).filter((heading) => heading !== null);
+    expect(found).toEqual(PAGE_SECTIONS);
   });
 
   it("has no en dashes or em dashes", () => {

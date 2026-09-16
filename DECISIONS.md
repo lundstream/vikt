@@ -9252,9 +9252,16 @@ draws a jagged daily line.
 | En dagsvikt är mest brus | a figure that flickers through six mornings of the same body and settles on the trend, beside fourteen daily readings the reader draws the trend through by scrolling |
 | Underhåll mäts, inte räknas | the formula's number in Sten and the measured one in Snö, both counting up once when reached, both tabular so nothing moves |
 | Det du loggar | six cards, one per area, each in its own accent: Blåbär for food, Gran for the day, Honung for the pot, Is for Samband, and **no accent** for reminders and the coach, because neither is an area |
+| Appen i telefonen | three framed pictures of the demo account, one to a row with a sentence beside each, turning with their own position in the viewport |
+| Din data | self-hosted, AGPL, CSV, JSON and Excel, self-deletion, with the links to `/integritet` and the source |
 | Om AI | one column, no accent: it reads meals and writes the week's summary, it never produces a figure, and it runs on hardware the operator controls |
-| Så ser det ut | three phone frames holding real captures of the seeded demo account, resting at a slight tilt and coming level as they scroll in |
-| Dina data | self-hosted, AGPL, CSV, JSON and Excel, self-deletion, with the links to `/integritet` and the source |
+
+**The order above is the order of the page** (D180). Om AI moved to the bottom,
+below Din data: it answers a question a reader only has once they know what the
+app does, and it is the one section whose subject is a component rather than a
+thing the reader gets. A page that explains its language model before it has
+shown its screens is a page about the model. "Så ser det ut" became "Appen i
+telefonen" (D177) and "Dina data" became "Din data" (D180).
 
 #### Where the motion rules bit
 
