@@ -48,7 +48,17 @@
   --natt: #edf1f2; /* Papper: the page */
   --skymning: #e4e9eb; /* one step up from the page, for cards */
   --dis: #d6dee0; /* fields, raised surfaces, hairlines */
-  --sten: #5c6b72; /* darkened from #6B7B82 to hold 4.5:1 on Papper */
+  /**
+   * Sten, dark enough for 4,5:1 on every light surface (D175).
+   *
+   * This was `#5c6b72`, chosen to hold 4,5:1 on Papper, and it does: 4,86.
+   * What it does not hold is Dis, the raised surface fields and chips sit on,
+   * where it measures **4,05**. `contrast.test.ts` checks every text token
+   * against every surface now rather than against the page alone, which is
+   * what found it. `#55636a` is the nearest darker value on the same hue that
+   * passes all three: Papper 5,46, Skymning 5,08, Dis 4,55.
+   */
+  --sten: #55636a;
   --sno: #16232b; /* the text colour; on light it is the dark one */
 
   /**
@@ -148,7 +158,24 @@
   --scrim: rgb(15 20 24 / 0.72);
   --scrim-flat: rgb(15 20 24 / 0.88);
   --dis: #1e2d36;
-  --sten: #6b7b82;
+  /**
+   * Sten, light enough for 4,5:1 on every dark surface (D175).
+   *
+   * The profile's value is `#6B7B82` and the profile promises 4,5:1. On the
+   * dark theme, which is the primary one, it measured **4,22 on Natt, 3,65 on
+   * Skymning and 3,22 on Dis**: every meta line on a card, and every "inte än",
+   * was below AA for the 12 pt text it is used at. The light theme had always
+   * carried a corrected value with a comment saying why; the dark theme never
+   * did.
+   *
+   * `#85949A` is the nearest lighter value on the same hue that passes on all
+   * three: Natt 5,91, Skymning 5,12, Dis 4,52. **Skymning is not the worst
+   * surface, Dis is**: the obvious correction, `#7A8B92`, passes Skymning at
+   * 4,53 and still fails Dis at 4,00.
+   *
+   * Profile v1.5 carries this value.
+   */
+  --sten: #85949a;
   --sno: #edf1f2;
 
   --lingon: #e0455f;

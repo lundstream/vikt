@@ -224,7 +224,7 @@ The palette carries Norrland names so it can be spoken about. Dark is the primar
 --natt      #0F1418   background
 --skymning  #16232B   cards
 --dis       #1E2D36   fields, raised surfaces, lines
---sten      #6B7B82   secondary text, meta
+--sten      #85949A   secondary text, meta (D175: the profile's #6B7B82 is 3,65:1 on Skymning)
 --sno       #EDF1F2   text, primary button
 
 --lingon    #E0455F   the trend line. The wordmark. Nothing else.

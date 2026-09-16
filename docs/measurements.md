@@ -296,9 +296,36 @@ confirmation appearing: **264 ms**.
 
 ## Contrast and focus
 
+**The "zero failures" below was wrong, and it is left here with its correction
+rather than edited into looking right.**
+
 Audited programmatically across six screens on **both themes** after the theme
 setting landed (D117): **zero** contrast failures against WCAG AA, and a visible
 focus ring on all 186 interactive elements.
+
+What that audit could not see is that it walked rendered screens: it reported
+the pairs it happened to find, and a token is not a pair. Computed from the
+tokens themselves (D175, `apps/web/test/contrast.test.ts`), Sten failed on every
+dark surface it is used on:
+
+| Sten | on Natt | on Skymning | on Dis |
+|---|---|---|---|
+| `#6B7B82`, the profile's value, dark theme | 4,22 | **3,65** | **3,22** |
+| `#85949A`, from D175 | 5,91 | 5,12 | 4,52 |
+| `#5C6B72`, the old light-theme value | 4,86 | 4,51 | **4,05** |
+| `#55636A`, from D175 | 5,46 | 5,08 | 4,55 |
+
+Two things worth keeping from that table. **Skymning is not the worst surface,
+Dis is**, so the obvious correction to `#7A8B92` would have passed the card and
+still failed the field at 4,00. And the light theme had already been corrected
+once by hand, to hold 4,5:1 **on Papper**, which is the same mistake in the
+other direction: one surface checked, the others assumed.
+
+The accents are unchanged and are held to what the profile claims of them:
+4,5:1 against Natt in the dark theme, and 3:1 as marks on the page and on a
+card. The light theme's Is is **2,78:1 on Dis**, which is why the guard checks
+that nothing draws an accent on a Dis surface rather than assuming nothing
+does.
 
 ---
 

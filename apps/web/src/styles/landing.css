@@ -19,33 +19,6 @@
  * page rather than an empty one.
  */
 
-/* --------------------------------------------------------- secondary text -- */
-
-/**
- * Sten, one step lighter, on the public pages only (D173).
- *
- * The profile's Sten is `#6B7B82`, and on the dark theme's surfaces it measures
- * **4,22:1 on Natt and 3,65:1 on Skymning**. The brief for this page requires
- * 4,5:1 and Lighthouse docked the page for exactly these elements, so the
- * public bundle lightens it to `#7C8C94`: 5,32:1 on Natt and 4,61:1 on
- * Skymning, which passes on both surfaces the page alternates between.
- *
- * This is not a new idea. `tokens.css` already darkens Sten to `#5c6b72` in the
- * light theme, with a comment saying it is to hold 4,5:1 on Papper: the same
- * correction, in the other direction. The dark theme never
- * got the same treatment, which means every meta line on a card in the app is
- * at 3,65:1 today. That is a finding about the app rather than about this page,
- * it is recorded in STATE.md, and fixing it is a change to the profile's own
- * value rather than something to do quietly from here.
- *
- * `--sten` rather than `--muted`, so `--uncertain` moves with it: both point at
- * the same palette name, and a page where the uncertain figure passed and the
- * meta line did not would be the sort of half-fix this file exists to avoid.
- */
-:root {
-  --sten: #7c8c94;
-}
-
 /* ------------------------------------------------------------- the hero -- */
 
 /**

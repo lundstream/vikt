@@ -9395,3 +9395,59 @@ and the guard refusing a list that lost one.
 Not as the way to do it, as the fallback for when the token is not to hand. The
 same reasoning as D164's: the panel is not wrong, it is just a place where the
 ordering mistake above is the default rather than an accident.
+
+---
+
+### D175 — Sten is lighter, because the profile's value never held 4,5:1
+
+The profile promises 4,5:1. The dark theme's Sten, `#6B7B82`, measures **4,22 on
+Natt, 3,65 on Skymning and 3,22 on Dis**, and Sten is what every meta line,
+every unit beside a figure and every "inte än" is set in, at 12 px. So the
+promise was false everywhere it mattered most, in the theme the profile calls
+the primary one.
+
+| | old | new | Natt | Skymning | Dis |
+|---|---|---|---|---|---|
+| dark | `#6B7B82` | **`#85949A`** | 5,91 | 5,12 | 4,52 |
+| light | `#5C6B72` | **`#55636A`** | 5,46 | 5,08 | 4,55 |
+
+Both are the nearest value on the same hue that passes on **every** surface,
+lighter in the dark theme and darker in the light one. Profile v1.5 carries
+them.
+
+#### Skymning is not the worst surface
+
+The obvious correction is the one that fixes the card: `#7A8B92` passes Skymning
+at 4,53. It still fails **Dis** at 4,00, and Dis is the raised surface that
+fields and chips sit on, with `bg-field text-muted` in two components today. One
+step further is `#85949A`, which passes all three, and that is the value.
+
+The light theme needed the same treatment. It had been corrected once already,
+by hand, "to hold 4,5:1 on Papper" — the same mistake in the other direction:
+one surface checked and the rest assumed. On Dis it was 4,05.
+
+#### Why nothing caught it
+
+`docs/measurements.md` has claimed **zero contrast failures on both themes**
+since D117, from an audit that walked six rendered screens. An audit of screens
+reports the pairs it happens to encounter; a token is not a pair, and the pair
+that fails may simply not have been on any of the six. The claim was left in
+that file with its correction beside it rather than quietly edited.
+
+`contrast.test.ts` computes it instead: every body-text token against every
+surface token, in both themes, from `tokens.css` itself. Body text is Snö and
+Sten (profile page 3) and is held to 4,5:1. The five accents are marks and large
+figures, held to the 3:1 WCAG puts on those, plus the profile's own claim that
+they clear 4,5:1 against Natt.
+
+**One exclusion, guarded rather than assumed.** Accents are checked on the page
+and on a card, not on Dis, because nothing draws one there: the light theme's Is
+on Dis is 2,78:1 and would fail even 3:1. A second test reads the components and
+fails if anything ever pairs an accent with `bg-field`, so the exclusion cannot
+outlive the fact that justifies it.
+
+#### What it cost
+
+One token in each theme, and the landing page's private override from D173
+deleted: the public pages inherit the corrected Sten like everything else, which
+is what should have happened in the first place.

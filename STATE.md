@@ -68,6 +68,12 @@ when it will be down, and its mail goes out.
   no screen had offered before. Exercised on the development account at 360 px
   and desktop: 90 rows, no page overflow, and the downloaded workbook matching
   the table in 2 014 of 2 014 cells.
+- **Secondary text is readable** (D175). Sten was below AA on every dark
+  surface it is used on, worst on Dis at 3,22:1, while the profile promised
+  4,5:1. It is `#85949A` in the dark theme and `#55636A` in the light one now,
+  and a guard computes every body-text token against every surface in both
+  themes from the tokens themselves, because the audit that reported "zero
+  failures" walked screens and a token is not a pair.
 - **The landing page draws the argument before it states it** (D173). Thirty
   readings arrive, a trend line draws through them, and only then does the page
   say "gör det lättare" in words. Seven sections after it, one scroll-driven:
@@ -1136,25 +1142,25 @@ What the next version should say:
 - **the phone frames**, their tilt, and that it flattens;
 - **Sten on dark surfaces**, below.
 
-### Sten does not hold 4,5:1 in the dark theme
+### Sten holds 4,5:1 now, in both themes (D175)
 
-Measured with the WCAG formula, recorded in `docs/measurements.md`:
+Was open for the owner to decide; decided and done. The profile's `#6B7B82`
+measured **4,22 on Natt, 3,65 on Skymning and 3,22 on Dis**, and Sten is what
+every meta line and every "inte än" is set in.
 
-| | on Natt | on Skymning |
+| | old | new |
 |---|---|---|
-| Sten `#6B7B82`, the profile's value | 4,22:1 | **3,65:1** |
+| dark | `#6B7B82` | **`#85949A`** |
+| light | `#5C6B72` | **`#55636A`** |
 
-**Every meta line and every "inte än" on a card in the app is at 3,65:1.** The
-light theme already knows: `tokens.css` darkens Sten to `#5c6b72` there, with a
-comment saying it is to hold 4,5:1 on Papper. The dark theme, which is the
-primary one, never got the same correction.
+Both are the nearest value on the same hue that passes on every surface.
+**Skymning was not the worst surface, Dis was**, so the obvious correction to
+`#7A8B92` would have passed the card and still failed the field. The landing
+page's private override from D173 is deleted, and `contrast.test.ts` computes
+every body-text token against every surface in both themes from `tokens.css`.
 
-The public pages lighten it to `#7C8C94` (5,32:1 and 4,61:1) because D173's
-brief holds them to 4,5:1 and Lighthouse docked the page for exactly those
-elements. **The app is unchanged**, because the same correction there is a
-change to the profile's own value on every screen, and that is the owner's call
-rather than a side effect of a landing page. Lightening `--sten` in the dark
-theme block of `tokens.css` is the whole change if you want it.
+**Profile v1.5 needs these two values**, together with the landing section
+below.
 
 ## The guards, and what runs them
 
