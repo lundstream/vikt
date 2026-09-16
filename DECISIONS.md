@@ -9176,3 +9176,45 @@ sentences, and this is the second time it has earned its place.
   D155: the interpretation appears in **all six** (against one of six before),
   and the new check refused exactly one sentence, of exactly the shape it exists
   for.
+
+---
+
+### D172 — Motion carries meaning, and restraint is the style
+
+Written **before** the landing page was rebuilt rather than after, because the
+rule that arrives after the animation is a rule about somebody else's next
+animation.
+
+§5 had a full theory of colour and nothing about movement, at the moment a page
+was about to be built out of movement. The gap is the same shape the colour rule
+fills: without it, the question "should this move" is answered by taste, and
+taste on a marketing page answers yes.
+
+**Motion carries meaning, or it does not happen.** A line drawing itself says
+the trend accumulates; a figure counting up says it was measured rather than
+chosen; a point appearing says a reading arrived. Every animation has to survive
+"what does this tell the reader that the finished state does not", and most
+answers are "nothing", which is the right answer and means no animation.
+
+Three binding consequences: everything that moves **stops** (no perpetual
+breathing, pulsing or drifting, with one exception for a field that is the
+background rather than the subject and pauses when the tab is hidden); reduced
+motion gets **the final frame**, not a stripped page, because an animation
+written without that is the usual way the quality floor is breached; and the
+**wordmark never moves**, which the logo section has said since D86 and which is
+hardest to hold on exactly this page.
+
+**Restraint is the style.** Natt is a matte, unlit surface: no gradients, glow,
+glass, neon, glitch, 3D, or parallax beyond the hero. The product is a notebook
+that draws one careful line, and the page introducing it is held to the taste of
+the pages that are it.
+
+**The public pages are dark only.** The app follows the reader's theme (D117).
+A marketing page that changes its mind about its own colours has nothing to say
+about restraint.
+
+**Every §5 guard applies to the landing page.** `copy-style.test.ts`,
+`colour-meaning.test.ts` and `class-names.test.ts` each already have a half that
+reads the landing JSX rather than the dictionary, because the page ships without
+it (D99, D111). The rule is written down now so the next page cannot be built
+exempt.
