@@ -141,15 +141,20 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
       ].join("\n"),
     },
     "node .*stack.mjs deploy": { code: 0, out: "set IMAGE_TAG=1.2.0\npulled\nredeployed\nup" },
+    /*
+      Production's own boot log, which has no VAPID line at all: that check only
+      speaks when the key is new or changed, and silence is the good case.
+    */
     "ssh docker logs": {
       code: 0,
       out: [
-        "vikt-api 1.2.0 (build 9f2c1a3)",
+        "Running migrations...",
+        "Migration applied: 0030_food_search_fold",
+        "Migration applied: 0031_restore_checks",
         "Migrations: 2 applied, 32 recorded in total",
-        "  0030_food_search_fold applied",
-        "  0031_restore_checks applied",
-        "VAPID public key unchanged since last boot",
-        "vision self-test: SEES (qwen2.5vl:7b)",
+        '{"level":30,"version":"1.2.0","commit":"a21224c","msg":"api build"}',
+        '{"level":30,"msg":"api up"}',
+        '{"level":30,"model":"qwen3-vl:8b","ms":8124,"msg":"the vision model can see"}',
       ].join("\n"),
     },
     "curl .*api/health": { code: 0, out: '{"ok":true}\n200' },
@@ -294,6 +299,9 @@ describe("a release where everything answers well", () => {
       "run 42 (release, v1.2.0) is success",
       "nothing blocks this deploy",
       "Migrations: 2 applied",
+      "0030_food_search_fold applied",
+      "VAPID: no line, so the key is unchanged",
+      "vision: the vision model can see",
       "/api/health 200",
       'published "Version 1.2.0"',
     ]) {
@@ -500,13 +508,73 @@ describe("a release that stops", () => {
     expect(out.text()).toContain("run 77 (release, v1.2.0) finished green");
   });
 
+  /**
+   * Proof by reintroduction for the defect that stopped the fifth attempt.
+   *
+   * A healthy boot prints no VAPID line and prints its vision line seconds
+   * later, and requiring both failed a deploy that had just succeeded. The
+   * healthy world above has no VAPID line; this asserts the step is content.
+   */
+  it("does not require diagnostics a healthy boot omits", async () => {
+    const runner = new FakeRunner();
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain("VAPID: no line, so the key is unchanged");
+  });
+
+  /** But a VAPID key that has changed is every push subscription broken. */
+  it("stops when the VAPID key has changed", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "ssh docker logs": {
+        code: 0,
+        out: [
+          "Migrations: 0 applied, 32 recorded in total",
+          '{"level":30,"version":"1.2.0","msg":"api build"}',
+          '{"level":40,"subscriptions":3,"msg":"the VAPID public key changed since the last boot."}',
+        ].join("\n"),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 11 });
+    expect(out.text()).toContain("not the one the subscriptions were made with");
+  });
+
+  /** And a vision model that cannot see is a feature that will be absent. */
+  it("stops when the vision self-test fails", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "ssh docker logs": {
+        code: 0,
+        out: [
+          "Migrations: 0 applied, 32 recorded in total",
+          '{"level":30,"version":"1.2.0","msg":"api build"}',
+          '{"level":40,"model":"llava:7b","msg":"the vision model cannot see"}',
+        ].join("\n"),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 11 });
+    expect(out.text()).toContain("the vision self-test did not pass");
+  });
+
   /** A log without the version line is a deploy that did not take. */
   it("stops when the API log does not name the version", async () => {
     const runner = new FakeRunner({
       ...healthyWorld(),
       "ssh docker logs": {
         code: 0,
-        out: "vikt-api 1.1.1\nMigrations: 0 applied, 30 recorded\nVAPID ok\nvision: SEES",
+        out: [
+          "Migrations: 0 applied, 30 recorded in total",
+          '{"level":30,"version":"1.1.1","msg":"api build"}',
+          '{"level":30,"msg":"the vision model can see"}',
+        ].join("\n"),
       },
     });
     const out = sink();

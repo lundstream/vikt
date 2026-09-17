@@ -594,27 +594,84 @@ export function buildSteps({ version, runner, root = ROOT }) {
 
     {
       name: "the API came up on the new version",
+      /**
+       * What a **healthy** boot prints, which is not the same list as "every
+       * diagnostic this server has".
+       *
+       * The first version required a VAPID line and a vision line. Neither is
+       * there on a good boot: `checkVapidKey` logs only when the key is new or
+       * has changed, and silence means every existing push subscription still
+       * works; `startVisionWatch` answers in its own time and is deliberately
+       * silent while the workstation is unreachable, which is this
+       * installation's ordinary state. Requiring them failed a deploy that had
+       * just succeeded (D183).
+       *
+       * So the two that must be there are required, the two that are
+       * diagnostics are **read rather than demanded**, and a bad one fails.
+       * The vision self-test is waited for, because it took eight seconds on
+       * the real release and the log was read immediately.
+       */
       run() {
         if (runner.dryRun) return ok("skipped: --dry-run deploys nothing to check");
 
-        const log = runner.remote(context.host, "docker logs --tail 200 vikt-api-1 2>&1");
+        const read = () => runner.remote(context.host, "docker logs --tail 300 vikt-api-1 2>&1");
+
+        let log = read();
         if (log.code !== 0) return fail(`could not read the API log:\n${log.out}`);
 
+        /* Up to 40 s for the vision self-test, which runs after the server is up. */
+        for (let attempt = 0; attempt < 8 && !/vision model/i.test(log.out); attempt += 1) {
+          runner.local("node", ["-e", "setTimeout(() => {}, 5000)"]);
+          log = read();
+        }
+
+        const lines = log.out.split("\n");
         const missing = [];
-        if (!log.out.includes(version)) missing.push(`the version line for ${version}`);
-        if (!/Migrations:\s*\d+ applied/i.test(log.out)) missing.push("the migrations line");
-        if (!/VAPID/i.test(log.out)) missing.push("the VAPID line");
-        if (!/vision/i.test(log.out)) missing.push("the vision self-test line");
+
+        const versionLine = lines.find(
+          (line) => line.includes(`"version":"${version}"`) || line.includes(`vikt-api ${version}`),
+        );
+        if (!versionLine) missing.push(`the version line for ${version}`);
+
+        const migrations = lines.find((line) => /Migrations:\s*\d+ applied/i.test(line));
+        if (!migrations) missing.push("the migrations line");
+
         if (missing.length > 0) {
           return fail(`the API log is missing ${missing.join(", ")}:\n${log.out.slice(-1200)}`);
         }
 
-        const lines = log.out
-          .split("\n")
-          .filter((line) => /version|Migrations:|VAPID|vision/i.test(line))
-          .slice(-6)
-          .join("\n");
-        return ok(lines);
+        /* Applied migrations, named, which is what STATE.md predicts per release. */
+        const applied = lines
+          .filter((line) => /Migration applied:/i.test(line))
+          .map((line) => line.replace(/^.*Migration applied:\s*/i, "").trim());
+
+        /*
+          A VAPID line is a warning, not a heartbeat: its absence is the good
+          case. A changed key answers 403 for every existing subscription, so
+          that one fails the step.
+        */
+        const vapid = lines.filter((line) => /VAPID/i.test(line));
+        const vapidTrouble = vapid.filter((line) => /changed since the last boot|could not check/i.test(line));
+        if (vapidTrouble.length > 0) {
+          return fail(`the VAPID key is not the one the subscriptions were made with:\n${vapidTrouble.join("\n")}`);
+        }
+
+        const vision = lines.filter((line) => /vision model/i.test(line));
+        const visionBad = vision.filter((line) => /cannot see|does not see|failed/i.test(line));
+        if (visionBad.length > 0) {
+          return fail(`the vision self-test did not pass:\n${visionBad.join("\n")}`);
+        }
+
+        const said = (line) => line.replace(/^.*"msg":"([^"]+)".*$/, "$1");
+        return ok(
+          [
+            versionLine.replace(/^.*?(\{"level")/, "$1").slice(0, 160),
+            migrations.trim(),
+            ...applied.map((name) => `  ${name} applied`),
+            `VAPID: ${vapid.length === 0 ? "no line, so the key is unchanged" : said(vapid.at(-1))}`,
+            `vision: ${vision.length === 0 ? "no line yet; the layer is off or unreachable" : said(vision.at(-1))}`,
+          ].join("\n"),
+        );
       },
     },
 
