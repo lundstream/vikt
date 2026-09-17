@@ -82,6 +82,22 @@ when it will be down, and its mail goes out.
   and a guard computes every body-text token against every surface in both
   themes from the tokens themselves, because the audit that reported "zero
   failures" walked screens and a token is not a pair.
+- **A release is one command, and it has never been run to the end** (D182).
+  `node scripts/release.mjs <version>` runs the eleven steps INFRA.md writes
+  out, prints what each found, and stops at the first bad answer with nothing
+  after it attempted. 32 tests hold it, including every step failed in turn and
+  the plan step run against a live Portainer double. **Run for 1.2.0 it stops at
+  step 1**: `VIKT_HOST` is not set and this workstation has never had SSH to the
+  host. Production is on `1.1.1`.
+- **The landing page is centred, still, and the ring is whole** (D181). The
+  hero's viewBox is padded by the ring's reach, so the ring at the endpoint
+  renders as a ring rather than an arc opening leftwards, which it had been
+  every time. The trend card holds 84,5 from the first frame and the daily card
+  swaps outright at 900 ms; the daily figure is Sten and the trend is Snö, the
+  maintenance section's own pairing. Every heading and paragraph is centred with
+  the reading measure kept, the cards left aligned inside. Measured again:
+  **performance 98, accessibility 100, zero layout shift**, 12,8 kB of 15 and
+  58,8 of 60.
 - **The landing page reads at a talking pace** (D180). The line draws, lands in
   one Lingon ring at the endpoint, holds still for a beat, and then "Gör",
   "det", "lättare." arrive 700 ms apart. "Trendvikt, inte dagsvikt" is two
@@ -331,6 +347,7 @@ deploy needs that it did not before, and the one command that does it.
 | **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
 | **A new landing page** (D173, D177, D178, D179, D180) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve and landing in a ring, a claim that arrives a word at a time, a daily weight cycling beside the trend it makes, three phone screens one to a row, and a share card |
 | **Two formatting fixes** (D179) | the weekly review card names the day in Swedish instead of showing an ISO date, and the weekly trend change in it reads one decimal like every other weight |
+| **A release is one command** (D182) | nothing a user sees. `node scripts/release.mjs <version>` runs the runbook, prints each step's evidence and stops at the first failure |
 | **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
 | **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
 
@@ -374,6 +391,44 @@ deploy needs that it did not before, and the one command that does it.
   one always failed.
 
 #### The deploy, as one command
+
+```sh
+node scripts/release.mjs 1.2.0
+```
+
+**This is the whole runbook now** (D182): the backup and its restore check on
+the host, the tree and CI, `main`, the tag, the release workflow, the plan, the
+deploy, the API log, the two HTTP checks and the Nyheter post. It prints each
+step's evidence and **stops at the first failure with nothing after it
+attempted**. `--dry-run` runs every check and changes nothing.
+
+**It was run on 2026-09-17 and stopped at step 1 of 13.** Production is still on
+`1.1.1`, and nothing was written to the host, to Portainer or to GitHub:
+
+```
+FAIL 1/13 the workstation has what it needs
+       VIKT_HOST is not set, so there is no host to back up or publish on
+```
+
+`VIKT_HOST` is `user@host` for the Docker host, set in the workstation's
+environment beside `PORTAINER_TOKEN`, which **is** set. It needs a key-based
+login, because the command passes `BatchMode=yes` and refuses password
+authentication rather than stopping an unattended release at a prompt.
+
+Two things before the first real run, both in INFRA.md, "What the release user
+needs on the host":
+
+- **This workstation has never had a shell on that host.** Every existing path
+  goes through the Portainer API, so the SSH access is new rather than an unset
+  variable.
+- **No sudo is needed, but two things are**, once, as root on the host:
+  `usermod -aG docker <user>`, and `install -d -o <user> -g <user> -m 750`
+  for `/var/backups/vikt` and `/var/backups/vikt/app`. That is read off
+  `backup.sh` and `restore-check.sh` rather than measured on the host, which
+  could not be reached; the first run is what confirms it.
+
+The steps it replaces, for a person or for a self-hoster, are unchanged in
+INFRA.md, "Deploying a version, in order". By hand the deploy itself is still:
 
 ```sh
 node scripts/stack.mjs plan 1.2.0 --release-file \
@@ -694,6 +749,9 @@ tag, and production runs it.** Everything below is `1.2.0`:
 | `0b54372` | Trendvikt, inte dagsvikt: two figures, not a table |
 | `d32f4b1` | The frames turn enough to see |
 | `c73fc83` | Din data, and Om AI last |
+| `ee66b41` | Record the fifth pass |
+| `4f401c5` | Centred, still, and with room for the ring |
+| `9c6080b` | The runbook is a command, and it stops at the first bad answer |
 
 Two migrations are among them, `0030_food_search_fold` and
 `0031_restore_checks`, and the compose file changed. "Inför nästa deploy" above
@@ -860,6 +918,49 @@ Stockholm it finds the account, and at 08:00 it finds nobody, which is the
 late-is-worse-than-never rule outside a test harness.
 
 **Still open, and only the owner can close it** (see the section below).
+
+**The full sweep, 2026-09-17, after the sixth landing pass**: `shoot2.mjs` over
+every finished screen at 360 px and desktop against the development server,
+**40 of 40, none failed**, verdict in the set's `verdict.txt`. CI green on `dev`
+for `9c6080b`.
+
+**The sweep asks the landing page two questions nothing else could** (D181).
+Both are relationships between elements rather than properties of one, which is
+why neither a token test nor a screenshot had caught them: the sentence beside a
+phone picture against a page paragraph, and the gap before the footer against
+the gap between two sections. Both landing rows now read
+`landing-ok=sentence15/meta13/gap64` — 15 px against a 15 px paragraph, 13 px
+one step below it, and 64 px of footer gap against 64 px of section padding.
+
+**Exercised through the interface on 2026-09-17**, the sixth landing pass
+(D181), against the **production build** served by `vite preview`:
+
+- **The ring, mid-flight**, which is the only state it has: at 0,70 opacity its
+  box is 937 to 951 px inside an SVG box of 297 to 969, so it is whole on the
+  right, the top and the bottom. It had been clipped at the right edge on every
+  run since it was written, and no screenshot of the finished page could have
+  shown that, because by then the ring is gone;
+- **the two cards**: the trend reads 84,5 from the first sample and never
+  changes, the daily steps 84,6 to 84,4 to 84,6 at 900 ms and stops while it is
+  off screen, unchanged over 2,7 s. The daily figure is Sten
+  `rgb(133, 148, 154)` and the trend is Snö `rgb(237, 241, 242)`, which is the
+  maintenance section's own pairing read off the page;
+- **alignment**: twenty-three headings and paragraphs outside the cards, none of
+  them left aligned;
+- **a phone frame** at seven positions: +22,0°, +9,8°, 0,0°, 0,0°, 0,0°, -9,8°,
+  -22,0°, `box-shadow: none` at every one;
+- **reduced motion**: the ring `display: none`, the line drawn, all three words
+  present, the frames square, the daily card holding one reading;
+- **Lighthouse at mobile settings**: performance 98, accessibility 100, zero
+  layout shift, with no audit failing.
+
+**Exercised as a command, not through a screen**: `node scripts/release.mjs
+1.2.0`, which stopped at step 1 of 13 with `VIKT_HOST is not set` and attempted
+nothing after it. That is the whole of what it did, and it is the evidence that
+the stopping works outside its own tests. Everything below step 1 is held by
+`release.test.ts`: every step failed in turn, each asserting both the stop and
+that nothing belonging to a later step was asked, plus the plan step run against
+a live Portainer double.
 
 **The full sweep, 2026-09-16, after the landing page's second pass**:
 `shoot2.mjs` over every finished screen at 360 px and desktop against the
