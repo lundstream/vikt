@@ -47,9 +47,21 @@ const STATE = readFileSync(path.join(ROOT, "STATE.md"), "utf8");
 
 type Call = { kind: "local" | "remote"; command: string };
 
+/**
+ * The commit the release targets, taken from the real STATE.md.
+ *
+ * Read rather than invented, because the target is what step 3 asks CI about
+ * and what step 6 moves `main` to: a fixture that disagreed with the handover
+ * would be testing a release of something nobody is releasing.
+ */
+const TARGET = (() => {
+  const handover = readHandover(STATE, "1.2.0");
+  return handover.ok && handover.commit ? handover.commit : "a".repeat(40);
+})();
+
 /** What a healthy world says, keyed by the start of the command. */
 function healthyWorld(): Record<string, { code: number; out: string }> {
-  const head = "a".repeat(40);
+  const head = TARGET;
   return {
     "gh auth status": { code: 0, out: "Logged in to github.com" },
     "git status --porcelain": { code: 0, out: "" },
@@ -59,6 +71,7 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "git rev-list --count origin/dev..HEAD": { code: 0, out: "0" },
     "git rev-parse --short HEAD": { code: 0, out: "abc1234" },
     "git rev-parse HEAD": { code: 0, out: head },
+    "git rev-list --count origin/dev..HEAD ": { code: 0, out: "0" },
     "gh run list --branch dev": {
       code: 0,
       out: JSON.stringify([
@@ -249,7 +262,8 @@ describe("a release where everything answers well", () => {
     for (const evidence of [
       "VIKT_HOST set",
       "clean, on dev, pushed",
-      "success for abc1234",
+      `releasing ${TARGET.slice(0, 7)}`,
+      `success for ${TARGET.slice(0, 7)}`,
       "/var/backups/vikt/vikt-20260917T200000Z.dump",
       "users 4",
       "main fast-forwarded",

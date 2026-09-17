@@ -396,6 +396,12 @@ deploy needs that it did not before, and the one command that does it.
 node scripts/release.mjs 1.2.0
 ```
 
+**`main` and the tag are at `a21224c`, and `dev` has moved past it.** The
+release-command fix that came out of the first attempt (below) landed after the
+version was cut, so it is not part of 1.2.0 and ships with the next one. **For
+`1.2.0` it is `a21224c`**, which is what the command releases and what CI is
+checked for; `dev`'s tip is a different commit and deliberately so.
+
 **This is the whole runbook now** (D182): the backup and its restore check on
 the host, the tree and CI, `main`, the tag, the release workflow, the plan, the
 deploy, the API log, the two HTTP checks and the Nyheter post. It prints each

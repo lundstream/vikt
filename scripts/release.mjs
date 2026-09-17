@@ -126,11 +126,22 @@ export function readHandover(state, version) {
     return { ok: false, why: `STATE.md's "Inför nästa deploy" does not mention ${version}` };
   }
 
-  /* Every `--set NAME=value` the section gives for this version's command. */
-  const sets = [...text.matchAll(/--set\s+([A-Z][A-Z0-9_]*)=(\S+)/g)].map((m) => ({
-    name: m[1],
-    value: m[2],
-  }));
+  /*
+    Every `--set NAME=value` the section gives, once each.
+
+    The section shows the command twice, as one line and as the by-hand
+    equivalent, so a plain scan hands the same variable to `stack.mjs` twice.
+    Harmless there and confusing to read, and a duplicate that disagreed with
+    itself would be worse than either.
+  */
+  const sets = [
+    ...new Map(
+      [...text.matchAll(/--set\s+([A-Z][A-Z0-9_]*)=(\S+)/g)].map((m) => [
+        m[1],
+        { name: m[1], value: m[2] },
+      ]),
+    ).values(),
+  ];
 
   /* And every `--set-from-env NAME`, whose value is never written down. */
   const fromEnv = [...text.matchAll(/--set-from-env\s+([A-Z][A-Z0-9_]*)/g)].map((m) => m[1]);
@@ -143,8 +154,14 @@ export function readHandover(state, version) {
    * name. Both are legitimate and they need different handling, so the absence
    * is a value rather than a missing one.
    */
+  /*
+    Whitespace rather than a space, because STATE.md is prose and prose wraps:
+    the first version of this missed the line it was written for, because "For"
+    ended one line and the version began the next.
+  */
+  const escaped = version.replace(/\./g, "\\.");
   const named = text.match(
-    new RegExp(`For \\\`?${version.replace(/\./g, "\\.")}\\\`? it is \\\`([0-9a-f]{7,40})\\\``),
+    new RegExp("For\\s+`?" + escaped + "`?\\s+it\\s+is\\s+`([0-9a-f]{7,40})`"),
   );
 
   return { ok: true, sets, fromEnv, commit: named ? named[1] : null };
@@ -202,9 +219,22 @@ export function buildSteps({ version, runner, root = ROOT }) {
           return fail("gh is not logged in, so the release and its run cannot be reached", "gh auth login");
         }
 
+        /*
+          The handover, read here rather than at step 6, because **which commit
+          is being released** decides what step 3 should ask CI about. When dev
+          has moved past the release those are different commits, and checking
+          the tip would be checking something that is not going into production.
+        */
+        const handover = readHandover(readFileSync(path.join(root, "STATE.md"), "utf8"), version);
+        if (!handover.ok) return fail(handover.why);
+
         context.host = host;
+        context.handover = handover;
         /* The host, never the user, and never the token. */
-        return ok(`VIKT_HOST set, PORTAINER_TOKEN set, gh authenticated`);
+        return ok(
+          `VIKT_HOST set, PORTAINER_TOKEN set, gh authenticated` +
+            `${handover.commit ? `, STATE.md names ${handover.commit.slice(0, 7)}` : ""}`,
+        );
       },
     },
 
@@ -234,12 +264,32 @@ export function buildSteps({ version, runner, root = ROOT }) {
 
         const head = runner.local("git", ["rev-parse", "--short", "HEAD"]).out;
         context.head = head;
-        return ok(`clean, on dev, pushed, at ${head}`);
+
+        /*
+          What is being released: the commit STATE.md names, or dev's tip when
+          the whole of dev is the release. Both are legitimate; the difference
+          is whether dev has moved on since the version was cut.
+        */
+        context.target = context.handover.commit ?? runner.local("git", ["rev-parse", "HEAD"]).out;
+
+        return ok(
+          `clean, on dev, pushed, at ${head}` +
+            `${context.handover.commit ? `, releasing ${context.target.slice(0, 7)}` : ""}`,
+        );
       },
     },
 
     {
-      name: "CI is green for that commit",
+      name: "CI is green for the commit being released",
+      /**
+       * The **target's** run, found by sha, not the newest run on dev.
+       *
+       * Those are the same commit when the whole of dev is the release and
+       * different ones the moment anything lands after the version was cut. A
+       * release that checks the tip is checking something that is not going
+       * into production, which is the same mistake step 8 made about the
+       * workflow: "newest" is not "mine".
+       */
       run() {
         const run = runner.local("gh", [
           "run",
@@ -247,26 +297,26 @@ export function buildSteps({ version, runner, root = ROOT }) {
           "--branch",
           "dev",
           "--limit",
-          "1",
+          "30",
           "--json",
           "headSha,conclusion,status,displayTitle",
         ]);
         if (run.code !== 0) return fail("could not read CI runs", run.out);
 
-        const [latest] = JSON.parse(run.out || "[]");
-        if (!latest) return fail("no CI run found for dev");
-
-        const full = runner.local("git", ["rev-parse", "HEAD"]).out;
-        if (latest.headSha !== full) {
+        const runs = JSON.parse(run.out || "[]");
+        const mine = runs.find((entry) => entry.headSha === context.target);
+        if (!mine) {
           return fail(
-            `the newest CI run is for ${String(latest.headSha).slice(0, 7)}, not ${context.head}`,
-            "push dev and wait for its run",
+            `no CI run found for ${context.target.slice(0, 7)}`,
+            "push that commit to dev and wait for its run",
           );
         }
-        if (latest.status !== "completed" || latest.conclusion !== "success") {
-          return fail(`CI for ${context.head} is ${latest.status}/${latest.conclusion}`);
+        if (mine.status !== "completed" || mine.conclusion !== "success") {
+          return fail(
+            `CI for ${context.target.slice(0, 7)} is ${mine.status}/${mine.conclusion}`,
+          );
         }
-        return ok(`${latest.conclusion} for ${context.head}: ${latest.displayTitle}`);
+        return ok(`${mine.conclusion} for ${context.target.slice(0, 7)}: ${mine.displayTitle}`);
       },
     },
 
@@ -336,13 +386,7 @@ export function buildSteps({ version, runner, root = ROOT }) {
     {
       name: "main is at the release commit",
       run() {
-        const handover = readHandover(readFileSync(path.join(root, "STATE.md"), "utf8"), version);
-        if (!handover.ok) return fail(handover.why);
-        context.handover = handover;
-
-        const target = handover.commit ?? runner.local("git", ["rev-parse", "HEAD"]).out;
-        context.target = target;
-
+        const target = context.target;
         if (runner.dryRun) return ok(`would fast-forward main to ${target.slice(0, 7)}`);
 
         runner.local("git", ["fetch", "origin", "main"]);
