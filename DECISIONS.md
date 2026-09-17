@@ -10154,3 +10154,91 @@ is why neither a token test nor a screenshot caught them, and why the sweep
 asserts them now: the row's sentence against a paragraph, the meta line against
 the sentence, the footer gap against a section gap. A sweep that only asks "is
 anything overflowing" answers a narrower question than it appears to.
+
+---
+
+### D182 — The runbook is a command, and it stops at the first bad answer
+
+A deploy was eleven steps in a document, done by hand, at the end of a day. Two
+of them have already been done wrong in ways recorded here: a stack variable set
+in a panel the deployed compose never read (D156), and a variable set beside the
+deploy rather than in it (D174). Both were found afterwards.
+
+`node scripts/release.mjs 1.2.0` runs them in order.
+
+#### Stopping is the feature
+
+Every step prints what it found, and **nothing after a failure is attempted**.
+That is the whole control flow and the reason the command is worth having: a
+deploy that has half happened is the state this installation can least afford,
+and the way not to reach it is never to take the next step on a bad answer.
+
+The failure says what would have to be true and, where there is one, where to
+set it: `VIKT_HOST is not set` is followed by what to set it to and which
+section of INFRA.md explains it. A release that stops at step one and names its
+own prerequisite is a release somebody can finish unattended tomorrow.
+
+The tests fail **each step in turn** and assert both the stop and that nothing
+belonging to a later step was asked. One test that fails the first step proves
+the loop breaks; it does not prove the tenth step's failure stops the eleventh.
+
+#### STATE.md is the input, not a second copy
+
+The `--set` list and the Nyheter post are read out of `STATE.md`'s own handover
+and news block, the same words a person would have followed. A configuration
+file listing them again is the D156 shape one level up: two copies, free to
+disagree, with the running one invisible.
+
+Anything sensitive goes through `--set-from-env NAME`, so the value never
+reaches a command line or the output.
+
+#### The host, over SSH, without a password
+
+`BatchMode=yes` and `PasswordAuthentication=no` together are what make "never a
+password" a property rather than an intention: without a usable key the step
+**fails** instead of stopping an unattended release at a prompt nobody is
+watching (§7).
+
+**The scripts need no sudo**, determined from reading them rather than from the
+host, because this workstation has never had a shell there: every existing path
+goes through the Portainer API. `backup.sh` needs the `docker` group and a
+writable backup directory; `restore-check.sh` needs the same group and to read
+the dump, and every database it makes is inside the container. INFRA.md carries
+the two `install -d` lines that set that up, and says explicitly that a NOPASSWD
+sudoers line is **not** wanted: it would grant a password-less root path for two
+scripts that do not need root, to save running two commands once.
+
+#### The Nyheter post stopped being the step with no evidence
+
+It was a person pasting a block from STATE.md into a textarea at the end of a
+deploy: no record of what was published, and no way to tell a finished deploy
+from one that stopped just before the end. `pnpm --filter api news:publish`
+takes the post as a file and is **idempotent on the title**, because a release
+command is re-run after a failure and the post is near the end.
+
+It does not update a post that already exists. An announcement that changes
+moves its `updatedAt`, which un-dismisses it for everybody who has already read
+it, so re-publishing edited notes would put the same news in front of every
+reader a second time. It refuses and names the id; an edit is a decision
+somebody makes on the screen, where they can see what it will do.
+
+#### The manual runbook stays
+
+INFRA.md keeps every step written out for a person, with the part of the command
+that does it named beside each. A self-hoster with no access to this workstation
+has to be able to deploy by hand, and a runbook that exists only as a script is
+a runbook nobody can read. §7 gains the convention: "uppdatera prod" is this
+command, and the reply is each step's evidence.
+
+#### Two things the tests found before the host could
+
+**A synchronous child cannot be answered by a double in the same process.** The
+first version of the stack-double test used `execFileSync`, which blocks the
+event loop that would serve the HTTP request it is waiting for. It deadlocked
+for five minutes and reported nothing. `stack-deploy.test.ts` spawns for exactly
+this reason, and now so does this.
+
+**`Object.assign(env, { NAME: undefined })` sets the string "undefined".** The
+test for "VIKT_HOST is not set" passed step one, because as far as anything
+reading it was concerned the variable was set. A test that removes a variable
+has to remove it.

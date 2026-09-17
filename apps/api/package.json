@@ -11,6 +11,7 @@
     "test": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:watch": "vitest",
     "invite": "tsx src/scripts/invite.ts",
+    "news:publish": "tsx src/scripts/news-publish.ts",
     "restore-check": "tsx src/scripts/restore-check.ts",
     "landing-fixture": "tsx ../../scripts/landing-fixture.mjs",
     "db:generate": "drizzle-kit generate",

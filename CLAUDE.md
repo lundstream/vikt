@@ -788,6 +788,16 @@ a commit on `main` is a commit that the next redeploy ships.
     5173 -State Listen` gives the PID.
   - Clear `apps/web/node_modules/.vite` when a dependency or the Tailwind config
     changed. The API's `tsx watch` picks up source edits on its own and rarely needs it.
+- **"uppdatera prod" means `node scripts/release.mjs <version>`**, with the
+  version being the next one `STATE.md` names under "Inför nästa deploy", and
+  the reply is **each step's evidence**: the dump's path and size, the row
+  counts the restore check read back, the commit `main` was moved to, the tag,
+  the workflow run, the plan's verdict, the deploy, the API log's version and
+  migration lines, the two HTTP codes, and what the Nyheter post did. The
+  command stops at the first failure and attempts nothing after it, so a report
+  that ends early is a report of where production actually is. Never work around
+  a step that cannot run: say what is missing and where it is set, so the next
+  attempt runs unattended. `INFRA.md` carries the same steps for a person.
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
