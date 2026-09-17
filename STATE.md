@@ -378,17 +378,27 @@ its fix.
 the handover: what changes, what the deploy needs that it did not before, and
 the one command that does it.
 
+**For `1.2.1` it is `1f1738f`**, which is `dev`'s tip at the time of writing and
+is what the command releases.
+
 #### What 1.2.1 changes
 
 | | what a user sees |
 |---|---|
-| **The release notes appear** (D183) | 1.2.0's post was never published, because the script that publishes it was not in the image. It is now, and this release publishes it |
+| **"Gratis" on the landing page** (D184) | a section saying there is no paid version and none is coming, and why: the app costs nothing to run |
+| **The release notes appear** (D183) | 1.2.0's own post was never published, because the script that publishes it was not built into the image. It is a `tsup` entry now, and this release publishes the post for 1.2 |
+
+And six fixes nobody using the app can see, all in the release command itself
+(D183): the workflow run is found by its tag, CI is read for the commit being
+released, the commit STATE.md names is resolved to a full sha, a variable the
+run is setting counts as set, the plan's verdict is read rather than its labels,
+and the API log is checked for what a healthy boot actually prints.
 
 #### What the deploy needs that 1.2.0 did not
 
 **Nothing.** No migration, no new stack variable, no compose change. `0030` and
 `0031` went out with 1.2.0, so step 11 should report `Migrations: 0 applied, 32
-recorded in total`.
+recorded in total`, and step 9's plan should list no `setting:` line at all.
 
 #### The deploy, as one command
 
@@ -420,8 +430,13 @@ tankstreck (§5), och registret är appens eget: du, inte "användaren".
 <details>
 <summary>1.2.1</summary>
 
+**The post is for 1.2 rather than for 1.2.1.** What a reader got is everything
+1.2.0 brought; 1.2.1 is the release that manages to announce it, plus one
+section on a page they may never have opened. A post headed "1.2.1" would be
+announcing a patch number to people who never saw 1.2.0 arrive.
+
 ```markdown
-## Version 1.2.0
+## Vikt 1.2
 
 **Mat och makron.** En summa som bygger på mat där uppgiften saknas står som
 "minst" i stället för att se komplett ut, och under den står hur stor del av
