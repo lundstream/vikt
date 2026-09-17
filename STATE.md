@@ -361,6 +361,10 @@ inside the container and the image it was deployed from has no
 `tsx` is a dev dependency a production image does not carry (D183). The entry
 exists now, so the post ships with 1.2.1.
 
+**The closing sweep, 2026-09-17**: `shoot2.mjs` over every finished screen at
+360 px and desktop, **40 of 40, none failed**, both landing rows reading
+`landing-ok=sentence15/meta13/gap64`. CI green on `dev` throughout.
+
 **It took seven attempts and every failure was in the tooling, not the app**
 (D183): six checks answering a question next to the one they were asked, and one
 script that could only run where it was not. Each has a test that fails without
