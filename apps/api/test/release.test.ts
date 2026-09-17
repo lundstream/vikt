@@ -56,7 +56,13 @@ type Call = { kind: "local" | "remote"; command: string };
  */
 const TARGET = (() => {
   const handover = readHandover(STATE, "1.2.0");
-  return handover.ok && handover.commit ? handover.commit : "a".repeat(40);
+  const named = handover.ok && handover.commit ? handover.commit : null;
+  /*
+    Padded to forty characters, because the command resolves the short sha
+    STATE.md names into the full one every other tool reports. Comparing the
+    two as strings found no CI run for a commit whose run was green.
+  */
+  return named === null ? "a".repeat(40) : named.padEnd(40, "0");
 })();
 
 /** What a healthy world says, keyed by the start of the command. */
@@ -71,7 +77,8 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "git rev-list --count origin/dev..HEAD": { code: 0, out: "0" },
     "git rev-parse --short HEAD": { code: 0, out: "abc1234" },
     "git rev-parse HEAD": { code: 0, out: head },
-    "git rev-list --count origin/dev..HEAD ": { code: 0, out: "0" },
+    /* Resolving the short sha STATE.md names into the full one. */
+    "git rev-parse [0-9a-f]{7}": { code: 0, out: head },
     "gh run list --branch dev": {
       code: 0,
       out: JSON.stringify([

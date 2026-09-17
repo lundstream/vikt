@@ -269,8 +269,21 @@ export function buildSteps({ version, runner, root = ROOT }) {
           What is being released: the commit STATE.md names, or dev's tip when
           the whole of dev is the release. Both are legitimate; the difference
           is whether dev has moved on since the version was cut.
+
+          **Resolved to a full sha**, because STATE.md names the short one a
+          person can read and everything this talks to reports the long one.
+          Comparing the two as strings found no CI run for a commit whose run
+          was green and sitting there.
         */
-        context.target = context.handover.commit ?? runner.local("git", ["rev-parse", "HEAD"]).out;
+        const named = context.handover.commit ?? "HEAD";
+        const resolved = runner.local("git", ["rev-parse", named]);
+        if (resolved.code !== 0 || !/^[0-9a-f]{40}$/.test(resolved.out)) {
+          return fail(
+            `STATE.md names ${named}, which is not a commit in this repository`,
+            "check the commit under 'Inför nästa deploy'",
+          );
+        }
+        context.target = resolved.out;
 
         return ok(
           `clean, on dev, pushed, at ${head}` +
