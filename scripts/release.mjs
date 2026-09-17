@@ -541,17 +541,42 @@ export function buildSteps({ version, runner, root = ROOT }) {
 
     {
       name: "the deploy plan is clean",
+      /**
+       * Three questions, and none of them is "does the word 'missing' appear".
+       *
+       * It was. The plan's ordinary output contains the lines "required by the
+       * release and not set: **none**" and "new in the release and not set:
+       * none", so a grep for `missing|not set` failed a plan that had just said
+       * nothing blocks the deploy. A check that matches a **label** rather than
+       * a fact reports the absence of a problem as a problem (D183).
+       *
+       * What actually says so: the exit code, a line beginning `blocked:`, and
+       * the closing sentence. `stack.mjs` produces all three deliberately.
+       */
       run() {
         const args = stackArgs(version, context.handover, "plan");
         const plan = runner.local("node", [path.join(root, "scripts/stack.mjs"), ...args]);
+
         if (plan.code !== 0) return fail(`plan exited ${plan.code}:\n${plan.out}`);
+
+        const blocked = plan.out
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith("blocked:"));
+        if (blocked.length > 0) {
+          return fail(`the plan is blocked:\n${blocked.join("\n")}\n\n${plan.out}`);
+        }
+
         if (!/nothing blocks this deploy/i.test(plan.out)) {
           return fail(`the plan did not end "nothing blocks this deploy":\n${plan.out}`);
         }
-        if (/missing|not set/i.test(plan.out)) {
-          return fail(`the plan reports something missing:\n${plan.out}`);
-        }
-        return ok("nothing blocks this deploy");
+
+        /* What it says it will change, which is the evidence worth keeping. */
+        const changes = plan.out
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => /^(setting:|unsetting:|IMAGE_TAG|IMAGE_REPO)/.test(line));
+        return ok(["nothing blocks this deploy", ...changes].join("\n"));
       },
     },
 

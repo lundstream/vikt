@@ -123,7 +123,23 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
         { databaseId: 9, status: "completed", conclusion: "failure", headBranch: "main", event: "push" },
       ]),
     },
-    "node .*stack.mjs plan": { code: 0, out: "…\nnothing blocks this deploy" },
+    /*
+      The real plan's shape, labels and all. Those labels contain the words
+      "not set", which is what the first version of step 9 grepped for.
+    */
+    "node .*stack.mjs plan": {
+      code: 0,
+      out: [
+        "variables  26 set in the stack (names only; values are not printed)",
+        "           required by the release and not set: none",
+        "           new in the release and not set: none",
+        "           setting: BACKUP_HOST_DIR (new)",
+        "change",
+        "           IMAGE_TAG  1.1.1 -> 1.2.0",
+        "",
+        "nothing blocks this deploy",
+      ].join("\n"),
+    },
     "node .*stack.mjs deploy": { code: 0, out: "set IMAGE_TAG=1.2.0\npulled\nredeployed\nup" },
     "ssh docker logs": {
       code: 0,
@@ -366,17 +382,52 @@ describe("a release that stops", () => {
     expect(runner.calls.some((c) => /backup\.sh/.test(c.command))).toBe(false);
   });
 
-  it("stops when the plan does not end clean", async () => {
+  /**
+   * A blocked plan stops the release, and it is the `blocked:` line that says
+   * so rather than a word appearing somewhere in the output (D183).
+   */
+  it("stops when the plan is blocked", async () => {
     const runner = new FakeRunner({
       ...healthyWorld(),
-      "node .*stack.mjs plan": { code: 0, out: "IMAGE_TAG missing\nnothing blocks this deploy" },
+      "node .*stack.mjs plan": {
+        code: 1,
+        out: "required by the release and not set: BACKUP_HOST_DIR\n\nblocked: set BACKUP_HOST_DIR first",
+      },
     });
     const out = sink();
     const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
-    expect(out.text()).toContain("reports something missing");
     expect(runner.calls.some((c) => /stack\.mjs deploy/.test(c.command))).toBe(false);
+  });
+
+  /** And a plan that exits 0 while printing `blocked:` is still blocked. */
+  it("stops on a blocked line even when the plan exits zero", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "node .*stack.mjs plan": { code: 0, out: "blocked: the stack file is not the release's" },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
+    expect(out.text()).toContain("the plan is blocked");
+  });
+
+  /**
+   * Proof by reintroduction, for the defect that stopped the fourth attempt at
+   * releasing 1.2.0: the plan's own labels say "not set: none", and a step that
+   * grepped for "not set" failed a plan that had just passed.
+   */
+  it("is not failed by the words in a clean plan's labels", async () => {
+    const runner = new FakeRunner();
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain("nothing blocks this deploy");
+    /* And it keeps what the plan said it would change. */
+    expect(out.text()).toContain("IMAGE_TAG  1.1.1 -> 1.2.0");
   });
 
   /**
