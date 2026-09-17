@@ -43,6 +43,16 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const STATE = readFileSync(path.join(ROOT, "STATE.md"), "utf8");
 
+/**
+ * The version STATE.md is preparing, read rather than written down here.
+ *
+ * It was `1.2.0` in this file until 1.2.0 shipped and the handover became the
+ * next one's, at which point every test that reads STATE.md failed for a reason
+ * that had nothing to do with the command. A test about "the next deploy"
+ * follows the next deploy.
+ */
+const VERSION = STATE.match(/The next deploy is `(\d+\.\d+\.\d+)`/)?.[1] ?? "0.0.0";
+
 /* ----------------------------------------------------------- the fake world -- */
 
 type Call = { kind: "local" | "remote"; command: string };
@@ -55,7 +65,7 @@ type Call = { kind: "local" | "remote"; command: string };
  * would be testing a release of something nobody is releasing.
  */
 const TARGET = (() => {
-  const handover = readHandover(STATE, "1.2.0");
+  const handover = readHandover(STATE, VERSION);
   const named = handover.ok && handover.commit ? handover.commit : null;
   /*
     Padded to forty characters, because the command resolves the short sha
@@ -110,7 +120,7 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "git rev-list --count [0-9a-f]+\\.\\.origin/main": { code: 0, out: "0" },
     "git push origin": { code: 0, out: "" },
     "gh release view": { code: 1, out: "release not found" },
-    "gh release create": { code: 0, out: "https://github.com/lundstream/vikt/releases/tag/v1.2.0" },
+    "gh release create": { code: 0, out: `https://github.com/lundstream/vikt/releases/tag/v${VERSION}` },
     /*
       Two runs for the tag, as release.yml really produces (D169), plus an older
       failed run for something else. The step has to take the `release` one.
@@ -118,8 +128,8 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "gh run list --workflow release.yml": {
       code: 0,
       out: JSON.stringify([
-        { databaseId: 42, status: "completed", conclusion: "success", headBranch: "v1.2.0", event: "release" },
-        { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: "v1.2.0", event: "push" },
+        { databaseId: 42, status: "completed", conclusion: "success", headBranch: `v${VERSION}`, event: "release" },
+        { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: `v${VERSION}`, event: "push" },
         { databaseId: 9, status: "completed", conclusion: "failure", headBranch: "main", event: "push" },
       ]),
     },
@@ -135,12 +145,12 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
         "           new in the release and not set: none",
         "           setting: BACKUP_HOST_DIR (new)",
         "change",
-        "           IMAGE_TAG  1.1.1 -> 1.2.0",
+        `           IMAGE_TAG  1.2.0 -> ${VERSION}`,
         "",
         "nothing blocks this deploy",
       ].join("\n"),
     },
-    "node .*stack.mjs deploy": { code: 0, out: "set IMAGE_TAG=1.2.0\npulled\nredeployed\nup" },
+    "node .*stack.mjs deploy": { code: 0, out: `set IMAGE_TAG=${VERSION}\npulled\nredeployed\nup` },
     /*
       Production's own boot log, which has no VAPID line at all: that check only
       speaks when the key is new or changed, and silence is the good case.
@@ -152,7 +162,7 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
         "Migration applied: 0030_food_search_fold",
         "Migration applied: 0031_restore_checks",
         "Migrations: 2 applied, 32 recorded in total",
-        '{"level":30,"version":"1.2.0","commit":"a21224c","msg":"api build"}',
+        `{"level":30,"version":"${VERSION}","commit":"a21224c","msg":"api build"}`,
         '{"level":30,"msg":"api up"}',
         '{"level":30,"model":"qwen3-vl:8b","ms":8124,"msg":"the vision model can see"}',
       ].join("\n"),
@@ -160,7 +170,7 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "curl .*api/health": { code: 0, out: '{"ok":true}\n200' },
     "curl .*4173|curl .*/$": { code: 0, out: "200" },
     "ssh cat >": { code: 0, out: "" },
-    "ssh docker cp": { code: 0, out: 'published "Version 1.2.0" as 8f1c, 1240 characters, not mailed' },
+    "ssh docker cp": { code: 0, out: 'published "Vikt 1.2" as 8f1c, 1240 characters, not mailed' },
     /* tsx is a dev dependency, so a production image cannot run it (D183). */
     "ssh .*pnpm --filter api news:publish": { code: 1, out: "sh: 1: tsx: not found" },
   };
@@ -230,8 +240,8 @@ function withEnv<T>(extra: Record<string, string | undefined>, run: () => T): T 
 
 describe("what STATE.md says the release needs", () => {
   it("finds the version's own handover", () => {
-    const handover = readHandover(STATE, "1.2.0");
-    expect(handover.ok, `STATE.md's handover does not mention 1.2.0`).toBe(true);
+    const handover = readHandover(STATE, VERSION);
+    expect(handover.ok, `STATE.md's handover does not mention ${VERSION}`).toBe(true);
   });
 
   /**
@@ -241,30 +251,51 @@ describe("what STATE.md says the release needs", () => {
    * panel that the deployed compose never read.
    */
   it("reads the same --set list the documented command uses", () => {
-    const handover = readHandover(STATE, "1.2.0");
+    const handover = readHandover(STATE, VERSION);
     expect(handover.ok).toBe(true);
     if (!handover.ok) return;
 
-    expect(handover.sets.map((entry) => entry.name)).toContain("BACKUP_HOST_DIR");
-    const args = stackArgs("1.2.0", handover, "plan");
-    expect(args.slice(0, 3)).toEqual(["plan", "1.2.0", "--release-file"]);
-    expect(args.join(" ")).toContain("--set BACKUP_HOST_DIR=");
+    const args = stackArgs(VERSION, handover, "plan");
+    expect(args.slice(0, 3)).toEqual(["plan", VERSION, "--release-file"]);
+
+    /*
+      Whatever the section lists, once each. 1.2.0 needed BACKUP_HOST_DIR and
+      1.2.1 needs nothing, so what is asserted is the correspondence rather than
+      a variable name that belongs to one release.
+    */
+    for (const entry of handover.sets) {
+      expect(args.join(" ")).toContain(`--set ${entry.name}=${entry.value}`);
+    }
+    expect(new Set(handover.sets.map((entry) => entry.name)).size).toBe(handover.sets.length);
   });
 
   /** Anything sensitive is named, never valued, on the command line (§7). */
   it("passes sensitive variables by name only", () => {
     const handover = { ok: true as const, sets: [], fromEnv: ["SECRET_KEY"], commit: null };
-    const args = stackArgs("1.2.0", handover, "deploy");
+    const args = stackArgs(VERSION, handover, "deploy");
     expect(args).toContain("--set-from-env");
     expect(args).toContain("SECRET_KEY");
     expect(args.join(" ")).not.toMatch(/SECRET_KEY=/);
   });
 
+  /**
+   * Found by the `<summary>` that names the version, not by a heading inside
+   * the post: the heading is copy, and a deploy script should not be what
+   * decides how an announcement is worded.
+   */
   it("takes the Nyheter post out of STATE.md's own block", () => {
-    const post = readNewsPost(STATE, "1.2.0");
-    expect(post, "no ## Version 1.2.0 block in STATE.md").not.toBeNull();
-    expect(post).toMatch(/^# Version 1\.2\.0\n/);
+    const post = readNewsPost(STATE, VERSION);
+    expect(post, `no <summary>${VERSION}</summary> block in STATE.md`).not.toBeNull();
+
+    /* One `# Title` line, which is what news-publish reads. */
+    expect(post).toMatch(/^# \S/);
+    expect(post!.split("\n").filter((line) => /^# /.test(line))).toHaveLength(1);
     expect(post!.length).toBeGreaterThan(200);
+  });
+
+  /** A version with no block of its own is nothing, rather than someone else's. */
+  it("does not hand back another version's post", () => {
+    expect(readNewsPost(STATE, "9.9.9")).toBeNull();
   });
 });
 
@@ -274,38 +305,48 @@ describe("a release where everything answers well", () => {
   it("runs every step and says so", async () => {
     const runner = new FakeRunner();
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     const text = out.text();
     expect(result, text).toMatchObject({ ok: true });
     expect(text).not.toContain("FAIL");
-    expect(text).toContain("1.2.0 is live");
+    expect(text).toContain(`${VERSION} is live`);
   });
 
   /** Each step's evidence, not just that it passed. */
   it("prints what it found at each step", async () => {
     const runner = new FakeRunner();
     const out = sink();
-    await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
     const text = out.text();
+
+    /*
+      Only when STATE.md names one: a release of dev's tip says nothing about a
+      target, and which of the two it is depends on whether dev has moved past
+      the version being cut.
+    */
+    const handover = readHandover(STATE, VERSION);
+    if (handover.ok && handover.commit) {
+      expect(text).toContain(`releasing ${handover.commit.slice(0, 7)}`);
+      expect(text).toContain(`STATE.md names ${handover.commit.slice(0, 7)}`);
+    }
 
     for (const evidence of [
       "VIKT_HOST set",
       "clean, on dev, pushed",
-      `releasing ${TARGET.slice(0, 7)}`,
       `success for ${TARGET.slice(0, 7)}`,
       "/var/backups/vikt/vikt-20260917T200000Z.dump",
       "users 4",
       "main fast-forwarded",
-      "v1.2.0 created",
-      "run 42 (release, v1.2.0) is success",
+      `v${VERSION} created`,
+      `run 42 (release, v${VERSION}) is success`,
       "nothing blocks this deploy",
       "Migrations: 2 applied",
       "0030_food_search_fold applied",
       "VAPID: no line, so the key is unchanged",
       "vision: the vision model can see",
       "/api/health 200",
-      'published "Version 1.2.0"',
+      'published "Vikt 1.2"',
     ]) {
       expect(text, `no evidence for: ${evidence}`).toContain(evidence);
     }
@@ -316,7 +357,7 @@ describe("a release where everything answers well", () => {
     const runner = new FakeRunner();
     const out = sink();
     await withEnv({ PORTAINER_TOKEN: "ptr_a_real_looking_token" }, () =>
-      release({ version: "1.2.0", runner, out, root: ROOT }),
+      release({ version: VERSION, runner, out, root: ROOT }),
     );
     expect(out.text()).not.toContain("ptr_a_real_looking_token");
   });
@@ -324,9 +365,9 @@ describe("a release where everything answers well", () => {
   /** The host is reached with a key and no password, ever (§7). */
   it("never offers a password to the host", async () => {
     const runner = new FakeRunner();
-    await withEnv({}, () => release({ version: "1.2.0", runner, out: sink(), root: ROOT }));
+    await withEnv({}, () => release({ version: VERSION, runner, out: sink(), root: ROOT }));
 
-    const steps = buildSteps({ version: "1.2.0", runner: new FakeRunner(), root: ROOT });
+    const steps = buildSteps({ version: VERSION, runner: new FakeRunner(), root: ROOT });
     expect(steps.length).toBeGreaterThan(10);
 
     /* The real runner's ssh flags, asserted on the source rather than mocked. */
@@ -364,7 +405,7 @@ describe("a release that stops", () => {
       const out = sink();
 
       const result = await withEnv({}, () =>
-        release({ version: "1.2.0", runner, out, root: ROOT }),
+        release({ version: VERSION, runner, out, root: ROOT }),
       );
 
       expect(result, out.text()).toMatchObject({ ok: false, stoppedAt: step });
@@ -383,7 +424,7 @@ describe("a release that stops", () => {
     const runner = new FakeRunner();
     const out = sink();
     const result = await withEnv({ VIKT_HOST: undefined }, () =>
-      release({ version: "1.2.0", runner, out, root: ROOT }),
+      release({ version: VERSION, runner, out, root: ROOT }),
     );
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 1 });
@@ -405,7 +446,7 @@ describe("a release that stops", () => {
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
     expect(runner.calls.some((c) => /stack\.mjs deploy/.test(c.command))).toBe(false);
@@ -418,7 +459,7 @@ describe("a release that stops", () => {
       "node .*stack.mjs plan": { code: 0, out: "blocked: the stack file is not the release's" },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
     expect(out.text()).toContain("the plan is blocked");
@@ -432,12 +473,12 @@ describe("a release that stops", () => {
   it("is not failed by the words in a clean plan's labels", async () => {
     const runner = new FakeRunner();
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result, out.text()).toMatchObject({ ok: true });
     expect(out.text()).toContain("nothing blocks this deploy");
     /* And it keeps what the plan said it would change. */
-    expect(out.text()).toContain("IMAGE_TAG  1.1.1 -> 1.2.0");
+    expect(out.text()).toContain(`IMAGE_TAG  1.2.0 -> ${VERSION}`);
   });
 
   /**
@@ -463,11 +504,11 @@ describe("a release that stops", () => {
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 8 });
     /* It says no run appeared, not that a run failed. */
-    expect(out.text()).toContain("no run of release.yml for v1.2.0 appeared");
+    expect(out.text()).toContain(`no run of release.yml for v${VERSION} appeared`);
     expect(out.text()).not.toContain("run 9");
     /* And nothing was deployed on the strength of it. */
     expect(runner.calls.some((c) => /stack\.mjs deploy/.test(c.command))).toBe(false);
@@ -480,15 +521,15 @@ describe("a release that stops", () => {
       "gh run list --workflow release.yml": {
         code: 0,
         out: JSON.stringify([
-          { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: "v1.2.0", event: "push" },
+          { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: `v${VERSION}`, event: "push" },
         ]),
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 8 });
-    expect(out.text()).toContain("no run of release.yml for v1.2.0 appeared");
+    expect(out.text()).toContain(`no run of release.yml for v${VERSION} appeared`);
   });
 
   /** A run still going is watched to its end rather than guessed at. */
@@ -498,16 +539,45 @@ describe("a release that stops", () => {
       "gh run list --workflow release.yml": {
         code: 0,
         out: JSON.stringify([
-          { databaseId: 77, status: "in_progress", conclusion: null, headBranch: "v1.2.0", event: "release" },
+          { databaseId: 77, status: "in_progress", conclusion: null, headBranch: `v${VERSION}`, event: "release" },
         ]),
       },
       "gh run watch 77": { code: 0, out: "✓ release.yml" },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result, out.text()).toMatchObject({ ok: true });
-    expect(out.text()).toContain("run 77 (release, v1.2.0) finished green");
+    expect(out.text()).toContain(`run 77 (release, v${VERSION}) finished green`);
+  });
+
+  /**
+   * The release is of a commit, not of a branch tip (D183, second).
+   *
+   * When dev has moved past the version, the newest run on dev is about a
+   * commit that is not going into production. Here the tip's run is failing and
+   * the target's is green: taking the newest would stop a release that should
+   * proceed, and — worse on another day — a green tip would wave through a
+   * target nobody had tested.
+   */
+  it("reads CI for the commit being released, not for dev's tip", async () => {
+    const tip = "f".repeat(40);
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "git rev-parse --short HEAD": { code: 0, out: tip.slice(0, 7) },
+      "gh run list --branch dev": {
+        code: 0,
+        out: JSON.stringify([
+          { headSha: tip, status: "completed", conclusion: "failure", displayTitle: "a later commit" },
+          { headSha: TARGET, status: "completed", conclusion: "success", displayTitle: "the release" },
+        ]),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
+
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain(`success for ${TARGET.slice(0, 7)}: the release`);
   });
 
   /**
@@ -520,7 +590,7 @@ describe("a release that stops", () => {
   it("does not require diagnostics a healthy boot omits", async () => {
     const runner = new FakeRunner();
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result, out.text()).toMatchObject({ ok: true });
     expect(out.text()).toContain("VAPID: no line, so the key is unchanged");
@@ -534,13 +604,13 @@ describe("a release that stops", () => {
         code: 0,
         out: [
           "Migrations: 0 applied, 32 recorded in total",
-          '{"level":30,"version":"1.2.0","msg":"api build"}',
+          `{"level":30,"version":"${VERSION}","msg":"api build"}`,
           '{"level":40,"subscriptions":3,"msg":"the VAPID public key changed since the last boot."}',
         ].join("\n"),
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 11 });
     expect(out.text()).toContain("not the one the subscriptions were made with");
@@ -554,13 +624,13 @@ describe("a release that stops", () => {
         code: 0,
         out: [
           "Migrations: 0 applied, 32 recorded in total",
-          '{"level":30,"version":"1.2.0","msg":"api build"}',
+          `{"level":30,"version":"${VERSION}","msg":"api build"}`,
           '{"level":40,"model":"llava:7b","msg":"the vision model cannot see"}',
         ].join("\n"),
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 11 });
     expect(out.text()).toContain("the vision self-test did not pass");
@@ -580,10 +650,49 @@ describe("a release that stops", () => {
       },
     });
     const out = sink();
-    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 11 });
-    expect(out.text()).toContain("the version line for 1.2.0");
+    expect(out.text()).toContain(`the version line for ${VERSION}`);
+  });
+});
+
+/* ------------------------------------------------------- what runs where -- */
+
+/**
+ * The Nyheter step runs something the production image actually has (D183,
+ * seventh).
+ *
+ * It was wired as `pnpm --filter api news:publish`, which runs the TypeScript
+ * through `tsx`: a dev dependency, absent from a production image, in a
+ * container that has no pnpm either. The release deployed 1.2.0, confirmed it
+ * from outside, and stopped at its last step on `sh: 1: tsx: not found`.
+ *
+ * Asserted on the sources rather than through the fake runner, because what was
+ * wrong is **which binary is named** and where it comes from, and a fake that
+ * answers either one proves nothing about the image.
+ */
+describe("what the release runs inside the container", () => {
+  const source = readFileSync(path.join(ROOT, "scripts/release.mjs"), "utf8");
+
+  it("invokes the built script, not the TypeScript one", () => {
+    expect(source).toContain("node dist/news-publish.js");
+    expect(source, "tsx is a dev dependency and is not in a production image").not.toMatch(
+      /docker exec[^\n]*pnpm --filter api news:publish/,
+    );
+  });
+
+  /** And the build actually produces it, which is the other half. */
+  it("builds that script into the image", () => {
+    const tsup = readFileSync(path.join(ROOT, "apps/api/tsup.config.ts"), "utf8");
+    expect(tsup).toContain('"news-publish": "src/scripts/news-publish.ts"');
+  });
+
+  /** The precedent it should have followed from the start. */
+  it("uses the same shape restore-check already did", () => {
+    const tsup = readFileSync(path.join(ROOT, "apps/api/tsup.config.ts"), "utf8");
+    expect(tsup).toContain('"restore-check": "src/scripts/restore-check.ts"');
+    expect(source).toMatch(/node dist\/\w[\w-]*\.js/);
   });
 });
 
@@ -619,7 +728,8 @@ describe("the plan step, against a stack double", () => {
 
       if (url.pathname === "/token") return json(200, { token: "t" });
       if (url.pathname.includes("/manifests/")) {
-        res.writeHead(url.pathname.endsWith("/1.2.0") ? 200 : 404);
+        /* The registry has the version under release, and nothing else. */
+        res.writeHead(url.pathname.endsWith(`/${VERSION}`) ? 200 : 404);
         return res.end();
       }
       if (url.pathname === "/api/stacks") {
@@ -677,11 +787,11 @@ describe("the plan step, against a stack double", () => {
   }
 
   it("builds arguments stack.mjs accepts, and reads its verdict", async () => {
-    const handover = readHandover(STATE, "1.2.0");
+    const handover = readHandover(STATE, VERSION);
     expect(handover.ok).toBe(true);
     if (!handover.ok) return;
 
-    const result = await run(stackArgs("1.2.0", handover, "plan"));
+    const result = await run(stackArgs(VERSION, handover, "plan"));
 
     /* Not a usage error: the arguments release.mjs builds are ones it takes. */
     expect(result.out, result.out).not.toMatch(/^usage:/m);

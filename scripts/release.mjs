@@ -167,18 +167,36 @@ export function readHandover(state, version) {
   return { ok: true, sets, fromEnv, commit: named ? named[1] : null };
 }
 
-/** The version's Nyheter post, out of STATE.md's own block. */
+/**
+ * The version's Nyheter post, out of STATE.md's own block.
+ *
+ * Found by the `<summary>` that names the version, which is how "Till Nyheter"
+ * is actually written, rather than by guessing at a heading inside the post.
+ * The heading is copy: it said "Version 1.2.0" and is "Vikt 1.2" now, and a
+ * reader of the release notes should not have their announcement's wording
+ * decided by a regular expression in a deploy script.
+ *
+ * `news-publish` wants a `# Title` line, and STATE.md writes the post's own
+ * heading at `##` because it is nested in this document. The first heading is
+ * promoted on the way out; everything else is passed through untouched.
+ */
 export function readNewsPost(state, version) {
-  const marker = `## Version ${version}`;
-  const at = state.indexOf(marker);
-  if (at < 0) return null;
+  const summary = state.indexOf(`<summary>${version}</summary>`);
+  if (summary < 0) return null;
 
-  const rest = state.slice(at);
-  const end = rest.indexOf("\n```");
-  if (end < 0) return null;
+  const rest = state.slice(summary);
+  const open = rest.indexOf("```markdown");
+  if (open < 0) return null;
 
-  /* `## Version 1.2.0` in STATE.md is the post's own `# Title` here. */
-  return `# Version ${version}\n${rest.slice(marker.length, end).trim()}\n`;
+  const body = rest.slice(open + "```markdown".length);
+  const close = body.indexOf("\n```");
+  if (close < 0) return null;
+
+  const post = body.slice(0, close).trim();
+  if (post.length === 0) return null;
+
+  /* The post's own first heading becomes the title `news-publish` reads. */
+  return `${post.replace(/^##\s+/, "# ")}\n`;
 }
 
 /* ------------------------------------------------------------------ steps -- */

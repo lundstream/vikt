@@ -10242,3 +10242,95 @@ this reason, and now so does this.
 test for "VIKT_HOST is not set" passed step one, because as far as anything
 reading it was concerned the variable was set. A test that removes a variable
 has to remove it.
+
+---
+
+### D183 — Seven defects in the seams, found by deploying for real
+
+1.2.0 went to production on 2026-09-17, from `a21224c`. It took seven attempts,
+and **every failure was in the release tooling rather than in the app**. Two
+thousand tests were green throughout.
+
+They are one entry rather than seven because six of them are one mistake wearing
+different clothes: **a check answering a question adjacent to the one it was
+asked.** Each is listed with the test that now fails without its fix, because a
+defect found by running something is only closed when something else would find
+it again.
+
+#### The six of a kind
+
+| what was asked | what was answered | the test |
+|---|---|---|
+| this tag's workflow run | the newest run of that workflow | "never reports an older run as this tag's" |
+| CI for the commit being released | CI for dev's tip | "reads CI for the commit being released, not for dev's tip" |
+| is commit `a21224c` green | does `a21224c` equal `a21224c7925…` | the fake world's sha is forty characters |
+| will this variable be set | is it set already | "counts a required variable this run sets as set" |
+| is the plan blocked | does the word "not set" appear | "is not failed by the words in a clean plan's labels" |
+| did the API come up | did it print every diagnostic it has | "does not require diagnostics a healthy boot omits" |
+
+**The newest run of `release.yml`** was, one second after the tag was pushed, a
+run from two days earlier that had failed for an unrelated reason: GitHub had
+not registered the tag's run yet. "No run yet" and "the run failed" are
+different facts and only one of them should stop a release. `release.yml` also
+makes two runs per tag, a `push` and a `release`, one cancelled by the
+concurrency group (D169), so a cancelled run is never the answer either.
+
+**The newest run on `dev`** is about the tip, and the tip stops being the
+release the moment anything lands after the version is cut — which is what
+happened, because the fix for the defect above landed there. STATE.md names the
+release commit for exactly this, and the handover is read at step 1 now so that
+step 3 knows which commit to ask about.
+
+**A short sha is not a long one.** STATE.md names the seven characters a person
+reads and every tool reports forty. Compared as strings, no CI run existed for a
+commit whose run was green and sitting there.
+
+**A variable this run is setting is not a missing variable.** `stack.mjs`
+checked required variables before resolving `--set`, so it printed
+`setting: BACKUP_HOST_DIR (new)` and `blocked: set BACKUP_HOST_DIR first` in the
+same breath. That made D174's whole point — the variable riding in the same
+update as the compose file and the tag — unreachable through the step that
+exists to confirm it.
+
+**A label is not a fact.** The plan's ordinary output contains "required by the
+release and not set: **none**", and a grep for `missing|not set` failed a plan
+that had just passed. The same mistake as a guard matching the phrase inside its
+own explanatory comment, which this repository has made before.
+
+**A healthy boot is quiet.** The log check demanded a VAPID line and a vision
+line. `checkVapidKey` speaks only when the key is new or changed, so silence
+means every push subscription still works; `startVisionWatch` is deliberately
+silent while the workstation is unreachable, and on the day it answered eight
+seconds after the log was read. Requiring them failed a deploy that had
+succeeded. The two lines that must be there are still required; the two that are
+diagnostics are read, and a bad one fails.
+
+#### The seventh, which is a different mistake
+
+**A script that could only run where it was not.** `news:publish` was wired as
+`pnpm --filter api news:publish`, which runs the TypeScript through `tsx`: a dev
+dependency, absent from a production image, in a container with no pnpm. The
+release deployed 1.2.0, confirmed it from outside, and stopped at its last step
+on `sh: 1: tsx: not found`.
+
+`restore-check` has been run in that container as `node dist/restore-check.js`
+since D168, and the tsup entry list is where that is arranged. The precedent was
+written down and not followed. Held now by three tests: the command names the
+built script, the build produces it, and it is the shape `restore-check` already
+uses.
+
+#### What this says about the tests
+
+None of these was reachable by the suites. Every one lived in the seam between
+this tooling and something outside it — GitHub, git, Portainer, a built image —
+and a seam is precisely what a unit test replaces with a fixture that agrees
+with it.
+
+The tests written here do not fix that in general; what they do is stop each
+specific seam from moving back. The thing that actually found them was **running
+the command against the real world**, which is the argument for having built it
+rather than deploying by hand: a person doing this by hand makes the same six
+substitutions silently, and nothing stops at step 8 to say so.
+
+The cost is on the record: seven attempts, six commits of repair, and a
+production deploy that was correct from the first attempt that reached it.

@@ -329,142 +329,84 @@ phase 3.
   built, and so is the coach (8b). What is left in that phase is the milestone
   messages the persona was also meant to deliver.
 
+## Production runs 1.2.0
+
+**Deployed 2026-09-17 from `a21224c`**, by `node scripts/release.mjs 1.2.0`.
+Twelve of its thirteen steps ran; the thirteenth could not, and is the first
+thing 1.2.1 fixes.
+
+| step | evidence |
+|---|---|
+| 1 workstation | `VIKT_HOST` set, `PORTAINER_TOKEN` set, gh authenticated, STATE.md names `a21224c` |
+| 2 tree | clean, on `dev`, pushed, releasing `a21224c` |
+| 3 CI | success for `a21224c` |
+| 4 backup | `/var/backups/vikt/vikt-20260917T062557Z.dump`, 304K |
+| 5 restore | `daily_log 65, food_entries 239, plans 2, users 4, weight_log 99`, restored copy and live database agree |
+| 6 main | at `a21224c` |
+| 7 tag | `v1.2.0` published |
+| 8 workflow | run `35188610215` success |
+| 9 plan | nothing blocks this deploy; `IMAGE_TAG 1.1.1 -> 1.2.0`, `BACKUP_HOST_DIR` set in the same update (D174) |
+| 10 deploy | both containers on the new image, the API healthy |
+| 11 API log | `version 1.2.0, commit a21224c`; **`Migrations: 2 applied, 32 recorded in total`**, `0030_food_search_fold` and `0031_restore_checks`; VAPID silent, so the key is unchanged; `the vision model can see` |
+| 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200 |
+| 13 Nyheter | **did not run**: `sh: 1: tsx: not found` |
+
+Confirmed independently after the run: `/api/health` reports
+`"version":"1.2.0","commit":"a21224c…","db":"up"`, and `vikt-api-1` and
+`vikt-nginx-1` are both on `:1.2.0` with the API healthy.
+
+**1.2.0's release notes are not announced in the app.** Step 13 runs the post
+inside the container and the image it was deployed from has no
+`dist/news-publish.js`: the script was written after the build's entry list, and
+`tsx` is a dev dependency a production image does not carry (D183). The entry
+exists now, so the post ships with 1.2.1.
+
+**It took seven attempts and every failure was in the tooling, not the app**
+(D183): six checks answering a question next to the one they were asked, and one
+script that could only run where it was not. Each has a test that fails without
+its fix.
+
+---
+
 ## Inför nästa deploy
 
-**The next deploy is `1.2.0`, and it is everything on `dev` since `1.1.1`.**
-Production runs `1.1.1`. This section is the handover: what changes, what the
-deploy needs that it did not before, and the one command that does it.
+**The next deploy is `1.2.1`.** Production runs `1.2.0` (above). This section is
+the handover: what changes, what the deploy needs that it did not before, and
+the one command that does it.
 
-#### What 1.2.0 changes
+#### What 1.2.1 changes
 
 | | what a user sees |
 |---|---|
-| **"minst" at every span** (D55) | an incomplete macro sum says "minst" with the share of the food behind it, on Översikt, Mat and in the coach's sheet |
-| **Search on Mat** (D165) | a typo inside a long name still finds the food, and the screen says whether it is still looking |
-| **Samband per week** (D166, D170) | intake against trend change, one point per whole week, with the expected line drawn from measured maintenance, and a ring on a week where the eating changed |
-| **The coach says what each area means** (D171) | every domain it raises carries the app's own one-sentence interpretation, marked as general |
-| **A table of days, and Excel** (D167) | Data, Dagar: one row per day, seventeen columns, sortable. Inställningar: the whole account as .xlsx, JSON, or CSV per table |
-| **The backup screen** (D168) | "Senaste återställningstest", and the destination help no longer says S3 is unimplemented |
-| **A new landing page** (D173, D177, D178, D179, D180) | the public page is rebuilt: a hero whose trend line is the app's own arithmetic drawn with the app's own curve and landing in a ring, a claim that arrives a word at a time, a daily weight cycling beside the trend it makes, three phone screens one to a row, and a share card |
-| **Two formatting fixes** (D179) | the weekly review card names the day in Swedish instead of showing an ISO date, and the weekly trend change in it reads one decimal like every other weight |
-| **A release is one command** (D182) | nothing a user sees. `node scripts/release.mjs <version>` runs the runbook, prints each step's evidence and stops at the first failure |
-| **Secondary text is readable** (D175) | every grey label and unit passes 4,5:1 on the surface it sits on, in both themes |
-| **Three things a screenshot showed** (D176) | the 90-day trend delta has one decimal, the estimate chip reads "≈ uppskattning", and the documented Blåbär matches the one the app draws |
+| **The release notes appear** (D183) | 1.2.0's post was never published, because the script that publishes it was not in the image. It is now, and this release publishes it |
 
-#### What the deploy needs that 1.1.1 did not
+#### What the deploy needs that 1.2.0 did not
 
-- **Two migrations, `0030_food_search_fold` and `0031_restore_checks`.** Both
-  additive. `0030` adds a generated column and a trigram index to `food_items`
-  and needs ownership of that table; it rewrites the table, so on a large
-  catalogue it is the slow one. `0031` adds a table and needs ownership of the
-  database. **Neither needs superuser**, and `0031` is not the same as the
-  `CREATEDB` the restore check needs at runtime. Step 6 should report
-  `Migrations: 2 applied, 32 recorded in total`.
-- **`BACKUP_HOST_DIR`, and the directory behind it** (D168). The compose reads
-  `${BACKUP_HOST_DIR:?...}`, so the stack **refuses to start without it**. On the
-  Docker host, before the deploy:
-
-  ```sh
-  sudo mkdir -p /var/backups/vikt/app
-  sudo chown 1000:1000 /var/backups/vikt/app
-  sudo chmod 700 /var/backups/vikt/app
-  ```
-
-- **The compose file changed**, so the deploy replaces it: `--release-file`.
-- **`PUBLIC_BASE_URL` reaches the web container now** (D173), for the share
-  card's absolute URLs. It is already a stack variable, so nothing to set.
-- **`SUPPORT_URL`, if the support link is wanted.** The footer's "Bjud på en öl"
-  is dropped rather than shown empty when it is unset (D121), which is why it is
-  absent on `dev` and why nothing is broken there. Production has it in the
-  variables table in INFRA.md; set it in the same panel as the others if it is
-  not there yet:
-
-  | Variable | Value |
-  |---|---|
-  | `SUPPORT_URL` | `https://buymeacoffee.com/lundstream` |
-
-  Verified against the production build with the value set: five footer links,
-  the last being "Bjud på en öl" to that address.
-- **The release workflow changed** (D169): `release.yml` builds on a tag, a
-  published release or a manual run, not on a push to `main`. `gh release create`
-  is still the command, and it now starts **one** run rather than two of which
-  one always failed.
+**Nothing.** No migration, no new stack variable, no compose change. `0030` and
+`0031` went out with 1.2.0, so step 11 should report `Migrations: 0 applied, 32
+recorded in total`.
 
 #### The deploy, as one command
 
 ```sh
-node scripts/release.mjs 1.2.0
+node scripts/release.mjs 1.2.1
 ```
 
-**`main` and the tag are at `a21224c`, and `dev` has moved past it.** The
-release-command fix that came out of the first attempt (below) landed after the
-version was cut, so it is not part of 1.2.0 and ships with the next one. **For
-`1.2.0` it is `a21224c`**, which is what the command releases and what CI is
-checked for; `dev`'s tip is a different commit and deliberately so.
-
-**This is the whole runbook now** (D182): the backup and its restore check on
-the host, the tree and CI, `main`, the tag, the release workflow, the plan, the
-deploy, the API log, the two HTTP checks and the Nyheter post. It prints each
-step's evidence and **stops at the first failure with nothing after it
-attempted**. `--dry-run` runs every check and changes nothing.
-
-**It was run on 2026-09-17 and stopped at step 1 of 13.** Production is still on
-`1.1.1`, and nothing was written to the host, to Portainer or to GitHub:
-
-```
-FAIL 1/13 the workstation has what it needs
-       VIKT_HOST is not set, so there is no host to back up or publish on
-```
-
-`VIKT_HOST` is `user@host` for the Docker host, set in the workstation's
-environment beside `PORTAINER_TOKEN`, which **is** set. It needs a key-based
-login, because the command passes `BatchMode=yes` and refuses password
-authentication rather than stopping an unattended release at a prompt.
-
-Two things before the first real run, both in INFRA.md, "What the release user
-needs on the host":
-
-- **This workstation has never had a shell on that host.** Every existing path
-  goes through the Portainer API, so the SSH access is new rather than an unset
-  variable.
-- **No sudo is needed, but two things are**, once, as root on the host:
-  `usermod -aG docker <user>`, and `install -d -o <user> -g <user> -m 750`
-  for `/var/backups/vikt` and `/var/backups/vikt/app`. That is read off
-  `backup.sh` and `restore-check.sh` rather than measured on the host, which
-  could not be reached; the first run is what confirms it.
-
-The steps it replaces, for a person or for a self-hoster, are unchanged in
-INFRA.md, "Deploying a version, in order". By hand the deploy itself is still:
+`--dry-run` runs every check and changes nothing. It prints each step's evidence
+and stops at the first failure with nothing after it attempted (D182). The steps
+it replaces, for a person or a self-hoster, are in INFRA.md, "Deploying a
+version, in order"; by hand the deploy itself is:
 
 ```sh
-node scripts/stack.mjs plan 1.2.0 --release-file \
-  --set BACKUP_HOST_DIR=/var/backups/vikt/app
-
-node scripts/stack.mjs deploy 1.2.0 --release-file \
-  --set BACKUP_HOST_DIR=/var/backups/vikt/app --yes
+node scripts/stack.mjs plan 1.2.1 --release-file
+node scripts/stack.mjs deploy 1.2.1 --release-file --yes
 ```
 
-`plan` first, with the same arguments, and it has to end "nothing blocks this
-deploy". The variable rides in the same update as the compose file and the tag
-(D174), so there is no second restart and no window where the new image is up
-without the directory it writes to.
-
-Rollback is `node scripts/stack.mjs deploy 1.1.1 --keep-file --yes`, and it
-crosses two migrations: both are additive, so `1.1.1` runs against the newer
-schema, and the rollback dump below is what covers anything that is not.
-
-**Take a backup first (step 1), as always.** Production still has no scheduled
-backup configured, so the only copy is the one you take: `/srv/vikt/infra/backup.sh`
-on the host puts a dump in `/var/backups/vikt/`. The host is snapshotted by PBS
-every 24 hours, and a snapshot is crash consistent rather than application
-consistent, which is not the same as a dump (INFRA.md).
-
-The runbook lives in `INFRA.md`, "Deploying a version, in order", because it is
-about **this installation** and this file is public (D119).
+Rollback is `node scripts/stack.mjs deploy 1.2.0 --keep-file --yes`, and it
+crosses no migration.
 
 **Every pass on `dev` still appends to this section**, and nothing merges to
-`main` until it has been read. Anything operational that a pass discovers goes
-into the runbook; anything a user will see goes into the news post below.
+`main` until it has been read.
 
 ### Till Nyheter
 
@@ -472,7 +414,7 @@ into the runbook; anything a user will see goes into the news post below.
 tankstreck (§5), och registret är appens eget: du, inte "användaren".
 
 <details>
-<summary>1.2.0</summary>
+<summary>1.2.1</summary>
 
 ```markdown
 ## Version 1.2.0
