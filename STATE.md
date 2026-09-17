@@ -378,8 +378,20 @@ its fix.
 the handover: what changes, what the deploy needs that it did not before, and
 the one command that does it.
 
-**For `1.2.1` it is `1f1738f`**, which is `dev`'s tip at the time of writing and
-is what the command releases.
+**1.2.1 is the whole of `dev`**, so nothing is named here and the command
+releases the tip.
+
+It did name `1f1738f`, and that could not work: CI is
+`concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true`, so every
+push to `dev` cancels the run before it. A commit that stops being the tip
+within about three minutes ends up with a **cancelled** run rather than a green
+one, and step 3 reads that as what it is: no verdict.
+
+So the named-commit path is for a release that has genuinely been left behind by
+`dev` — where the named commit's run finished long ago — and not for one cut a
+minute before the next commit. When the whole of `dev` is the release, say
+nothing here and let the tip be it, which also means the last commit before the
+deploy has to be allowed to finish its run.
 
 #### What 1.2.1 changes
 

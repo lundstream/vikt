@@ -343,8 +343,20 @@ export function buildSteps({ version, runner, root = ROOT }) {
           );
         }
         if (mine.status !== "completed" || mine.conclusion !== "success") {
+          /*
+            A cancelled run is the common one and it is not a failure: CI is
+            `cancel-in-progress` per branch, so any commit that stops being the
+            tip before its run finishes ends up here. It means there is no
+            verdict, not that there is a bad one.
+          */
+          const why =
+            mine.conclusion === "cancelled"
+              ? "a later push to dev cancelled it, so this commit has no verdict. " +
+                "Re-run it, or release dev's tip and let its run finish"
+              : "fix it and push again";
           return fail(
             `CI for ${context.target.slice(0, 7)} is ${mine.status}/${mine.conclusion}`,
+            why,
           );
         }
         return ok(`${mine.conclusion} for ${context.target.slice(0, 7)}: ${mine.displayTitle}`);
