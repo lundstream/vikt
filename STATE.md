@@ -409,8 +409,10 @@ and the API log is checked for what a healthy boot actually prints.
 #### What the deploy needs that 1.2.0 did not
 
 **Nothing.** No migration, no new stack variable, no compose change. `0030` and
-`0031` went out with 1.2.0, so step 11 should report `Migrations: 0 applied, 32
-recorded in total`, and step 9's plan should list no `setting:` line at all.
+`0031` went out with 1.2.0, so step 11 reports `Migrations: none to apply, 32
+already recorded` — `migrate.ts` has a second sentence for the nothing-to-do
+case, which is not the one a release with migrations prints — and step 9's plan
+lists no `setting:` line at all.
 
 #### The deploy, as one command
 

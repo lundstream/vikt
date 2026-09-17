@@ -663,7 +663,14 @@ export function buildSteps({ version, runner, root = ROOT }) {
         );
         if (!versionLine) missing.push(`the version line for ${version}`);
 
-        const migrations = lines.find((line) => /Migrations:\s*\d+ applied/i.test(line));
+        /*
+          `migrate.ts` writes one of two sentences: "N applied, M recorded in
+          total" when it did something, and "none to apply, M already recorded"
+          when it did not. Matching only the first required every release to
+          carry a migration, and 1.2.1 carried none: the line was there, saying
+          so, and the step called it missing.
+        */
+        const migrations = lines.find((line) => /^\s*Migrations:/i.test(line));
         if (!migrations) missing.push("the migrations line");
 
         if (missing.length > 0) {

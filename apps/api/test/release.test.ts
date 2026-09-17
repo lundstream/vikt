@@ -636,6 +636,35 @@ describe("a release that stops", () => {
     expect(out.text()).toContain("the vision self-test did not pass");
   });
 
+  /**
+   * A release with no migrations still prints a migrations line (D183, ninth).
+   *
+   * `migrate.ts` has two sentences: "N applied, M recorded in total" and "none
+   * to apply, M already recorded". The check matched only the first, so it
+   * required every release to carry a migration; 1.2.1 carried none, the line
+   * was there saying exactly that, and the step called it missing.
+   */
+  it("accepts the nothing-to-do wording of the migrations line", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "ssh docker logs": {
+        code: 0,
+        out: [
+          "Running migrations...",
+          "Migrations: none to apply, 32 already recorded",
+          "Starting API...",
+          `{"level":30,"version":"${VERSION}","commit":"bc06167","msg":"api build"}`,
+          '{"level":30,"model":"qwen3-vl:8b","msg":"the vision model can see"}',
+        ].join("\n"),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
+
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain("Migrations: none to apply, 32 already recorded");
+  });
+
   /** A log without the version line is a deploy that did not take. */
   it("stops when the API log does not name the version", async () => {
     const runner = new FakeRunner({
