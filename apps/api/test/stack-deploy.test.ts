@@ -239,6 +239,36 @@ describe("stack.mjs plan", () => {
     expect(leaked(result)).toEqual([]);
   });
 
+  /**
+   * A required variable this run is setting is not a missing variable (D183).
+   *
+   * The checks ran before `--set` was resolved, so a genuinely new required
+   * variable blocked the plan whatever was passed: on the first real release of
+   * 1.2.0 the plan printed `setting: BACKUP_HOST_DIR (new)` and
+   * `blocked: set BACKUP_HOST_DIR first` in the same breath, which made D174's
+   * whole point — the variable riding in the same update as the compose file
+   * and the tag — unreachable through `plan`.
+   *
+   * The stack double here is missing one of the variables the compose requires,
+   * which is exactly the state production was in.
+   */
+  it("counts a required variable this run sets as set", async () => {
+    const required = REQUIRED.find((name) => name !== "IMAGE_TAG")!;
+    state.vars = state.vars.filter((entry) => entry.name !== required);
+
+    const without = await run(["plan", "1.1.1", "--ref", "HEAD"]);
+    expect(without.code, "the double is not actually missing the variable").toBe(1);
+    expect(without.stderr).toContain(`blocked: set ${required} first`);
+
+    const withSet = await run(["plan", "1.1.1", "--ref", "HEAD", "--set", `${required}=/tmp/x`]);
+    expect(withSet.stderr, withSet.stdout).toBe("");
+    expect(withSet.code).toBe(0);
+    expect(withSet.stdout).toContain("required by the release and not set: none");
+    expect(withSet.stdout).toContain(`setting: ${required} (new)`);
+    expect(withSet.stdout).toContain("nothing blocks this deploy");
+    expect(leaked(withSet)).toEqual([]);
+  });
+
   it("blocks on a tag the registry does not have", async () => {
     const result = await run(["plan", "9.9.9", "--ref", "HEAD"]);
 

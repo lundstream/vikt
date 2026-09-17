@@ -319,17 +319,6 @@ async function plan(version, options) {
     blockers.push("the stack file is not the release's: pass --release-file or --keep-file");
   }
 
-  const releaseVars = composeVariables(release ?? stack.file);
-  const missingRequired = [...releaseVars.required].filter(
-    (name) => !setNames.has(name) && !(name === "IMAGE_TAG"),
-  );
-  const added = [...releaseVars.all].filter((name) => !running.all.has(name) && !setNames.has(name));
-
-  out(`variables  ${stack.vars.length} set in the stack (names only; values are not printed)`);
-  out(`           required by the release and not set: ${missingRequired.join(", ") || "none"}`);
-  out(`           new in the release and not set: ${added.join(", ") || "none"}`);
-  if (missingRequired.length > 0) blockers.push(`set ${missingRequired.join(", ")} first`);
-
   const repo = options.repo ?? REGISTRY_REPO;
 
   /**
@@ -338,8 +327,32 @@ async function plan(version, options) {
    * Names only, and that is the whole reporting rule: the values are a host
    * directory today and could be anything tomorrow, and a plan that printed
    * them would print whatever somebody passed to `--set-from-env`.
+   *
+   * **Resolved before the checks below**, because a variable this run is about
+   * to set is not a missing variable. It used to be resolved after them, so a
+   * genuinely new required variable blocked the plan no matter what was passed:
+   * the plan printed `setting: BACKUP_HOST_DIR (new)` and `blocked: set
+   * BACKUP_HOST_DIR first` in the same breath, and D174's whole point — that
+   * the variable rides in the same update as the compose file and the tag — was
+   * unreachable through `plan`. Found on the first real release (D183).
    */
   const { set, unset } = resolveVariables(options);
+
+  const releaseVars = composeVariables(release ?? stack.file);
+  /** Set in the stack already, or set by this run: both count as set. */
+  const willBeSet = new Set([...setNames, ...Object.keys(set)]);
+
+  const missingRequired = [...releaseVars.required].filter(
+    (name) => !willBeSet.has(name) && !(name === "IMAGE_TAG"),
+  );
+  const added = [...releaseVars.all].filter(
+    (name) => !running.all.has(name) && !willBeSet.has(name),
+  );
+
+  out(`variables  ${stack.vars.length} set in the stack (names only; values are not printed)`);
+  out(`           required by the release and not set: ${missingRequired.join(", ") || "none"}`);
+  out(`           new in the release and not set: ${added.join(", ") || "none"}`);
+  if (missingRequired.length > 0) blockers.push(`set ${missingRequired.join(", ")} first`);
   const known = new Map(stack.vars.map((entry) => [entry.name, entry.value]));
   const changing = Object.keys(set).map((name) =>
     !known.has(name)
