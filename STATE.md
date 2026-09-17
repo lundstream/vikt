@@ -329,52 +329,70 @@ phase 3.
   built, and so is the coach (8b). What is left in that phase is the milestone
   messages the persona was also meant to deliver.
 
-## Production runs 1.2.0
+## Production runs 1.2.1
 
-**Deployed 2026-09-17 from `a21224c`**, by `node scripts/release.mjs 1.2.0`.
-Twelve of its thirteen steps ran; the thirteenth could not, and is the first
-thing 1.2.1 fixes.
+**Deployed 2026-09-17 from `bc06167`**, by `node scripts/release.mjs 1.2.1`.
+**All thirteen steps ran**, which had never happened before.
 
 | step | evidence |
 |---|---|
-| 1 workstation | `VIKT_HOST` set, `PORTAINER_TOKEN` set, gh authenticated, STATE.md names `a21224c` |
-| 2 tree | clean, on `dev`, pushed, releasing `a21224c` |
-| 3 CI | success for `a21224c` |
-| 4 backup | `/var/backups/vikt/vikt-20260917T062557Z.dump`, 304K |
-| 5 restore | `daily_log 65, food_entries 239, plans 2, users 4, weight_log 99`, restored copy and live database agree |
-| 6 main | at `a21224c` |
-| 7 tag | `v1.2.0` published |
-| 8 workflow | run `35188610215` success |
-| 9 plan | nothing blocks this deploy; `IMAGE_TAG 1.1.1 -> 1.2.0`, `BACKUP_HOST_DIR` set in the same update (D174) |
+| 1 workstation | `VIKT_HOST` set, `PORTAINER_TOKEN` set, gh authenticated, STATE.md names `bc06167` |
+| 2 tree | clean, on `dev`, pushed, releasing `bc06167` |
+| 3 CI | success for `bc06167` |
+| 4 backup | `/var/backups/vikt/vikt-20260917T220025Z.dump`, 308K |
+| 5 restore | `daily_log 66, food_entries 247, plans 2, users 4, weight_log 99`, restored copy and live database agree |
+| 6 main | at `bc06167` |
+| 7 tag | `v1.2.1` |
+| 8 workflow | run `35278864241` success |
+| 9 plan | nothing blocks this deploy; `IMAGE_TAG 1.2.0 -> 1.2.1`, **no `setting:` line**, because this release needs no variable |
 | 10 deploy | both containers on the new image, the API healthy |
-| 11 API log | `version 1.2.0, commit a21224c`; **`Migrations: 2 applied, 32 recorded in total`**, `0030_food_search_fold` and `0031_restore_checks`; VAPID silent, so the key is unchanged; `the vision model can see` |
+| 11 API log | `version 1.2.1, commit bc06167`; **`Migrations: none to apply, 32 already recorded`**; VAPID silent, so the key is unchanged; `the vision model can see` |
 | 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200 |
-| 13 Nyheter | **did not run**: `sh: 1: tsx: not found` |
+| 13 Nyheter | **`published "Vikt 1.2" as eab68bfd-66d0-40c7-b2a6-ace7eeaca944, 2133 characters, not mailed`** |
 
-Confirmed independently after the run: `/api/health` reports
-`"version":"1.2.0","commit":"a21224c…","db":"up"`, and `vikt-api-1` and
-`vikt-nginx-1` are both on `:1.2.0` with the API healthy.
+**Confirmed in production afterwards, through the interface.** `/app/nyheter`
+shows "Vikt 1.2" at the top, dated torsdag 17 september, with its sections
+rendered from the Markdown subset (D128): Mat och makron, Data, Samband,
+Coachen, Läsbarhet, Rättat, Startsidan. `/` shows eight sections in order with
+**Gratis** between "Appen i telefonen" and "Din data", two paragraphs, beginning
+"Det finns ingen betalversion."
 
-**1.2.0's release notes are not announced in the app.** Step 13 runs the post
-inside the container and the image it was deployed from has no
-`dist/news-publish.js`: the script was written after the build's entry list, and
-`tsx` is a dev dependency a production image does not carry (D183). The entry
-exists now, so the post ships with 1.2.1.
+#### What it took, after 1.2.0
 
-**The closing sweep, 2026-09-17**: `shoot2.mjs` over every finished screen at
-360 px and desktop, **40 of 40, none failed**, both landing rows reading
-`landing-ok=sentence15/meta13/gap64`. CI green on `dev` throughout.
+Two more findings, both in the tooling and both now held by a test:
 
-**It took seven attempts and every failure was in the tooling, not the app**
+- **A release with no migrations still prints a migrations line** (D183, ninth).
+  `migrate.ts` has two sentences and the check matched one of them, so it
+  quietly required every release to carry a migration. 1.2.1 carries none.
+- **A named commit needs a run that was allowed to finish**, and the tip stops
+  being a safe target once the tag exists. Both are written up under "Inför
+  nästa deploy" as the rule they produced.
+
+---
+
+## Production ran 1.2.0 before it
+
+**Deployed 2026-09-17 from `a21224c`**, twelve of thirteen steps. The thirteenth
+could not run: the image had no `dist/news-publish.js`, because the script was
+written after the build's entry list and `tsx` is a dev dependency a production
+image does not carry (D183). That is what 1.2.1 fixed, and why 1.2's release
+notes reached readers a day late.
+
+It took seven attempts and **every failure was in the tooling, not the app**
 (D183): six checks answering a question next to the one they were asked, and one
-script that could only run where it was not. Each has a test that fails without
-its fix.
+script that could only run where it was not.
+
+The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ---
 
 ## Inför nästa deploy
 
-**The next deploy is `1.2.1`.** Production runs `1.2.0` (above). This section is
+**There is no next deploy prepared.** Production runs `1.2.1` (above), which is
+everything on `dev` up to `bc06167`. The commits after it are the two fixes the
+release itself produced and this record; the next pass appends here.
+
+What follows is 1.2.1's handover, kept as the worked example the next one copies. This section is
 the handover: what changes, what the deploy needs that it did not before, and
 the one command that does it.
 

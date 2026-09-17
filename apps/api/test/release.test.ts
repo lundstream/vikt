@@ -51,7 +51,18 @@ const STATE = readFileSync(path.join(ROOT, "STATE.md"), "utf8");
  * that had nothing to do with the command. A test about "the next deploy"
  * follows the next deploy.
  */
-const VERSION = STATE.match(/The next deploy is `(\d+\.\d+\.\d+)`/)?.[1] ?? "0.0.0";
+const VERSION = (() => {
+  /*
+    The next deploy when one is prepared, and otherwise the one that shipped:
+    its handover stays in STATE.md as the worked example the next one copies,
+    and it is still what these tests are about. A fixed version here broke every
+    STATE.md test the moment a release went out, which is the wrong thing to be
+    sensitive to.
+  */
+  const next = STATE.match(/The next deploy is `(\d+\.\d+\.\d+)`/)?.[1];
+  const live = STATE.match(/^## Production runs (\d+\.\d+\.\d+)/m)?.[1];
+  return next ?? live ?? "0.0.0";
+})();
 
 /* ----------------------------------------------------------- the fake world -- */
 
