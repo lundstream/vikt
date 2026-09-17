@@ -378,20 +378,25 @@ its fix.
 the handover: what changes, what the deploy needs that it did not before, and
 the one command that does it.
 
-**1.2.1 is the whole of `dev`**, so nothing is named here and the command
-releases the tip.
+**For `1.2.1` it is `bc06167`.** It is tagged `v1.2.1`, it is what production
+runs, and its CI run finished green before anything else was pushed.
 
-It did name `1f1738f`, and that could not work: CI is
+Getting here took two goes at the same question, and both are worth keeping.
+
+**A named commit needs a run that was allowed to finish.** This first named
+`1f1738f`, whose run was **cancelled**: CI is
 `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true`, so every
-push to `dev` cancels the run before it. A commit that stops being the tip
-within about three minutes ends up with a **cancelled** run rather than a green
-one, and step 3 reads that as what it is: no verdict.
+push to `dev` kills the run before it, and a commit that stops being the tip
+within about three minutes never gets a verdict at all. Step 3 read that
+correctly — a cancelled run is no verdict rather than a bad one — and stopped.
 
-So the named-commit path is for a release that has genuinely been left behind by
-`dev` — where the named commit's run finished long ago — and not for one cut a
-minute before the next commit. When the whole of `dev` is the release, say
-nothing here and let the tip be it, which also means the last commit before the
-deploy has to be allowed to finish its run.
+**And then the tip stopped being a safe target.** With nothing named, the
+release follows `dev`'s tip; once `v1.2.1` was tagged on `bc06167` and the next
+fix landed, following the tip would have moved `main` past the tag. So the
+commit is named again, and it is the one the tag is on.
+
+The rule both attempts arrive at: **name the commit once the tag exists**, and
+before that, let the last commit's run finish before deploying.
 
 #### What 1.2.1 changes
 
