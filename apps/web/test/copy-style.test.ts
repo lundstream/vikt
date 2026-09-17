@@ -243,6 +243,7 @@ const PAGE_SECTIONS = [
   "Förbränning mäts utifrån det du loggar",
   "Vad appen gör",
   "Appen i telefonen",
+  "Gratis",
   "Din data",
   "Om AI",
 ];
@@ -253,14 +254,19 @@ describe("landing page copy", () => {
   /**
    * If the extractor ever stops finding anything, every check below passes.
    *
-   * The rebuilt page (D173) is prose in seven sections rather than a strip of
-   * short labels, so it has fewer and longer strings than the page this floor
-   * was written against. A count alone would have to move every time the copy
-   * does, so what holds the guard honest now is the section list: every heading
-   * the page ships has to be among the strings being checked, and a section
-   * that stopped being read would fail here by name.
+   * This used to assert every section heading, which worked while every heading
+   * was more than one word. `jsxStrings` drops single words on purpose, because
+   * one is usually a class fragment rather than copy, so "Gratis" (D184) is
+   * invisible to it exactly as the tagline's words are (D179) — and a guard
+   * that fails because the page gained a one-word heading is testing its own
+   * extractor's filter rather than the page.
+   *
+   * So the two jobs are separated. **This one guards the extractor**: enough
+   * strings, and some known sentences from opposite ends of the page. **The
+   * heading list is checked below, off the markup**, where a single word is
+   * just as visible as a sentence.
    */
-  it("is actually being read, section by section", () => {
+  it("is actually being read", () => {
     expect(strings.length).toBeGreaterThan(25);
 
     /*
@@ -272,8 +278,14 @@ describe("landing page copy", () => {
     */
     expect(taglineWords().join(" ")).toBe("Gör det lättare.");
 
-    for (const heading of PAGE_SECTIONS) {
-      expect(strings, `the landing section "${heading}" is not being read`).toContain(heading);
+    /* One from the top of the page and one from the bottom, so a truncated
+       read fails rather than passing on the half it managed. */
+    for (const sentence of [
+      "Lättare att reglera din vikt",
+      "Det finns ingen betalversion.",
+    ]) {
+      const found = strings.some((value) => value.includes(sentence));
+      expect(found, `the extractor is not reading: ${sentence}`).toBe(true);
     }
   });
 
@@ -288,6 +300,12 @@ describe("landing page copy", () => {
    * the order the components are *defined*, which is not the order they are
    * rendered: it failed against a page that was already correct, which is the
    * same defect as a check that passes against one that is not.
+   */
+  /**
+   * Every section the page ships, in order, read off `<main>`.
+   *
+   * This is where a missing or renamed section fails, including a one-word one
+   * the copy extractor cannot see.
    */
   it("says them in the order the page is built in", () => {
     const source = readFileSync(LANDING_FILE, "utf8");

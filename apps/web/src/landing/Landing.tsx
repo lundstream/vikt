@@ -71,6 +71,7 @@ export function Landing() {
         <Maintenance />
         <WhatItDoes />
         <Screens />
+        <Gratis />
         <YourData />
         <AboutAi />
       </main>
@@ -606,6 +607,50 @@ function Screens() {
               </div>
             </div>
           ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ gratis -- */
+
+/**
+ * That there is nothing to buy, said once, in its own section (D184).
+ *
+ * It is the question a stranger asks second, after "what is this", and the page
+ * had no answer anywhere: a reader who wondered what the catch was had to infer
+ * it from the AGPL paragraph three sections down, which is an answer about
+ * licensing rather than about money.
+ *
+ * **Text only, no figure and no accent.** Nothing here is a number, and a
+ * section about not charging that shouted would be doing the thing it says it
+ * does not do. It sits directly above "Din data" because the two are the same
+ * promise from different directions: nothing is sold, and nothing about you is
+ * the product.
+ *
+ * **The licence stays in "Din data".** It is said there as a right the reader
+ * has over their own installation, which is what that section is for, and a
+ * second telling here would be the page making its strongest claim twice
+ * (D179's finding about the fortnight, in prose rather than in pictures).
+ */
+function Gratis() {
+  return (
+    <section className="pt-16">
+      <Container>
+        <SectionHeading>Gratis</SectionHeading>
+
+        <div className="mx-auto mt-6 max-w-prose space-y-4 text-center text-body text-muted">
+          <p>
+            Det finns ingen betalversion. Ingen prenumeration och inget som är låst bakom en
+            uppgradering, och det kommer inte att dyka upp: koden är öppen, så den version som
+            finns i dag går alltid att köra.
+          </p>
+          <p>
+            Det går för att appen inte kostar något att driva. En liten server, ingen
+            annonsförsäljning, ingen data att sälja och ingen tillväxtplan. Kör du den själv kostar
+            den dig en container på en maskin du redan har.
+          </p>
         </div>
       </Container>
     </section>

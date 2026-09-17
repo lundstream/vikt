@@ -9253,6 +9253,7 @@ draws a jagged daily line.
 | Underhåll mäts, inte räknas | the formula's number in Sten and the measured one in Snö, both counting up once when reached, both tabular so nothing moves |
 | Det du loggar | six cards, one per area, each in its own accent: Blåbär for food, Gran for the day, Honung for the pot, Is for Samband, and **no accent** for reminders and the coach, because neither is an area |
 | Appen i telefonen | three framed pictures of the demo account, one to a row with a sentence beside each, turning with their own position in the viewport |
+| Gratis | text only: there is no paid version and none is coming, and the reason, which is that the app costs nothing to run (D184) |
 | Din data | self-hosted, AGPL, CSV, JSON and Excel, self-deletion, with the links to `/integritet` and the source |
 | Om AI | one column, no accent: it reads meals and writes the week's summary, it never produces a figure, and it runs on hardware the operator controls |
 
