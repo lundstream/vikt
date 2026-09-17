@@ -76,7 +76,14 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     },
     "ssh /srv/vikt/infra/restore-check.sh": {
       code: 0,
-      out: ["--- what came back ---", "users 4", "weight_log 912", "food_entries 310"].join("\n"),
+      out: [
+        "--- what came back ---",
+        "users 4",
+        "weight_log 912",
+        "--- against the live database ---",
+        "users 4",
+        "weight_log 912",
+      ].join("\n"),
     },
     /* A sha goes on either side of the range, so these are patterns, not text. */
     "git rev-list --count origin/main\\.\\.": { code: 0, out: "6" },
@@ -84,9 +91,17 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "git push origin": { code: 0, out: "" },
     "gh release view": { code: 1, out: "release not found" },
     "gh release create": { code: 0, out: "https://github.com/lundstream/vikt/releases/tag/v1.2.0" },
+    /*
+      Two runs for the tag, as release.yml really produces (D169), plus an older
+      failed run for something else. The step has to take the `release` one.
+    */
     "gh run list --workflow release.yml": {
       code: 0,
-      out: JSON.stringify([{ databaseId: 42, status: "completed", conclusion: "success" }]),
+      out: JSON.stringify([
+        { databaseId: 42, status: "completed", conclusion: "success", headBranch: "v1.2.0", event: "release" },
+        { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: "v1.2.0", event: "push" },
+        { databaseId: 9, status: "completed", conclusion: "failure", headBranch: "main", event: "push" },
+      ]),
     },
     "node .*stack.mjs plan": { code: 0, out: "…\nnothing blocks this deploy" },
     "node .*stack.mjs deploy": { code: 0, out: "set IMAGE_TAG=1.2.0\npulled\nredeployed\nup" },
@@ -239,7 +254,7 @@ describe("a release where everything answers well", () => {
       "users 4",
       "main fast-forwarded",
       "v1.2.0 created",
-      "run 42 is success",
+      "run 42 (release, v1.2.0) is success",
       "nothing blocks this deploy",
       "Migrations: 2 applied",
       "/api/health 200",
@@ -341,6 +356,76 @@ describe("a release that stops", () => {
     expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
     expect(out.text()).toContain("reports something missing");
     expect(runner.calls.some((c) => /stack\.mjs deploy/.test(c.command))).toBe(false);
+  });
+
+  /**
+   * The defect that stopped the first real release of 1.2.0.
+   *
+   * The tag had been pushed a second earlier and GitHub had not registered its
+   * run yet, so "the newest run of release.yml" was a run from two days before
+   * that had failed for an unrelated reason. The command stopped, correctly, on
+   * an answer about something else entirely.
+   *
+   * Proof by reintroduction: a world where the only runs are old ones must not
+   * produce a verdict about them.
+   */
+  it("never reports an older run as this tag's", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "gh run list --workflow release.yml": {
+        code: 0,
+        out: JSON.stringify([
+          { databaseId: 9, status: "completed", conclusion: "failure", headBranch: "main", event: "push" },
+          { databaseId: 8, status: "completed", conclusion: "success", headBranch: "v1.1.1", event: "release" },
+        ]),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 8 });
+    /* It says no run appeared, not that a run failed. */
+    expect(out.text()).toContain("no run of release.yml for v1.2.0 appeared");
+    expect(out.text()).not.toContain("run 9");
+    /* And nothing was deployed on the strength of it. */
+    expect(runner.calls.some((c) => /stack\.mjs deploy/.test(c.command))).toBe(false);
+  });
+
+  /** A cancelled run is not an answer either: release.yml makes one per tag. */
+  it("ignores the cancelled twin of the tag's run", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "gh run list --workflow release.yml": {
+        code: 0,
+        out: JSON.stringify([
+          { databaseId: 41, status: "completed", conclusion: "cancelled", headBranch: "v1.2.0", event: "push" },
+        ]),
+      },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 8 });
+    expect(out.text()).toContain("no run of release.yml for v1.2.0 appeared");
+  });
+
+  /** A run still going is watched to its end rather than guessed at. */
+  it("watches a run that has not finished", async () => {
+    const runner = new FakeRunner({
+      ...healthyWorld(),
+      "gh run list --workflow release.yml": {
+        code: 0,
+        out: JSON.stringify([
+          { databaseId: 77, status: "in_progress", conclusion: null, headBranch: "v1.2.0", event: "release" },
+        ]),
+      },
+      "gh run watch 77": { code: 0, out: "✓ release.yml" },
+    });
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: "1.2.0", runner, out, root: ROOT }));
+
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain("run 77 (release, v1.2.0) finished green");
   });
 
   /** A log without the version line is a deploy that did not take. */

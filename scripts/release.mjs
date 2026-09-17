@@ -305,14 +305,31 @@ export function buildSteps({ version, runner, root = ROOT }) {
         if (result.code !== 0) {
           return fail(`restore-check.sh exited ${result.code}:\n${result.out}`);
         }
-        /* The row counts it printed, which is the evidence that it read. */
-        const rows = result.out
-          .split("\n")
-          .filter((line) => /^\s*\w+\s+\d+\s*$/.test(line))
-          .map((line) => line.trim())
-          .join(", ");
-        if (rows === "") return fail(`restore-check.sh reported no tables:\n${result.out}`);
-        return ok(rows);
+        /*
+          The row counts it printed. It prints them twice, once for the restored
+          copy and once for the live database, and the two matching is the
+          check: repeating them in the evidence made it read like a bug, so they
+          are compared here and reported once.
+        */
+        const blocks = result.out.split("---").map((block) =>
+          block
+            .split("\n")
+            .filter((line) => /^\s*\w+\s+\d+\s*$/.test(line))
+            .map((line) => line.trim()),
+        );
+        const counted = blocks.filter((block) => block.length > 0);
+        if (counted.length === 0) return fail(`restore-check.sh reported no tables:\n${result.out}`);
+
+        const [restored, live] = counted;
+        if (live && restored.join(",") !== live.join(",")) {
+          return fail(
+            `the restored copy and the live database disagree:\n` +
+              `  restored: ${restored.join(", ")}\n  live:     ${live.join(", ")}`,
+          );
+        }
+        return ok(
+          `${restored.join(", ")}${live ? " (restored copy and live database agree)" : ""}`,
+        );
       },
     },
 
@@ -383,30 +400,85 @@ export function buildSteps({ version, runner, root = ROOT }) {
 
     {
       name: "the release workflow is green",
+      /**
+       * **This tag's run, and only this tag's.**
+       *
+       * The first version took the newest run of `release.yml`, which on the
+       * first real release was a run from two days earlier that had failed:
+       * the tag had been pushed a second before, and GitHub had not registered
+       * its run yet. The command stopped, correctly, on an answer about
+       * something else entirely.
+       *
+       * So the run is identified by the **ref it was triggered for**, and a run
+       * that is not there yet is waited for rather than substituted. That is the
+       * same shape as step 3, which checks CI's `headSha` against the commit
+       * being released rather than trusting "newest".
+       *
+       * `release.yml` can produce two runs for one tag, a `push` and a
+       * `release`, one of which is cancelled by the concurrency group (D169).
+       * The `release` one is what publishes the images, so it is preferred, and
+       * a cancelled run is never accepted as the answer.
+       */
       run() {
         if (runner.dryRun) return ok("skipped: --dry-run creates no tag to watch");
 
-        const watch = runner.local("gh", [
-          "run",
-          "list",
-          "--workflow",
-          "release.yml",
-          "--limit",
-          "1",
-          "--json",
-          "databaseId,status,conclusion",
-        ]);
-        if (watch.code !== 0) return fail("could not read the release workflow", watch.out);
-        const [run] = JSON.parse(watch.out || "[]");
-        if (!run) return fail("no release workflow run found for the tag");
+        const tag = `v${version}`;
 
-        if (run.status !== "completed") {
-          const waited = runner.local("gh", ["run", "watch", String(run.databaseId), "--exit-status"]);
-          if (waited.code !== 0) return fail(`the release workflow failed:\n${waited.out}`);
-          return ok(`run ${run.databaseId} finished green`);
+        const find = () => {
+          const listed = runner.local("gh", [
+            "run",
+            "list",
+            "--workflow",
+            "release.yml",
+            "--limit",
+            "20",
+            "--json",
+            "databaseId,status,conclusion,headBranch,event",
+          ]);
+          if (listed.code !== 0) return { error: listed.out };
+
+          const mine = JSON.parse(listed.out || "[]").filter(
+            (entry) => entry.headBranch === tag && entry.conclusion !== "cancelled",
+          );
+          /* The `release` event is the one that publishes; prefer it. */
+          return { run: mine.find((entry) => entry.event === "release") ?? mine[0] };
+        };
+
+        /*
+          Up to two minutes for the run to appear. A tag pushed a second ago has
+          no run yet, and "no run" is not the same fact as "the run failed".
+        */
+        let found = find();
+        for (let attempt = 0; attempt < 24 && !found.error && !found.run; attempt += 1) {
+          runner.local("node", ["-e", "setTimeout(() => {}, 5000)"]);
+          found = find();
         }
-        if (run.conclusion !== "success") return fail(`run ${run.databaseId} is ${run.conclusion}`);
-        return ok(`run ${run.databaseId} is ${run.conclusion}`);
+
+        if (found.error) return fail("could not read the release workflow", found.error);
+        if (!found.run) {
+          return fail(
+            `no run of release.yml for ${tag} appeared within two minutes`,
+            `check https://github.com/lundstream/vikt/actions for ${tag}`,
+          );
+        }
+
+        const run = found.run;
+        if (run.status !== "completed") {
+          const waited = runner.local("gh", [
+            "run",
+            "watch",
+            String(run.databaseId),
+            "--exit-status",
+          ]);
+          if (waited.code !== 0) {
+            return fail(`the release workflow for ${tag} failed:\n${waited.out}`);
+          }
+          return ok(`run ${run.databaseId} (${run.event}, ${tag}) finished green`);
+        }
+        if (run.conclusion !== "success") {
+          return fail(`run ${run.databaseId} for ${tag} is ${run.conclusion}`);
+        }
+        return ok(`run ${run.databaseId} (${run.event}, ${tag}) is ${run.conclusion}`);
       },
     },
 
