@@ -1,8 +1,13 @@
 /**
  * Publishes a release's Nyheter post, from a file, once (D182).
  *
- *   pnpm --filter api news:publish -- --file notes.md
- *   pnpm --filter api news:publish -- --file notes.md --mail
+ *   pnpm --filter api news:publish -- --file notes.md          # on a workstation
+ *   docker exec vikt-api-1 node dist/news-publish.js --file …  # in production
+ *
+ * **It is built into the image** (`tsup.config.ts`), like `restore-check`,
+ * because that is the only way it can run where it has to: `tsx` is a dev
+ * dependency and a production image has none. The release command stopped at
+ * its last step on `sh: 1: tsx: not found` the first time this ran (D183).
  *
  * The file is the post as it is pasted into Administration, Meddelanden: a
  * first-level heading is the title and everything after it is the body. That is

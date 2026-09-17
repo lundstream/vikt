@@ -161,6 +161,8 @@ function healthyWorld(): Record<string, { code: number; out: string }> {
     "curl .*4173|curl .*/$": { code: 0, out: "200" },
     "ssh cat >": { code: 0, out: "" },
     "ssh docker cp": { code: 0, out: 'published "Version 1.2.0" as 8f1c, 1240 characters, not mailed' },
+    /* tsx is a dev dependency, so a production image cannot run it (D183). */
+    "ssh .*pnpm --filter api news:publish": { code: 1, out: "sh: 1: tsx: not found" },
   };
 }
 

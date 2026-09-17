@@ -711,10 +711,16 @@ export function buildSteps({ version, runner, root = ROOT }) {
         );
         if (write.code !== 0) return fail(`could not write the post to the host:\n${write.out}`);
 
+        /*
+          `node dist/news-publish.js`, which is how `restore-check` is already
+          run in there (D168). Not `pnpm --filter api news:publish`: that runs
+          the TypeScript through `tsx`, which is a dev dependency and is not in
+          a production image, and the container has no pnpm either.
+        */
         const published = runner.remote(
           context.host,
           `docker cp ${remotePath} vikt-api-1:${remotePath} && ` +
-            `docker exec vikt-api-1 pnpm --filter api news:publish -- --file ${remotePath}; ` +
+            `docker exec vikt-api-1 node dist/news-publish.js --file ${remotePath}; ` +
             `rm -f ${remotePath}`,
         );
         if (published.code !== 0) return fail(`news:publish exited ${published.code}:\n${published.out}`);
