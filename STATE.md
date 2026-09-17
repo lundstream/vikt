@@ -357,6 +357,12 @@ Coachen, Läsbarhet, Rättat, Startsidan. `/` shows eight sections in order with
 **Gratis** between "Appen i telefonen" and "Din data", two paragraphs, beginning
 "Det finns ingen betalversion."
 
+**The closing sweep, 2026-09-17**: `shoot2.mjs` over every finished screen at
+360 px and desktop, **40 of 40, none failed**, both landing rows reading
+`landing-ok=sentence15/meta13/gap64`. The page is 6 796 px tall at 360 and
+5 206 at desktop, up from 6 402 and 4 925, which is the Gratis section (D184).
+CI green on `dev` throughout.
+
 #### What it took, after 1.2.0
 
 Two more findings, both in the tooling and both now held by a test:
