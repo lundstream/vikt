@@ -3,12 +3,7 @@ import { HeaderLockup } from "../components/Wordmark.js";
 import { LandingPrimary } from "./LandingPrimary.js";
 import { HeroGraph } from "./TrendDrawing.js";
 import { startLandingMotion } from "./landing-motion.js";
-import {
-  MAINTENANCE,
-  MORNING_READINGS,
-  SETTLED_TREND,
-  SETTLED_TREND_KG,
-} from "./seeded.js";
+import { MAINTENANCE, MORNING_READINGS, SETTLED_TREND } from "./seeded.js";
 import { LandingFooter } from "./Footer.js";
 import { siteConfig } from "../lib/site-config.js";
 
@@ -57,7 +52,13 @@ export function Landing() {
       <Header />
       <span data-scroll-sentinel aria-hidden="true" className="block h-px" />
 
-      <main>
+      {/*
+        The gap before the footer is the gap between any two sections (D181).
+        Every section pads its own top, so the last one had nothing under it and
+        Om AI's final paragraph sat on the footer's rule. Here rather than on
+        the last section, so it survives a reorder.
+      */}
+      <main className="pb-16">
         {/*
           Om AI sits last, above the footer (D180). It answers a question a
           reader has only once they know what the app does, and it is the one
@@ -87,9 +88,17 @@ function Container({ children, className = "" }: { children: ReactNode; classNam
 /**
  * A section heading: one separator, and it is the rule (D114). An underline
  * would read as a link, which is the one thing a heading must not be.
+ *
+ * Centred, like every heading and paragraph on this page (D181). The rule still
+ * runs the width of the container, so the page keeps one left edge for the
+ * things that have one: the cards inside the grids stay left aligned, because a
+ * card is a small block of its own and centred text inside a box reads as a
+ * quotation.
  */
 function SectionHeading({ children }: { children: ReactNode }) {
-  return <h2 className="border-t border-edge pt-4 text-metric-sm text-ink">{children}</h2>;
+  return (
+    <h2 className="border-t border-edge pt-4 text-center text-metric-sm text-ink">{children}</h2>
+  );
 }
 
 /**
@@ -216,9 +225,10 @@ function Hero() {
             app, somebody without one cannot get one from this page, and both
             can run their own copy.
           */}
-          <p className="hero-actions mt-6 max-w-prose text-note text-muted">
-            Appen kräver en inbjudan, och den här installationen delar inte ut några. Vill du ha en
-            egen kan du köra den på en egen server. Koden är öppen och ligger på{" "}
+          <p className="hero-actions mx-auto mt-6 max-w-prose text-note text-muted">
+            Appen kräver en inbjudan och den här installationen delar inte ut några för
+            tillfället. Vill du använda appen kan du köra den på en egen server. Koden är öppen
+            och ligger på{" "}
             <a
               className="underline underline-offset-4 hover:text-ink"
               href={siteConfig().repo}
@@ -300,11 +310,18 @@ function Noise() {
         <SectionHeading>Trendvikt, inte dagsvikt</SectionHeading>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          {/*
+            Sten on the left and Snö on the right, which is the same pairing the
+            maintenance section uses for the formula and the measured figure
+            (D180): **the figure the app is arguing against is Sten, and the one
+            it stands behind is Snö**. A daily weight is the thing you should
+            not act on, and a formula's guess is the number the app replaces.
+          */}
           <figure className="reveal rounded-card border border-edge bg-card p-6">
             <Figure
               value={MORNING_READINGS[0]!}
               unit="kg"
-              className="text-figure-sm text-ink"
+              className="text-figure-sm text-uncertain"
               cycle
             />
             <figcaption className="mt-2 text-note text-muted">
@@ -312,23 +329,24 @@ function Noise() {
             </figcaption>
           </figure>
 
+          {/*
+            No count-up. The trend is the one figure on this page that holds
+            still, and a number that counts up on arrival is a number that has
+            just been worked out: the opposite of what the card is for. It is
+            rendered from the first frame.
+          */}
           <figure
             className="reveal rounded-card border border-edge bg-card p-6"
             style={{ "--i": 1 } as CSSProperties}
           >
-            <Figure
-              value={SETTLED_TREND}
-              unit="kg"
-              className="text-figure-sm text-ink"
-              countTo={SETTLED_TREND_KG}
-            />
+            <Figure value={SETTLED_TREND} unit="kg" className="text-figure-sm text-ink" />
             <figcaption className="mt-2 text-note text-muted">
               Fjorton morgnar, en siffra.
             </figcaption>
           </figure>
         </div>
 
-        <p className="mt-6 max-w-prose text-body text-muted">
+        <p className="mx-auto mt-6 max-w-prose text-center text-body text-muted">
           Ett kilo upp eller ner över en natt kan bero på salt, sömn och vatten. Trenden visar i
           stället vad som hänt under veckan och ger dig en bättre fingervisning som du kan fatta
           beslut på.
@@ -378,7 +396,7 @@ function Maintenance() {
           </figure>
         </div>
 
-        <p className="mt-6 max-w-prose text-body text-muted">
+        <p className="mx-auto mt-6 max-w-prose text-center text-body text-muted">
           En formel gissar vad en kropp av din storlek förbränner. Appen räknar i stället ut den
           siffra som förklarar både vad du ätit och vad trenden gjort under samma period, och räknar
           om den varje dag. Den säger alltid vilken av de två du tittar på och hur säker den är.
@@ -468,7 +486,7 @@ function AboutAi() {
       <Container>
         <SectionHeading>Om AI</SectionHeading>
 
-        <div className="mt-6 max-w-prose space-y-4 text-body text-muted">
+        <div className="mx-auto mt-6 max-w-prose space-y-4 text-center text-body text-muted">
           <p>
             Det läser vad du ätit, från en förklarande mening eller ett foto av tallriken. Det
             föreslår vad du kan laga av det du har hemma. Coachen ser dina siffror och skriver en
@@ -576,10 +594,15 @@ function Screens() {
                 />
               </div>
 
-              <div className="max-w-prose">
-                {/* The profile's own two rows: body 15/22 in Snö, meta 12/16 in Sten. */}
+              {/*
+                The sentence is the page's paragraph size and the line under it
+                is one step down the scale (D181). It was two steps down, at the
+                profile's `meta`, which beside a 268 px picture read as a
+                caption on a caption.
+              */}
+              <div className="mx-auto max-w-prose text-center">
                 <p className="text-body text-ink">{screen.title}</p>
-                <p className="mt-3 text-meta text-muted">{screen.meta}</p>
+                <p className="mt-3 text-note text-muted">{screen.meta}</p>
               </div>
             </div>
           ))}
@@ -598,11 +621,11 @@ function Screens() {
  */
 function YourData() {
   return (
-    <section className="py-16">
+    <section className="pt-16">
       <Container>
         <SectionHeading>Din data</SectionHeading>
 
-        <div className="mt-6 max-w-prose space-y-4 text-body text-muted">
+        <div className="mx-auto mt-6 max-w-prose space-y-4 text-center text-body text-muted">
           <p>
             Appen körs på en server. Kör du den själv är det din, och kör någon annan den är det
             deras, och båda fallen förklaras på integritetssidan. Ingenting säljs, ingenting mäts för
@@ -618,7 +641,7 @@ function YourData() {
           </p>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-5 text-note">
+        <div className="mt-6 flex flex-wrap justify-center gap-5 text-note">
           <a className="text-muted underline underline-offset-4 hover:text-ink" href="/integritet">
             Integritet
           </a>

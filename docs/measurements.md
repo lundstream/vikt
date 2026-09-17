@@ -11,6 +11,75 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, sixth pass
+
+2026-09-17, after D181.
+
+| | fifth | sixth |
+|---|---|---|
+| performance | 98 | **98** |
+| accessibility | 100 | **100** |
+| cumulative layout shift | 0 | **0** |
+| largest contentful paint | 2,3 s | 2,3 s |
+| total blocking time | 0 ms | 0 ms |
+| speed index | 1,7 s | 1,7 s |
+
+No accessibility audit failed. The landing chunk is **12,8 kB** of its 15 kB
+budget and everything `/` fetches is **58,8 kB** of 60.
+
+### The ring, whole
+
+The hero's viewBox is `-18 -18 676 276`: padded by the ring's reach on every
+side. Measured mid-ring, at 0,70 opacity, the ring's box is 937 to 951 px
+against an SVG box of 297 to 969, so it is **inside on the right, the top and
+the bottom**. Before this it ran from the endpoint at the box's right edge to
+18 units past it, and the right half was clipped off every time.
+
+### The hero's intervals
+
+| | |
+|---|---|
+| ring starts after the line completes | 86 ms |
+| ring gone | 443 ms later |
+| first word after the ring | 361 ms |
+| between the words | **700 ms**, twice |
+| sentence after the last word | 701 ms |
+
+Stated as intervals rather than timestamps: the absolute numbers move with how
+long the page took to load, and what the sequence is made of is the gaps.
+
+### The two cards
+
+The trend card reads **84,5 from the first sample** and never changes: there is
+no count-up on it any more. The daily card steps 84,6 to 84,4 to 84,6 at 900 ms
+and stops while it is off screen, unchanged over 2,7 s.
+
+Colours, read off the page: the daily figure is Sten `rgb(133, 148, 154)` and
+the trend is Snö `rgb(237, 241, 242)`, which is the same pairing as the
+maintenance section's formula and measured figures.
+
+### Alignment, type and spacing
+
+Twenty-three headings and paragraphs outside the cards, **none of them left
+aligned**. A phone row's sentence is 15 px against a page paragraph's 15 px, and
+its meta line 13 px. The gap between the last section and the footer is 64 px,
+which is the section padding, 64 px.
+
+### A phone frame, unchanged
+
++22,0°, +9,8°, 0,0°, 0,0°, 0,0°, -9,8°, -22,0°, `box-shadow: none` throughout.
+
+### Reduced motion
+
+The ring is `display: none`, the line is drawn, all three words are present, the
+frames are square and the daily card holds one reading over 2,7 s.
+
+### Both widths
+
+360 px: no overflow, 6 362 px tall. Desktop 1 280: 4 925 px tall.
+
+---
+
 ## The landing page, fifth pass
 
 2026-09-17, after D180.

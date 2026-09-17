@@ -95,15 +95,11 @@ function countTo(element: HTMLElement, target: number): void {
   requestAnimationFrame(step);
 }
 
-/** Half the crossfade: how long the old figure takes to go before the new one. */
-const FADE_MS = 160;
-
 /**
  * The daily number, stepping through the fixture's readings (D180).
  *
  * The left card's whole content is that **this number is different every
- * morning**, so it keeps changing: one reading at a time, with a short
- * crossfade so a change reads as a new reading rather than as digits rolling.
+ * morning**, so it keeps changing: one reading at a time, swapped outright.
  * Tabular figures, so nothing shifts while it does.
  *
  * ## Why it loops, where §5 says everything that moves stops
@@ -123,15 +119,15 @@ function cycleReadings(element: HTMLElement): () => void {
   const digits = digitsOf(element);
   let index = 0;
   let timer: number | null = null;
-  let fade: number | null = null;
 
+  /*
+    Outright, with no fade (D181). The card's content is the number, and a
+    third of every cycle spent dissolving draws the eye to the change rather
+    than to what changed. A scale shows one reading, then another.
+  */
   const step = () => {
     index = (index + 1) % MORNING_READINGS.length;
-    element.classList.add("figure-fading");
-    fade = window.setTimeout(() => {
-      digits.textContent = MORNING_READINGS[index]!;
-      element.classList.remove("figure-fading");
-    }, FADE_MS);
+    digits.textContent = MORNING_READINGS[index]!;
   };
 
   const watcher = new IntersectionObserver(
@@ -150,7 +146,6 @@ function cycleReadings(element: HTMLElement): () => void {
   return () => {
     watcher.disconnect();
     if (timer !== null) window.clearInterval(timer);
-    if (fade !== null) window.clearTimeout(fade);
   };
 }
 

@@ -10024,6 +10024,20 @@ which makes the same kind of comparison: one figure against another, in two
 cards. The left cycles through the fourteen readings at 900 ms each with a short
 crossfade; the right holds the trend and counts up to it once.
 
+#### The pairing, which is now a rule for both sections
+
+**Sten is the figure the app argues against; Snö is the one it stands behind.**
+
+The maintenance section had it first without naming it: the formula's guess is
+Sten and the measured figure is Snö. "Trendvikt, inte dagsvikt" makes the same
+shape of comparison, so it takes the same colours: the cycling daily weight is
+Sten and the trend is Snö.
+
+That is not "left is grey": it is that a reader can tell, before reading a word,
+which of two figures the page is recommending. The rule holds for any future
+pair of cards that compares two numbers, and it is why neither section needs a
+sentence explaining which figure to use.
+
 **The left card loops, and §5 says everything that moves stops.** It needs its
 own reasoning rather than the drifting field's, because it is the subject rather
 than the background: what it says has no end state. A trend settles and a line
@@ -10071,3 +10085,72 @@ the components are *defined* in, which is not the order they are rendered, so it
 failed against a page that was already correct. A check that reads the wrong
 thing fails and passes for the same bad reason; it reads the list out of
 `<main>` and looks each component's heading up now.
+
+---
+
+### D181 — Centred, still, and with room for the ring
+
+The last landing pass before 1.2.0, and every item is something that only shows
+up on a rendered page: a clipped arc, a number that moves when it should not, a
+paragraph sitting on a rule.
+
+#### The ring was never a ring
+
+It is drawn at the endpoint, the endpoint sits at the right edge of the drawing
+because that is where today is, and the ring expands to four and a half times
+its radius. So **it was outside the viewBox for its entire run** and the right
+half of it was clipped off every time: the page showed an arc opening leftwards.
+
+No screenshot of the finished page could have caught it, because by then the
+ring is gone; and the measurement that found the fill-mode bug in D180 reads
+opacity, which was correct throughout. It took looking at a frame from the
+middle of it.
+
+The box is padded by the ring's reach on all four sides rather than the SVG
+being given `overflow: visible`, because the hero section clips its own
+overflow: a fix that holds only while no ancestor ever clips is a fix waiting to
+be undone by a layout change that has nothing to do with it.
+
+#### The trend stands still
+
+The trend card counted up on reveal, borrowed from the maintenance figures. But
+a number counting up says **it was just worked out**, which is right for a
+measured maintenance level and exactly wrong for the one figure on the page
+whose argument is that it does not jump about. It is rendered from the first
+frame now.
+
+The daily card's crossfade went with it. Fading out and in over 160 ms each way
+put the card in a state of *changing* for a third of every cycle, which draws
+the eye to the dissolve rather than to the number, and the number is the whole
+content. A scale does not dissolve between readings.
+
+#### Everything is centred
+
+Every heading and every paragraph, in every section, with the reading measure
+kept. The cards inside the grids stay left aligned, because a card is a small
+block of its own and centred text inside a box reads as a quotation.
+
+The page had been centred in the hero and left aligned everywhere else since
+D178, which was a defensible position and read as two pages stapled together:
+the hero announced itself and then the argument shuffled to one side. One
+alignment, and the rule under each heading still spans the container, so the
+page keeps a left edge for the things that have one.
+
+#### Two sizes and a gap, asserted in the sweep
+
+The sentence beside each phone picture is the page's paragraph size and the line
+under it is one step down the scale. It had been two steps down, at the `meta`
+size added in D179, which beside a 268 px picture read as a caption on a
+caption. `meta` is gone from the scale again: a size nothing uses is one of the
+"four sizes that happen to differ" that comment warns about.
+
+**The gap before the footer** was zero. Every section pads its own top, so the
+last one had nothing under it and Om AI's final paragraph sat on the footer's
+rule. The padding is on `<main>` rather than on the last section, so it survives
+the next reorder.
+
+Both are **relationships between elements** rather than properties of one, which
+is why neither a token test nor a screenshot caught them, and why the sweep
+asserts them now: the row's sentence against a paragraph, the meta line against
+the sentence, the footer gap against a section gap. A sweep that only asks "is
+anything overflowing" answers a narrower question than it appears to.

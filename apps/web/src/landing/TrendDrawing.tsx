@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { heroGeometry, HERO_BOX, MARKS, type Reading } from "./seeded.js";
+import { heroGeometry, HERO_BOX, MARKS, RING_REACH, type Reading } from "./seeded.js";
 
 /**
  * The landing page's graph (D173, D177, D178, D179).
@@ -88,9 +88,19 @@ export function HeroGraph() {
   const { points, vertices, path } = heroGeometry();
   const end = vertices.at(-1)!;
 
+  /*
+    The viewBox is padded by the ring's reach on every side (`seeded.ts`), so
+    the ring at the endpoint renders whole. The drawing's own coordinates are
+    unchanged: the line still starts at x = 0 and ends at the right, and the
+    padding is negative space around it.
+  */
+  const box =
+    `${-RING_REACH} ${-RING_REACH} ` +
+    `${HERO_BOX.width + RING_REACH * 2} ${HERO_BOX.height + RING_REACH * 2}`;
+
   return (
     <svg
-      viewBox={`0 0 ${HERO_BOX.width} ${HERO_BOX.height}`}
+      viewBox={box}
       className="h-auto w-full"
       aria-hidden="true"
       focusable="false"

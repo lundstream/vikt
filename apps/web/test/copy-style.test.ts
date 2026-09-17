@@ -292,7 +292,10 @@ describe("landing page copy", () => {
   it("says them in the order the page is built in", () => {
     const source = readFileSync(LANDING_FILE, "utf8");
 
-    const main = source.slice(source.indexOf("<main>"), source.indexOf("</main>"));
+    /* `<main` rather than `<main>`: it carries a className now, and a check
+       that depends on an element having no attributes is a check that breaks
+       the first time one is added. */
+    const main = source.slice(source.indexOf("<main"), source.indexOf("</main>"));
     const rendered = [...main.matchAll(/<([A-Z]\w*)\s*\/>/g)].map((match) => match[1]!);
     expect(rendered.length, "no sections found in <main>").toBeGreaterThan(4);
 

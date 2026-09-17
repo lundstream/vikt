@@ -246,24 +246,16 @@
 /* ------------------------------------------------- the daily figure, cycling -- */
 
 /**
- * The left card's crossfade (D180).
+ * The left card's figure changes outright (D181).
  *
- * `landing-motion.ts` adds this class, waits for the fade, swaps the digits and
- * takes it off again, so the change reads as a **new reading** rather than as
- * digits rolling over. The figure is tabular, so nothing shifts while it does.
+ * It faded out and back in over 160 ms each way, which put the card in a state
+ * of *changing* for a third of every cycle: a reader's eye is drawn to the
+ * fading, not to the number, and the card's whole content is the number. A
+ * scale does not dissolve between readings; it shows one, then another.
  *
- * This section used to state all fourteen readings at once in a grid, which is
- * a table: a reader counts it instead of taking the point. One at a time, and
- * the point is that it keeps changing.
+ * So there is no rule here at all any more, which is the point. The figure is
+ * tabular, so nothing shifts when the digits change.
  */
-.figure-fading [data-figure-value] {
-  opacity: 0;
-}
-
-[data-cycle] [data-figure-value] {
-  display: inline-block;
-  transition: opacity 160ms ease-out;
-}
 
 /* ------------------------------------------------------------ the phones -- */
 
@@ -430,9 +422,4 @@
     transition: none;
   }
 
-  /* No crossfade either: the card keeps the one reading it was rendered with. */
-  [data-cycle] [data-figure-value] {
-    opacity: 1;
-    transition: none;
-  }
 }

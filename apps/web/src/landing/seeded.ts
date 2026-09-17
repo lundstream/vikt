@@ -108,6 +108,22 @@ export const MARKS = {
   endpointRadius: 4,
 } as const;
 
+/**
+ * How far the landing ring reaches past the endpoint, in the box's own units.
+ *
+ * The ring scales to 4,5 times the endpoint's radius (`landing.css`), and the
+ * endpoint sits at the right edge of the drawing because that is where today
+ * is. So the ring is **outside the viewBox** for its whole run, and the right
+ * half of it was being clipped off: the page showed an arc opening leftwards
+ * rather than a ring, every time, and no still frame of the finished page could
+ * have shown it.
+ *
+ * The box is padded by this much on every side rather than the SVG being given
+ * `overflow: visible`, because the hero section clips its own overflow and a
+ * fix that depends on no ancestor ever clipping is a fix waiting to be undone.
+ */
+export const RING_REACH = MARKS.endpointRadius * 4.5;
+
 /* ------------------------------------------------------------- the easing -- */
 
 /**
