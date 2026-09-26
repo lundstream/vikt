@@ -261,7 +261,8 @@ export const envSchema = z.object({
     .refine((value) => !/^\s*\d+\s*$/.test(value), {
       message:
         "looks like a hop count. It now takes the immediate peer's address or CIDR " +
-        '(e.g. "172.31.240.0/24"); a hop count cannot validate the peer and is ' +
+        "(e.g. the `edge` subnet pinned in infra/docker-compose.yml); a hop count cannot " +
+        "validate the peer and is " +
         "spoofable. See DECISIONS.md D14.",
     }),
 

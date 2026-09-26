@@ -11472,3 +11472,23 @@ range, `192.0.2.0/25` against `192.0.2.200`.
 
 The published history keeps the addresses it has, including the two 1.3.0's
 record put into STATE.md (`829daf5`). It is not rewritten.
+
+**The exception, decided by the owner after review: approved, but only where
+the subnet is defined.** `172.31.240.0/24` may appear in the two compose files,
+which define it, and in DECISIONS.md, where D14 documents it; anywhere else it
+fails the test like any other private address. The test was scoped first and
+seen failing on every mention outside those three files: the example in two
+error messages (`env.ts`, `lib/trust-proxy.ts`), the trust-proxy and client-ip
+tests, `infra/.env.example`, CLAUDE.md, and the previous session's report. The
+messages and `.env.example` now say "the `edge` subnet" and where it is pinned;
+the tests trust `198.51.100.0/24` and use peers inside it, with the untrusted
+peer moved to `203.0.113.7`; CLAUDE.md and the report name the subnet without
+its number. A unit test holds the scope itself: the same address passes in a
+compose file and in DECISIONS.md and fails in a test, CLAUDE.md and
+`.env.example`.
+
+**And watching a test fail never reaches a real host (§7).** Seeing the new
+helper test fail against the old `portainer.mjs` sent one request, with a dummy
+key, to the owner's Portainer: the test removed `PORTAINER_URL`, and the old
+script fell back to the real address. Such a check now runs with the network
+cut or with every address pointing at a documentation range.

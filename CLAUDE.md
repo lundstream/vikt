@@ -811,11 +811,18 @@ a commit on `main` is a commit that the next redeploy ships.
   a real address reads it from the environment by name, like a credential:
   `PORTAINER_URL` beside `PORTAINER_TOKEN`, `VIKT_HOST` for the host.
   `apps/api/test/no-private-addresses.test.ts` fails on any RFC 1918 address in
-  a tracked file, naming the file and line; the one range it allows is the
-  product's own `edge` Docker subnet, `172.31.240.0/24`, which every
-  installation gets and which is nobody's network (D14, D197). 1.3.0's record
-  put two addresses into STATE.md (`829daf5`); the published history keeps
-  them and is not rewritten.
+  a tracked file, naming the file and line. The one exception is the product's
+  own `edge` Docker subnet, nobody's network, and only in the files that define
+  and document it: the two compose files and DECISIONS.md (D14, D197).
+  Everywhere else it is written as "the `edge` subnet". 1.3.0's record put two
+  addresses into STATE.md (`829daf5`); the published history keeps them and is
+  not rewritten.
+- **Watching a test fail never reaches a real host.** A check run against old
+  code to see it fail runs with the network cut, or with every address it could
+  use pointing at a documentation range. The old `portainer.mjs` sent one
+  request to the owner's Portainer, with a dummy key, while its new test was
+  being watched fail, because the variable the test removed had a default that
+  was the real host (D197).
 - **Restart the development server when a change needs it.** Do not ask first and do
   not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
   dependencies at boot, and neither notices a file it read once. A green `pnpm build`

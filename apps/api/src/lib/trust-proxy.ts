@@ -48,7 +48,7 @@ export function assertNotHopCount(raw: string): void {
     throw new Error(
       `TRUST_PROXY is "${raw}", which looks like a hop count. It now takes the ` +
         `address or CIDR of the immediate peer instead — the nginx container or ` +
-        `the compose subnet, e.g. "172.31.240.0/24". A hop count cannot validate ` +
+        `the \`edge\` subnet pinned in infra/docker-compose.yml. A hop count cannot validate ` +
         `the peer and is spoofable; see DECISIONS.md D14.`,
     );
   }

@@ -80,7 +80,7 @@ describe("the logged client IP", () => {
   });
 
   it("ignores CF-Connecting-IP when the peer is not trusted", async () => {
-    await withApp("172.31.240.0/24", async (app, lines) => {
+    await withApp("198.51.100.0/24", async (app, lines) => {
       await app.inject({
         method: "GET",
         url: "/api/health",

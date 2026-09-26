@@ -147,7 +147,7 @@ All four items are done, and nothing was released. `dev` is pushed with CI green
   - INFRA.md, which is local, names it and holds the value.
 - **Test addresses moved to documentation ranges.** `release.test.ts` and the trust-proxy tests use RFC 5737 addresses now. The trust-proxy prefix-length check moved to `192.0.2.0/25` against `192.0.2.200`.
 - **`no-private-addresses.test.ts` reads every tracked file.** It fails on any RFC 1918 address, naming file and line. I ran it first on the tree as it stood, and it failed on `scripts/portainer.mjs:35`, `release.test.ts:230` and six trust-proxy examples before passing. Its own samples are built from numbers, so it doesn't flag itself.
-- **One range is allowed: `172.31.240.0/24`.** That is the product's own `edge` Docker subnet from D14, pinned in both compose files and nobody's network. It is written down as an exception for you to judge.
+- **One range is allowed: the `edge` subnet.** That is the product's own `edge` Docker subnet from D14, pinned in both compose files and nobody's network. It is written down as an exception for you to judge.
 - **One request reached your Portainer.** To see the new helper test fail, I ran it against the old script. The old script sent one request with a dummy key to its built-in default host; the request failed, and nothing else was sent.
 - The published history is not rewritten.
 

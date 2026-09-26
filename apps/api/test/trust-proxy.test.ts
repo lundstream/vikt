@@ -21,9 +21,9 @@ describe("TRUST_PROXY parsing", () => {
   });
 
   it("accepts a CIDR, an address, and a list", () => {
-    expect(compileTrustedPeers("172.31.240.0/24")).toBeTypeOf("function");
+    expect(compileTrustedPeers("198.51.100.0/24")).toBeTypeOf("function");
     expect(compileTrustedPeers("198.51.100.3")).toBeTypeOf("function");
-    expect(compileTrustedPeers("198.51.100.3, 172.31.240.0/24")).toBeTypeOf("function");
+    expect(compileTrustedPeers("203.0.113.3, 198.51.100.0/24")).toBeTypeOf("function");
     expect(compileTrustedPeers("loopback")).toBeTypeOf("function");
   });
 
@@ -38,10 +38,10 @@ describe("TRUST_PROXY parsing", () => {
 });
 
 describe("peer validation", () => {
-  const trust = compileTrustedPeers("172.31.240.0/24");
+  const trust = compileTrustedPeers("198.51.100.0/24");
 
   it("accepts an address inside the trusted subnet", () => {
-    expect(isTrustedPeer(trust, "172.31.240.5")).toBe(true);
+    expect(isTrustedPeer(trust, "198.51.100.5")).toBe(true);
   });
 
   it("rejects one outside it", () => {
@@ -59,7 +59,7 @@ describe("peer validation", () => {
   });
 
   it("rejects everything when nothing is trusted", () => {
-    expect(isTrustedPeer(false, "172.31.240.5")).toBe(false);
+    expect(isTrustedPeer(false, "198.51.100.5")).toBe(false);
   });
 
   it("rejects a missing peer address", () => {
@@ -68,15 +68,15 @@ describe("peer validation", () => {
 });
 
 describe("resolving the client IP", () => {
-  const trust = compileTrustedPeers("172.31.240.0/24");
+  const trust = compileTrustedPeers("198.51.100.0/24");
 
   it("uses CF-Connecting-IP when the peer is trusted", () => {
     expect(
       resolveClientIp({
         trust,
-        remoteAddress: "172.31.240.5",
+        remoteAddress: "198.51.100.5",
         cfConnectingIp: "203.0.113.9",
-        fallback: "172.31.240.5",
+        fallback: "198.51.100.5",
       }),
     ).toBe("203.0.113.9");
   });
@@ -89,29 +89,29 @@ describe("resolving the client IP", () => {
     expect(
       resolveClientIp({
         trust,
-        remoteAddress: "198.51.100.7",
+        remoteAddress: "203.0.113.7",
         cfConnectingIp: "198.51.100.1",
-        fallback: "198.51.100.7",
+        fallback: "203.0.113.7",
       }),
-    ).toBe("198.51.100.7");
+    ).toBe("203.0.113.7");
   });
 
   it("ignores it entirely when nothing is trusted", () => {
     expect(
       resolveClientIp({
         trust: false,
-        remoteAddress: "172.31.240.5",
+        remoteAddress: "198.51.100.5",
         cfConnectingIp: "203.0.113.9",
-        fallback: "172.31.240.5",
+        fallback: "198.51.100.5",
       }),
-    ).toBe("172.31.240.5");
+    ).toBe("198.51.100.5");
   });
 
   it("falls back when the header is absent", () => {
     expect(
       resolveClientIp({
         trust,
-        remoteAddress: "172.31.240.5",
+        remoteAddress: "198.51.100.5",
         cfConnectingIp: undefined,
         fallback: "192.0.2.4",
       }),
@@ -123,7 +123,7 @@ describe("resolving the client IP", () => {
       expect(
         resolveClientIp({
           trust,
-          remoteAddress: "172.31.240.5",
+          remoteAddress: "198.51.100.5",
           cfConnectingIp: value,
           fallback: "192.0.2.4",
         }),
@@ -135,7 +135,7 @@ describe("resolving the client IP", () => {
     expect(
       resolveClientIp({
         trust,
-        remoteAddress: "172.31.240.5",
+        remoteAddress: "198.51.100.5",
         cfConnectingIp: ["203.0.113.9", "198.51.100.1"],
         fallback: "192.0.2.4",
       }),
@@ -146,7 +146,7 @@ describe("resolving the client IP", () => {
     expect(
       resolveClientIp({
         trust,
-        remoteAddress: "172.31.240.5",
+        remoteAddress: "198.51.100.5",
         cfConnectingIp: "2001:db8::1",
         fallback: "192.0.2.4",
       }),
