@@ -11737,3 +11737,66 @@ and "fetaost".
 **The seeded user, with history and its own foods**, differs on three: "kebabpizza"
 reaches its own "Kebabpizza"; "filmjölk" and "Filmjölk 3%" reach "Filmjölk 3%",
 the row it has logged 68 times.
+
+### D199 — "Tolkningen är inte igång" was the model answering in the wrong shape
+
+*2026-09-26, the owner's phone, 20:18 to 20:22 local.*
+
+"Ett glas mjölk" and "Entrecote, potatis i ugn …" were refused in production
+with `llm.unavailableNow`, while the same sheet offered the plate photo. Three
+explanations were on the table: the model server unreachable, a timeout while
+a model loaded, or the phone's 1.3.0 client misreading 1.4.0's API. **It was
+none of them.** The logs, read before anything was restarted:
+
+- **The API** answered every `POST /api/llm/parse-food` in the window with 200:
+  the first at 18:17:04 UTC in 8 624 ms, the next eight in 224 to 415 ms. No
+  warning, no error. A refusal travels as `{ available: false, reason }` inside
+  a 200 (D6), so the status codes could not tell a parse from a refusal.
+- **Ollama on the workstation** logged the same nine `POST /api/chat`, all 200:
+  the first loaded gemma4:e4b, the text model, in 7,27 s (the 8,6 s above), and
+  the rest took 215 to 408 ms. The server was up and the model loaded.
+- **On dev**, the API is the same code as 1.4.0 on this path. Both sentences,
+  sent the way the sentence tool sends them, came back `available: false,
+  reason: unusable_output`.
+
+**The model answered, in a shape the app could not read.** In free JSON mode
+(`format: "json"`), gemma4:e4b wrote "Ett glas mjölk" as
+`{"items":[{"name":"mjölk","portion":{"count":1,"unit":"glas"}},{"estimatedGrams":250,"confidence":0.9}]}`:
+valid JSON, one food split in two. The strict reader refused it, correctly, and
+the client, which reads every refusal as the model being away, said
+"Tolkningen är inte igång just nu". Twenty everyday sentences in free JSON mode:
+**seven refused**, among them "3 dl filmjölk med müsli" and "100 g kycklingfilé
+och ris" (a null where a number goes), "ett glas apelsinjuice" and "ett äpple".
+This was not new in 1.4.0; the path is unchanged since 1.3.0.
+
+**The fix is at the source: the shape is asked for with a schema**, which
+Ollama enforces while sampling, as the label and recipe readers already do
+(D190, D195). The same twenty sentences: **one refused**, "ett äpple", written
+as a count with an empty unit, `{"count":1,"unit":""}`. That is one of the
+thing itself, so the reader now makes an empty unit "st", a repair that changes
+no figure and gives the household table a unit it knows. The prompt's example
+stays, because it says what the fields mean. Through the dev API afterwards:
+"Ett glas mjölk" is "Mjölk fett 3% berikad"; the entrecote sentence gives three
+rows.
+
+**And a refusal now says what happened.** `unusable_output` shows "Tolkningen
+förstod inte meningen. Skriv den på ett annat sätt, eller sök upp maten
+själv."; every other reason keeps "inte igång". An older client still says
+"inte igång" for both, but with the schema it will seldom have cause to.
+
+**The model server itself**: Ollama on the workstation is the instance a
+session started from its shell at 13:20 that day. Its parent process has
+exited and Ollama carried on, so it was not stopped with the shell. The
+workstation also has Ollama's own shortcut in the user's Startup folder, which
+is how it normally runs: started at login, by the logged-in user, independent of
+any terminal. The condition for the §7 rule the owner asked about (a server
+started from a session's shell and stopped with it) did not occur, and the rule
+was not added.
+
+Held by tests: the route sends `PARSE_SCHEMA` and not free JSON mode (seen
+failing on the old service); the split reply from production, verbatim, is still
+refused as `unusable_output`; an empty unit is read as "st".
+
+**Not changed here**: the plate photo still asks in free JSON mode, and its
+reader is more forgiving (D143). It has not been seen failing this way; a
+schema for it would need its own probe on the vision model.

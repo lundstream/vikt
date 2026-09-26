@@ -1181,6 +1181,7 @@ export const sv = {
   "llm.saveRowsOne": "Spara 1 rad",
   "llm.nothingFound": "Hittade ingen mat i texten. Skriv om den, eller sök upp maten själv.",
   "llm.unavailableNow": "Tolkningen är inte igång just nu. Sök upp maten själv så länge.",
+  "llm.notUnderstood": "Tolkningen förstod inte meningen. Skriv den på ett annat sätt, eller sök upp maten själv.",
   "llm.logged": "{count} rader loggade",
   "llm.loggedOne": "1 rad loggad",
 

@@ -17,6 +17,14 @@ import { compoundSplits, isPlausibleMatch, matchStrength } from "../src/services
  */
 
 describe("reading the model's reply", () => {
+  /** "ett äpple": one of the thing itself, which is "st" (D199). */
+  it("reads an empty unit as a count of the thing", () => {
+    const result = readParsedFood(
+      JSON.stringify({ items: [{ name: "äpple", portion: { count: 1, unit: "" }, estimatedGrams: 150, confidence: 0.9 }] }),
+    );
+    expect(result).toMatchObject({ ok: true, items: [{ name: "äpple", portion: { count: 1, unit: "st" }, estimatedGrams: 150 }] });
+  });
+
   it("accepts the agreed shape", () => {
     const result = readParsedFood(
       JSON.stringify({

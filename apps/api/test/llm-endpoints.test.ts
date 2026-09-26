@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import type { ChatResult, LlmClient } from "../src/llm/client.js";
+import type { ChatOptions, ChatResult, LlmClient } from "../src/llm/client.js";
+import { PARSE_SCHEMA } from "../src/llm/parse-food.js";
 import { auth, createUser, localDate, type TestUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
 
@@ -99,6 +100,51 @@ describe("when the workstation is off", () => {
     // The whole point: a client can render this without an error banner.
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ available: false, reason: "disabled" });
+  });
+});
+
+/**
+ * What production met on 2026-09-26 (D199): the model answered every time, in
+ * a shape the reader cannot read, and the person was told the model was not
+ * running. The shape is now asked for with a schema, and a refusal says what
+ * happened.
+ */
+describe("the sentence, asked for with a schema", () => {
+  const calls: ChatOptions[] = [];
+  const split: ChatResult = {
+    ok: true,
+    // gemma4:e4b's answer to "Ett glas mjölk" in free JSON mode, verbatim.
+    content: '{"items":[{"name":"mjölk","portion":{"count":1,"unit":"glas"}},{"estimatedGrams":250,"confidence":0.9}]}',
+    model: "gemma4:e4b",
+    ms: 260,
+  };
+  const ctx = useTestApp({}, {
+    llm: {
+      enabled: true,
+      chat: async (options) => {
+        calls.push(options);
+        return split;
+      },
+      chatStream: async () => split,
+      reachable: async () => true,
+    },
+  });
+
+  it("sends the schema, not free JSON mode", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    await app.inject({ method: "POST", url: "/api/llm/parse-food", headers: auth(user), payload: { text: "Ett glas mjölk" } });
+    const call = calls.at(-1)!;
+    expect(call.schema).toBe(PARSE_SCHEMA);
+    expect(call.json).toBeUndefined();
+  });
+
+  it("still refuses the split answer, as unusable output rather than an outage", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    const response = await app.inject({ method: "POST", url: "/api/llm/parse-food", headers: auth(user), payload: { text: "Ett glas mjölk" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ available: false, reason: "unusable_output" });
   });
 });
 

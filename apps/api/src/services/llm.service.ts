@@ -23,7 +23,7 @@ import {
 import type { Db } from "../db/index.js";
 import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
-import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
+import { PARSE_SCHEMA, parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
 import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
 import { LABEL_SCHEMA, readLabel, readLabelMessages } from "../llm/read-label.js";
 import { RECIPE_SCHEMA, readRecipe, readRecipeMessages } from "../llm/read-recipe.js";
@@ -93,7 +93,8 @@ export async function parseFoodText(
   const reply = await client.chat({
     model: env.OLLAMA_MODEL_SMALL,
     messages: parseFoodMessages(text),
-    json: true,
+    // The shape enforced while sampling, not only checked afterwards (D199).
+    schema: PARSE_SCHEMA,
     temperature: 0,
     timeoutMs: env.OLLAMA_TIMEOUT_MS,
   });

@@ -46,6 +46,43 @@ Regler:
 - Ta med varje livsmedel för sig. "smörgås med ost" är två rader: bröd och ost.
 - Hittar du ingen mat alls: {"items":[]}`;
 
+/**
+ * The shape, enforced by Ollama while it samples (`format`), as the label and
+ * recipe readers already are (D190, D195).
+ *
+ * Free JSON mode was enough until it was not: on 2026-09-26 gemma4:e4b answered
+ * "Ett glas mjölk" with `{"items":[{"name":"mjölk","portion":{…}},
+ * {"estimatedGrams":250,"confidence":0.9}]}`, one food split into two objects,
+ * valid JSON in the wrong shape. The reader refused it, correctly, and the
+ * person saw "Tolkningen är inte igång just nu" in production. Over twenty
+ * everyday sentences, free JSON mode was refused 7 times and this schema once
+ * (D199). The example in the prompt stays: it says what the fields mean, the
+ * schema only says where they go.
+ */
+export const PARSE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          portion: {
+            type: ["object", "null"],
+            properties: { count: { type: "number" }, unit: { type: "string" } },
+            required: ["count", "unit"],
+          },
+          estimatedGrams: { type: "number" },
+          confidence: { type: "number" },
+        },
+        required: ["name", "portion", "estimatedGrams", "confidence"],
+      },
+    },
+  },
+  required: ["items"],
+};
+
 export function parseFoodMessages(text: string): ChatMessage[] {
   return [
     { role: "system", content: PARSE_SYSTEM_PROMPT },
@@ -85,6 +122,20 @@ export function readParsedFood(content: string): ParseOutcome {
       reason: "unusable_output",
       detail: `model produced nutrition fields: ${offending.slice(0, 5).join(", ")}`,
     };
+  }
+
+  /*
+    One repair that changes no figure (D199): "ett äpple" comes back as a count
+    with an empty unit, `{"count":1,"unit":""}`, which is one of the thing
+    itself. That is "st", the unit the household table already knows.
+  */
+  if (raw !== null && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
+    for (const item of (raw as { items: unknown[] }).items) {
+      const portion = (item as { portion?: { unit?: unknown } } | null)?.portion;
+      if (portion && typeof portion === "object" && typeof portion.unit === "string" && portion.unit.trim() === "") {
+        portion.unit = "st";
+      }
+    }
   }
 
   const parsed = parsedFoodSchema.safeParse(raw);

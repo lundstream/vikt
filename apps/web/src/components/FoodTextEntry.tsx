@@ -134,11 +134,13 @@ export function FoodTextEntry({
 
     if (!result.available) {
       /**
-       * The box went off between the health check and now. Still not an error:
-       * the text stays in the box and the note says the manual path is there,
-       * which is the same tone the offline notices use (D43).
+       * Still not an error: the text stays in the box and the note says the
+       * manual path is there, the same tone the offline notices use (D43).
+       * But it says what happened. A reply the model gave in a shape the app
+       * cannot read is not "not running", which is what this said in
+       * production when the model had answered every time (D199).
        */
-      setNote(t("llm.unavailableNow"));
+      setNote(t(result.reason === "unusable_output" ? "llm.notUnderstood" : "llm.unavailableNow"));
       return;
     }
 
