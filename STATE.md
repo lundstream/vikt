@@ -115,11 +115,11 @@ development server**, item by item, each with its own verdict file. Released as
 - **No private address in a tracked file** (D197) has no screen: the helper's
   refusal and release step 1 are held by tests, and the address test failed on
   `scripts/portainer.mjs:35` before it passed.
-- **The closing sweep, 2026-09-26, after the matcher pass**: `pnpm
+- **The closing sweep, 2026-09-26, after the 1.4.0 release**: `pnpm
   harness:sweep` over every finished screen at 360 px and desktop, **45 of 45**
   with the sign-in; both landing rows `landing-ok=sentence15/meta13/gap64`,
   6 796 px at 360 and 5 206 at desktop, unchanged. CI green on `dev` at
-  `54e0e16`.
+  `3fe7f05`.
 
 - **Phases 0 to 6 are built and used daily**: invite-only auth, the weight log
   and trend line, adaptive TDEE and projections, the food database with barcode
@@ -993,7 +993,8 @@ deploy:
 
 | | |
 |---|---|
-| (this record) | Production runs 1.4.0; a dry run does not say it is live |
+| (this record) | The session's report |
+| `3fe7f05` | Production runs 1.4.0, and a dry run no longer says it is live |
 
 ### Before the next redeploy
 
