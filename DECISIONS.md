@@ -10783,3 +10783,88 @@ database for the rest (there is no database row: that is why the label is
 being photographed); keeping the photograph with the food so the figures can
 be re-checked (it is a picture of somebody's kitchen, and D143's promise is
 that it stops existing once read).
+
+---
+
+### D191 — The first stored image: one interface, two backends, and both backups
+
+*2026-09-26. Phase 14, item 6.*
+
+A meal may have one photo. It is the first image this app keeps: D10 decided
+in the first phase that photos would live outside the database and never be
+public, and until now nothing had been stored to test that decision against.
+
+**One interface, `MediaStore`, two backends.** A **directory**, bound into the
+container at `/media` from the stack variable `MEDIA_HOST_DIR`, the way the
+backup directory is and for the same two reasons (uid 1000 cannot write a
+named volume's root-owned mountpoint, and the photos must outlive the
+container); and **S3**, using the backup's own connection under a `media`
+folder beside the backups, so choosing it adds no second set of credentials.
+`MEDIA_STORAGE` picks; `MEDIA_DIR` is empty and means `/media` in production
+and `.media` beside the API on a workstation, so development needs nothing
+configured. The passthrough guard holds both variables, and a new block in
+`stack-variables.test.ts` holds the bind as the backup's is held: required,
+documented with the commands that make the directory, no named volume.
+
+**A key has one shape and nothing else is accepted:**
+`users/<user>/meals/<meal>-<random>.jpg`. The user is the first folder, so an
+account's photos are one prefix to remove; a key that does not match is
+refused before it becomes a path, and the directory backend checks the
+resolved path stays inside its root as a second lock. Replacing a photo writes
+a new key and removes the old one after the meal points at the new, so a
+reader never holds a key that has gone, and the URL changes with it.
+
+**The server does not take the client's word for the image.** The phone
+resizes to 1 280 px, turns it upright and strips EXIF (D190), and the server
+checks all three again: a JPEG only, no side over 1 280 px, and every APP1 to
+APP15 segment and comment removed before it is written, so no stored photo
+carries a location, a time or a phone model whatever sent it. A picture still
+tagged as turned is refused rather than stripped, because stripping the tag
+would store it sideways. `shared/jpeg.ts` reads the markers; nothing decodes a
+pixel, so there is no image library in the API.
+
+**Served only through an authenticated endpoint**, scoped to the owner: a
+stranger's request, for a meal or a photo, is the same 404 as no photo at all,
+without a session it is 401, and the response is `private`, versioned by the
+URL so a day's caching is safe.
+
+**It goes with everything it belongs to.** With the meal, after the row. With
+the account, before the rows, as D10 always planned: the self-delete path had
+carried a no-op "remove photos" hook since then, and an admin's delete now
+removes the folder too. The deletion preview counts the photos from the meals
+that point at one.
+
+**In the export**, as a zip beside the data files: the JSON the import reads, a
+CSV per table, and every photo under `media/` by its key. The zip is built with
+`fflate`, the one dependency this adds.
+
+**In both backups.** The app's scheduled backup writes
+`vikt-<time>.media.enc` beside each dump: every stored photo in a zip,
+encrypted in the dump's own format with the dump's key, written even when
+empty so "no photos" and "no archive" can be told apart, pruned with the same
+retention. The restore check opens it and fails when a photo the restored
+database names is missing or is not a photograph; a dump from before 1.3 has
+no archive, names no photos and passes. Both runs record how many photos they
+saw, and Administration, Backup shows the counts. `infra/backup.sh` archives
+the media directory as `media-<time>.tar.gz` beside its own dump, and
+`infra/restore-check.sh` checks that pair the same way; `docs/backup.md` and
+the runbook have the host commands and the restore steps. `backup.sh` had
+carried an "uploads" section since D96 for exactly this, tarring a directory
+nothing wrote to.
+
+**Exercised through the interface:** a phone photo of 3 MB with EXIF added to
+a meal in the sheet, shown in the sheet and the list, 960 by 1 280, stored
+under the user's folder with no EXIF, carried by the zip export beside the JSON
+and 21 CSVs, refused without a session. The S3 half of the backup is asserted
+in the CI-only live suite, inside the existing full-run test so the CI-only
+count stays nine.
+
+**Found on the way:** GNU tar reads a colon in an archive path as a remote
+host, so the scripts stream through stdin and stdout rather than `-f`.
+
+**Rejected:** photos in Postgres (D10, and a backup that grows by megabytes a
+meal); a public or signed URL (the owner is the only reader until item 7 says
+otherwise, and a session is already the credential); an image library to
+re-encode on the server (a marker walk does what is needed, and a native
+dependency in the API image is a build that can break for reasons unrelated to
+this app); a second S3 configuration for photos (a second set of keys to rotate).
