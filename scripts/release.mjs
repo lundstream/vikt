@@ -136,7 +136,13 @@ export function readHandover(state, version) {
   */
   const sets = [
     ...new Map(
-      [...text.matchAll(/--set\s+([A-Z][A-Z0-9_]*)=(\S+)/g)].map((m) => [
+      /*
+        A value ends at whitespace or at a backtick. STATE.md is prose with
+        inline code in it, and `(\S+)` took the closing backtick of
+        "`--set MEDIA_STORAGE=s3`" as part of the value: a sentence explaining
+        when *not* to set a variable would have set it to "s3`" (D193).
+      */
+      [...text.matchAll(/--set\s+([A-Z][A-Z0-9_]*)=([^\s`]+)/g)].map((m) => [
         m[1],
         { name: m[1], value: m[2] },
       ]),

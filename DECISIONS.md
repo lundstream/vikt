@@ -10936,3 +10936,39 @@ brief rules out); sharing by reference, so a reader's list follows the
 author's edits (the author could rewrite what somebody else logged); sharing
 with named people (a list of accounts to choose from would show every reader
 who else is here, which the installation otherwise never does).
+
+---
+
+### D193 — Phase 14 as far as it went: 1.3.0 prepared, recipe import not started
+
+*2026-09-26. Phase 14, item 9.*
+
+**Built, and exercised through the interface:** the meal entity (D186), the
+section (D187), logging from Mat (D189), the label photo with D5 amended
+(D190), meal photos in storage and both backups (D191), and sharing (D192).
+1.3.0 is prepared in STATE.md's "Inför nästa deploy": four migrations, one new
+required stack variable (`MEDIA_HOST_DIR`), the host commands for its
+directory, the host scripts to install first, the rollback that needs step 2's
+dump because 0032 drops the template tables, and a Nyheter post for 1.3. The
+README's feature list and the landing page's card for Mat say what the app now
+does: "Streckkod, en mening, ett foto eller etiketten."
+
+**Not started: import from a photo of a recipe** (item 8). Its first step is a
+probe on one real recipe page, as every model path has been since D143, and
+there is no recipe page among the photographs in `scratch/vision`: plates, a
+burger, three packages and the three labels. A page generated for the purpose
+would be a probe of the generator, not of a page somebody photographs in a
+kitchen. Nothing of the item is built. It needs one photograph of a real
+recipe page or card in `scratch/vision/recipes/`, and then it starts where
+D143 and D190 started.
+
+**Found while writing the handover, and fixed:** the release command reads
+every `--set NAME=value` in "Inför nästa deploy", and its value pattern,
+`(\S+)`, took the closing backtick of inline code as part of the value. A
+sentence in the 1.3.0 handover explaining when *not* to set `MEDIA_STORAGE`
+read as `--set MEDIA_STORAGE=s3\``, and a release would have deployed with the
+storage set to a value the schema refuses at boot. The pattern stops at a
+backtick now, the sentence no longer uses the command's syntax, and a test
+holds both. It is recurring error class ten, a check answering the question
+next to the one it was asked: "which variables does the handover set" answered
+by "which strings in it look like a setting".

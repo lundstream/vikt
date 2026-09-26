@@ -43,16 +43,24 @@ pace" — agree when they should. `CLAUDE.md` §4 specifies the arithmetic exact
 - **Weight**, with the trend line, waist-to-height on the same axis, and
   projections to a goal by two independent routes shown side by side.
 - **Food**, by barcode, by name against Open Food Facts and Livsmedelsverket, by
-  describing a meal in a sentence, or by typing an estimate for the pizzeria
-  down the road. Portions resolve through what you logged last time, your own
-  definitions, and a table of Swedish household measures.
+  describing a meal in a sentence, by photographing the plate, by photographing
+  the nutrition label of something no database knows, or by typing an estimate
+  for the pizzeria down the road. Portions resolve through what you logged last
+  time, your own definitions, and a table of Swedish household measures.
+- **Meals**: the dishes you cook, with a portion count and figures per
+  portion, built with the same tools and logged at any number of portions as
+  ordinary rows that keep the meal's name. One photo each, kept on your own
+  server. A meal can be shared with everyone on the same installation under a
+  display name, and whoever saves or logs it gets a copy of their own.
 - **The day**: energy, mood, sleep, steps, alcohol, activity, measurements.
 - **Milestones and a savings pot** for the things you did not buy.
 - **Offline**. Everything you log is written locally first and syncs when the
   network comes back, so a meal logged in a shop basement is logged.
 - **An optional local LLM layer** for parsing meals and suggesting recipes,
   which degrades to manual entry when the machine running it is off. It never
-  produces a calorie figure: it names foods, and the database prices them.
+  produces a calorie figure: it names foods, and the database prices them. The
+  one exception is a photographed nutrition label, which it transcribes, and
+  which is only saved once the figures add up and you have confirmed each one.
 
 Two rules the whole app is built on: **there is no failure state** — a missed day
 renders as a gap, never as red — and **absent is not zero**. A day nobody logged

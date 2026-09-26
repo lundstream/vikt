@@ -423,7 +423,7 @@ function WhatItDoes() {
     {
       title: "Mat",
       tint: "text-nutrition",
-      body: "Streckkod, en mening eller ett foto. Det du åt i går ligger överst och loggas igen med två tryck.",
+      body: "Streckkod, en mening, ett foto eller etiketten. Dina måltider ligger överst, och det du åt i går loggas igen med två tryck.",
     },
     {
       title: "Dagen",
@@ -551,8 +551,8 @@ function Screens() {
     {
       src: "/screens/mat.png",
       alt: "Matloggen med sökning och senast loggade rader",
-      title: "Mat loggas med streckkod, en mening eller ett foto.",
-      meta: "Sökning i livsmedelsdatabasen, sparade måltider och favoriter du använder ofta.",
+      title: "Mat loggas med streckkod, en mening, ett foto eller etiketten.",
+      meta: "Sökning i livsmedelsdatabasen, dina måltider per portion och favoriter du använder ofta.",
     },
     {
       src: "/screens/framsteg.png",

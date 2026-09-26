@@ -280,6 +280,28 @@ describe("what STATE.md says the release needs", () => {
     expect(new Set(handover.sets.map((entry) => entry.name)).size).toBe(handover.sets.length);
   });
 
+  /**
+   * A value stops at a backtick (D193). The 1.3.0 handover's prose mentioned
+   * "`--set MEDIA_STORAGE=s3`" to say when not to set it, and the parser read
+   * the sentence as an instruction with the value "s3`".
+   */
+  it("does not take inline code's closing backtick as part of a value", () => {
+    const text = [
+      "## Inför nästa deploy",
+      "",
+      "The next deploy is `9.9.9`. Only if the backup is S3 would `--set MEDIA_STORAGE=s3` apply.",
+      "",
+      "```sh",
+      "node scripts/stack.mjs plan 9.9.9 --release-file --set MEDIA_HOST_DIR=/var/lib/vikt/media",
+      "```",
+    ].join("\n");
+    const handover = readHandover(text, "9.9.9");
+    expect(handover.ok).toBe(true);
+    if (!handover.ok) return;
+    expect(handover.sets).toContainEqual({ name: "MEDIA_STORAGE", value: "s3" });
+    expect(handover.sets.every((entry) => !entry.value.includes("`"))).toBe(true);
+  });
+
   /** Anything sensitive is named, never valued, on the command line (§7). */
   it("passes sensitive variables by name only", () => {
     const handover = { ok: true as const, sets: [], fromEnv: ["SECRET_KEY"], commit: null };
