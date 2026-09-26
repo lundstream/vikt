@@ -115,6 +115,21 @@ development server**, item by item, each with its own verdict file. Released as
 - **No private address in a tracked file** (D197) has no screen: the helper's
   refusal and release step 1 are held by tests, and the address test failed on
   `scripts/portainer.mjs:35` before it passed.
+- **The sentence tool, after 1.4.0** (D199), 2026-09-26: "ett glas mjölk"
+  typed into "En mening" on Mat with the real model is read and proposes
+  "Mjölk fett 3% berikad", 1 glas, 250 g, 149 kcal; the same sentence and the
+  entrecote sentence the owner's phone was refused on are read through the dev
+  API. Shot at 360 px and desktop.
+- **Välj bild** (D200), 2026-09-26, with the real models, at 360 px and
+  desktop: the plate photo given a picked JPEG and read into rows; the label
+  photo given a picked JPEG and transcribed; the recipe photo given a PNG
+  screenshot of a recipe page, five rows, "4 portioner" filling the count, the
+  amounts the catalogue cannot convert typed in, saved as "Pannkakor från
+  skärmbild" of four portions; a text file named `.png` answered with "Bilden
+  gick inte att läsa. Ta en ny." in the sheet; the meal's own photo input
+  without `capture`. 30 of 30.
+- **The meal photo's line** (D201): "Bara du ser det, om du inte delar
+  måltiden." in the sheet at 360 px and desktop, 4 of 4.
 - **The closing sweep, 2026-09-26, after the 1.4.0 release**: `pnpm
   harness:sweep` over every finished screen at 360 px and desktop, **45 of 45**
   with the sign-in; both landing rows `landing-ok=sentence15/meta13/gap64`,
@@ -640,10 +655,28 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ## Inför nästa deploy
 
-**Nothing is prepared yet.** Production runs `1.4.0` (above), released from
-`c6b435f`; everything on `dev` after that commit goes into the next deploy,
-which takes a number here, with its handover, once there is something to
-release.
+**The next deploy is `1.4.1`**: what the owner found on a phone the evening
+1.4.0 went out. Production runs `1.4.0` (above).
+
+**No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
+release commit is named once the `v1.4.1` tag exists, and before that the
+release follows `dev`'s tip, whose CI run has to have finished green before the
+command is started. Push nothing between starting it and step 7.
+
+#### What 1.4.1 changes
+
+| | what a user sees |
+|---|---|
+| **The sentence is read** (D199) | "Ett glas mjölk" said "Tolkningen är inte igång just nu" while the model had answered every time, in a shape the app could not read. The shape is now asked for with a schema: over twenty everyday sentences, refusals went from seven to none. A sentence the model still cannot turn into foods says "Tolkningen förstod inte meningen", not that it is not running |
+| **Välj bild** (D200) | the plate photo, the recipe photo and the label photo each have "Välj bild" beside the camera, for a picture already on the phone; it is resized and stripped of location and time in the phone like a new one |
+| **Screenshots of recipes** (D200) | the recipe photo's intro says a screenshot works, and often best; a yield printed as "4 portioner · 30 min" fills the portion count |
+| **The meal photo's line** (D201) | "Bara du ser det, om du inte delar måltiden.", the privacy page's own promise, where it said only "Bara du ser det." |
+
+**What the deploy needs that 1.4.0 did not: nothing.** No migration, no stack
+variable, no host change, so there is no `release` block below. The models are
+the ones production already uses: gemma4:e4b for the sentence and qwen3.6:27b
+for the coach (both the defaults, not set in the stack), and qwen3-vl:8b for
+the photos (`LLM_VISION_MODEL`).
 
 #### How the next release is told what to set
 
@@ -661,6 +694,8 @@ the command before step 1 (D194).
   test): it ends "every check passed and nothing was changed", where 1.4.0's
   said "1.4.0 is live" while production ran 1.3.0. The release command only;
   nothing a user sees.
+- **The sentence tool** (D199), **Välj bild** (D200) and **the meal photo's
+  line** (D201): the table above, and "Current state".
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -669,6 +704,32 @@ until it has been read.
 
 **Färdig text, klistra in som den är** under Administration, Meddelanden. Inga
 tankstreck (§5), och registret är appens eget: du, inte "användaren".
+
+<details>
+<summary>1.4.1</summary>
+
+```markdown
+## Vikt 1.4.1
+
+**Välj en bild.** Fotot av tallriken, receptet och näringsdeklarationen kan nu
+också hämtas ur bilderna i telefonen, inte bara tas med kameran. Välj bild
+ligger bredvid kameraknappen. Bilden förminskas och rensas från plats och tid i
+telefonen, precis som ett nytt foto.
+
+**Skärmbilder av recept.** Hittar du ett recept på webben kan du ta en
+skärmbild och välja den, och det blir ofta bäst: inga ränder och ingen
+avskuren spalt. Står det hur många portioner receptet räcker till fylls
+antalet i, även när tiden står på samma rad.
+
+**En mening förstås.** Skriver du vad du ätit, som "ett glas mjölk", tolkas det
+nu som det ska. Förstår tolkningen ändå inte meningen säger den det, i stället
+för att säga att den inte är igång.
+
+**Fotot på en måltid.** Texten under fotot säger nu det som gäller: bara du ser
+det, om du inte delar måltiden.
+```
+
+</details>
 
 <details>
 <summary>1.4.0</summary>
@@ -1028,6 +1089,10 @@ Fredrik's checks in production, listed there, including one real recipe photo
 through Måltider on a phone.
 
 
+
+### The 2026-09-26 evening brief: the phone test, and 1.4.1
+
+Items 1 to 3 done on `dev` (D199, D200, D201); 1.4.1 prepared above.
 ### The second landing brief: the page's polish, Sten, and three defects
 
 **All four items are done on `dev`**, and nothing inside one was left half
