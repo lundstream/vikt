@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  ApplyTemplate,
   ConfirmParsedInput,
   CreateEstimate,
   CreateFoodPortion,
@@ -12,9 +11,10 @@ import type {
   UpdatePantryStaple,
   UpdateSavedRecipe,
   CreateFoodEntry,
-  CreateTemplate,
+  CreateMeal,
+  LogMeal,
   UpdateFoodEntry,
-  UpdateTemplate,
+  UpdateMeal,
 } from "shared";
 import { MIN_SEARCH_LENGTH } from "shared";
 import { api } from "./api.js";
@@ -23,7 +23,7 @@ import { INSIGHTS_KEY, INTAKE_KEY } from "./log.js";
 
 export const RECENT_KEY = ["food", "recent"] as const;
 export const ENTRIES_KEY = ["food", "entries"] as const;
-export const TEMPLATES_KEY = ["food", "templates"] as const;
+export const MEALS_KEY = ["meals"] as const;
 
 /**
  * The list that opens the logging screen. Recent foods first is the single
@@ -48,11 +48,15 @@ export function useFoodEntries(from?: string, to?: string) {
   });
 }
 
-export function useTemplates() {
+/**
+ * The person's meals, most used first (D186). The order is the server's, so
+ * the row at the top of Mat and the Måltider section agree about "the usual".
+ */
+export function useMeals() {
   return useQuery({
-    queryKey: TEMPLATES_KEY,
-    queryFn: () => api.listTemplates(),
-    select: (data) => data.templates,
+    queryKey: MEALS_KEY,
+    queryFn: () => api.listMeals(),
+    select: (data) => data.meals,
     staleTime: 60_000,
   });
 }
@@ -233,13 +237,12 @@ export function useCreateManualFood() {
   });
 }
 
-/** Renaming a saved meal (D56). */
-export function useUpdateTemplate() {
+/** Editing a meal: its name, portions or rows (D56, D186). */
+export function useUpdateMeal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateTemplate }) =>
-      api.updateTemplate(id, input),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY }),
+    mutationFn: ({ id, input }: { id: string; input: UpdateMeal }) => api.updateMeal(id, input),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
   });
 }
 
@@ -256,31 +259,45 @@ export function useDeleteFoodEntry() {
   });
 }
 
-export function useCreateTemplate() {
+export function useCreateMeal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateTemplate) => api.createTemplate(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY }),
+    mutationFn: (input: CreateMeal) => api.createMeal(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
   });
 }
 
-export function useApplyTemplate() {
+/**
+ * Logging a meal goes through the queue, like every other food write (D186).
+ *
+ * One queued mutation for the whole meal rather than one per row: the server
+ * derives each row's key from the logging's, so a replay writes the same rows,
+ * and the meal lands whole or not at all. The request body carries the meal's
+ * id, which is where `requestFor` finds the path.
+ */
+export function useLogMeal(timezone = "Europe/Stockholm") {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ templateId, input }: { templateId: string; input: ApplyTemplate }) =>
-      api.applyTemplate(templateId, input),
+    mutationFn: async (input: LogMeal & { mealId: string }) =>
+      enqueueAndSync({
+        kind: "meal-log",
+        timezone,
+        localDate: input.localDate,
+        clientUuid: input.clientUuid,
+        body: input,
+      }),
     onSuccess: () => {
       invalidateIntake(queryClient);
-      void queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY });
+      void queryClient.invalidateQueries({ queryKey: MEALS_KEY });
     },
   });
 }
 
-export function useDeleteTemplate() {
+export function useDeleteMeal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (templateId: string) => api.deleteTemplate(templateId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY }),
+    mutationFn: (mealId: string) => api.deleteMeal(mealId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
   });
 }
 
@@ -446,9 +463,9 @@ export function useSavedRecipes() {
 }
 
 /**
- * Keeping a recipe also creates the meal template that cooks it again, so the
- * template list is stale too. Forgetting that half is the one-entry-behind
- * defect in a new place.
+ * Keeping a recipe also creates the meal that cooks it again, so the meal list
+ * is stale too. Forgetting that half is the one-entry-behind defect in a new
+ * place.
  */
 export function useSaveRecipe() {
   const queryClient = useQueryClient();
@@ -456,7 +473,7 @@ export function useSaveRecipe() {
     mutationFn: (input: CreateSavedRecipe) => api.saveRecipe(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: RECIPES_KEY });
-      void queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY });
+      void queryClient.invalidateQueries({ queryKey: MEALS_KEY });
     },
   });
 }

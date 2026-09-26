@@ -97,7 +97,7 @@ function takeOverWrites(onWrite: () => Promise<Response>) {
 const RESPONSES = [
   { match: "/api/me", body: ME },
   { match: "/api/food-entry/recent", body: { entries: ENTRIES } },
-  { match: "/api/meal-templates", body: { templates: [] } },
+  { match: "/api/meals", body: { meals: [] } },
 ];
 
 describe("a save that is taking its time", () => {

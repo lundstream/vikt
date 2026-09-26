@@ -181,7 +181,7 @@ export async function insertRecipe(
     title: string;
     steps: string[];
     items: unknown[];
-    templateId: string | null;
+    mealId: string | null;
   },
 ): Promise<SavedRecipeRow> {
   const [row] = await db.insert(savedRecipes).values({ userId, ...values }).returning();

@@ -473,7 +473,7 @@ describe("saving a recipe", () => {
     ],
   });
 
-  it("keeps the text and generates the template that cooks it again", async () => {
+  it("keeps the text and makes the meal that cooks it again (D186)", async () => {
     const { app, db } = ctx();
     const user = await createUser(app, db);
     const foodItemId = await manualFood(app, user, "Rökt skinka", 110);
@@ -489,15 +489,19 @@ describe("saving a recipe", () => {
     const body = saved.json();
     expect(body.title).toBe("Skinkmacka");
     expect(body.steps).toHaveLength(2);
-    // §6: a recipe holds the prose, a template holds the rows, and they link.
-    expect(body.templateId).not.toBeNull();
+    // §6: a recipe holds the prose, a meal holds the rows, and they link.
+    expect(body.mealId).not.toBeNull();
     // The portion label survives, so a reopened recipe still reads "5 skivor".
     expect(body.items[0].portion).toEqual({ count: 5, unit: "skivor" });
 
-    const templates = (
-      await app.inject({ method: "GET", url: "/api/meal-templates", headers: auth(user) })
-    ).json().templates;
-    expect(templates.map((t: { name: string }) => t.name)).toContain("Skinkmacka");
+    const meals = (
+      await app.inject({ method: "GET", url: "/api/meals", headers: auth(user) })
+    ).json().meals;
+    const meal = meals.find((m: { name: string }) => m.name === "Skinkmacka");
+    // The stated portion is the row's amount and unit; the grams still price it.
+    expect(meal.items[0]).toMatchObject({ amount: 5, unit: "skivor", grams: 60 });
+    expect(meal.portions).toBe(1);
+    expect(meal.perPortion.kcal).toBeCloseTo(66);
   });
 
   it("is editable, which is the whole point of keeping one", async () => {
@@ -554,9 +558,9 @@ describe("saving a recipe", () => {
 
   /**
    * A recipe whose ingredients the database cannot price has nothing to put in
-   * a template: every application of it would write zero-energy rows (D74).
+   * a meal: every logging of it would be lighter than it reads (D74).
    */
-  it("skips the template when nothing could be priced", async () => {
+  it("makes no meal when nothing could be priced", async () => {
     const { app, db } = ctx();
     const user = await createUser(app, db);
 
@@ -567,6 +571,6 @@ describe("saving a recipe", () => {
       payload: recipe(null),
     });
 
-    expect(saved.json().templateId).toBeNull();
+    expect(saved.json().mealId).toBeNull();
   });
 });

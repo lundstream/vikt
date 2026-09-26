@@ -16,6 +16,7 @@ export * from "./schemas/correlation.js";
 export * from "./schemas/milestone.js";
 export * from "./schemas/insights.js";
 export * from "./schemas/food.js";
+export * from "./schemas/meals.js";
 export * from "./schemas/llm.js";
 export * from "./schemas/portions.js";
 export * from "./schemas/habits.js";

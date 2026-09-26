@@ -290,6 +290,7 @@ export const sv = {
   // uppslaget castas till en nyckel och typkollen därför inte såg det (D153).
   "queue.kind.weight-update": "Ändrad vägning",
   "queue.kind.habit-check": "Vana",
+  "queue.kind.meal-log": "Måltid",
   "queue.kind.manual-intake": "Kalorier",
   "queue.kind.food-entry": "Mat",
   "queue.kind.daily": "Dagen",

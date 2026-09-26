@@ -21,9 +21,9 @@ import type { Db } from "../db/index.js";
  * What comes out, in dependency order.
  *
  * The order matters for import: `food_items` must exist before a `food_entry`
- * can point at one, and a `meal_template` before its items. Exported in the
- * same order it has to be read back in, so the import is a loop rather than a
- * topological sort.
+ * can point at one, a meal before its rows, and a meal before the food rows
+ * that were logged from it (D186). Exported in the same order it has to be read
+ * back in, so the import is a loop rather than a topological sort.
  */
 export const EXPORTED_TABLES = [
   "profiles",
@@ -33,11 +33,11 @@ export const EXPORTED_TABLES = [
   "daily_log",
   "activity_log",
   "manual_intake",
+  "meals",
+  "meal_items",
   "food_entries",
   "food_portions",
   "food_favourites",
-  "meal_templates",
-  "meal_template_items",
   "milestones",
   "savings_rules",
   "savings_events",
@@ -80,11 +80,11 @@ export const EXCLUDED_TABLES = [
 ] as const;
 
 /**
- * `meal_template_items` hangs off a template rather than off a user, so it is
- * scoped through its parent. Everything else has `user_id` directly.
+ * `meal_items` hangs off a meal rather than off a user, so it is scoped through
+ * its parent. Everything else has `user_id` directly.
  */
 const SCOPE: Partial<Record<ExportedTable, string>> = {
-  meal_template_items: `template_id in (select id from meal_templates where user_id = $1)`,
+  meal_items: `meal_id in (select id from meals where user_id = $1)`,
 };
 
 async function rowsFor(db: Db, table: ExportedTable, userId: string) {
@@ -131,9 +131,9 @@ export async function exportUser(userId: string, db: Db): Promise<UserExport> {
         union
         select food_item_id from pantry_staples where user_id = '${userId}' and food_item_id is not null
         union
-        select mti.food_item_id from meal_template_items mti
-          join meal_templates mt on mt.id = mti.template_id
-          where mt.user_id = '${userId}' and mti.food_item_id is not null
+        select mi.food_item_id from meal_items mi
+          join meals m on m.id = mi.meal_id
+          where m.user_id = '${userId}' and mi.food_item_id is not null
       )`),
   );
 

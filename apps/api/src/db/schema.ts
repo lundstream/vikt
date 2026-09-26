@@ -592,6 +592,19 @@ export const foodEntries = pgTable(
       .notNull()
       .default("1.00"),
     confirmed: boolean("confirmed").notNull().default(true),
+    /**
+     * Logged from a meal (D186): which one, which logging, and the meal's name
+     * and the portions eaten, as they were. All four null on any other row.
+     *
+     * The group is `mealLogUuid`, so a day reads "Frukost · 1 portion" with
+     * its rows underneath. `mealId` is a reference for counting how often a
+     * meal is logged, allowed to go null when the meal is removed; nothing
+     * reads its absence as meaning anything (§3).
+     */
+    mealId: uuid("meal_id").references(() => meals.id, { onDelete: "set null" }),
+    mealLogUuid: uuid("meal_log_uuid"),
+    mealName: text("meal_name"),
+    mealPortions: numeric("meal_portions", { precision: 6, scale: 2 }),
   },
   (t) => [
     uniqueIndex("food_entries_client_key").on(t.userId, t.clientUuid),
@@ -623,40 +636,87 @@ export const manualIntake = pgTable(
   ],
 );
 
-export const mealTemplates = pgTable(
-  "meal_templates",
+/**
+ * A dish, with a portion count (Phase 14, D186).
+ *
+ * Replaced the meal template, which was a named set of rows logged again at the
+ * same grams and could not say how many people the pot fed. Every template
+ * became a meal of one portion under its own id (`0032_meals.sql`).
+ *
+ * **Nothing here is energy.** The per-portion figures are computed from the
+ * ingredient rows and the food they point at, by `mealNutrition` in the shared
+ * calc and nowhere else, so a corrected food corrects every meal that uses it
+ * from the next log onward, and no logged day changes: a log writes ordinary
+ * food rows, which are their own snapshot.
+ */
+export const meals = pgTable(
+  "meals",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** Idempotent create (§3). A migrated template's is its own id. */
+    clientUuid: uuid("client_uuid").notNull(),
     name: text("name").notNull(),
+    /** How many portions the ingredient rows make. Decimals allowed, never 0. */
+    portions: numeric("portions", { precision: 6, scale: 2 }).notNull().default("1"),
     defaultMealSlot: mealSlotEnum("default_meal_slot"),
-    useCount: integer("use_count").notNull().default(0),
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    /**
+     * Every time it was logged, carried over from the template's `use_count`.
+     * The list is ordered by the last ninety days of logs, read from
+     * `food_entries`; this is the lifetime figure, kept so nothing the template
+     * held was lost.
+     */
+    loggedCount: integer("logged_count").notNull().default(0),
+    lastLoggedAt: timestamp("last_logged_at", { withTimezone: true }),
+    /** Where the one photo lives in media storage (item 6). Null: no photo. */
+    photoKey: text("photo_key"),
+    photoUpdatedAt: timestamp("photo_updated_at", { withTimezone: true }),
+    /**
+     * Shared with everyone on this installation since this moment (item 7).
+     * A timestamp rather than a flag, and nothing cascades to it (§3).
+     */
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
+    /**
+     * The shared meal this was copied from, and its author's display name at
+     * the time. Provenance only: not a foreign key, because the author may
+     * delete theirs and the copy is the reader's own from the moment it exists.
+     */
+    copiedFromMealId: uuid("copied_from_meal_id"),
+    copiedFromName: text("copied_from_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("meal_templates_user_used_idx").on(t.userId, t.lastUsedAt)],
+  (t) => [
+    uniqueIndex("meals_client_key").on(t.userId, t.clientUuid),
+    index("meals_user_idx").on(t.userId, t.updatedAt),
+  ],
 );
 
-export const mealTemplateItems = pgTable("meal_template_items", {
+/**
+ * One ingredient row of a meal: a food, an amount and a unit.
+ *
+ * `grams` is what the amount and unit came to when the row was saved, and it is
+ * the number the arithmetic uses. The amount and unit are kept for the person
+ * reading it: "2 dl" is what they measured, and "200 g" is what it weighs.
+ */
+export const mealItems = pgTable("meal_items", {
   id: uuid("id").primaryKey().defaultRandom(),
-  templateId: uuid("template_id")
+  mealId: uuid("meal_id")
     .notNull()
-    .references(() => mealTemplates.id, { onDelete: "cascade" }),
+    .references(() => meals.id, { onDelete: "cascade" }),
   foodItemId: uuid("food_item_id").references(() => foodItems.id, {
     onDelete: "set null",
   }),
   /**
-   * The item's name at the time it was added. Kept so that deleting the food it
-   * points at leaves a readable line rather than grams of nothing (D17). The
-   * default exists only so the column could be added to an existing table; the
-   * service always writes a real name, and a test holds it to that.
+   * The food's name when the row was added, so deleting the food leaves a
+   * readable line rather than grams of nothing (D17). A row whose food is gone
+   * has unknown energy, and the meal's figures say "minst" (D55).
    */
-  nameSnapshot: text("name_snapshot").notNull().default(""),
-  freetext: text("freetext"),
+  nameSnapshot: text("name_snapshot").notNull(),
+  amount: numeric("amount", { precision: 8, scale: 2 }).notNull(),
+  unit: text("unit").notNull().default("g"),
   grams: numeric("grams", { precision: 7, scale: 1 }).notNull(),
   position: smallint("position").notNull().default(0),
 });
@@ -995,7 +1055,7 @@ export const pantryStaples = pgTable(
 /**
  * How a dish was cooked, kept as prose.
  *
- * Its own table rather than a field on `meal_templates`, per §6, because they
+ * Its own table rather than a field on the meal (once `meal_templates`), per §6, because they
  * answer different questions: a template is "log these rows again in one tap",
  * a recipe is "how did I cook that". They link through `template_id`, so
  * cooking it again is one tap and reading how is one tap more.
@@ -1023,8 +1083,8 @@ export const savedRecipes = pgTable(
      * food leaves a readable line rather than grams of nothing.
      */
     items: jsonb("items").notNull(),
-    /** The template generated from it, so cooking it again is one tap. */
-    templateId: uuid("template_id").references(() => mealTemplates.id, {
+    /** The meal made from it, so cooking it again is one tap (D186). */
+    mealId: uuid("meal_id").references(() => meals.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true })

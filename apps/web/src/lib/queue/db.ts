@@ -83,7 +83,13 @@ export type MutationKind =
   | "measurement"
   | "activity"
   | "savings-offset"
-  | "habit-check";
+  | "habit-check"
+  /**
+   * A whole meal, logged at some number of portions (D186). One mutation, many
+   * rows: the server derives each row's key from this one's, so a replay
+   * writes the same rows and the meal arrives whole or not at all.
+   */
+  | "meal-log";
 
 /**
  * `pending` is waiting to be sent, `failed` has been refused and needs a

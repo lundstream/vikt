@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
-import type { FoodEntry, FoodItem, MealTemplate } from "shared";
+import type { FoodEntry, FoodItem, Meal } from "shared";
 import {
   allPortionUnits,
   resolveDefaultAmount, MIN_SEARCH_LENGTH, formatDecimal, formatKcal, sumOrNull, dayMacros } from "shared";
@@ -14,17 +14,17 @@ import {
   usePortions,
   useSavePortion,
   useSetFavourite,
-  useApplyTemplate,
+  useLogMeal,
   useBarcodeLookup,
   useFoodEntries,
   useFoodSearch,
   useRecentFoods,
   useSaveFoodEntry,
   useUpdateFoodEntry,
-  useUpdateTemplate,
-  useDeleteTemplate,
-  useTemplates,
-  useCreateTemplate,
+  useUpdateMeal,
+  useDeleteMeal,
+  useMeals,
+  useCreateMeal,
   useDeleteFoodEntry,
 } from "../lib/food.js";
 import { formatLongDay } from "../lib/dates.js";
@@ -127,10 +127,10 @@ export function FoodLog() {
   const dayWord = isToday ? t("quick.today").toLowerCase() : t("food.dayThis");
 
   const recent = useRecentFoods(12);
-  const templates = useTemplates();
+  const meals = useMeals();
   const todayEntries = useFoodEntries(today, today);
   const saveEntry = useSaveFoodEntry(timezone);
-  const applyTemplate = useApplyTemplate();
+  const logMeal = useLogMeal(timezone);
 
   /**
    * `?skanna` opens the camera on arrival, so the dashboard's scan action is
@@ -439,17 +439,16 @@ export function FoodLog() {
     }
   }
 
-  async function logTemplate(template: MealTemplate) {
-    setSavingId(template.id);
+  async function logSavedMeal(meal: Meal) {
+    setSavingId(meal.id);
     try {
-      await applyTemplate.mutateAsync({
-        templateId: template.id,
-        input: {
-          localDate: today,
-          clientUuids: template.items.map(() => clientUuid()),
-        },
+      await logMeal.mutateAsync({
+        mealId: meal.id,
+        clientUuid: clientUuid(),
+        localDate: today,
+        portions: 1,
       });
-      announce(t("food.loggedMeal", { name: template.name }));
+      announce(t("food.loggedMeal", { name: meal.name }));
     } catch (error) {
       announce(saveProblem(error), true);
     } finally {
@@ -675,16 +674,16 @@ export function FoodLog() {
           </div>
         ) : null}
 
-        {templates.data && templates.data.length > 0 ? (
+        {meals.data && meals.data.length > 0 ? (
           <section aria-label={t("food.meals")} className="mb-8">
             <h2 className="mb-1 text-note text-muted">{t("food.meals")}</h2>
             <ul className="divide-y divide-edge border-y border-edge">
-              {templates.data.map((template) => (
+              {meals.data.map((meal) => (
                 <TemplateRow
-                  key={template.id}
-                  template={template}
-                  onLog={() => void logTemplate(template)}
-                  logging={savingId === template.id}
+                  key={meal.id}
+                  template={meal}
+                  onLog={() => void logSavedMeal(meal)}
+                  logging={savingId === meal.id}
                 />
               ))}
             </ul>
@@ -906,7 +905,7 @@ function TodaySection({
   onCopyDay?: (entries: FoodEntry[]) => Promise<void>;
   copyingDay?: boolean;
 }) {
-  const createTemplate = useCreateTemplate();
+  const createMeal = useCreateMeal();
   const deleteEntry = useDeleteFoodEntry();
 
   /**
@@ -934,19 +933,29 @@ function TodaySection({
     setSelected(new Set(entries.map((entry) => entry.id)));
   }, [entries]);
 
-  const chosen = entries.filter((entry) => selected.has(entry.id));
+  /**
+   * Only rows with a food go into a meal (D186): a meal is priced from the
+   * database every time it is logged, and a typed row has nothing there to
+   * price it from. It stays on the day; it just does not travel.
+   */
+  const chosen = entries.filter(
+    (entry) => selected.has(entry.id) && entry.foodItemId !== null && entry.grams > 0,
+  );
 
   async function save(event: FormEvent) {
     event.preventDefault();
     if (name.trim() === "" || chosen.length === 0) return;
 
-    await createTemplate.mutateAsync({
+    await createMeal.mutateAsync({
+      clientUuid: clientUuid(),
       name: name.trim(),
+      portions: 1,
       items: chosen.map((entry) => ({
-        foodItemId: entry.foodItemId,
+        foodItemId: entry.foodItemId!,
         // The name at the time, so deleting the food leaves a readable line (D17).
         nameSnapshot: entry.name,
-        freetext: entry.foodItemId ? null : entry.name,
+        amount: entry.grams,
+        unit: "g",
         grams: entry.grams,
       })),
     });
@@ -1584,12 +1593,12 @@ function TemplateRow({
   onLog,
   logging,
 }: {
-  template: MealTemplate;
+  template: Meal;
   onLog: () => void;
   logging: boolean;
 }) {
-  const update = useUpdateTemplate();
-  const remove = useDeleteTemplate();
+  const update = useUpdateMeal();
+  const remove = useDeleteMeal();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(template.name);
 

@@ -118,7 +118,7 @@ function mount(posted: string[]) {
     responses: [
       { match: "/api/me", body: ME },
       { match: "/api/insights", body: INSIGHTS },
-      { match: "/api/meal-templates", body: { templates: [] } },
+      { match: "/api/meals", body: { meals: [] } },
       { match: "/api/food/favourites", body: { items: [] } },
     ],
     stateful: [

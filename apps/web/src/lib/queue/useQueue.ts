@@ -5,7 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, type MutationKind } from "./db.js";
 import { drainQueue, onQueueSent } from "./sync.js";
 import { INSIGHTS_KEY, INTAKE_KEY, WEIGHT_KEY } from "../log.js";
-import { ENTRIES_KEY, RECENT_KEY } from "../food.js";
+import { ENTRIES_KEY, MEALS_KEY, RECENT_KEY } from "../food.js";
 import {
   ACTIVITY_KEY,
   CORRELATION_KEY,
@@ -111,6 +111,8 @@ const AFFECTED: Record<MutationKind, readonly (readonly string[])[]> = {
    * intake, not a measurement and not an input to any number on the dashboard.
    */
   "habit-check": [HABIT_KEY, DAY_KEY],
+  /** A meal's rows are food rows, and the meal list is ordered by how often. */
+  "meal-log": [RECENT_KEY, ENTRIES_KEY, INTAKE_KEY, INSIGHTS_KEY, MEALS_KEY],
 };
 
 /** How often the queue is retried while something is waiting. */

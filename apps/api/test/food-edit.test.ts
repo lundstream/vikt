@@ -7,7 +7,7 @@ import { useTestApp } from "./harness.js";
 const ctx = useTestApp();
 
 /**
- * Correcting a logged food entry, and editing a saved meal.
+ * Correcting a logged food entry. Editing a meal is `meals.test.ts` (D186).
  *
  * §3 says every user-created row ships with an edit and a delete in the phase
  * that creates it (D56). A food entry is many-per-day, so re-logging is not an
@@ -188,81 +188,5 @@ describe("editing a food entry", () => {
 
     expect(response.statusCode).toBe(404);
     expect((await entriesOf(app, owner))[0].kcal).toBe(600);
-  });
-});
-
-describe("saved meals", () => {
-  async function saveMeal(app: FastifyInstance, user: TestUser, name: string) {
-    const response = await app.inject({
-      method: "POST",
-      url: "/api/meal-templates",
-      headers: auth(user),
-      payload: {
-        name,
-        items: [{ nameSnapshot: "Havregryn", freetext: "Havregryn", grams: 60 }],
-      },
-    });
-    if (response.statusCode !== 201 && response.statusCode !== 200) {
-      throw new Error(`template failed (${response.statusCode}): ${response.body}`);
-    }
-    return response.json<{ id: string }>().id;
-  }
-
-  it("can be renamed", async () => {
-    const { app, db } = ctx();
-    const user = await createUser(app, db);
-    const id = await saveMeal(app, user, "Frukost");
-
-    const response = await app.inject({
-      method: "PATCH",
-      url: `/api/meal-templates/${id}`,
-      headers: auth(user),
-      payload: { name: "Vardagsfrukost" },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json().name).toBe("Vardagsfrukost");
-  });
-
-  it("can be deleted", async () => {
-    const { app, db } = ctx();
-    const user = await createUser(app, db);
-    const id = await saveMeal(app, user, "Frukost");
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: `/api/meal-templates/${id}`,
-      headers: auth(user),
-    });
-
-    expect(response.statusCode).toBe(204);
-
-    const list = (
-      await app.inject({ method: "GET", url: "/api/meal-templates", headers: auth(user) })
-    ).json().templates;
-    expect(list).toHaveLength(0);
-  });
-
-  it("is scoped to the caller", async () => {
-    const { app, db } = ctx();
-    const owner = await createUser(app, db);
-    const stranger = await createUser(app, db);
-    const id = await saveMeal(app, owner, "Frukost");
-
-    expect(
-      (
-        await app.inject({
-          method: "DELETE",
-          url: `/api/meal-templates/${id}`,
-          headers: auth(stranger),
-        })
-      ).statusCode,
-    ).toBe(404);
-
-    // The scoping was never the problem; reporting success for a no-op was.
-    const list = (
-      await app.inject({ method: "GET", url: "/api/meal-templates", headers: auth(owner) })
-    ).json().templates;
-    expect(list).toHaveLength(1);
   });
 });

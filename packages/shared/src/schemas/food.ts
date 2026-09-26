@@ -182,65 +182,19 @@ export const foodEntrySchema = z.object({
   fiberG: z.number().nullable(),
   confidence: z.number(),
   confirmed: z.boolean(),
+  /**
+   * Logged from a meal (D186): the logging these rows share, the meal's name
+   * and the portions eaten, as they were. Null on every other row. Defaulted
+   * so an entry cached by an older client still parses.
+   */
+  mealId: z.string().uuid().nullable().default(null),
+  mealLogUuid: z.string().uuid().nullable().default(null),
+  mealName: z.string().nullable().default(null),
+  mealPortions: z.number().nullable().default(null),
 });
 export type FoodEntry = z.infer<typeof foodEntrySchema>;
 
 export const foodEntryListSchema = z.object({ entries: z.array(foodEntrySchema) });
-
-/* ---------------------------------------------------------- meal templates */
-
-export const templateItemSchema = z.object({
-  foodItemId: z.string().uuid().nullable(),
-  /** The name at the time it was added, so a deleted food leaves a readable line (D17). */
-  nameSnapshot: z.string(),
-  freetext: z.string().nullable(),
-  grams: z.number(),
-  position: z.number().int(),
-});
-export type TemplateItem = z.infer<typeof templateItemSchema>;
-
-export const mealTemplateSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  defaultMealSlot: mealSlotSchema.nullable(),
-  useCount: z.number().int(),
-  lastUsedAt: z.string().nullable(),
-  items: z.array(templateItemSchema),
-});
-export type MealTemplate = z.infer<typeof mealTemplateSchema>;
-
-export const mealTemplateListSchema = z.object({
-  templates: z.array(mealTemplateSchema),
-});
-
-export const createTemplateSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  defaultMealSlot: mealSlotSchema.nullish(),
-  items: z
-    .array(
-      z.object({
-        foodItemId: z.string().uuid().nullish(),
-        nameSnapshot: z.string().trim().min(1).max(200),
-        freetext: z.string().trim().max(200).nullish(),
-        grams: z.number().min(0).max(10000),
-      }),
-    )
-    .min(1)
-    .max(40),
-});
-export type CreateTemplate = z.infer<typeof createTemplateSchema>;
-
-export const updateTemplateSchema = createTemplateSchema.partial();
-export type UpdateTemplate = z.infer<typeof updateTemplateSchema>;
-
-/** Applying a template writes one food entry per item, all idempotent. */
-export const applyTemplateSchema = z.object({
-  localDate: localDateSchema,
-  mealSlot: mealSlotSchema.nullish(),
-  /** One per item, so a replay of the whole application is still idempotent. */
-  clientUuids: z.array(clientUuidSchema).min(1).max(40),
-});
-export type ApplyTemplate = z.infer<typeof applyTemplateSchema>;
 
 /* ------------------------------------------------- estimates and favourites */
 

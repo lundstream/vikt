@@ -36,6 +36,8 @@ export const ENDPOINTS: Record<MutationKind, string> = {
   activity: "/activity",
   "savings-offset": "/savings/offsets",
   "habit-check": "/habit-check",
+  // The meal's id goes in the path; see `requestFor` below.
+  "meal-log": "/meals",
 };
 
 /**
@@ -152,6 +154,10 @@ export function requestFor(mutation: {
   if (mutation.kind === "weight-update") {
     const id = String(mutation.body.id ?? "");
     return { url: `/api/weight/${encodeURIComponent(id)}`, method: "PUT" };
+  }
+  if (mutation.kind === "meal-log") {
+    const id = String(mutation.body.mealId ?? "");
+    return { url: `/api/meals/${encodeURIComponent(id)}/log`, method: "POST" };
   }
   return { url: `/api${ENDPOINTS[mutation.kind]}`, method: "POST" };
 }

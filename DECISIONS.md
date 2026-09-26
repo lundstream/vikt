@@ -10403,3 +10403,91 @@ next push, and a tip that moved past the tag.
 **One thing this could not do.** The brief numbers the class ten, and nothing
 in the repository lists one to nine. §7 says so in a parenthesis rather than
 inventing them.
+
+---
+
+### D186 — A meal is a dish with a portion count, and a logging is a snapshot
+
+*2026-09-26. Phase 14, item 2.*
+
+§1's third excellent thing is "repeat a previous meal in one tap", and Phase 3
+built it as a meal template: a named set of rows, logged again at the same
+grams. What a template cannot say is how many people the pot fed, so a stew
+cooked for four was either saved as four portions and logged as a quarter by
+hand, row by row, or not saved at all.
+
+**One entity, `meals`, per user.** A name, a portion count (numeric, default 1,
+decimals allowed, never zero: a check constraint and the schema both say so),
+ingredient rows in `meal_items` that reference a food with an **amount, a unit
+and the grams they came to**, and timestamps. The grams are the arithmetic; the
+amount and unit are what the person measured, "2 dl" and "1 paket", kept for
+reading.
+
+**The templates became meals without loss, under their own ids**
+(`0032_meals.sql`). Name, default meal slot, `use_count` as `logged_count`,
+`last_used_at` as `last_logged_at`, the creation time, every row at the same
+grams with the unit "g", the freetext of a row from before `name_snapshot`
+existed, and a recipe's reference to its template, which is now its `meal_id`
+by the same id. `migration-meals.test.ts` builds a 1.2 database, writes
+templates the way 1.2 did, applies 0032 and checks every one of those. Then
+the old tables are dropped, **the one non-additive migration in the
+repository, and named as such**: the brief says the old storage goes, and two
+tables holding the same meals is how two screens come to disagree. Rolling the
+image back past it needs the dump the release takes at step 2, and STATE.md's
+handover says so.
+
+**Per-portion figures come from `mealNutrition` in the shared calc, and
+nowhere else.** It is D55 on a dish: the priced rows through `dayMacros`,
+divided by the portions, "minst" below the gate. One thing is new. A day's rows
+always carry energy; a meal's row whose food was deleted does not, so it makes
+the energy a floor as well, and every macro with it, because coverage cannot be
+judged against energy nobody knows. The server returns what the function
+returned, and the sheet (item 3) calls it on rows being edited.
+
+**A logging writes ordinary food rows, as a snapshot.** Each is the row's
+grams times portions eaten over portions made, priced from the food as it is
+now, and carries four new nullable columns: `meal_id` (a reference, set null
+when the meal goes, and nothing reads its absence as meaning anything, §3),
+`meal_log_uuid` (the group), `meal_name` and `meal_portions` (snapshots). An
+edit to the meal, or its removal, changes no logged day; `meals.test.ts` edits
+and removes a meal after logging it and compares the day.
+
+**Idempotent on the logging, not on each row.** The client names the logging
+once; every row's `client_uuid` is a version-5 uuid derived from that name and
+the row's position (`lib/derive-uuid.ts`). A replay writes the same rows and is
+counted once; a second logging has a new name and writes new rows. The template
+asked for one key per row, which tied the request to a row count the client
+could get wrong, and did: `SavedRecipes` counted the recipe's ingredients while
+the template held only the priced ones, so a recipe with one unpriced row was
+refused with `uuid_count`. It is one mutation of a new queue kind, `meal-log`,
+so a meal logged offline arrives whole or not at all, where the template wrote
+straight to the API one row at a time and a failure left half a breakfast.
+
+**"Most used" is read from the rows, not kept as a counter.** Loggings in the
+last ninety days by `logged_at`, the moment somebody reached for it, then the
+last logging, then the newest meal. A logging whose rows were all removed stops
+counting, which is the honest answer to "how often do I eat this".
+
+**A row a meal cannot price is not logged, and the answer says which.** A food
+deleted after the meal was made leaves a readable name (D17) and unknown
+energy; the log skips it and returns its name, rather than logging a meal that
+is quietly lighter than it reads.
+
+**Isolation.** Every repository function takes the owner first. Rows are
+reached only through a meal scoped to the owner; a row's food is priced only if
+the owner can see it; a create or edit that names somebody else's private food
+is refused with 422 before it is stored. All six endpoints answer 404 to a
+stranger, tested each.
+
+**Found on the way: an export that pointed at a food could not be imported.**
+The shared foods an export carries include the two columns Postgres generates
+(the search vector, 0004, and the folded name, 0030), and it refuses to be
+handed them. Nothing noticed because no exported row had ever pointed at a food
+in a test; the meal round trip did. The import now reads the generated columns
+from `information_schema` and leaves them out. An export from before 1.3, with
+templates in it, is upgraded on read by the same mapping as 0032.
+
+**Rejected:** keeping templates beside meals (two answers to "my breakfast");
+storing per-portion figures on the meal (a number the calc did not produce, and
+stale the moment a food is corrected); a join table for loggings (the rows
+already say which logging they belong to).

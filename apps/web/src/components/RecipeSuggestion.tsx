@@ -190,7 +190,7 @@ export function RecipeSuggestion({
         foodItemId: row.foodItemId,
         portion: row.portion,
       })),
-      createTemplate: true,
+      createMeal: true,
     });
 
     setNote(t("recipe.kept"));

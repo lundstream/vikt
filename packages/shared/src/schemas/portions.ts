@@ -99,7 +99,7 @@ export type UpdatePantryStaple = z.infer<typeof updatePantryStapleSchema>;
 /**
  * One line of a saved recipe's ingredient list.
  *
- * Snapshotted rather than joined, for the reason `meal_template_items` keeps a
+ * Snapshotted rather than joined, for the reason `meal_items` keeps a
  * name (D17): deleting the food item leaves a readable line rather than grams
  * of nothing. `portion` is the label it was rendered with, kept so a reopened
  * recipe still reads "2 ägg" rather than reverting to grams.
@@ -117,8 +117,8 @@ export const savedRecipeSchema = z.object({
   title: z.string(),
   steps: z.array(z.string()),
   items: z.array(savedRecipeItemSchema),
-  /** The meal template generated from it, so cooking it again is one tap. */
-  templateId: z.string().uuid().nullable(),
+  /** The meal made from it, so cooking it again is one tap (D186). */
+  mealId: z.string().uuid().nullable(),
   createdAt: z.string(),
 });
 export type SavedRecipe = z.infer<typeof savedRecipeSchema>;
@@ -128,11 +128,11 @@ export const createSavedRecipeSchema = z.object({
   steps: z.array(z.string().trim().min(1).max(400)).min(1).max(20),
   items: z.array(savedRecipeItemSchema).min(1).max(30),
   /**
-   * Whether to generate the meal template at the same time. §6 wants cooking it
-   * again to be one tap, and the template is what makes that possible; it
-   * reuses the phase 3 path rather than a parallel one.
+   * Whether to make a meal of it at the same time. §6 wants cooking it again
+   * to be one tap, and the meal is what makes that possible; it is the same
+   * entity the Måltider section lists, not a parallel one (D186).
    */
-  createTemplate: z.boolean().default(true),
+  createMeal: z.boolean().default(true),
 });
 export type CreateSavedRecipe = z.infer<typeof createSavedRecipeSchema>;
 

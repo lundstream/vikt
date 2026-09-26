@@ -3,21 +3,22 @@ import type { SavedRecipe } from "shared";
 import { formatDecimal, formatPortion } from "shared";
 import { Disclosure } from "./Disclosure.js";
 import {
-  useApplyTemplate,
   useDeleteRecipe,
+  useLogMeal,
   useSavedRecipes,
   useUpdateRecipe,
 } from "../lib/food.js";
+import { useMe } from "../lib/session.js";
 import { clientUuid } from "../lib/uuid.js";
 import { plural, t } from "../i18n/index.js";
 
 /**
  * Recipes that have been kept: how a dish was cooked (§6 phase 8).
  *
- * Deliberately not the same thing as a saved meal. A meal template is "log
- * these rows again in one tap"; a recipe is "how did I cook that". They link,
- * so cooking it again is one tap on the template the recipe generated, and
- * reading how is one tap more here.
+ * Deliberately not the same thing as a meal. A meal is "log these rows again
+ * in one tap"; a recipe is "how did I cook that". They link, so cooking it
+ * again is one tap on the meal the recipe made (D186), and reading how is one
+ * tap more here.
  *
  * The three rules §6 sets for storing model-generated prose:
  *
@@ -73,7 +74,8 @@ function RecipeRow({
   localDate: string;
   onLogged: (message: string) => void;
 }) {
-  const apply = useApplyTemplate();
+  const me = useMe();
+  const log = useLogMeal(me.data?.profile.timezone);
   const update = useUpdateRecipe();
   const remove = useDeleteRecipe();
 
@@ -82,14 +84,24 @@ function RecipeRow({
   const [steps, setSteps] = useState(recipe.steps.join("\n"));
   const [confirming, setConfirming] = useState(false);
 
-  /** Cooking it again: the template the recipe generated, through the phase 3 path. */
+  /**
+   * Cooking it again: one portion of the meal the recipe made (D186).
+   *
+   * The count is of the rows the meal holds, which are the priced ones. It
+   * used to count every ingredient and send one key per ingredient to a
+   * template that held only the priced ones, so a recipe with one unpriced row
+   * was refused outright.
+   */
   async function cook() {
-    if (!recipe.templateId) return;
-    await apply.mutateAsync({
-      templateId: recipe.templateId,
-      input: { localDate, clientUuids: recipe.items.map(() => clientUuid()) },
+    if (!recipe.mealId) return;
+    await log.mutateAsync({
+      mealId: recipe.mealId,
+      clientUuid: clientUuid(),
+      localDate,
+      portions: 1,
     });
-    onLogged(plural(recipe.items.length, "recipe.loggedOne", "recipe.logged"));
+    const rows = recipe.items.filter((item) => item.foodItemId !== null).length;
+    onLogged(plural(rows, "recipe.loggedOne", "recipe.logged"));
   }
 
   async function saveEdit() {
@@ -120,17 +132,17 @@ function RecipeRow({
         </button>
 
         {/*
-          One tap to cook it again, which is what the template is for. Absent
-          when nothing in the recipe could be priced, because a template of
-          unpriced rows would write a zero-energy meal every time (D74).
+          One tap to cook it again, which is what the meal is for. Absent when
+          nothing in the recipe could be priced, because a meal of unpriced
+          rows would log nothing every time (D74).
         */}
-        {recipe.templateId ? (
+        {recipe.mealId ? (
           <button
             type="button"
             data-testid={`cook-recipe-${recipe.id}`}
             className="shrink-0 text-note text-muted underline underline-offset-4"
             onClick={() => void cook()}
-            disabled={apply.isPending}
+            disabled={log.isPending}
           >
             {t("recipe.cookAgain")}
           </button>

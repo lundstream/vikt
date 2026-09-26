@@ -1,11 +1,9 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
-  applyTemplateSchema,
   barcodeLookupSchema,
   barcodeSchema,
   createFoodEntrySchema,
-  createTemplateSchema,
   dateRangeQuerySchema,
   errorResponseSchema,
   foodEntryListSchema,
@@ -13,10 +11,7 @@ import {
   foodItemSchema,
   foodSearchQuerySchema,
   foodSearchResultSchema,
-  mealTemplateListSchema,
-  mealTemplateSchema,
   updateFoodEntrySchema,
-  updateTemplateSchema,
   createEstimateSchema,
   favouriteSchema,
 } from "shared";
@@ -33,14 +28,6 @@ import {
   searchFood,
   starFood,
 } from "../services/food.service.js";
-import {
-  applyTemplate,
-  createTemplate,
-  editTemplate,
-  getTemplate,
-  getTemplates,
-  removeTemplate,
-} from "../services/template.service.js";
 
 /**
  * Food logging.
@@ -217,50 +204,6 @@ export const foodRoutes: FastifyPluginAsyncZod = async (app) => {
     }),
   );
 
-  /* -------------------------------------------------------- meal templates */
-
-  app.get(
-    "/meal-templates",
-    {
-      preHandler: app.requireAuth,
-      schema: { response: { 200: mealTemplateListSchema, 401: errorResponseSchema } },
-    },
-    async (request) => ({ templates: await getTemplates(request.userId!, app.db) }),
-  );
-
-  app.post(
-    "/meal-templates",
-    {
-      preHandler: app.requireAuth,
-      schema: {
-        body: createTemplateSchema,
-        response: { 201: mealTemplateSchema, 401: errorResponseSchema },
-      },
-    },
-    async (request, reply) => {
-      const template = await createTemplate(request.userId!, app.db, request.body);
-      return reply.code(201).send(template);
-    },
-  );
-
-  app.patch(
-    "/meal-templates/:templateId",
-    {
-      preHandler: app.requireAuth,
-      schema: {
-        params: z.object({ templateId: z.string().uuid() }),
-        body: updateTemplateSchema,
-        response: {
-          200: mealTemplateSchema,
-          401: errorResponseSchema,
-          404: errorResponseSchema,
-        },
-      },
-    },
-    async (request) =>
-      editTemplate(request.userId!, app.db, request.params.templateId, request.body),
-  );
-
   /**
    * Corrects a logged entry's amount (D56, D65). The macro snapshot is
    * recomputed from the food item, so 250 g mistyped for 150 leaves behind the
@@ -305,67 +248,5 @@ export const foodRoutes: FastifyPluginAsyncZod = async (app) => {
       );
       return reply.code(204).send(null);
     },
-  );
-
-  app.delete(
-    "/meal-templates/:templateId",
-    {
-      preHandler: app.requireAuth,
-      schema: {
-        params: z.object({ templateId: z.string().uuid() }),
-        response: {
-          204: z.null(),
-          401: errorResponseSchema,
-          // The row is not the caller's, or is already gone.
-          404: errorResponseSchema,
-        },
-      },
-    },
-    async (request, reply) => {
-      await removeTemplate(request.userId!, app.db, request.params.templateId);
-      return reply.code(204).send(null);
-    },
-  );
-
-  app.get(
-    "/meal-templates/:templateId",
-    {
-      preHandler: app.requireAuth,
-      schema: {
-        params: z.object({ templateId: z.string().uuid() }),
-        response: {
-          200: mealTemplateSchema,
-          401: errorResponseSchema,
-          404: errorResponseSchema,
-        },
-      },
-    },
-    async (request) => getTemplate(request.userId!, app.db, request.params.templateId),
-  );
-
-  app.post(
-    "/meal-templates/:templateId/apply",
-    {
-      preHandler: app.requireAuth,
-      schema: {
-        params: z.object({ templateId: z.string().uuid() }),
-        body: applyTemplateSchema,
-        response: {
-          200: foodEntryListSchema,
-          400: errorResponseSchema,
-          401: errorResponseSchema,
-          404: errorResponseSchema,
-          422: errorResponseSchema,
-        },
-      },
-    },
-    async (request) => ({
-      entries: await applyTemplate(
-        request.userId!,
-        app.db,
-        request.params.templateId,
-        request.body,
-      ),
-    }),
   );
 };

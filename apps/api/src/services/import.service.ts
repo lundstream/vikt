@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { EXPORTED_TABLES, type UserExport } from "./export.service.js";
+import { upgradeLegacyTables } from "../lib/legacy-export.js";
 
 /**
  * Reading an export back (D96).
@@ -23,9 +24,7 @@ export type ImportOutcome =
   | { ok: false; reason: "not_an_export" | "wrong_version" | "account_not_empty" };
 
 /** Columns that must be re-pointed at the receiving account. */
-const OWNED = new Set<string>(
-  EXPORTED_TABLES.filter((table) => table !== "meal_template_items"),
-);
+const OWNED = new Set<string>(EXPORTED_TABLES.filter((table) => table !== "meal_items"));
 
 /**
  * Whether this account has anything that would collide.
@@ -70,8 +69,9 @@ function literal(value: unknown): string {
  * database one import at a time.
  */
 const REMAPPED_KEYS: Partial<Record<string, { column: string; from: string }[]>> = {
-  meal_template_items: [{ column: "template_id", from: "meal_templates" }],
-  saved_recipes: [{ column: "template_id", from: "meal_templates" }],
+  meal_items: [{ column: "meal_id", from: "meals" }],
+  food_entries: [{ column: "meal_id", from: "meals" }],
+  saved_recipes: [{ column: "meal_id", from: "meals" }],
   savings_events: [{ column: "milestone_id", from: "milestones" }],
   savings_offsets: [{ column: "rule_id", from: "savings_rules" }],
 };
@@ -86,8 +86,10 @@ export async function importUser(
   if (file.version !== 1) return { ok: false, reason: "wrong_version" };
   if (!(await isEmpty(db, userId))) return { ok: false, reason: "account_not_empty" };
 
+  const tables = upgradeLegacyTables(file.tables ?? {});
+
   let rows = 0;
-  /** Old id to new, per table, so the four foreign keys above can follow. */
+  /** Old id to new, per table, so the foreign keys above can follow. */
   const remap = new Map<string, Map<string, string>>();
 
   /**
@@ -98,8 +100,26 @@ export async function importUser(
    * the importing rows point at. Overwriting it with a copy from someone else's
    * export would let an import edit shared data.
    */
+  /**
+   * Columns Postgres computes itself (the search vector and the folded name,
+   * 0004 and 0030), which it refuses to be handed. Read from the schema rather
+   * than listed, so the next generated column is covered without anybody
+   * remembering this loop. Found in 1.3: until meals, no exported row pointed
+   * at a food, so no import had ever written one (D186).
+   */
+  const generated = new Set(
+    (
+      (await db.execute(
+        sql.raw(
+          `select column_name from information_schema.columns
+           where table_name = 'food_items' and is_generated = 'ALWAYS'`,
+        ),
+      )) as unknown as { column_name: string }[]
+    ).map((row) => row.column_name),
+  );
+
   for (const item of file.foodItems ?? []) {
-    const columns = Object.keys(item);
+    const columns = Object.keys(item).filter((column) => !generated.has(column));
     await db.execute(
       sql.raw(
         `insert into food_items (${columns.join(",")}) values (${columns
@@ -110,7 +130,7 @@ export async function importUser(
   }
 
   for (const table of EXPORTED_TABLES) {
-    for (const row of file.tables?.[table] ?? []) {
+    for (const row of tables[table] ?? []) {
       const values: Record<string, unknown> = { ...row };
 
       // Re-point at the receiving account. The exported id belonged to another.

@@ -312,7 +312,7 @@ function unavailableNotice(error: AdapterUnavailable): string {
 
 /* ------------------------------------------------------------ food entries */
 
-async function toEntry(userId: string, db: Db, row: FoodEntryRow): Promise<FoodEntry> {
+export async function toEntry(userId: string, db: Db, row: FoodEntryRow): Promise<FoodEntry> {
   const item = row.foodItemId ? await findFoodById(userId, db, row.foodItemId) : undefined;
 
   return {
@@ -332,6 +332,10 @@ async function toEntry(userId: string, db: Db, row: FoodEntryRow): Promise<FoodE
     fiberG: toNumberOrNull(row.fiberG),
     confidence: toNumber(row.confidence),
     confirmed: row.confirmed,
+    mealId: row.mealId,
+    mealLogUuid: row.mealLogUuid,
+    mealName: row.mealName,
+    mealPortions: toNumberOrNull(row.mealPortions),
   };
 }
 

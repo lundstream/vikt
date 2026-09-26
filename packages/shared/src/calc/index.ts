@@ -17,6 +17,7 @@
  *   habit-streak.ts   one habit's chain, ticked/missed/unknown (D137)
  *   milestone.ts      detection on the trend, never raw    — done, phase 5
  *   macros.ts         macro targets from NNR 2023, derived (D52)
+ *   meals.ts          a meal per portion, the "minst" rule on a dish (D186)
  *   bmi.ts            BMI from the trend weight, never a raw reading
  */
 
@@ -35,4 +36,5 @@ export * from "./streak.js";
 export * from "./habit-streak.js";
 export * from "./milestone.js";
 export * from "./macros.js";
+export * from "./meals.js";
 export * from "./bmi.js";

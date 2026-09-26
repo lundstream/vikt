@@ -1,18 +1,10 @@
 import { and, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/index.js";
-import {
-  foodEntries,
-  foodFavourites,
-  foodItems,
-  mealTemplateItems,
-  mealTemplates,
-} from "../db/schema.js";
+import { foodEntries, foodFavourites, foodItems } from "../db/schema.js";
 import { FOLD_FROM, FOLD_TO, foldForSearch } from "../lib/search-fold.js";
 
 export type FoodItemRow = typeof foodItems.$inferSelect;
 export type FoodEntryRow = typeof foodEntries.$inferSelect;
-export type MealTemplateRow = typeof mealTemplates.$inferSelect;
-export type MealTemplateItemRow = typeof mealTemplateItems.$inferSelect;
 
 /**
  * `food_items` is a **shared cache**, not a user-owned table, so most reads here
@@ -244,6 +236,19 @@ export async function upsertFoodEntry(
         fiberG: values.fiberG ?? null,
         confidence: values.confidence ?? "1.00",
         confirmed: values.confirmed ?? true,
+        /*
+          A meal's rows say so on a replay too (D186). Only when given: a plain
+          entry replayed by the queue carries none of these and must not clear
+          them from a row that has them.
+        */
+        ...(values.mealLogUuid
+          ? {
+              mealId: values.mealId ?? null,
+              mealLogUuid: values.mealLogUuid,
+              mealName: values.mealName ?? null,
+              mealPortions: values.mealPortions ?? null,
+            }
+          : {}),
       },
     })
     .returning();
@@ -350,123 +355,6 @@ export async function recentFoods(
     if (distinct.length >= limit) break;
   }
   return distinct;
-}
-
-/* ---------------------------------------------------------- meal templates */
-
-export async function listTemplates(userId: string, db: Db): Promise<MealTemplateRow[]> {
-  return db
-    .select()
-    .from(mealTemplates)
-    .where(eq(mealTemplates.userId, userId))
-    .orderBy(desc(mealTemplates.lastUsedAt), desc(mealTemplates.createdAt));
-}
-
-export async function findTemplate(
-  userId: string,
-  db: Db,
-  templateId: string,
-): Promise<MealTemplateRow | undefined> {
-  const [row] = await db
-    .select()
-    .from(mealTemplates)
-    .where(and(eq(mealTemplates.userId, userId), eq(mealTemplates.id, templateId)))
-    .limit(1);
-  return row;
-}
-
-/**
- * Template items are reached only through a template that has already been
- * scoped to the user, which is why this takes `userId` and joins rather than
- * querying `meal_template_items` directly on an id from the request.
- */
-export async function listTemplateItems(
-  userId: string,
-  db: Db,
-  templateId: string,
-): Promise<MealTemplateItemRow[]> {
-  const template = await findTemplate(userId, db, templateId);
-  if (!template) return [];
-
-  return db
-    .select()
-    .from(mealTemplateItems)
-    .where(eq(mealTemplateItems.templateId, templateId))
-    .orderBy(mealTemplateItems.position);
-}
-
-export async function insertTemplate(
-  userId: string,
-  db: Db,
-  values: { name: string; defaultMealSlot: MealTemplateRow["defaultMealSlot"] },
-): Promise<MealTemplateRow> {
-  const [row] = await db
-    .insert(mealTemplates)
-    .values({ userId, ...values })
-    .returning();
-  if (!row) throw new Error("insertTemplate returned no row");
-  return row;
-}
-
-export async function replaceTemplateItems(
-  userId: string,
-  db: Db,
-  templateId: string,
-  items: Omit<typeof mealTemplateItems.$inferInsert, "templateId">[],
-): Promise<void> {
-  const template = await findTemplate(userId, db, templateId);
-  if (!template) return;
-
-  await db.delete(mealTemplateItems).where(eq(mealTemplateItems.templateId, templateId));
-  if (items.length === 0) return;
-  await db.insert(mealTemplateItems).values(items.map((item) => ({ ...item, templateId })));
-}
-
-export async function renameTemplate(
-  userId: string,
-  db: Db,
-  templateId: string,
-  name: string,
-): Promise<MealTemplateRow | undefined> {
-  const [row] = await db
-    .update(mealTemplates)
-    .set({ name })
-    .where(and(eq(mealTemplates.userId, userId), eq(mealTemplates.id, templateId)))
-    .returning();
-  return row;
-}
-
-export async function touchTemplate(
-  userId: string,
-  db: Db,
-  templateId: string,
-): Promise<void> {
-  await db
-    .update(mealTemplates)
-    .set({ lastUsedAt: new Date(), useCount: sql`${mealTemplates.useCount} + 1` })
-    .where(and(eq(mealTemplates.userId, userId), eq(mealTemplates.id, templateId)));
-}
-
-/**
- * Returns whether a row was actually removed.
- *
- * `void` was not enough. The query has always been scoped by `user_id`, so a
- * stranger's delete removed nothing and leaked nothing — but the route reported
- * 204 anyway, which tells a client a row is gone when it is not. Every other
- * delete in the codebase answers 404 there (milestones, savings rules, manual
- * intake), and the odd one out is the one that hides a bug.
- */
-export async function deleteTemplate(
-  userId: string,
-  db: Db,
-  templateId: string,
-): Promise<boolean> {
-  const rows = await db
-    .delete(mealTemplates)
-    .where(and(eq(mealTemplates.userId, userId), eq(mealTemplates.id, templateId)))
-    .returning({ id: mealTemplates.id });
-
-  return rows.length > 0;
 }
 
 /* ----------------------------------------------------------- favourites */

@@ -295,7 +295,11 @@ export default tseslint.config(
                 // Food *entry* CRUD is about individual rows, not about what a
                 // day's intake is. It never aggregates them into a total.
                 "services/food.service.ts",
-                "services/template.service.ts",
+                // Meals (D186): whether a logging already wrote its rows, and
+                // how many loggings a meal had in ninety days. Both count
+                // loggings; neither reads a calorie or builds a day's total.
+                "services/meal.service.ts",
+                "repositories/meal.repo.ts",
                 // Owns "which days have any log entry" for the streak (§4.6),
                 // which reads that a row exists and never its calories.
                 "services/series.service.ts",

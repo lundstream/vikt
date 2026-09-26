@@ -32,7 +32,8 @@ import {
   type SavedRecipeRow,
 } from "../repositories/portions.repo.js";
 import { searchFoodItems } from "../repositories/food.repo.js";
-import { createTemplate } from "./template.service.js";
+import { createMeal } from "./meal.service.js";
+import { randomUUID } from "node:crypto";
 
 /* ------------------------------------------------------------- portions */
 
@@ -260,39 +261,44 @@ export async function getRecipe(
 }
 
 /**
- * Saves a recipe, and the template that makes cooking it again one tap.
+ * Saves a recipe, and the meal that makes cooking it again one tap.
  *
- * The template is generated through the **phase 3 path** rather than a parallel
- * one (§6), so a recipe's rows behave exactly like any other saved meal: the
- * same apply endpoint, the same idempotency, the same edit and delete. The
- * recipe holds the prose; the template holds the rows; the link between them is
- * what makes "cook it again" and "read how" two different taps rather than one
- * confused screen.
+ * The meal is made through the **Måltider path** rather than a parallel one
+ * (§6, D186), so a recipe's rows behave exactly like any other meal: the same
+ * log endpoint, the same idempotency, the same edit and delete, and it is
+ * listed in Måltider with the rest. The recipe holds the prose; the meal holds
+ * the rows; the link between them is what makes "cook it again" and "read how"
+ * two different taps rather than one confused screen.
  *
- * Only priced rows go into the template. An ingredient the database could not
- * price has no nutrition to log, and putting it in the template would produce a
- * zero-energy row on every future application of it (D74).
+ * Only priced rows go into the meal. An ingredient the database could not
+ * price has no nutrition to log, and putting it in the meal would make every
+ * future logging of it lighter than it reads (D74). A row keeps the portion it
+ * was stated in, "2 ägg", as its amount and unit.
  */
 export async function saveRecipe(
   userId: string,
   db: Db,
   input: CreateSavedRecipe,
 ): Promise<SavedRecipe> {
-  let templateId: string | null = null;
+  let mealId: string | null = null;
 
-  if (input.createTemplate) {
-    const priced = input.items.filter((item) => item.foodItemId !== null);
+  if (input.createMeal) {
+    const priced = input.items.filter((item) => item.foodItemId !== null && item.grams > 0);
     if (priced.length > 0) {
-      const template = await createTemplate(userId, db, {
-        name: input.title,
+      const meal = await createMeal(userId, db, {
+        clientUuid: randomUUID(),
+        name: input.title.slice(0, 80),
+        portions: 1,
         items: priced.map((item) => ({
           foodItemId: item.foodItemId!,
-          // Never empty: a template item without a name is the D17 failure.
+          // Never empty: a row without a name is the D17 failure.
           nameSnapshot: item.name,
+          amount: item.portion?.count ?? item.grams,
+          unit: item.portion?.unit ?? "g",
           grams: item.grams,
         })),
       });
-      templateId = template.id;
+      mealId = meal.id;
     }
   }
 
@@ -300,7 +306,7 @@ export async function saveRecipe(
     title: input.title,
     steps: input.steps,
     items: input.items,
-    templateId,
+    mealId,
   });
 
   return describeRecipe(row);
@@ -326,7 +332,7 @@ function describeRecipe(row: SavedRecipeRow): SavedRecipe {
     title: row.title,
     steps: row.steps as string[],
     items: row.items as SavedRecipe["items"],
-    templateId: row.templateId,
+    mealId: row.mealId,
     createdAt: row.createdAt.toISOString(),
   };
 }

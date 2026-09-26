@@ -33,6 +33,7 @@ import { logRoutes } from "./routes/log.routes.js";
 import { planRoutes } from "./routes/plan.routes.js";
 import { insightsRoutes } from "./routes/insights.routes.js";
 import { foodRoutes } from "./routes/food.routes.js";
+import { mealRoutes } from "./routes/meal.routes.js";
 import { llmRoutes } from "./routes/llm.routes.js";
 import { publicRoutes } from "./routes/public.routes.js";
 import { adminRoutes } from "./routes/admin.routes.js";
@@ -268,6 +269,7 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
       await api.register(planRoutes);
       await api.register(insightsRoutes);
       await api.register(foodRoutes);
+      await api.register(mealRoutes);
       await api.register(dailyRoutes);
       await api.register(habitRoutes);
       await api.register(coachRoutes);

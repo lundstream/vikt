@@ -36,12 +36,10 @@ import type {
   ManualIntake,
   ManualIntakeList,
   MeResponse,
-  ApplyTemplate,
   BarcodeLookup,
   CreateFoodEntry,
   CreatePlan,
   ConfirmParsedInput,
-  CreateTemplate,
   LlmHealth,
   ParseFoodResponse,
   ParseFoodPhotoRequest,
@@ -61,12 +59,13 @@ import type {
   UpdateSavedRecipe,
   RecipeResponse,
   UpdateFoodEntry,
-  UpdateTemplate,
+  CreateMeal,
+  Meal,
+  UpdateMeal,
   DayTableResponse,
   FoodEntry,
   FoodItem,
   FoodSearchResult,
-  MealTemplate,
   Plan,
   RegisterRequest,
   UpdatePlan,
@@ -239,7 +238,20 @@ export const api = {
   recentFoods: (limit = 20) =>
     request<{ entries: FoodEntry[] }>(`/food-entry/recent?limit=${limit}`),
 
-  listTemplates: () => request<{ templates: MealTemplate[] }>("/meal-templates"),
+  // ------------------------------------------------------ Måltider (D186)
+  listMeals: () => request<{ meals: Meal[] }>("/meals"),
+
+  createMeal: (input: CreateMeal) =>
+    request<Meal>("/meals", { method: "POST", body: JSON.stringify(input) }),
+
+  updateMeal: (mealId: string, input: UpdateMeal) =>
+    request<Meal>(`/meals/${encodeURIComponent(mealId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteMeal: (mealId: string) =>
+    request<void>(`/meals/${encodeURIComponent(mealId)}`, { method: "DELETE" }),
 
   // ------------------------------------------------- the optional LLM layer
   /**
@@ -351,27 +363,6 @@ export const api = {
 
   deleteRecipe: (id: string) =>
     request<{ deleted: boolean }>(`/recipes/${id}`, { method: "DELETE" }),
-
-  createTemplate: (input: CreateTemplate) =>
-    request<MealTemplate>("/meal-templates", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
-  applyTemplate: (templateId: string, input: ApplyTemplate) =>
-    request<{ entries: FoodEntry[] }>(`/meal-templates/${templateId}/apply`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
-  updateTemplate: (templateId: string, input: UpdateTemplate) =>
-    request<MealTemplate>(`/meal-templates/${encodeURIComponent(templateId)}`, {
-      method: "PATCH",
-      body: JSON.stringify(input),
-    }),
-
-  deleteTemplate: (templateId: string) =>
-    request<void>(`/meal-templates/${templateId}`, { method: "DELETE" }),
 
   insights: (asOf: string) => request<InsightsResponse>(`/insights?asOf=${asOf}`),
 
