@@ -191,6 +191,7 @@ export const EXPORT_COLUMN_NAMES: Readonly<Record<string, string>> = {
   remind_day_weekend: "Påminnelse att fylla i dagen på helgen",
   remind_day_weekend_minute: "Påminnelse att fylla i dagen på helgen, minut på dygnet",
   coach_tone: "Coachens ton",
+  public_name: "Visningsnamn",
 };
 
 /** A header for a column, or null when nobody has named it yet. */

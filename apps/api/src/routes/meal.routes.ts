@@ -2,7 +2,11 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
   PHOTO_MAX_BASE64,
+  copySharedMealSchema,
   createMealSchema,
+  reportSharedMealSchema,
+  shareMealSchema,
+  sharedMealListSchema,
   errorResponseSchema,
   logMealSchema,
   mealListSchema,
@@ -15,8 +19,14 @@ import {
   editMeal,
   getMeal,
   getMeals,
+  copySharedMeal,
+  getSharedMeals,
   logMeal,
+  logSharedMeal,
   readMealPhoto,
+  reportSharedMeal,
+  shareMeal,
+  unshareMeal,
   removeMeal,
   removeMealPhoto,
   setMealPhoto,
@@ -32,6 +42,96 @@ import {
  */
 export const mealRoutes: FastifyPluginAsyncZod = async (app) => {
   const params = z.object({ mealId: z.string().uuid() });
+
+  /* ------------------------------------------------ sharing (D192) */
+
+  /**
+   * Every meal shared on this installation. The one list here that is not the
+   * reader's own, by design: shared means shared with everyone who has an
+   * account on this server, and never with anyone who does not.
+   */
+  app.get(
+    "/meals/shared",
+    {
+      preHandler: app.requireAuth,
+      schema: { response: { 200: sharedMealListSchema, 401: errorResponseSchema } },
+    },
+    async (request) => ({ meals: await getSharedMeals(request.userId!, app.db) }),
+  );
+
+  app.post(
+    "/meals/shared/:mealId/copy",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        body: copySharedMealSchema,
+        response: { 200: mealSchema, 401: errorResponseSchema, 404: errorResponseSchema, 422: errorResponseSchema },
+      },
+    },
+    async (request) =>
+      copySharedMeal(request.userId!, app.db, app.media, request.params.mealId, request.body.clientUuid),
+  );
+
+  app.post(
+    "/meals/shared/:mealId/log",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        body: logMealSchema,
+        response: {
+          200: mealLogResultSchema.extend({ mealId: z.string().uuid() }),
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+          422: errorResponseSchema,
+        },
+      },
+    },
+    async (request) =>
+      logSharedMeal(request.userId!, app.db, app.media, request.params.mealId, request.body),
+  );
+
+  app.post(
+    "/meals/shared/:mealId/report",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        body: reportSharedMealSchema,
+        response: { 204: z.null(), 401: errorResponseSchema, 404: errorResponseSchema, 422: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      await reportSharedMeal(request.userId!, app.db, request.params.mealId, request.body.reason);
+      return reply.code(204).send(null);
+    },
+  );
+
+  app.post(
+    "/meals/:mealId/share",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        body: shareMealSchema,
+        response: { 200: mealSchema, 401: errorResponseSchema, 404: errorResponseSchema, 422: errorResponseSchema },
+      },
+    },
+    async (request) => shareMeal(request.userId!, app.db, request.params.mealId),
+  );
+
+  app.delete(
+    "/meals/:mealId/share",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        response: { 200: mealSchema, 401: errorResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => unshareMeal(request.userId!, app.db, request.params.mealId),
+  );
 
   app.get(
     "/meals",

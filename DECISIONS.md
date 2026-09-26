@@ -10868,3 +10868,71 @@ otherwise, and a session is already the credential); an image library to
 re-encode on the server (a marker walk does what is needed, and a native
 dependency in the API image is a build that can break for reasons unrelated to
 this app); a second S3 configuration for photos (a second set of keys to rotate).
+
+---
+
+### D192 — Sharing a meal reaches this installation, by display name, as a copy
+
+*2026-09-26. Phase 14, item 7.*
+
+**Shared means shared with everyone who has an account here, and nobody
+else.** There is no link to send and no public page: the list is behind a
+session like every other screen, and the one read in the meal repository that
+is not scoped to the reader (`listSharedMeals`) is that list, by design and
+said so where it is written.
+
+**It needs a display name.** `profiles.public_name`, a new Profil field that is
+empty by default. It is deliberately not `users.display_name`, which is the
+name an administrator sees and which nobody chose to show anyone. Without one
+the share control is absent from the sheet, not greyed, and the server refuses
+the share with the reason. A name cleared after sharing takes the author's
+meals out of the list rather than showing them under nothing.
+
+**The sharer confirms the recipe is theirs to share**, because a cookbook's
+text belongs to its author. A checkbox in the sheet, and on the wire the
+literal `true`, which is the only value the schema takes. The sheet says who
+will see what before the button is offered.
+
+**What a reader sees:** the name, the rows with amounts, the portions, the
+figures per portion priced as the author sees the foods, the photo, and the
+author's display name. Not the e-mail, not the real name, not a single logged
+day. The privacy page says exactly this.
+
+**Logging or saving a shared meal copies it into the reader's own meals, as a
+snapshot**, and the copy is theirs from that moment: the author's later edits
+change neither the copy nor any day it was logged on, and it survives the
+author's meal and account. One copy per reader and meal; a later save or log
+finds it. A food private to the author (a transcribed label, a typed estimate)
+becomes a private copy of the reader's own, because the reader cannot see the
+author's and a meal that prices as nothing is not a copy. The photo is copied
+into the reader's folder. The copy keeps the author's display name as it was,
+so the list can say "från Testkocken".
+
+**A reader can report a shared meal**, once, with a reason. Administration has
+a new tab, Anmälningar, listing the open reports with the meal, the author's
+display name and e-mail (the administrator sees accounts anyway), the reporter
+and the reason. "Sluta dela" takes the meal out of the list and nothing else;
+"Låt den vara delad" keeps it; either closes every open report on the meal,
+records who and what in the report, and writes the audit log. The chip for the
+author's own shared meal is "delad" in the neutral state style: sharing is not
+logging, so it does not borrow Gran.
+
+**Deleting an account removes its shares**, because they cascade with its
+meals, and removes nothing a reader copied. Tested in the API suite; not
+exercised against the development database, whose rows this project does not
+delete.
+
+**Exercised through the interface** with two accounts: a display name set in
+Profil, a meal shared from its sheet after the confirmation, marked "delad" in
+the author's list; the reader sees it under Delade måltider with the photo and
+"från Testkocken" and no e-mail, logs one portion, which copies it (with the
+photo) and writes the day from the copy, reads "Kycklinggryta · 1 portion" on
+Mat, finds no share control on their copy for want of a display name, and
+reports the meal; Administration lists it and stops sharing it; the reader's
+copy remains. 32 of 32.
+
+**Rejected:** a public link (sharing beyond the installation is the thing the
+brief rules out); sharing by reference, so a reader's list follows the
+author's edits (the author could rewrite what somebody else logged); sharing
+with named people (a list of accounts to choose from would show every reader
+who else is here, which the installation otherwise never does).

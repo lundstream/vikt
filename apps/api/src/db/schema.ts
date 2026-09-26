@@ -271,6 +271,13 @@ export const profiles = pgTable("profiles", {
    * on the phone is meant on the laptop.
    */
   coachTone: text("coach_tone").notNull().default("torr"),
+  /**
+   * The name other people on this installation see beside a meal this person
+   * shares (D192). Empty by default, and sharing needs one: the share control
+   * is absent without it. Not `users.display_name`, which is the name an
+   * administrator sees and which nobody chose to show anyone else.
+   */
+  publicName: text("public_name"),
   remindWeighWeekend: boolean("remind_weigh_weekend").notNull().default(false),
   remindWeighWeekendMinute: integer("remind_weigh_weekend_minute").notNull().default(420),
   remindDayWeekend: boolean("remind_day_weekend").notNull().default(false),
@@ -722,6 +729,31 @@ export const mealItems = pgTable("meal_items", {
   grams: numeric("grams", { precision: 7, scale: 1 }).notNull(),
   position: smallint("position").notNull().default(0),
 });
+
+/**
+ * A reader saying a shared meal should not be shared (D192).
+ *
+ * One per reader and meal. Dealt with is a timestamp and who dealt with it,
+ * and what was decided: `unshared` or `kept`.
+ */
+export const mealReports = pgTable(
+  "meal_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => meals.id, { onDelete: "cascade" }),
+    reporterId: uuid("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedByEmail: text("resolved_by_email"),
+    resolution: text("resolution"),
+  },
+  (t) => [uniqueIndex("meal_reports_once").on(t.mealId, t.reporterId)],
+);
 
 /* --------------------------------------------------------------- activity */
 

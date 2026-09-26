@@ -88,6 +88,22 @@ export function Privacy() {
           några.
         </P>
         <P>
+          Dina måltider, och ett foto till var och en om du lägger till det. Fotot förminskas i
+          telefonen och rensas från plats, tidpunkt och telefonmodell, och servern rensar det
+          igen innan det sparas. Det ligger i en egen mapp för ditt konto, utanför databasen,
+          och visas bara för dig, om du inte delar måltiden. Det följer med i exporten och i
+          backuperna.
+        </P>
+        <P>
+          Ett visningsnamn, om du anger ett under Profil. Det är tomt tills du skriver något, och
+          det används bara bredvid måltider du delar.
+        </P>
+        <P>
+          Etiketter du fotograferar. Bilden på näringsdeklarationen hanteras som ett foto av
+          maten: den läses en gång och sparas inte. Det som sparas är livsmedlet du själv
+          godkänner, med siffrorna du bekräftat.
+        </P>
+        <P>
           Sådant som hör till driften. Inloggningar med tidpunkt, kön av utgående mejl, och en
           förfrågan om en inbjudningskod tills den är besvarad. Förfrågan
           innehåller namnet och adressen som skrevs och raden om varför, om det
@@ -182,6 +198,17 @@ export function Privacy() {
           inte till kön för sådant som väntar på nätverk. Går det inte att skicka är
           bilden borta och du får ta en ny. Det som kan sparas är raderna du själv
           godkänner, alltså livsmedlets namn och mängden.
+        </P>
+        <P>
+          Delar du en måltid ser alla med konto på den här installationen den, och ingen annan.
+          De ser måltidens namn, raderna med mängder, portionerna, fotot om den har ett och ditt
+          visningsnamn. De ser aldrig din mejladress, ditt riktiga namn, dina loggade dagar
+          eller något annat du loggat. Utan visningsnamn går det inte att dela alls. Du kan
+          sluta dela när du vill, och en administratör kan sluta dela en måltid som någon
+          anmält. Sparar eller loggar någon din måltid blir den en kopia som är deras, och den
+          ändras inte när du ändrar din. Raderar du kontot försvinner dina delningar, men
+          kopior andra redan sparat finns kvar hos dem, utan ditt namn på något annat än
+          raden som säger varifrån den kom.
         </P>
         <P>
           Kontrollen på formuläret är ingen tredje part. Den ber din webbläsare räkna ut ett tal, och svaret

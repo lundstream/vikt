@@ -143,6 +143,26 @@ export const useAdminLog = () =>
     retry: false,
   });
 
+/** An open report on a shared meal (D192). */
+export type MealReport = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  reporterEmail: string;
+  mealId: string;
+  mealName: string;
+  authorName: string | null;
+  authorEmail: string;
+  shared: boolean;
+};
+
+export const useMealReports = () =>
+  useQuery({
+    queryKey: ["admin", "meal-reports"],
+    queryFn: () => get<{ reports: MealReport[] }>("/api/admin/meal-reports"),
+    retry: false,
+  });
+
 /* -------------------------------------------------------------- mutations */
 
 /** One hook per action, so a screen names what it is doing at the call site. */
@@ -177,6 +197,11 @@ export const useMintInvite = () =>
 export const useRevokeInvite = () =>
   useAdminAction((input: { code: string }) =>
     send<{ ok: true }>(`/api/admin/invites/${encodeURIComponent(input.code)}`, "DELETE"),
+  );
+
+export const useResolveMealReport = () =>
+  useAdminAction((input: { id: string; action: "unshare" | "keep" }) =>
+    send<null>(`/api/admin/meal-reports/${input.id}/resolve`, "POST", { action: input.action }),
   );
 
 export const useRetryMail = () =>

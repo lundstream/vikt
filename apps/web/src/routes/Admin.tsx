@@ -9,6 +9,7 @@ import { MailSettings } from "./admin/MailSettings.js";
 import { Backup } from "./admin/Backup.js";
 import { Announcements } from "./admin/Announcements.js";
 import { Log } from "./admin/Log.js";
+import { MealReports } from "./admin/MealReports.js";
 import { AdminBuild } from "../components/AppVersion.js";
 
 /**
@@ -39,6 +40,7 @@ const TABS = [
   ["mejlserver", "admin.tabMailSettings"],
   ["backup", "admin.tabBackup"],
   ["meddelanden", "admin.tabAnnouncements"],
+  ["anmalningar", "admin.tabReports"],
   ["logg", "admin.tabLog"],
 ] as const satisfies readonly (readonly [string, TranslationKey])[];
 
@@ -120,6 +122,7 @@ export function Admin() {
       {tab === "mejlserver" ? <MailSettings /> : null}
       {tab === "backup" ? <Backup /> : null}
       {tab === "meddelanden" ? <Announcements /> : null}
+      {tab === "anmalningar" ? <MealReports /> : null}
       {tab === "logg" ? <Log /> : null}
     </main>
   );

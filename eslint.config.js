@@ -161,6 +161,10 @@ export default tseslint.config(
             "revokeInvite",
             "retryMail",
             "listAdminLog",
+            // Reports on shared meals (D192): an administrator's queue across
+            // every account, behind requireAdmin like the rest of this block.
+            "listMealReports",
+            "resolveMealReport",
 
             /**
              * Mail settings are per **installation**, not per account (D102).

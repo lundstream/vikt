@@ -26,6 +26,7 @@ import { INSIGHTS_KEY, INTAKE_KEY } from "./log.js";
 export const RECENT_KEY = ["food", "recent"] as const;
 export const ENTRIES_KEY = ["food", "entries"] as const;
 export const MEALS_KEY = ["meals"] as const;
+export const SHARED_MEALS_KEY = ["meals", "shared"] as const;
 
 /**
  * The list that opens the logging screen. Recent foods first is the single
@@ -292,6 +293,58 @@ export function useLogMeal(timezone = "Europe/Stockholm") {
       invalidateIntake(queryClient);
       void queryClient.invalidateQueries({ queryKey: MEALS_KEY });
     },
+  });
+}
+
+/**
+ * The meals shared on this installation (D192). Under the meals key, so
+ * anything that changes a meal refreshes this list too: sharing one, a copy
+ * made from one.
+ */
+export function useSharedMeals() {
+  return useQuery({
+    queryKey: SHARED_MEALS_KEY,
+    queryFn: () => api.listSharedMeals(),
+    select: (data) => data.meals,
+    staleTime: 60_000,
+  });
+}
+
+export function useShareMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mealId, share }: { mealId: string; share: boolean }) =>
+      share ? api.shareMeal(mealId) : api.unshareMeal(mealId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
+  });
+}
+
+export function useCopySharedMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mealId, clientUuid }: { mealId: string; clientUuid: string }) =>
+      api.copySharedMeal(mealId, clientUuid),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
+  });
+}
+
+/** Not queued: it copies the meal first, which needs the server (D192). */
+export function useLogSharedMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mealId, input }: { mealId: string; input: LogMeal }) =>
+      api.logSharedMeal(mealId, input),
+    onSuccess: () => {
+      invalidateIntake(queryClient);
+      void queryClient.invalidateQueries({ queryKey: MEALS_KEY });
+    },
+  });
+}
+
+export function useReportSharedMeal() {
+  return useMutation({
+    mutationFn: ({ mealId, reason }: { mealId: string; reason: string }) =>
+      api.reportSharedMeal(mealId, reason),
   });
 }
 

@@ -163,6 +163,8 @@ export const meResponseSchema = z.object({
      */
     /** Which voice the coach uses (D140). Defaulted for an older identity. */
     coachTone: z.enum(["torr", "peppig", "saklig"]).default("torr"),
+    /** The name shown beside a meal this person shares (D192). Null: none, no sharing. */
+    publicName: z.string().nullable().default(null),
     remindWeighWeekend: z.boolean().default(false),
     remindWeighWeekendMinute: z.number().int().min(0).max(1439).default(420),
     remindDayWeekend: z.boolean().default(false),
@@ -247,6 +249,16 @@ export const updateProfileSchema = z
     remindDayMinute: z.number().int().min(0).max(1439),
     /** Which voice the coach uses (D140). */
     coachTone: z.enum(["torr", "peppig", "saklig"]),
+    /**
+     * The name shown beside a shared meal (D192). Empty clears it, and without
+     * one the share control is absent.
+     */
+    publicName: z
+      .string()
+      .trim()
+      .max(40)
+      .nullable()
+      .transform((value) => (value === null || value === "" ? null : value)),
     remindWeighWeekend: z.boolean(),
     remindWeighWeekendMinute: z.number().int().min(0).max(1439),
     remindDayWeekend: z.boolean(),

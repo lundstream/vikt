@@ -37,6 +37,8 @@ export function Profile() {
   const [birthDate, setBirthDate] = useState(profile?.birthDate ?? "");
   const [heightCm, setHeightCm] = useState(formatForInput(profile?.heightCm));
   const [lastDrinkOn, setLastDrinkOn] = useState(profile?.lastDrinkOn ?? "");
+  /** The name beside a shared meal (D192). Empty: no sharing, and no share control. */
+  const [publicName, setPublicName] = useState(profile?.publicName ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -58,6 +60,7 @@ export function Profile() {
       sex,
       birthDate: birthDate === "" ? null : birthDate,
       heightCm: height.value ?? undefined,
+      publicName,
     });
 
     if (!parsed.success) {
@@ -123,6 +126,23 @@ export function Profile() {
             {...fieldAria("birthDate", errors.birthDate, true)}
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
+          />
+        </Field>
+
+        <Field
+          id="publicName"
+          label={t("profile.publicName")}
+          error={errors.publicName}
+          hint={t("profile.publicNameHint")}
+        >
+          <input
+            id="publicName"
+            className="field"
+            maxLength={40}
+            autoComplete="nickname"
+            {...fieldAria("publicName", errors.publicName, true)}
+            value={publicName}
+            onChange={(e) => setPublicName(e.target.value)}
           />
         </Field>
 

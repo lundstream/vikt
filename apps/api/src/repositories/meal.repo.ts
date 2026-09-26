@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/index.js";
-import { foodEntries, foodItems, mealItems, meals } from "../db/schema.js";
+import { foodEntries, foodItems, mealItems, mealReports, meals, profiles } from "../db/schema.js";
 
 /**
  * Måltider (D186). Every function takes the owner first and scopes by it (§3).
@@ -241,4 +241,82 @@ export async function recentMealLogs(
   return new Map(
     rows.filter((row) => row.mealId !== null).map((row) => [row.mealId as string, Number(row.logs)]),
   );
+}
+
+/* --------------------------------------------------- sharing (D192) */
+
+/**
+ * Only an author with a display name is shown: sharing needs one, and a name
+ * cleared after sharing takes the author's meals out of the list rather than
+ * showing them under nothing.
+ */
+const sharedAndNamed = and(
+  isNotNull(meals.sharedAt),
+  isNotNull(profiles.publicName),
+  ne(profiles.publicName, ""),
+)!;
+
+export type SharedMealRow = MealRow & { authorName: string };
+
+/**
+ * Every meal shared on this installation, newest first.
+ *
+ * The one read in this file that is not scoped to the reader, **by design**:
+ * shared means shared with everyone here. What it returns is the meal and the
+ * author's display name, nothing else about the author. `userId` is the
+ * reader, taken first like everywhere else, so the rule has a place to live if
+ * sharing ever narrows.
+ */
+export async function listSharedMeals(userId: string, db: Db): Promise<SharedMealRow[]> {
+  void userId;
+  const rows = await db
+    .select({ meal: meals, authorName: profiles.publicName })
+    .from(meals)
+    .innerJoin(profiles, eq(profiles.userId, meals.userId))
+    .where(sharedAndNamed)
+    .orderBy(desc(meals.sharedAt));
+  return rows.map((row) => ({ ...row.meal, authorName: row.authorName! }));
+}
+
+export async function findSharedMeal(
+  userId: string,
+  db: Db,
+  mealId: string,
+): Promise<SharedMealRow | undefined> {
+  void userId;
+  const [row] = await db
+    .select({ meal: meals, authorName: profiles.publicName })
+    .from(meals)
+    .innerJoin(profiles, eq(profiles.userId, meals.userId))
+    .where(and(eq(meals.id, mealId), sharedAndNamed))
+    .limit(1);
+  return row ? { ...row.meal, authorName: row.authorName! } : undefined;
+}
+
+/** The reader's own copy of a shared meal, if they have made one. */
+export async function findCopyOf(
+  userId: string,
+  db: Db,
+  sharedMealId: string,
+): Promise<MealRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(meals)
+    .where(and(eq(meals.userId, userId), eq(meals.copiedFromMealId, sharedMealId)))
+    .orderBy(desc(meals.createdAt))
+    .limit(1);
+  return row;
+}
+
+/** One report per reader and meal; a second says nothing new. */
+export async function insertMealReport(
+  userId: string,
+  db: Db,
+  mealId: string,
+  reason: string,
+): Promise<void> {
+  await db
+    .insert(mealReports)
+    .values({ mealId, reporterId: userId, reason })
+    .onConflictDoNothing({ target: [mealReports.mealId, mealReports.reporterId] });
 }

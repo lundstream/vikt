@@ -73,6 +73,7 @@ export type AuthedUser = {
     remindDayMinute: number;
     /** Which voice the coach uses (D140). */
     coachTone: "torr" | "peppig" | "saklig";
+    publicName: string | null;
     remindWeighWeekend: boolean;
     remindWeighWeekendMinute: number;
     remindDayWeekend: boolean;
@@ -252,6 +253,7 @@ export async function getMe(userId: string, db: Db): Promise<AuthedUser> {
       remindDay: profile.remindDay,
       remindDayMinute: profile.remindDayMinute,
       coachTone: coachToneSchema.catch("torr").parse(profile.coachTone),
+      publicName: profile.publicName,
       remindWeighWeekend: profile.remindWeighWeekend,
       remindWeighWeekendMinute: profile.remindWeighWeekendMinute,
       remindDayWeekend: profile.remindDayWeekend,

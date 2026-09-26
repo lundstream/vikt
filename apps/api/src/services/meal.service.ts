@@ -1,4 +1,4 @@
-import type { CreateMeal, LogMeal, Meal, MealLogResult, UpdateMeal } from "shared";
+import type { CreateMeal, LogMeal, Meal, MealLogResult, SharedMeal, UpdateMeal } from "shared";
 import {
   gramsForPortions,
   mealNutrition,
@@ -11,7 +11,11 @@ import {
 import type { Db } from "../db/index.js";
 import {
   deleteMeal as deleteMealRow,
+  findCopyOf,
   findMeal,
+  findSharedMeal,
+  insertMealReport,
+  listSharedMeals,
   insertMeal,
   listMealItems,
   listMeals,
@@ -23,7 +27,8 @@ import {
   type MealItemWithFood,
   type MealRow,
 } from "../repositories/meal.repo.js";
-import { findFoodById, upsertFoodEntry } from "../repositories/food.repo.js";
+import { findFoodById, upsertFoodEntry, upsertFoodItem } from "../repositories/food.repo.js";
+import { findProfile } from "../repositories/users.repo.js";
 import { toEntry } from "./food.service.js";
 import { deriveUuid } from "../lib/derive-uuid.js";
 import { assertDateSource, serverDate } from "../lib/date-source.js";
@@ -422,9 +427,187 @@ export async function readMealPhoto(
   media: MediaStore,
   mealId: string,
 ): Promise<Buffer> {
-  const meal = await findMeal(userId, db, mealId);
+  // The owner's own, or a meal shared with everyone here (D192).
+  const meal = (await findMeal(userId, db, mealId)) ?? (await findSharedMeal(userId, db, mealId));
   if (!meal || meal.photoKey === null) throw notFound("Det finns inget foto.");
   const bytes = await media.get(meal.photoKey);
   if (bytes === null) throw notFound("Det finns inget foto.");
   return bytes;
+}
+
+/* --------------------------------------------------- sharing (D192) */
+
+/**
+ * The meals shared on this installation, priced as their authors see them.
+ *
+ * A meal is priced from its own rows and the foods they point at, as its owner
+ * can see them, which for a shared meal is the author: a food private to the
+ * author still prices the author's meal, and becomes the reader's own private
+ * copy the moment they copy the meal.
+ */
+export async function getSharedMeals(userId: string, db: Db): Promise<SharedMeal[]> {
+  const rows = await listSharedMeals(userId, db);
+  const byAuthor = new Map<string, typeof rows>();
+  for (const row of rows) byAuthor.set(row.userId, [...(byAuthor.get(row.userId) ?? []), row]);
+
+  const items = new Map<string, MealItemWithFood[]>();
+  for (const [authorId, authored] of byAuthor) {
+    for (const [mealId, list] of groupItems(
+      await listMealItems(authorId, db, authored.map((row) => row.id)),
+    )) {
+      items.set(mealId, list);
+    }
+  }
+
+  return rows.map((row) => ({
+    ...toMeal(row, items.get(row.id) ?? [], 0),
+    authorName: row.authorName,
+    isOwn: row.userId === userId,
+  }));
+}
+
+/**
+ * Sharing a meal with everyone on this installation, never beyond it.
+ *
+ * Two conditions, both checked here as well as on the screen: a display name
+ * on the profile, which is what readers see beside it, and the sharer's word
+ * that the recipe is theirs to share (the schema takes only `true`).
+ */
+export async function shareMeal(userId: string, db: Db, mealId: string): Promise<Meal> {
+  const meal = await findMeal(userId, db, mealId);
+  if (!meal) throw notFound("Det finns ingen sådan måltid.");
+  const profile = await findProfile(userId, db);
+  if (!profile?.publicName?.trim()) {
+    throw unprocessable(
+      "no_public_name",
+      "Ange ett visningsnamn under Profil först. Det är namnet andra ser bredvid måltiden.",
+    );
+  }
+  if (meal.sharedAt === null) await updateMeal(userId, db, mealId, { sharedAt: new Date() });
+  return getMeal(userId, db, mealId);
+}
+
+export async function unshareMeal(userId: string, db: Db, mealId: string): Promise<Meal> {
+  const meal = await findMeal(userId, db, mealId);
+  if (!meal) throw notFound("Det finns ingen sådan måltid.");
+  if (meal.sharedAt !== null) await updateMeal(userId, db, mealId, { sharedAt: null });
+  return getMeal(userId, db, mealId);
+}
+
+/**
+ * A shared meal, copied into the reader's own meals as a snapshot.
+ *
+ * **The copy is theirs from the moment it exists**: the author's later edits
+ * change nothing in it, and removing the author's meal or account leaves it.
+ * Every row keeps its amount, unit and grams; a food the reader can already see
+ * is pointed at as it is, and a food private to the author becomes a private
+ * copy of the reader's own, because the reader cannot see the author's and a
+ * meal that prices as nothing is not a copy. The photo is copied into the
+ * reader's folder. The name and the author's display name at the time are
+ * kept, so the copy can say where it came from.
+ *
+ * One copy per reader and shared meal: a second save or a later logging finds
+ * the first rather than making another.
+ */
+export async function copySharedMeal(
+  userId: string,
+  db: Db,
+  media: MediaStore,
+  sharedMealId: string,
+  clientUuid: string,
+): Promise<Meal> {
+  const shared = await findSharedMeal(userId, db, sharedMealId);
+  if (!shared) throw notFound("Det finns ingen sådan delad måltid.");
+  if (shared.userId === userId) {
+    throw unprocessable("own_meal", "Det här är din egen måltid.");
+  }
+
+  const existing = await findCopyOf(userId, db, sharedMealId);
+  if (existing) return getMeal(userId, db, existing.id);
+
+  const items = await listMealItems(shared.userId, db, [shared.id]);
+
+  const copied = await db.transaction(async (tx) => {
+    const rows = [];
+    for (const item of items) {
+      let foodItemId: string | null = null;
+      if (item.foodItemId !== null && item.food !== null) {
+        if (await findFoodById(userId, tx, item.foodItemId)) {
+          foodItemId = item.foodItemId;
+        } else {
+          const original = await findFoodById(shared.userId, tx, item.foodItemId);
+          if (original) {
+            const { id: _id, fetchedAt: _fetched, searchVector: _vector, searchName: _name, ...values } = original;
+            const copy = await upsertFoodItem(userId, tx, {
+              ...values,
+              sourceRef: null,
+              createdBy: userId,
+              visibility: "private",
+            });
+            foodItemId = copy.id;
+          }
+        }
+      }
+      rows.push({
+        foodItemId,
+        nameSnapshot: item.food?.name ?? item.nameSnapshot,
+        amount: item.amount,
+        unit: item.unit,
+        grams: item.grams,
+        position: item.position,
+      });
+    }
+
+    const { row } = await insertMeal(userId, tx, {
+      clientUuid,
+      name: shared.name,
+      portions: shared.portions,
+      defaultMealSlot: shared.defaultMealSlot,
+      copiedFromMealId: shared.id,
+      copiedFromName: shared.authorName,
+    });
+    await replaceMealItems(userId, tx, row.id, rows);
+    return row;
+  });
+
+  if (shared.photoKey !== null) {
+    const bytes = await media.get(shared.photoKey).catch(() => null);
+    if (bytes !== null) {
+      const key = mealPhotoKey(userId, copied.id);
+      await media.put(key, bytes);
+      await updateMeal(userId, db, copied.id, { photoKey: key, photoUpdatedAt: new Date() });
+    }
+  }
+
+  return getMeal(userId, db, copied.id);
+}
+
+/**
+ * Logging a shared meal logs the reader's copy of it (D192): the copy is made
+ * the first time, and the rows come from it, so the author's later edits
+ * change no day the reader has logged.
+ */
+export async function logSharedMeal(
+  userId: string,
+  db: Db,
+  media: MediaStore,
+  sharedMealId: string,
+  input: LogMeal,
+): Promise<MealLogResult & { mealId: string }> {
+  const copy = await copySharedMeal(userId, db, media, sharedMealId, deriveUuid(input.clientUuid, 9999));
+  const result = await logMeal(userId, db, copy.id, input);
+  return { ...result, mealId: copy.id };
+}
+
+/** A reader saying a shared meal should not be shared. Administration decides. */
+export async function reportSharedMeal(
+  userId: string,
+  db: Db,
+  sharedMealId: string,
+  reason: string,
+): Promise<void> {
+  const shared = await findSharedMeal(userId, db, sharedMealId);
+  if (!shared) throw notFound("Det finns ingen sådan delad måltid.");
+  if (shared.userId === userId) throw unprocessable("own_meal", "Det här är din egen måltid.");
+  await insertMealReport(userId, db, sharedMealId, reason);
 }

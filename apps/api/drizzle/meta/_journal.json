@@ -246,6 +246,13 @@
       "when": 1788310209000,
       "tag": "0034_media_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788310210000,
+      "tag": "0035_meal_sharing",
+      "breakpoints": true
     }
   ]
 }

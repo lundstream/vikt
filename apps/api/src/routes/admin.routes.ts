@@ -14,6 +14,8 @@ import { eq } from "drizzle-orm";
 import { users } from "../db/schema.js";
 import {
   deleteUser,
+  listMealReports,
+  resolveMealReport,
   listAdminLog,
   listInvites,
   listUsers,
@@ -331,6 +333,55 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
       const removed = await deleteUser(app.db, actor, request.params.id);
       if (!removed) throw notFound("No such account.");
       return removed;
+    },
+  );
+
+  /**
+   * Reports on shared meals (D192): the open ones, and a decision on one.
+   * Unsharing takes the meal out of the shared list and nothing else.
+   */
+  app.get(
+    "/admin/meal-reports",
+    {
+      preHandler: app.requireAdmin,
+      schema: {
+        response: {
+          200: z.object({
+            reports: z.array(
+              z.object({
+                id: z.string().uuid(),
+                createdAt: z.string(),
+                reason: z.string(),
+                reporterEmail: z.string(),
+                mealId: z.string().uuid(),
+                mealName: z.string(),
+                authorName: z.string().nullable(),
+                authorEmail: z.string(),
+                shared: z.boolean(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async () => ({ reports: await listMealReports(app.db) }),
+  );
+
+  app.post(
+    "/admin/meal-reports/:id/resolve",
+    {
+      preHandler: app.requireAdmin,
+      schema: {
+        params: idParams,
+        body: z.object({ action: z.enum(["unshare", "keep"]) }),
+        response: { 204: z.null(), 404: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const actor = await actorFor(app, request.userId!);
+      const done = await resolveMealReport(app.db, actor, request.params.id, request.body.action);
+      if (!done) throw notFound("No such report.");
+      return reply.code(204).send(null);
     },
   );
 

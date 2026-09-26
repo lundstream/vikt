@@ -60,7 +60,10 @@ import type {
   RecipeResponse,
   UpdateFoodEntry,
   CreateMeal,
+  LogMeal,
   Meal,
+  MealLogResult,
+  SharedMeal,
   UpdateMeal,
   DayTableResponse,
   FoodEntry,
@@ -264,6 +267,36 @@ export const api = {
     request<Meal>(`/meals/${encodeURIComponent(mealId)}/photo`, {
       method: "PUT",
       body: JSON.stringify({ image }),
+    }),
+
+  // ------------------------------------------------ sharing (D192)
+  listSharedMeals: () => request<{ meals: SharedMeal[] }>("/meals/shared"),
+
+  shareMeal: (mealId: string) =>
+    request<Meal>(`/meals/${encodeURIComponent(mealId)}/share`, {
+      method: "POST",
+      body: JSON.stringify({ mayShare: true }),
+    }),
+
+  unshareMeal: (mealId: string) =>
+    request<Meal>(`/meals/${encodeURIComponent(mealId)}/share`, { method: "DELETE" }),
+
+  copySharedMeal: (mealId: string, clientUuid: string) =>
+    request<Meal>(`/meals/shared/${encodeURIComponent(mealId)}/copy`, {
+      method: "POST",
+      body: JSON.stringify({ clientUuid }),
+    }),
+
+  logSharedMeal: (mealId: string, input: LogMeal) =>
+    request<MealLogResult & { mealId: string }>(`/meals/shared/${encodeURIComponent(mealId)}/log`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  reportSharedMeal: (mealId: string, reason: string) =>
+    request<void>(`/meals/shared/${encodeURIComponent(mealId)}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
     }),
 
   deleteMealPhoto: (mealId: string) =>

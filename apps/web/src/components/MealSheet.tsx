@@ -8,10 +8,14 @@ import {
   useFoodSearch,
   useDeleteMealPhoto,
   useLlmHealth,
+  useShareMeal,
   useSetMealPhoto,
   useUpdateMeal,
 } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
+import { useMe } from "../lib/session.js";
+import { formatLongDay } from "../lib/dates.js";
+import { LOCALE } from "../i18n/index.js";
 import { api, ApiError } from "../lib/api.js";
 import { useOnline } from "../lib/queue/useQueue.js";
 import { readRequiredNumber } from "../lib/form-number.js";
@@ -105,6 +109,11 @@ export function MealSheet({
   const lookup = useBarcodeLookup();
   const setPhoto = useSetMealPhoto();
   const deletePhoto = useDeleteMealPhoto();
+  const me = useMe();
+  const shareMeal = useShareMeal();
+  const publicName = me.data?.profile.publicName?.trim() ?? "";
+  const [sharedAt, setSharedAt] = useState<string | null>(meal?.sharedAt ?? null);
+  const [mayShare, setMayShare] = useState(false);
 
   /**
    * The photo (D191): the saved one's URL, or a picture chosen for a meal not
@@ -649,6 +658,67 @@ export function MealSheet({
           />
         ) : null}
       </div>
+
+      {/*
+        Sharing (D192), on a saved meal and only with a display name: without
+        one the control is absent, not greyed. The sharer says the recipe is
+        theirs to share, because a cookbook's text belongs to its author, and
+        is told who will see what.
+      */}
+      {meal && publicName !== "" ? (
+        <div className="mt-8 border-t border-edge pt-4" data-testid="meal-share">
+          <h3 className="text-note text-muted">{t("meals.shareHeading")}</h3>
+          {sharedAt ? (
+            <div className="mt-2">
+              <p className="max-w-prose text-micro text-muted" data-testid="meal-shared-since">
+                {t("meals.sharedSince", { date: formatLongDay(sharedAt.slice(0, 10), LOCALE) })}
+              </p>
+              <button
+                type="button"
+                data-testid="meal-unshare"
+                className="btn-small mt-2"
+                disabled={shareMeal.isPending}
+                onClick={() =>
+                  void shareMeal
+                    .mutateAsync({ mealId: meal.id, share: false })
+                    .then((saved) => setSharedAt(saved.sharedAt))
+                }
+              >
+                {t("meals.unshare")}
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2">
+              <p className="max-w-prose text-micro text-muted">
+                {t("meals.shareWho", { name: publicName })}
+              </p>
+              <label className="mt-3 flex max-w-prose items-start gap-3 text-note text-ink">
+                <input
+                  type="checkbox"
+                  className="check mt-1"
+                  data-testid="meal-share-confirm"
+                  checked={mayShare}
+                  onChange={() => setMayShare((was) => !was)}
+                />
+                <span>{t("meals.shareConfirm")}</span>
+              </label>
+              <button
+                type="button"
+                data-testid="meal-share-action"
+                className="btn-small mt-3"
+                disabled={!mayShare || shareMeal.isPending}
+                onClick={() =>
+                  void shareMeal
+                    .mutateAsync({ mealId: meal.id, share: true })
+                    .then((saved) => setSharedAt(saved.sharedAt))
+                }
+              >
+                {t("meals.shareAction")}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {meal ? (
         <div className="mt-8 border-t border-edge pt-4">

@@ -150,3 +150,31 @@ export const mealLogResultSchema = z.object({
   skipped: z.array(z.string()),
 });
 export type MealLogResult = z.infer<typeof mealLogResultSchema>;
+
+/* ------------------------------------------------------ sharing (D192) */
+
+/**
+ * A meal shared with everyone on this installation, as a reader sees it: the
+ * author's display name and nothing else about them.
+ */
+export const sharedMealSchema = mealSchema.extend({
+  authorName: z.string(),
+  /** The reader's own shared meal, which the list shows but cannot copy. */
+  isOwn: z.boolean(),
+});
+export type SharedMeal = z.infer<typeof sharedMealSchema>;
+
+export const sharedMealListSchema = z.object({ meals: z.array(sharedMealSchema) });
+
+/**
+ * Sharing, confirmed. The sharer says the recipe is theirs to share, because a
+ * cookbook's text belongs to its author; the literal `true` is the only answer
+ * the schema takes.
+ */
+export const shareMealSchema = z.object({ mayShare: z.literal(true) });
+
+export const copySharedMealSchema = z.object({ clientUuid: clientUuidSchema });
+
+export const reportSharedMealSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});

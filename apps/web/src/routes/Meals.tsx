@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import type { Meal } from "shared";
+import type { Meal, SharedMeal } from "shared";
 import { useMe } from "../lib/session.js";
-import { useLlmHealth, useMeals } from "../lib/food.js";
+import { useLlmHealth, useMeals, useSharedMeals } from "../lib/food.js";
 import { useLogDate } from "../lib/log-date.js";
 import { MealFigures, formatPortions } from "../components/MealFigures.js";
 import { MealSheet } from "../components/MealSheet.js";
 import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
+import { SharedMealSheet } from "../components/SharedMealSheet.js";
 import { Sheet } from "../components/Sheet.js";
 import { ActionButton, newMealIcon, potIcon, type QuickAction } from "../components/QuickActions.js";
 import { t } from "../i18n/index.js";
@@ -26,7 +27,9 @@ import { t } from "../i18n/index.js";
 export function Meals() {
   const me = useMe();
   const meals = useMeals();
+  const shared = useSharedMeals();
   const llm = useLlmHealth();
+  const [reading, setReading] = useState<SharedMeal | null>(null);
   const { date: today } = useLogDate();
 
   const [sheet, setSheet] = useState<{ meal: Meal | null } | null>(null);
@@ -122,13 +125,23 @@ export function Meals() {
                       />
                     ) : null}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base text-ink">{meal.name}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-base text-ink">{meal.name}</span>
+                        {meal.sharedAt ? (
+                          <span className="tag tag-quiet shrink-0" data-testid="tag-shared">
+                            {t("meals.shared")}
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="num block text-micro text-muted">
                         {formatPortions(meal.portions)}
                         {" · "}
                         {meal.items.length === 1
                           ? t("food.itemOne")
                           : t("food.itemMany", { count: meal.items.length })}
+                        {meal.copiedFromName
+                          ? ` · ${t("meals.fromAuthor", { name: meal.copiedFromName })}`
+                          : ""}
                       </span>
                       <MealFigures figures={meal.perPortion} compact />
                     </span>
@@ -141,7 +154,77 @@ export function Meals() {
             </ul>
           )}
         </section>
+
+        {/*
+          What others here have shared (D192), below the reader's own: name,
+          whose, the figures per portion and the photo. The reader's own shared
+          meals are in their own list with the "delad" chip, not here.
+        */}
+        <section aria-labelledby="meals-shared" className="mt-10">
+          <h2 id="meals-shared" className="mb-1 text-note text-muted">
+            {t("meals.sharedHeading")}
+          </h2>
+          {shared.data === undefined ? null : shared.data.filter((meal) => !meal.isOwn).length === 0 ? (
+            <p className="max-w-prose border-y border-edge py-4 text-note text-muted">
+              {t("meals.sharedEmpty")}
+            </p>
+          ) : (
+            <ul className="divide-y divide-edge border-y border-edge" data-testid="shared-list">
+              {shared.data
+                .filter((meal) => !meal.isOwn)
+                .map((meal) => (
+                  <li key={meal.id}>
+                    <button
+                      type="button"
+                      data-testid={`shared-open-${meal.id}`}
+                      className="flex w-full items-start gap-3 py-3 text-left"
+                      onClick={() => setReading(meal)}
+                    >
+                      {meal.photoUrl ? (
+                        <img
+                          src={meal.photoUrl}
+                          alt=""
+                          className="size-14 shrink-0 rounded-lg object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-base text-ink">{meal.name}</span>
+                        <span className="num block text-micro text-muted">
+                          {t("meals.fromAuthor", { name: meal.authorName })}
+                          {" · "}
+                          {formatPortions(meal.portions)}
+                        </span>
+                        <MealFigures figures={meal.perPortion} compact />
+                      </span>
+                      <span aria-hidden="true" className="shrink-0 self-center text-muted">
+                        ›
+                      </span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </section>
       </main>
+
+      <Sheet
+        open={reading !== null}
+        onClose={() => setReading(null)}
+        title={reading?.name ?? ""}
+        testId="shared-meal-dialog"
+      >
+        {reading ? (
+          <SharedMealSheet
+            key={reading.id}
+            meal={reading}
+            onDone={(message) => {
+              setReading(null);
+              announce(message);
+            }}
+          />
+        ) : null}
+      </Sheet>
 
       <Sheet
         open={sheet !== null}

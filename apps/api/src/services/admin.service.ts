@@ -1,4 +1,5 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "../db/index.js";
 import {
   adminLog,
@@ -6,6 +7,9 @@ import {
   outboundEmail,
   sessions,
   users,
+  mealReports,
+  meals,
+  profiles,
 } from "../db/schema.js";
 import { mintInvite } from "./invite.service.js";
 import { requestReset } from "./reset.service.js";
@@ -320,4 +324,99 @@ export async function listAdminLog(db: Db, limit = 200) {
     detail: row.detail,
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+/* ------------------------------------------------ meal reports (D192) */
+
+export type MealReportSummary = {
+  id: string;
+  createdAt: string;
+  reason: string;
+  reporterEmail: string;
+  mealId: string;
+  mealName: string;
+  authorName: string | null;
+  authorEmail: string;
+  /** Still shared. A report on a meal its author has since unshared is moot. */
+  shared: boolean;
+};
+
+/** The open reports, oldest first: the queue an administrator works through. */
+export async function listMealReports(db: Db): Promise<MealReportSummary[]> {
+  const reporters = alias(users, "reporters");
+  const authors = alias(users, "authors");
+  const rows = await db
+    .select({
+      id: mealReports.id,
+      createdAt: mealReports.createdAt,
+      reason: mealReports.reason,
+      reporterEmail: reporters.email,
+      mealId: meals.id,
+      mealName: meals.name,
+      sharedAt: meals.sharedAt,
+      authorName: profiles.publicName,
+      authorEmail: authors.email,
+    })
+    .from(mealReports)
+    .innerJoin(meals, eq(meals.id, mealReports.mealId))
+    .innerJoin(reporters, eq(reporters.id, mealReports.reporterId))
+    .innerJoin(authors, eq(authors.id, meals.userId))
+    .leftJoin(profiles, eq(profiles.userId, meals.userId))
+    .where(isNull(mealReports.resolvedAt))
+    .orderBy(asc(mealReports.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    reason: row.reason,
+    reporterEmail: row.reporterEmail,
+    mealId: row.mealId,
+    mealName: row.mealName,
+    authorName: row.authorName,
+    authorEmail: row.authorEmail,
+    shared: row.sharedAt !== null,
+  }));
+}
+
+/**
+ * Deciding a report (D192): `unshare` takes the meal out of the shared list,
+ * `keep` leaves it. Either way every open report on that meal is closed, with
+ * who closed it and what they decided, and the audit log says so. Unsharing
+ * changes nothing else: the author keeps the meal, and copies readers already
+ * made remain theirs.
+ */
+export async function resolveMealReport(
+  db: Db,
+  actor: AdminActor,
+  reportId: string,
+  action: "unshare" | "keep",
+): Promise<boolean> {
+  const [report] = await db
+    .select({ mealId: mealReports.mealId, mealName: meals.name })
+    .from(mealReports)
+    .innerJoin(meals, eq(meals.id, mealReports.mealId))
+    .where(eq(mealReports.id, reportId))
+    .limit(1);
+  if (!report) return false;
+
+  if (action === "unshare") {
+    await db.update(meals).set({ sharedAt: null }).where(eq(meals.id, report.mealId));
+  }
+  await db
+    .update(mealReports)
+    .set({
+      resolvedAt: new Date(),
+      resolvedByEmail: actor.email,
+      resolution: action === "unshare" ? "unshared" : "kept",
+    })
+    .where(and(eq(mealReports.mealId, report.mealId), isNull(mealReports.resolvedAt)));
+
+  await record(
+    db,
+    actor,
+    action === "unshare" ? "meal.unshare" : "meal.report_kept",
+    report.mealId,
+    report.mealName,
+  );
+  return true;
 }
