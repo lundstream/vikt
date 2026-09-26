@@ -477,6 +477,17 @@ describe("a release where everything answers well", () => {
   });
 
   /** Each step's evidence, not just that it passed. */
+  /** The 1.4.0 dry run ended "1.4.0 is live" while production ran 1.3.0. */
+  it("never says a dry run's version is live", async () => {
+    const runner = new FakeRunner();
+    runner.dryRun = true;
+    const out = sink();
+    const result = await withEnv({}, () => release({ version: VERSION, runner, out, root: ROOT }));
+    expect(result, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).not.toContain(`${VERSION} is live`);
+    expect(out.text()).toContain("nothing was changed");
+  });
+
   it("prints what it found at each step", async () => {
     const runner = new FakeRunner();
     const out = sink();

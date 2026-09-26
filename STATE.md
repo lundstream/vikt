@@ -428,7 +428,74 @@ phase 3.
   built, and so is the coach (8b). What is left in that phase is the milestone
   messages the persona was also meant to deliver.
 
-## Production runs 1.3.0
+## Production runs 1.4.0
+
+**Deployed 2026-09-26 from `c6b435f`, tagged `v1.4.0`**, by `node scripts/release.mjs
+1.4.0`. All thirteen steps ran. The recipe photo (D195), the matcher every
+proposing tool uses (D196, D198) and the release command's fixes (D194, D197),
+after the gate the owner wrote in advance had passed on every line.
+
+**Before the command**, each read rather than assumed:
+
+- **`PORTAINER_URL`**, now required (D197): set in the workstation's
+  environment, checked by presence only, and step 1 said so.
+- **The vision model**: the workstation's Ollama lists `qwen3-vl:8b` and
+  answered `{"svar": "ja"}` in 8 tokens; the production host reaches it.
+- **The host scripts**: `backup.sh` and `restore-check.sh` equal to `c6b435f`.
+- **CI green for `c6b435f`**, the exact commit, before the command started.
+- **The dry run, green**: every step ok, exit 0, step 9 reading the two
+  unbuilt `:1.4.0` images as expected (D194). Its last line said "1.4.0 is
+  live", which a dry run never is; fixed on `dev` afterwards, with a test.
+
+| step | evidence |
+|---|---|
+| 1 workstation | `VIKT_HOST` set, `PORTAINER_TOKEN` set, `PORTAINER_URL` set, gh authenticated |
+| 2 tree | clean, on `dev`, pushed, at `c6b435f` |
+| 3 CI | success for `c6b435f` |
+| 4 backup | `/var/backups/vikt/vikt-20260926T173433Z.dump`, 324K; beside it `media-20260926T173433Z.tar.gz`, 111 bytes, one entry: the photo directory, still empty |
+| 5 restore | `daily_log 73, food_entries 310, plans 2, users 4, weight_log 108`, restored copy and live database agree |
+| 6 main | fast-forwarded 12 commits to `c6b435f` |
+| 7 tag | `v1.4.0` on `c6b435f` |
+| 8 workflow | run `36259517211` (release, `v1.4.0`) green |
+| 9 plan | nothing blocks this deploy; `IMAGE_TAG 1.3.0 -> 1.4.0`, no `setting:` line, because this release sets no variable |
+| 10 deploy | both containers on the new image, the API healthy; `the vision model can see` in 1 310 ms |
+| 11 API log | `version 1.4.0, commit c6b435f`; **`Migrations: none to apply, 36 already recorded`**; VAPID silent, so the key is unchanged; `vision: the vision model can see` |
+| 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200; and `/app/` 200 with `<title>Vikt</title>`, read after |
+| 13 Nyheter | **`published "Vikt 1.4" as 23e25343-48c9-4b94-afd6-f09afe3e883a, 1216 characters, not mailed`** |
+
+**Lighthouse once, on the production landing page** afterwards: 12.8.2, mobile
+preset, performance **98**, accessibility **100**, best practices **100**, SEO
+**100**; largest contentful paint 1,8 s, blocking time 0 ms, speed index 3,9 s,
+layout shift 0,017, one container. No landing code changed between 1.3.0 and
+1.4.0, where the shift was 0; one run over the real network, inside
+Lighthouse's "good".
+
+**Not yet confirmed through the interface in production**, because this
+session does not sign in there. For Fredrik:
+
+- Nyheter: "Vikt 1.4" at the top, with "Recept från foto", "Rader som inte kom
+  med ligger kvar" and "Bättre träffar".
+- **A real recipe on a phone**: Måltider, Ny måltid, "Recept från foto",
+  photograph a recipe's ingredient list. Each row shows its printed line; a
+  yield in portions fills the count; add the rows and save the meal.
+- Mat, "En mening": "ett glas mjölk" proposes milk, not milk chocolate.
+
+**Rollback**: no migration ran, so `node scripts/stack.mjs deploy 1.3.0
+--keep-file --yes` brings 1.3.0 back on the same data. The dump from step 4 is
+there if anything else is needed (docs/backup.md, "Restoring").
+
+#### What 1.4.0 changed
+
+| | what a user sees |
+|---|---|
+| **Recept från foto** (D195) | a new way in the meal sheet: photograph a recipe's ingredient list, in a book, on a card or on a screen, and its rows join the list with the printed line beside each. A yield in portions fills the count; a book with two amount sets asks once which to use; a row whose sets disagree says "kontrollera mot sidan"; a row with no amount says "inte än" and waits |
+| **Rows that were not added stay** (D195) | in the meal sheet, rows from a sentence, a photo or a recipe that have no amount yet or no match stay in the list after "Lägg till", where before they disappeared |
+| **Better matching** (D196, D198) | in every tool that proposes foods, the sentence, the plate photo and the recipe photo: the food named, not a longer word that starts with it and not a variety or a dish. "mjölk" is milk, not milk chocolate; "gula lökar" reach "Lök gul"; basil leaves reach basil, garlic cloves garlic, a chicken breast a breast row; "nötfärs" reaches plain beef mince, which the catalogue writes as two words. A bare "pizza" or "peppar" is no match rather than a guess, and the person searches. Among foods that fit, the one this person has logged most, and the same food every time they ask |
+
+
+---
+
+## Production ran 1.3.0 before it
 
 **Deployed 2026-09-26 from `392b618`, tagged `v1.3.0`**, by `node scripts/release.mjs
 1.3.0`. All thirteen steps ran. Phase 14, Måltider, with the label photo, meal
@@ -508,7 +575,7 @@ brief), carried under "Inför nästa deploy".
 
 ---
 
-## Production ran 1.2.1 before it
+## Production ran 1.2.1 before that
 
 **Deployed 2026-09-17 from `bc06167`**, by `node scripts/release.mjs 1.2.1`.
 **All thirteen steps ran**, which had never happened before.
@@ -555,7 +622,7 @@ Two more findings, both in the tooling and both now held by a test:
 
 ---
 
-## Production ran 1.2.0 before that
+## Production ran 1.2.0 earlier
 
 **Deployed 2026-09-17 from `a21224c`**, twelve of thirteen steps. The thirteenth
 could not run: the image had no `dist/news-publish.js`, because the script was
@@ -573,37 +640,10 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ## Inför nästa deploy
 
-**The next deploy is `1.4.0`**: the recipe photo (D195), built after 1.3.0,
-the food matcher that every proposing tool uses (D196, refined in D198 after
-the owner reviewed D196's table), and the release command's fixes (D194,
-D197). Production runs `1.3.0` (above). **The gate the owner wrote for it
-passed** on 2026-09-26, every line: fourteen for the matcher, fifteen through
-the meal sheet with both recipe photos (the session report of that date).
-
-**No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
-release commit is named once the `v1.4.0` tag exists, and before that the
-release follows `dev`'s tip, whose CI run has to have finished green before the
-command is started. Push nothing between starting it and step 7.
-
-#### What 1.4.0 changes
-
-| | what a user sees |
-|---|---|
-| **Recept från foto** (D195) | a new way in the meal sheet: photograph a recipe's ingredient list, in a book, on a card or on a screen, and its rows join the list with the printed line beside each. A yield in portions fills the count; a book with two amount sets asks once which to use; a row whose sets disagree says "kontrollera mot sidan"; a row with no amount says "inte än" and waits |
-| **Rows that were not added stay** (D195) | in the meal sheet, rows from a sentence, a photo or a recipe that have no amount yet or no match stay in the list after "Lägg till", where before they disappeared |
-| **Better matching** (D196, D198) | in every tool that proposes foods, the sentence, the plate photo and the recipe photo: the food named, not a longer word that starts with it and not a variety or a dish. "mjölk" is milk, not milk chocolate; "gula lökar" reach "Lök gul"; basil leaves reach basil, garlic cloves garlic, a chicken breast a breast row; "nötfärs" reaches plain beef mince, which the catalogue writes as two words. A bare "pizza" or "peppar" is no match rather than a guess, and the person searches. Among foods that fit, the one this person has logged most, and the same food every time they ask |
-
-**What the deploy needs that 1.3.0 did not.** No migration, no stack
-variable, no host change: the recipe photo uses `LLM_VISION_MODEL`, which
-production already sets to `qwen3-vl:8b`, and there is no `release` block
-below because nothing is to be set. **On the workstation, `PORTAINER_URL`**:
-`scripts/portainer.mjs` no longer falls back to a built-in address (D197), so
-release step 1 needs it beside `PORTAINER_TOKEN`. The owner set it before the
-release session; INFRA.md, "The Portainer token", has the value.
-
-**Rows of one name no longer tie** (D198): five Open Food Facts rows are named
-"Ost", from 252 to 354 kcal, and the search now ends in a total order
-(Livsmedelsverket first, then id), after the food the person has logged most.
+**Nothing is prepared yet.** Production runs `1.4.0` (above), released from
+`c6b435f`; everything on `dev` after that commit goes into the next deploy,
+which takes a number here, with its handover, once there is something to
+release.
 
 #### How the next release is told what to set
 
@@ -615,22 +655,12 @@ mention `--set` without setting anything. **There is no block yet, so the next
 release sets no variables.** Two blocks, or a line that is neither form, stop
 the command before step 1 (D194).
 
-#### On `dev` since 1.3.0
+#### On `dev` since 1.4.0
 
-- **The release block** and **the dry run's step 9** (D194): the release
-  command, not the app; nothing a user sees. A dry run no longer stops on the
-  release's own images, which it cannot have built.
-- **Recept från foto** (D195), exercised through the interface with both probe
-  photographs and saved as two meals; the list's rows that could not be added
-  now stay. Details under "Current state".
-- **The matcher** (D196): compounds are other foods, inflections are not,
-  qualifiers are counted from the catalogue, twenty candidates. Its before and
-  after, 94 queries, is in D196 and in the session report.
-- **No private address in a tracked file** (D197): `PORTAINER_URL` required,
-  a test over every tracked file, the `edge` subnet allowed only where it is
-  defined.
-- **The matcher refined** (D198): parts of a food, compounds written apart, no
-  varieties, a tail that describes the food, and one answer per person.
+- **A dry run no longer says the version is live** (`release.mjs`, with a
+  test): it ends "every check passed and nothing was changed", where 1.4.0's
+  said "1.4.0 is live" while production ran 1.3.0. The release command only;
+  nothing a user sees.
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -957,20 +987,13 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. **`main` is `392b618`, the `v1.3.0`
+between what is built and what is running. **`main` is `c6b435f`, the `v1.4.0`
 tag, and production runs it.** Everything on `dev` after it goes into the next
 deploy:
 
 | | |
 |---|---|
-| `54e0e16` | 1.4.0 prepared again: the recipe photos seen with the new matcher |
-| `c224343` | No private address in a tracked file; PORTAINER_URL has no default |
-| `ff55a74` | The matcher reads Swedish: compounds are other foods, qualifiers are counted |
-| `ad85670` | §7: a red check is not passed on a reading, and no LAN address is tracked |
-| `487eb3f` | The session's report, and STATE.md closed for the pass |
-| `626dbf6` | A recipe photographed: the model copies lines, the app reads them |
-| `b417005` | A release's variables are one fenced block; a dry run expects its images missing |
-| `829daf5` | Production runs 1.3.0, and all thirteen steps ran |
+| (this record) | Production runs 1.4.0; a dry run does not say it is live |
 
 ### Before the next redeploy
 
@@ -987,13 +1010,21 @@ Windows and the kill has to be by port.
 Eight items of nine done, each exercised through the interface and recorded
 (D185 to D193). **Open:**
 
-- **Item 8, import from a photo of a recipe: built after 1.3.0** (D195), for
-  `1.4.0`.
+- **Item 8, import from a photo of a recipe: built after 1.3.0** (D195) and
+  deployed in `1.4.0`.
 - **The three framed phone portraits** are Fredrik's: the raw screenshots in
   `docs/screens/raw/` carry the current date format; reframe them, replace the
   three portraits, and `node scripts/landing-screens.mjs` picks them up.
-- **`1.3.0` is deployed** (2026-09-26, "Production runs 1.3.0"). What is left
-  of it is Fredrik's three checks in production, listed there.
+- **`1.3.0` is deployed** (2026-09-26, "Production ran 1.3.0 before it").
+  What is left of it is Fredrik's three checks in production, listed there.
+
+### The 2026-09-26 release brief: the matcher refined, and 1.4.0
+
+**All four items done**: §7's two rules and the `edge` exception scoped (D197),
+the matcher's three refinements (D198), the gate passed on every line, and
+`1.4.0` deployed with all thirteen steps ("Production runs 1.4.0"). **Open:**
+Fredrik's checks in production, listed there, including one real recipe photo
+through Måltider on a phone.
 
 
 ### The second landing brief: the page's polish, Sten, and three defects

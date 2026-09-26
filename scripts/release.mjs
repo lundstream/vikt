@@ -939,7 +939,15 @@ export async function release({ version, runner, out = process.stdout, root = RO
     return { ok: false, stoppedAt: index + 1, step: step.name };
   }
 
-  out.write(`\n${version} is live, and every step above said so.\n`);
+  /*
+    A dry run changed nothing, so it must not say the version is live: the
+    1.4.0 dry run ended with that sentence while production still ran 1.3.0.
+  */
+  out.write(
+    runner.dryRun
+      ? `\ndry run of ${version}: every check passed and nothing was changed. ${version} is not live.\n`
+      : `\n${version} is live, and every step above said so.\n`,
+  );
   return { ok: true, stoppedAt: null };
 }
 
