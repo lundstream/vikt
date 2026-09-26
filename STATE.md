@@ -93,11 +93,11 @@ development server**, item by item, each with its own verdict file. Released as
   desktop.
 - **The release block** (D194) is held by `release.test.ts`, each new case seen
   failing before it passed; it has no screen.
-- **The closing sweep**: `shoot2.mjs` over every finished screen at 360 px and
-  desktop, now with Måltider and Anmälningar, **44 of 44**; both landing rows
-  `landing-ok=sentence15/meta13/gap64`, 6 796 px at 360 and 5 206 at desktop.
-- **Not built: import from a photo of a recipe** (item 8, D193). It starts
-  with a probe on a real recipe page and there is none in `scratch/vision`.
+- **The closing sweep, 2026-09-26, after 1.4.0's work**: `pnpm harness:sweep`
+  (the tracked `shoot2.mjs`) over every finished screen at 360 px and desktop,
+  **45 of 45** with the sign-in; both landing rows
+  `landing-ok=sentence15/meta13/gap64`, 6 796 px at 360 and 5 206 at desktop,
+  unchanged. CI green on `dev` at `626dbf6`.
 
 - **Phases 0 to 6 are built and used daily**: invite-only auth, the weight log
   and trend line, adaptive TDEE and projections, the food database with barcode
@@ -417,10 +417,10 @@ photos and sharing (D186 to D192).
 - **The photo directory**, over SSH: `/var/lib/vikt/media` exists, a directory,
   owned `1000:1000`, mode `700`. The release user is uid 1000 and in the
   `docker` group, which is what `backup.sh` needs to archive it.
-- **The vision model**: Ollama on 192.168.1.100 lists `qwen3-vl:8b`, and
+- **The vision model**: Ollama on the workstation lists `qwen3-vl:8b`, and
   answered a question under a JSON schema with `{"svar": "ja"}` in 8 tokens (in
   `thinking`, which the client reads when `content` is empty, as D190
-  recorded). The host reaches it: `/api/tags` 200 from 192.168.1.30.
+  recorded). The production host reaches it: `/api/tags` 200 from there.
 - **The host scripts**: `host-scripts.mjs check` found `backup.sh` and
   `restore-check.sh` different from HEAD, `install` wrote both, and `check`
   read both equal to `392b618`. The cron line stays uninstalled (D103).
@@ -444,7 +444,7 @@ photos and sharing (D186 to D192).
 | 7 tag | `v1.3.0` on `392b618` |
 | 8 workflow | run `36245630030` (release, `v1.3.0`) green |
 | 9 plan | nothing blocks this deploy; **`setting: MEDIA_HOST_DIR (new)`**; `IMAGE_TAG 1.2.1 -> 1.3.0` |
-| 10 deploy | both containers on the new image, the API healthy; `llm=on (http://192.168.1.100:11434)`, `the vision model can see` in 1 597 ms |
+| 10 deploy | both containers on the new image, the API healthy; `llm=on` (the workstation's Ollama), `the vision model can see` in 1 597 ms |
 | 11 API log | `version 1.3.0, commit 392b618`; **`Migrations: 4 applied, 36 recorded in total`** (`0032_meals`, `0033_label_photo`, `0034_media_backup`, `0035_meal_sharing`); VAPID silent, so the key is unchanged; `vision: the vision model can see` |
 | 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200; and `/app/` 200 with `<title>Vikt</title>`, read after |
 | 13 Nyheter | **`published "Vikt 1.3" as 0d85a6d2-dcbf-430a-bc27-42bad8e33e48, 1676 characters, not mailed`**, with the photo sentence ending "och visas bara för dig, om du inte delar måltiden." |
@@ -919,7 +919,9 @@ deploy:
 
 | | |
 |---|---|
-| (this record) | Production runs 1.3.0 |
+| `626dbf6` | A recipe photographed: the model copies lines, the app reads them |
+| `b417005` | A release's variables are one fenced block; a dry run expects its images missing |
+| `829daf5` | Production runs 1.3.0, and all thirteen steps ran |
 
 ### Before the next redeploy
 
