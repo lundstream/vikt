@@ -208,6 +208,35 @@ describe("reading a recipe off a screen, one set", () => {
   });
 });
 
+/**
+ * The matcher reads twenty candidates (D196). A stricter test needs the right
+ * row among them. Search ranks short names first among equals, so eight
+ * flavoured milks, each "Mjölk" and one word the matcher refuses, come ahead
+ * of plain milk; at five candidates the answer was "no match".
+ */
+describe("the matcher reads far enough down the search", () => {
+  const MILK = { title: null, yield: null, rows: [{ line: "10 dl mjölk", section: null }] };
+  const ctx = useTestApp({ LLM_VISION_MODEL: "qwen3-vl:8b" }, { llm: stubLlm(MILK) });
+
+  it("finds plain milk behind the flavoured ones", async () => {
+    const { app, db } = ctx();
+    const user = await createUser(app, db);
+    for (const flavour of ["kakao", "banan", "mango", "kaffe", "hallon", "vanilj", "choklad", "jordgubb"]) {
+      await food(db, `Mjölk ${flavour}`, "dairy_liquid", 80);
+    }
+    await food(db, "Mjölk fett 3% berikad", "dairy_liquid", 60);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/llm/read-recipe",
+      headers: auth(user),
+      payload: { image: markedImage().image },
+    });
+    const body = response.json() as Read;
+    expect(body.rows[0]!.match).toMatchObject({ name: "Mjölk fett 3% berikad", kcalPer100: 60 });
+  });
+});
+
 describe("readRecipe", () => {
   it("drops an empty line and an empty heading", () => {
     const outcome = readRecipe(

@@ -182,11 +182,13 @@ describe('"1 portion"', () => {
   it("is not an amount when the food has no portion defined", async () => {
     const { app, db } = ctx();
     const user = await createUser(app, db);
-    await manualFood(app, user, "Pizza kebab", 240);
+    // Named as the development catalogue names it. "Pizza kebab" matched only
+    // through the prefix rule D196 removed: "kebabpizza" is one compound word.
+    await manualFood(app, user, "Kebabpizza", 240);
 
     const body = await parse(app, user);
 
-    expect(body.items?.[0]?.match?.name).toBe("Pizza kebab");
+    expect(body.items?.[0]?.match?.name).toBe("Kebabpizza");
     expect(body.items?.[0]?.estimatedGrams).toBeNull();
     expect(body.items?.[0]?.portionSource).toBe("unknown");
   });

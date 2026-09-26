@@ -11210,3 +11210,233 @@ proposal is what makes that visible, and the person unticks it; the matcher
 itself is a separate pass. Most spoon and decilitre rows stayed "inte än" in the
 development database, because the foods they matched carry no category and so
 no household measure: the rule working, not a gap in it.
+
+### D196 — The matcher reads Swedish: compounds are other foods, inflections are not, and qualifiers are counted
+
+*2026-09-26, before 1.4.0 ships the recipe photo.*
+
+The recipe photo's exercise (D195) showed `matchRow` pricing "mjölk" as
+"Mjölkchoklad", "peppar" as "Pepparrot" and "nötfärs" as "Lasagne nötfärs".
+The matcher is D72's, shared by every tool that proposes foods: the sentence,
+the plate photo and the recipe photo. Two causes, both in `isPlausibleMatch`:
+
+- **It took any prefix of four letters or more as an inflection.** Swedish
+  compounds put the head last, so a name word that starts with the asked word
+  and goes on is usually a compound in which the asked word is only the first
+  part: a mjölkchoklad is a chocolate, a pepparrot is a root. The same length
+  rule missed the other way: "gula lökar" could not reach "Lök gul", because
+  "lök" and "gul" are under four letters. And it turned "mjöl" into "Mjölk".
+- **Its one-word allowance did not care which word came first**, so a dish
+  named before its ingredient passed.
+
+#### The rule now
+
+1. **A row is only its head**, the part before "m.", "med" or a comma, as D72
+   had it.
+2. **The head's first word is one of the words asked for**, in whatever order
+   the query gives them. These names put the food first and what describes it
+   after ("Ägg rått", "Spenat färsk", "Lök gul"), so a name led by something
+   else is that something: "Lasagne nötfärs" is lasagne.
+3. **Every word asked for is in the head, as itself or inflected.** An
+   inflection is a shared stem of three letters or more with an ending from a
+   closed set on each side: nothing, -a, -e, -n, -t, -en, -et, -er, -ar, -or,
+   -na, -erna, -arna, -orna. That covers tomat and tomater, lök and lökar, gul
+   and gula, ris and riset, klyfta and klyftor, in both directions. Any other
+   remainder is another word: "mjölkchoklad", "pepparrot", "kycklingkorv",
+   "risotto", and in the other direction "basilikablad" against "Basilika".
+4. **Everything else in the head describes the food, or the row is refused.**
+   Numbers and fat content, preparation, state and colour are free, as many as
+   the name has. Any other word is another food or a guess about which one.
+
+**The qualifiers were counted, not guessed.** Every word that follows the
+first word of a Livsmedelsverket name in the development catalogue (2 606
+rows) was counted. The list is the preparation, state, measure and colour
+words among them that occur at least once: "fett" 264 times, "rå" 213,
+"stekt" 157, "frysvara" 145, "berikad" 141, "kokt" 126, down to "bryggt" 3,
+"färskpressad" 5 and "strimlad" 1. Words that a guess would have added and the
+catalogue does not contain ("färskt", "osaltad", "frysta", "rivna") are not in
+it. Nouns that often follow a first word ("kött" 57, "bröd" 30, "salt" 26,
+"choklad" 17) are not qualifiers: they name a food. Four words introduce a
+qualifier and qualify the next word too: "u." ("u. salt"), "typ", "i" ("i
+olja") and "el.".
+
+**No extra word, not one.** The first version kept D72's allowance of one
+unexplained word, with qualifiers now free. The evidence table below showed
+what that one word lets in: "kyckling" as "Kyckling mage rå" (a gizzard), "ris"
+as "Ris avorio okokt" (a particular rice, uncooked, three times cooked rice's
+energy), "yoghurt" as "Yoghurt vanilje", "Pizza" as "Pizza orientalisk". Each
+is a cut, a flavour or a variety: a guess about which one was meant. With the
+fuller qualifier list, no allowance at all keeps "Kaffe bryggt", "Lök gul" and
+"Smör osaltat fett ca 80%" and refuses those four. "Salta pinnar", which starts
+with "salt" plus an ending, is refused for "pinnar".
+
+**Twenty candidates, not five.** A stricter test needs the right row among the
+candidates. `recipe-photo.test.ts` puts eight flavoured milks, "Mjölk" and one
+refused word each, ahead of "Mjölk fett 3% berikad" in the ranking (short names
+first among equals) and expects plain milk. It passes at twenty, and at five it
+fails with no match: seen both ways.
+
+**Null stays first-class.** Every refusal leaves the row unmatched, with its
+printed line and "Ingen träff" in the recipe list, and the person searches.
+
+#### The tests
+
+`llm-parse.test.ts`: the three live cases and the two in the function's
+comment must not match; twelve compound traps from the development catalogue,
+each a query that is only the first part of a longer food's name, must not
+match ("mjöl" and "Mjölk fett 3% berikad", "potatis" and "Potatismjöl", "ost"
+and "Ostron", "ägg" and "Äggula rå", "salt" and "Saltsill rå", "peppar" and
+"Pepparkaka", "lök" and "Löksås", "tomat" and "Tomatsås italiensk", "socker"
+and "Sockerärtor", "majs" and "Majsolja", "kaffe" and "Kaffegrädde fett 12%",
+"ris" and "Rismjöl vitt"); the other direction ("basilikablad", "vitlöksklyftor")
+must not match; plain foods that must ("mjölk", "gula lökar", "tomatpuré",
+"krossade tomater", "salt", "kyckling"); inflections both ways; qualifiers as
+many as the name has; any other word refused; the first word required. **All
+eight new tests fail on the rule at `487eb3f`**, run against a copy of it, and
+pass on this one. One older test in `photo-parse.test.ts`, about "1 portion"
+and not about matching, had named its fixture "Pizza kebab" for the query
+"kebabpizza"; that matched only through the prefix rule, and the development
+catalogue names it "Kebabpizza", so the fixture now does.
+
+#### Before and after
+
+For every row name in both recipe photos (`scratch/vision/recipes/expected.md`,
+as the recipe reader derives its search name), every name in the sentence and
+plate tools' tests and probes (D72, D143, `llm-check.ts`), and the thirty most
+logged foods in the development database (queried by their own names): the
+first plausible match, the matched food's name and kcal per 100 g. "Before" is
+the rule at `487eb3f`, copied verbatim, over a five-row search; "after" is this
+one over twenty. Read against the development catalogue as the seeded account.
+
+| source | query | before (5 candidates) | after (20) | changed |
+|---|---|---|---|---|
+| recipe, book | 1 pizzaboll, se sidan 110 (a cross-reference, not searched) | no match | no match | |
+| recipe, book | mozzarella di bufala DOP (0,39 g (50 g) mozzarella di bufala DOP, i bitar) | no match | no match |  |
+| recipe, book | lardo (20 g (25 g) lardo alt pancetta eller bacon, finskuren) | no match | no match |  |
+| recipe, book | vitlök (3 g (3,5 g) vitlök, finskivad (ca 1 vitlöksklyfta)) | Vitlök, 128 | Vitlök, 128 |  |
+| recipe, book | färska basilikablad (3–5 färska basilikablad) | Basilika färsk, 25 | no match | **changed** |
+| recipe, book | pecorino romano DOP (12 g (15 g) pecorino romano DOP, finriven) | no match | no match |  |
+| recipe, book | olivolja (3 g + 5 g (3 g + 7 g) olivolja) | Olivolja, 884 | Olivolja, 884 |  |
+| recipe, screen | gula lökar (2 gula lökar) | no match | Lök gul, 39 | **changed** |
+| recipe, screen | vitlöksklyftor (2 vitlöksklyftor) | Vitlök, 128 | no match | **changed** |
+| recipe, screen | nötfärs (500 g nötfärs eller hushållsfärs (ärt- och nötfärs)) | Lasagne nötfärs, 137 | no match | **changed** |
+| recipe, screen | olja (1 msk olja) | no match | no match |  |
+| recipe, screen | tomatpuré (4 msk tomatpuré) | Tomat, 17 | Tomatpuré konc. konserv., 84 | **changed** |
+| recipe, screen | torkad timjan (1 tsk torkad timjan) | no match | no match |  |
+| recipe, screen | torkad rosmarin (1 tsk torkad rosmarin) | no match | no match |  |
+| recipe, screen | krossade tomater (1 förp krossade tomater (à 390 g)) | Tomat krossad konserv. m. lag, 22 | Tomat krossad konserv. m. lag, 22 |  |
+| recipe, screen | köttbuljongtärning (1 köttbuljongtärning) | Köttbuljong ätf., 8 | no match | **changed** |
+| recipe, screen | salt (salt) | Salt örtsalt, 18 | Salt m. jod, 0 | **changed** |
+| recipe, screen | peppar (peppar) | Pepparrot, 70 | no match | **changed** |
+| recipe, screen | smör (6 msk smör (6 msk motsvarar ca 90 g)) | Smör Mindre, 381 | Smör fett 80%, 766 | **changed** |
+| recipe, screen | vetemjöl (6 msk vetemjöl) | Vetemjöl, 352 | Vetemjöl, 352 |  |
+| recipe, screen | mjölk (10 dl mjölk) | Mjölkchoklad, 535 | Mjölk fett 3% berikad, 60 | **changed** |
+| recipe, screen | riven parmesan (2 dl riven parmesan) | no match | no match |  |
+| recipe, screen | torkade lasagneplattor (9 torkade lasagneplattor) | no match | no match |  |
+| tools | mjölk | Mjölkchoklad, 535 | Mjölk fett 3% berikad, 60 | **changed** |
+| tools | peppar | Pepparrot, 70 | no match | **changed** |
+| tools | nötfärs | Lasagne nötfärs, 137 | no match | **changed** |
+| tools | kycklingfilé | Kycklingfilé, 100 | Kycklingfilé, 100 |  |
+| tools | fetaost | no match | no match |  |
+| tools | ägg | Ägg rått, 136 | Ägg kokt, 136 | tie order |
+| tools | spenat | Spenat färsk, 24 | Spenat färsk, 24 |  |
+| tools | tomat | Tomat, 17 | Tomat, 17 |  |
+| tools | ris | no match | no match |  |
+| tools | kyckling | no match | Kyckling kokt m. salt, 171 | **changed** |
+| tools | keso naturell | no match | no match |  |
+| tools | yoghurt | Yoghurt vanilje, 81 | Yoghurt naturell fett 10%, 109 | **changed** |
+| tools | rågbröd | no match | no match |  |
+| tools | salt | Salt örtsalt, 18 | Salt m. jod, 0 | **changed** |
+| tools | friterad potatis | no match | no match |  |
+| tools | kokt potatis | Potatis kokt m. salt, 83 | Potatis kokt m. salt, 83 |  |
+| tools | krämig dressing | no match | no match |  |
+| tools | kebabpizza | Kebabpizza, 240 | Kebabpizza, 240 |  |
+| tools | Mammas köttbullar | no match | no match |  |
+| tools | smör | Smör Mindre, 381 | Smör fett 80%, 766 | **changed** |
+| tools | kaffe | Kaffe bryggt, 2 | Kaffe bryggt, 2 |  |
+| tools | havregrynsgröt | Havregrynsgröt fullkorn, 66 | Havregrynsgröt fullkorn, 66 |  |
+| tools | lingonsylt | Lingonsylt, 148 | Lingonsylt, 148 |  |
+| tools | banan | Banan, 95 | Banan, 95 |  |
+| tools | ostmacka | no match | no match |  |
+| tools | filmjölk | Filmjölk, 60 | Filmjölk, 60 |  |
+| tools | müsli | no match | no match |  |
+| tools | Kött | Köttfärslåda, 124 | no match | **changed** |
+| tools | Gurksallad med tomater och feta | no match | no match |  |
+| tools | Krämig sås | no match | no match |  |
+| tools | Grillad köttfarsbiff | no match | no match |  |
+| tools | Potatismat | Barnmat potatis m. nötköttsgryta konserv., 79 | no match | **changed** |
+| tools | Vit krämsås | no match | no match |  |
+| tools | Salladblad | Grekisk sallad m. fetaost, 77 | no match | **changed** |
+| tools | Smörstekta bacon | no match | no match |  |
+| tools | Kycklingbröst | Kyckling bröstfilé m. skinn stekt m. salt, 187 | no match | **changed** |
+| tools | Tomater | Tomat, 17 | Tomat, 17 |  |
+| tools | Croutons | no match | no match |  |
+| tools | Ost | Ost, 252 | Ost, 354 | tie order |
+| tools | Parmesan | no match | no match |  |
+| tools | Pizza | Pizza orientalisk, 208 | Pizza veg. hemlagad, 179 | **changed** |
+| logged ×68 | Filmjölk 3% | Filmjölk 3%, 56 | Filmjölk 3%, 56 |  |
+| logged ×10 | Kycklingfilé | Kycklingfilé, 100 | Kycklingfilé, 100 |  |
+| logged ×10 | Rotfruktsgratäng | no match | no match |  |
+| logged ×8 | Havregrynsgröt | Havregrynsgröt fullkorn, 66 | Havregrynsgröt fullkorn, 66 |  |
+| logged ×8 | Laxfilé med potatis | no match | no match |  |
+| logged ×7 | Havrekli | Havrekli, 357 | Havrekli, 357 |  |
+| logged ×7 | Präst | Präst, 277 | Präst, 384 | tie order |
+| logged ×6 | Grekisk yoghurt | no match | no match |  |
+| logged ×5 | Banan | Banan, 95 | Banan, 95 |  |
+| logged ×5 | Bregott Normalsaltat | Bregott Normalsaltat, 678 | Bregott Normalsaltat, 678 |  |
+| logged ×5 | Gris skinka skivad rökt fett 1-3% | Gris skinka skivad rökt fett 1-3%, 99 | Gris skinka skivad rökt fett 1-3%, 99 |  |
+| logged ×5 | Hårt bröd fullkorn råg fibrer 15,5% typ Husman | no match | no match |  |
+| logged ×4 | Blåbär frysvara | Blåbär frysvara, 43 | Blåbär frysvara, 43 |  |
+| logged ×4 | Mild Kvarg - Vanilj | Mild Kvarg - Vanilj, 59 | Mild Kvarg - Vanilj, 59 |  |
+| logged ×4 | Ägg kokt | Ägg kokt, 136 | Ägg kokt, 136 |  |
+| logged ×2 | Gräddost | Gräddost, 422 | Gräddost, 422 |  |
+| logged ×2 | Pastagratäng Rossini m. kycklingfärs ananas paprika squash tomat purjolök | no match | no match |  |
+| logged ×2 | Ris avorio okokt | Ris avorio okokt, 358 | Ris avorio okokt, 358 |  |
+| logged ×2 | Surdegs Bröd | Surdegs Bröd, 220 | Surdegs Bröd, 220 |  |
+| logged ×1 | Amerikanske pannekaker | Amerikanske pannekaker, 295 | Amerikanske pannekaker, 295 |  |
+| logged ×1 | Babybel Mini | Babybel Mini, 295 | Babybel Mini, 295 |  |
+| logged ×1 | Bröd vitt typ levain | Bröd vitt typ levain, 249 | Bröd vitt typ levain, 249 |  |
+| logged ×1 | DORITOS sweet chili pepper | DORITOS sweet chili pepper, 477 | DORITOS sweet chili pepper, 477 |  |
+| logged ×1 | Doritos nacho cheese | Doritos nacho cheese, 480 | Doritos nacho cheese, 480 |  |
+| logged ×1 | Ferrari Salt Persika | Ferrari Salt Persika, 351 | Ferrari Salt Persika, 351 |  |
+| logged ×1 | Filmjölk A-fil fett 3% berikad | Filmjölk A-fil fett 3% berikad, 60 | Filmjölk A-fil fett 3% berikad, 60 |  |
+| logged ×1 | Filmjölk långfil fett 3% berikad | Filmjölk långfil fett 3% berikad, 60 | Filmjölk långfil fett 3% berikad, 60 |  |
+| logged ×1 | Fruktyoghurt fett 3,6% berikad | no match | no match |  |
+| logged ×1 | Gelégodis | Gelégodis, 350 | Gelégodis, 350 |  |
+| logged ×1 | Grillad Kyckling | Kyckling grillad m. skinn, 214 | Kyckling grillad m. skinn, 214 |  |
+
+94 queries: 22 changed by the rule, 3 by the order of equal rows.
+
+**What changed, read row by row.**
+
+- **Gained, the right food where there was a wrong one or none**: "mjölk" is
+  milk, not milk chocolate; "smör" is butter at 766 kcal, not a lighter spread
+  at 381; "tomatpuré" is tomato purée, not a tomato; "salt" is salt at 0, not
+  herb salt; "gula lökar" reaches "Lök gul"; "kyckling" reaches cooked chicken;
+  "yoghurt" reaches a plain yoghurt instead of vanilla.
+- **Refused, a wrong food made no match**: "peppar" (horseradish),
+  "nötfärs" (lasagne), "köttbuljongtärning" (ready-made broth, where a stock cube
+  is concentrate), "Kött" (a mince bake), "Potatismat" (baby food), "Salladblad"
+  (a Greek salad), "Pizza orientalisk" for "Pizza".
+- **Lost, a right food made no match**: "färska basilikablad" no longer reaches
+  "Basilika färsk", "vitlöksklyftor" no longer reaches "Vitlök", and
+  "Kycklingbröst" no longer reaches a chicken breast fillet. Each is a compound
+  query whose first part is the food; the rule reads a compound as another word
+  in both directions, and a person searches for these three. "Pizza" now
+  reaches "Pizza veg. hemlagad", a pizza, where the choice among pizzas is the
+  ranking's.
+- **Not the rule: the order of equal rows.** Three rows differ only in which of
+  several acceptable rows the search returned first: five Open Food Facts rows
+  are all named "Ost" (252 to 354 kcal), three are named "Präst" (277 to 384),
+  and "Ägg rått" and "Ägg kokt" tie. The database breaks full ties by its plan,
+  which differs between a five-row and a twenty-row query. Both rules accept
+  every one of those rows. **Not fixed here**, because it is the search's order
+  (D165) and not the matcher's rule; it is recorded because the energy the row
+  shows can differ by a hundred kcal per 100 g between two rows of one name.
+- **"yoghurt" reaches "Yoghurt naturell fett 10%"**, a plain yoghurt that is
+  the first plain one in the ranking; the matcher does not choose between fat
+  contents, and the proposal shows the name and the energy for the person to
+  judge.
+
+The recipe photos exercised through the interface with this matcher, and what
+the lists showed, are in STATE.md for 1.4.0.

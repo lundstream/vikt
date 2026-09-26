@@ -572,8 +572,12 @@ async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemR
    * unread is a different job with a much higher bar, and the first live run
    * showed exactly why — "kycklingfilé" came back as "Korv kycklingkorv" and
    * "fetaost" as "Grekisk sallad m. fetaost", both priced with full confidence.
+   *
+   * Twenty, not five (D196): a stricter test needs the right row to be among
+   * the candidates, and the ranking puts compounds that merely start with the
+   * word ("Mjölkchoklad" for "mjölk") ahead of it often enough.
    */
-  const rows = await searchFoodItems(userId, db, name, 5);
+  const rows = await searchFoodItems(userId, db, name, MATCH_CANDIDATES);
   return rows.find((candidate) => isPlausibleMatch(name, candidate.name)) ?? null;
 }
 
@@ -627,11 +631,14 @@ function priceRow(
   };
 }
 
+/** How many search rows `matchRow` reads before saying there is no match (D196). */
+export const MATCH_CANDIDATES = 20;
+
 /**
  * Whether a database row is actually the food that was named.
  *
- * Three rules, and each one exists because of a specific wrong answer from the
- * first live runs against the real database.
+ * Each rule exists because of a specific wrong answer from a live run against
+ * the real database (D72, then D196).
  *
  * **A row is only its head.** Food names in this database mark the "contains"
  * relation explicitly — "Grekisk sallad m. fetaost", "Fatteh m. kyckling",
@@ -641,14 +648,31 @@ function priceRow(
  * kyckling", which is not. Stripping "med" as a filler word, which is the
  * obvious thing to do, deletes exactly the signal that tells them apart.
  *
- * **Every word asked for has to be there.** "Kycklingfilé" is not
- * "kycklingkorv", however close the trigram score; pricing one as the other
- * puts a different food's energy into the intake series under a name the user
- * recognises. A longer inflection is the same word, since the model is asked
- * for the base form and the database is not written in it.
+ * **The head's first word is one of the words asked for.** These names put the
+ * food first and what describes it after ("Ägg rått", "Spenat färsk", "Timjan
+ * torkad", "Lök gul rå"), so a name that starts with something else is a dish
+ * or a product that contains the food: "Lasagne nötfärs" is lasagne. The query
+ * may give its words in any order; "gula lökar" reaches "Lök gul rå".
  *
- * **At most one word of qualification.** "Ägg rått" and "Spenat färsk" are the
- * food; three words for a one-word query is a product that merely contains it.
+ * **Every word asked for has to be there, as itself or inflected.** An
+ * inflection is the same stem with a short ending from a closed set (tomat,
+ * tomater; lök, lökar; gul, gula; ris, riset; klyfta, klyftor), in either
+ * direction. Anything else after the stem is another word: Swedish compounds
+ * put the head last, so "mjölkchoklad" is a chocolate, "pepparrot" a root and
+ * "kycklingkorv" a sausage, whatever they start with. The length rule this
+ * replaces let all three through, and turned "mjöl" into "Mjölk".
+ *
+ * **What is left must describe the food, not name another one.** Numbers, fat
+ * content, preparation, state and colour are free, as many as the name has
+ * ("Smör osaltat fett ca 80%" is butter, "Lök gul rå" is an onion, "Kaffe
+ * bryggt" is coffee); the qualifier list is the set of those words that follow
+ * the first word of a Livsmedelsverket name in this catalogue, counted rather
+ * than guessed (D196). **Any other word is another food, or a guess about which
+ * one**: "Kyckling mage rå" is a gizzard, "Ris avorio okokt" a particular rice
+ * uncooked, "Yoghurt vanilje" a flavour, and "Salta pinnar", which starts with
+ * "salt" plus an ending, is a pretzel. The rule this replaces allowed one such
+ * word and counted qualifiers against it, so it let the gizzard through and
+ * turned plain butter away.
  *
  * Failing any of them leaves `match` null, which is a first-class outcome
  * everywhere this is used: the row keeps its name, shows no energy, and says
@@ -656,11 +680,66 @@ function priceRow(
  */
 const CONTAINS_CONNECTOR = /\s(?:m\.|med|innehåller)\s|[,&+/]/i;
 
+/** The endings an inflected form adds to its stem, both directions (D196). */
+const INFLECTIONS = ["", "a", "e", "n", "t", "en", "et", "er", "ar", "or", "na", "erna", "arna", "orna"];
+
+/**
+ * Words that describe a food rather than name one: those that follow the first
+ * word of a Livsmedelsverket name in the development catalogue at least once,
+ * and are a preparation, a state, a fat content or a measure (D196).
+ */
+const QUALIFIERS = new Set([
+  // measure and fat content
+  "fett", "fetthalt", "vol", "ca", "light", "lätt", "lätta", "mager",
+  // raw, cooked and how
+  "rå", "rått", "råa", "stekt", "stekta", "ugnsstekt", "ugnsstekta", "råstekt", "kokt", "kokta",
+  "okokt", "okokta", "inkokt", "ångkokt", "ångprep", "tillagad", "tillagat", "tillagade",
+  "hemlagad", "hemlagade", "hembakad", "hembakade", "butiksbakad", "bakad", "gräddad",
+  "brungräddat", "normalgräddat", "grillad", "grillat", "friterad", "friterade", "friterat",
+  "panerad", "panerade", "panerat", "wokad", "wokade", "brynt", "fräst", "gratinerad", "stuvad",
+  "stuvade", "råstuvad", "värmd", "värmda", "förvälld", "förvällda", "bryggt", "rostad",
+  "rostade", "rostat", "ugnsrostad", "rökt", "varmrökt", "kallrökt", "lättrökt", "flatrökt",
+  "rundrökt", "orökt", "gravad", "rimmad", "rimmat", "inlagd", "syltade", "marinerad",
+  "marinerade", "kryddad", "kryddat", "smaksatt", "smaksatta", "urvattnad", "lufttorkad",
+  "torkad", "torkade", "torkat", "fermenterad", "fermenterat", "fermenterade", "pastöriserad",
+  "färskpressad", "kallpressad", "vispad", "puffat", "mald", "krossad", "krossade", "riven",
+  "skivad", "skivade", "strimlad", "tärnad", "putsad", "bortskuret", "avfettat", "renat",
+  // sweetened, salted, free of
+  "osötad", "osötat", "osötade", "sötad", "lättsötad", "lättsockrad", "sockrad", "sockerfritt",
+  "osaltat", "saltad", "saltade", "lågsalt", "extrasaltad", "extrasaltat", "glutenfri",
+  "glutenfritt", "mjölkfri", "laktosfri", "koffeinfritt", "berikad",
+  // state and texture
+  "färsk", "färska", "fryst", "frysvara", "kylvara", "kyld", "konserv", "pulver", "konc",
+  "drickf", "ätf", "helfabrikat", "förpackad", "flytande", "bredbart", "mjukt", "grovt", "slätt",
+  "fast", "fylld", "ofylld", "ojäst", "kolsyrad", "hel", "hela", "tunn", "blandad", "blandade",
+  "naturell", "naturella", "mild", "milda", "söt", "eko", "odlad", "vildfångad", "veg",
+  "fullkorn", "glacerade", "kanderade", "storhushåll", "restaurang",
+  // colour, which tells varieties of one food apart
+  "vit", "vitt", "vita", "röd", "rött", "röda", "gul", "gult", "svart", "svarta", "grönt",
+  "brunt", "mörkt",
+]);
+
+/** Words after which the next one qualifies: "u. salt", "typ ringar", "i olja", "el. grillad". */
+const QUALIFYING_MARKERS = new Set(["u", "utan", "typ", "i", "el", "eller"]);
+
 function significantWords(text: string): string[] {
   return text
     .toLowerCase()
     .split(/[^a-zà-öø-ÿ0-9]+/i)
     .filter((word) => word.length > 0);
+}
+
+/** The same word, or the same stem with two endings from the set. */
+function sameWord(asked: string, candidate: string): boolean {
+  if (asked === candidate) return true;
+  const [short, long] = asked.length <= candidate.length ? [asked, candidate] : [candidate, asked];
+  for (const shortEnding of INFLECTIONS) {
+    if (!short.endsWith(shortEnding)) continue;
+    const stem = short.slice(0, short.length - shortEnding.length);
+    if (stem.length < 3 || !long.startsWith(stem)) continue;
+    if (INFLECTIONS.includes(long.slice(stem.length))) return true;
+  }
+  return false;
 }
 
 export function isPlausibleMatch(query: string, name: string): boolean {
@@ -671,19 +750,27 @@ export function isPlausibleMatch(query: string, name: string): boolean {
   const found = significantWords(head);
   if (asked.length === 0 || found.length === 0) return false;
 
-  const covered = asked.every((word) =>
-    found.some(
-      (candidate) =>
-        candidate === word ||
-        // An inflection, either direction, but never a short prefix: "ris"
-        // starting "risotto" is a different food, "tomat" starting "tomater"
-        // is not.
-        (word.length >= 4 && candidate.startsWith(word)) ||
-        (candidate.length >= 4 && word.startsWith(candidate)),
-    ),
-  );
+  // The food is named first.
+  if (!asked.some((word) => sameWord(word, found[0]!))) return false;
 
-  return covered && found.length <= asked.length + 1;
+  // Every word asked for, somewhere in the head.
+  const covered = new Set<number>();
+  for (const word of asked) {
+    const index = found.findIndex((candidate) => sameWord(word, candidate));
+    if (index < 0) return false;
+    covered.add(index);
+  }
+
+  // The rest describes it, or it is another food.
+  const unexplained = found.filter(
+    (word, index) =>
+      !covered.has(index) &&
+      !/\d/.test(word) &&
+      !QUALIFIERS.has(word) &&
+      !QUALIFYING_MARKERS.has(word) &&
+      !(index > 0 && QUALIFYING_MARKERS.has(found[index - 1]!)),
+  ).length;
+  return unexplained === 0;
 }
 
 /* ----------------------------------------------------------------- recipes */

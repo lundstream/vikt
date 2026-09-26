@@ -344,6 +344,96 @@ describe("deciding whether a database row is the food that was named", () => {
 });
 
 /**
+ * The matcher after 1.3.0 (D196). Pairs in both directions, every real name
+ * one that exists in the development catalogue; "Lök gul rå" and "Timjan
+ * torkad" are the brief's own examples of the name shape.
+ */
+describe("the matcher: Swedish compounds, inflections and qualifiers (D196)", () => {
+  const match = (query: string, name: string) => isPlausibleMatch(query, name);
+
+  /** The three the recipe photo found, and the two in the function's comment. */
+  it("refuses the live cases", () => {
+    expect(match("mjölk", "Mjölkchoklad")).toBe(false);
+    expect(match("peppar", "Pepparrot")).toBe(false);
+    expect(match("nötfärs", "Lasagne nötfärs")).toBe(false);
+    expect(match("kycklingfilé", "Korv kycklingkorv")).toBe(false);
+    expect(match("fetaost", "Grekisk sallad m. fetaost")).toBe(false);
+  });
+
+  /** A query that is only the first part of a longer food's name, from the catalogue. */
+  it("refuses a compound that merely starts with the word asked for", () => {
+    const traps: [string, string][] = [
+      ["mjöl", "Mjölk fett 3% berikad"],
+      ["potatis", "Potatismjöl"],
+      ["ost", "Ostron"],
+      ["ägg", "Äggula rå"],
+      ["salt", "Saltsill rå"],
+      ["peppar", "Pepparkaka"],
+      ["lök", "Löksås"],
+      ["tomat", "Tomatsås italiensk"],
+      ["socker", "Sockerärtor"],
+      ["majs", "Majsolja"],
+      ["kaffe", "Kaffegrädde fett 12%"],
+      ["ris", "Rismjöl vitt"],
+    ];
+    for (const [query, name] of traps) {
+      expect(match(query, name), `${query} / ${name}`).toBe(false);
+    }
+  });
+
+  /** The same rule the other way: the query is the compound, the name its first part. */
+  it("refuses in the other direction too", () => {
+    expect(match("basilikablad", "Basilika färsk")).toBe(false);
+    expect(match("vitlöksklyftor", "Vitlök")).toBe(false);
+  });
+
+  it("accepts the plain food the length rule missed or ranked behind a compound", () => {
+    expect(match("mjölk", "Mjölk fett 3% berikad")).toBe(true);
+    expect(match("gula lökar", "Lök gul")).toBe(true);
+    expect(match("gula lökar", "Lök gul rå")).toBe(true);
+    expect(match("tomatpuré", "Tomatpuré konc. konserv.")).toBe(true);
+    expect(match("krossade tomater", "Tomat krossad konserv. m. lag")).toBe(true);
+    expect(match("salt", "Salt m. jod")).toBe(true);
+    expect(match("kyckling", "Kyckling kokt m. salt")).toBe(true);
+    expect(match("torkad timjan", "Timjan torkad")).toBe(true);
+  });
+
+  it("reads an inflection as the same word, both ways, and nothing else", () => {
+    expect(match("tomater", "Tomat")).toBe(true);
+    expect(match("lök", "Lökar")).toBe(true);
+    expect(match("gurkor", "Gurka")).toBe(true);
+    expect(match("vitlöksklyfta", "Vitlöksklyftor")).toBe(true);
+    expect(match("ris", "Riset")).toBe(true);
+    expect(match("ris", "Risotto färdig")).toBe(false);
+  });
+
+  /** "Smör osaltat fett ca 80%" was refused for having four words beside one. */
+  it("lets numbers, fat content and preparation qualify the food, as many as the name has", () => {
+    expect(match("smör", "Smör osaltat fett ca 80%")).toBe(true);
+    expect(match("smör", "Smör fett 80%")).toBe(true);
+    expect(match("kaffe", "Kaffe bryggt")).toBe(true);
+    expect(match("okra", "Okra kokt u. salt")).toBe(true);
+    expect(match("yoghurt", "Yoghurt naturell fett 10%")).toBe(true);
+  });
+
+  /** A second food word is a cut, a flavour or a variety: a guess, so no. */
+  it("refuses a name with any other word in it", () => {
+    expect(match("kyckling", "Kyckling mage rå")).toBe(false);
+    expect(match("ris", "Ris avorio okokt")).toBe(false);
+    expect(match("yoghurt", "Yoghurt vanilje")).toBe(false);
+    // "salt" and an ending, in front of the food it describes.
+    expect(match("salt", "Salta pinnar")).toBe(false);
+  });
+
+  /** These names put the food first; a name led by something else is that thing. */
+  it("needs the name to start with one of the words asked for", () => {
+    expect(match("bacon", "Gris bacon stekt")).toBe(false);
+    expect(match("nötfärs", "Lasagne nötfärs")).toBe(false);
+    expect(match("lök gul", "Lök gul")).toBe(true);
+  });
+});
+
+/**
  * The prompt has to ask for the portion, or the whole resolution path is dead
  * code. It was, on the first live run: the recipe prompt had been updated and
  * the parser's had not, so every row came back "uppskattad vikt".
