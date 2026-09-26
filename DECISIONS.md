@@ -11440,3 +11440,35 @@ one over twenty. Read against the development catalogue as the seeded account.
 
 The recipe photos exercised through the interface with this matcher, and what
 the lists showed, are in STATE.md for 1.4.0.
+
+### D197 — No private address in a tracked file, and `PORTAINER_URL` has no default
+
+*2026-09-26.*
+
+`scripts/portainer.mjs` fell back to this installation's Portainer host when
+`PORTAINER_URL` was unset, so the owner's LAN address sat in a public script,
+and `release.test.ts` named the Docker host's. **`PORTAINER_URL` is now
+required like `VIKT_HOST`**: the helper refuses without it with the variable's
+name, the runbook and exit 2, checked after the token so a session with
+neither hears about the credential first; `release.mjs` step 1 stops on it;
+INFRA.md, which is local, names it and holds the value. The release test uses
+RFC 5737's documentation range.
+
+**`no-private-addresses.test.ts` reads every file `git ls-files` lists**,
+binaries skipped, and fails on any RFC 1918 address, naming file and line. It
+was run first against the tree as it stood and failed on
+`scripts/portainer.mjs:35`, `release.test.ts:230` and six example addresses in
+`trust-proxy.test.ts`, then passed once they were moved. Its own samples are
+built from numbers, so the test does not contain what it looks for.
+
+**One range is allowed: `172.31.240.0/24`**, the `edge` bridge network both
+compose files pin so `TRUST_PROXY` can name the proxy's subnet (D14). It is
+part of the product, the same on every installation, and not an address on
+anybody's network; moving it would change production's network for nothing.
+The trust-proxy tests keep addresses inside it, because that subnet is what
+they test. The one they had just outside it, in the next /24, was there to
+prove the prefix length is honoured; that is now tested inside a documentation
+range, `192.0.2.0/25` against `192.0.2.200`.
+
+The published history keeps the addresses it has, including the two 1.3.0's
+record put into STATE.md (`829daf5`). It is not rewritten.

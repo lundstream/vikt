@@ -808,8 +808,13 @@ a commit on `main` is a commit that the next redeploy ships.
   a LAN address in it is a map of somebody's house. Tests and examples use the
   documentation ranges of RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`,
   `203.0.113.0/24`), which route nowhere by definition, and a script that needs
-  a real address reads it from the environment by name, like a credential.
-  1.3.0's record put two into STATE.md (`829daf5`); the published history keeps
+  a real address reads it from the environment by name, like a credential:
+  `PORTAINER_URL` beside `PORTAINER_TOKEN`, `VIKT_HOST` for the host.
+  `apps/api/test/no-private-addresses.test.ts` fails on any RFC 1918 address in
+  a tracked file, naming the file and line; the one range it allows is the
+  product's own `edge` Docker subnet, `172.31.240.0/24`, which every
+  installation gets and which is nobody's network (D14, D197). 1.3.0's record
+  put two addresses into STATE.md (`829daf5`); the published history keeps
   them and is not rewritten.
 - **Restart the development server when a change needs it.** Do not ask first and do
   not work around a stale one. Tailwind resolves its config at boot, Vite resolves its

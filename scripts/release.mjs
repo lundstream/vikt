@@ -304,6 +304,19 @@ export function buildSteps({ version, runner, root = ROOT, handover: given = nul
               "'The Portainer token')",
           );
         }
+        /*
+          Where Portainer is, by name and never by default (§7): the default
+          this used to have was the owner's own host, in a public repository.
+          Only presence is checked here; the plan at step 9 is what proves it
+          answers.
+        */
+        if (env("PORTAINER_URL") === null) {
+          return fail(
+            "PORTAINER_URL is not set, so there is no Portainer to read the stack from",
+            "set PORTAINER_URL to where Portainer answers, beside PORTAINER_TOKEN in the " +
+              "workstation's environment (INFRA.md, 'The Portainer token')",
+          );
+        }
 
         const gh = runner.local("gh", ["auth", "status"]);
         if (gh.code !== 0) {
@@ -326,7 +339,7 @@ export function buildSteps({ version, runner, root = ROOT, handover: given = nul
         context.handover = handover;
         /* The host, never the user, and never the token. */
         return ok(
-          `VIKT_HOST set, PORTAINER_TOKEN set, gh authenticated` +
+          `VIKT_HOST set, PORTAINER_TOKEN set, PORTAINER_URL set, gh authenticated` +
             `${handover.commit ? `, STATE.md names ${handover.commit.slice(0, 7)}` : ""}`,
         );
       },

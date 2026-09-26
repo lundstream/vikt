@@ -253,6 +253,29 @@ describe("the Portainer helper", () => {
     expect(run.stderr).toContain("INFRA.md");
   });
 
+  /**
+   * And without knowing where Portainer is. It used to fall back to the
+   * owner's own host, written into this public script; now the address comes
+   * from the environment by name, like the token, or not at all (§7).
+   */
+  it("refuses without PORTAINER_URL rather than falling back to an address", () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, PORTAINER_TOKEN: "ptr_dummy_token_value" };
+    delete env.PORTAINER_URL;
+
+    const run = spawnSync(process.execPath, [script, "check"], {
+      env,
+      encoding: "utf8",
+      timeout: 5000,
+      input: "",
+    });
+
+    expect(run.signal, "the helper did not exit").toBeNull();
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("PORTAINER_URL");
+    expect(run.stderr).toContain("INFRA.md");
+    expect(run.stderr).not.toContain("ptr_dummy_token_value");
+  });
+
   /** An empty variable is missing, not a credential. */
   it("treats an empty token as missing", () => {
     const run = spawnSync(process.execPath, [script, "check"], {

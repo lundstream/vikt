@@ -31,8 +31,31 @@
 
 import { pathToFileURL } from "node:url";
 
-/** Where Portainer is. Overridable, because the host is not a constant. */
-const BASE = process.env.PORTAINER_URL ?? "http://192.168.1.20:9000";
+/**
+ * Where Portainer is: `PORTAINER_URL`, required, with no default (§7).
+ *
+ * It had one, the owner's Portainer host, in a public repository. A network
+ * address belongs in INFRA.md, which is local, and a script reads it from the
+ * environment by name the way it reads the token. Missing, it refuses exactly
+ * as a missing token does: the variable's name, the runbook, exit 2.
+ */
+export function requireUrl() {
+  const url = process.env.PORTAINER_URL?.trim();
+  if (!url) {
+    process.stderr.write(
+      [
+        "PORTAINER_URL is not set.",
+        "",
+        "It is where Portainer answers, for example http://portainer.example:9000,",
+        "and it is set in the workstation's environment beside PORTAINER_TOKEN.",
+        'See INFRA.md, "The Portainer token".',
+        "",
+      ].join("\n"),
+    );
+    process.exit(2);
+  }
+  return url.replace(/\/$/, "");
+}
 
 /**
  * Everything this script prints passes through here (§7, D158 addendum).
@@ -108,9 +131,11 @@ export function requireToken() {
  * Portainer still reads it in exactly one place.
  */
 export async function request(path, { method = "GET", headers = {}, body } = {}) {
-  return fetch(BASE + path, {
+  // The token first, so a session with neither is told about the credential.
+  const token = requireToken();
+  return fetch(requireUrl() + path, {
     method,
-    headers: { "X-API-Key": requireToken(), ...headers },
+    headers: { "X-API-Key": token, ...headers },
     ...(body === undefined ? {} : { body }),
   });
 }

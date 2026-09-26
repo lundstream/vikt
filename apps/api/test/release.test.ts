@@ -227,7 +227,12 @@ function sink() {
   return { write: (text: string) => lines.push(text), text: () => lines.join("") };
 }
 
-const ENV = { VIKT_HOST: "deploy@192.168.1.30", PORTAINER_TOKEN: "ptr_dummy" };
+/** Addresses from RFC 5737's documentation range, never the owner's (§7). */
+const ENV = {
+  VIKT_HOST: "deploy@192.0.2.30",
+  PORTAINER_TOKEN: "ptr_dummy",
+  PORTAINER_URL: "http://192.0.2.20:9000",
+};
 
 function withEnv<T>(extra: Record<string, string | undefined>, run: () => T): T {
   const before = { ...process.env };
@@ -577,6 +582,20 @@ describe("a release that stops", () => {
       }
     });
   }
+
+  /** Required like VIKT_HOST, since it lost the default that was the owner's host (§7). */
+  it("stops at step 1 when PORTAINER_URL is not set, and names where to set it", async () => {
+    const runner = new FakeRunner();
+    const out = sink();
+    const result = await withEnv({ PORTAINER_URL: undefined }, () =>
+      release({ version: VERSION, runner, out, root: ROOT }),
+    );
+
+    expect(result).toMatchObject({ ok: false, stoppedAt: 1 });
+    expect(out.text()).toContain("PORTAINER_URL is not set");
+    expect(out.text()).toContain("INFRA.md");
+    expect(runner.calls.some((c) => /backup\.sh/.test(c.command))).toBe(false);
+  });
 
   it("stops at step 1 when VIKT_HOST is not set, and names where to set it", async () => {
     const runner = new FakeRunner();

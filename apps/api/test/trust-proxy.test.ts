@@ -22,8 +22,8 @@ describe("TRUST_PROXY parsing", () => {
 
   it("accepts a CIDR, an address, and a list", () => {
     expect(compileTrustedPeers("172.31.240.0/24")).toBeTypeOf("function");
-    expect(compileTrustedPeers("10.1.2.3")).toBeTypeOf("function");
-    expect(compileTrustedPeers("10.1.2.3, 172.31.240.0/24")).toBeTypeOf("function");
+    expect(compileTrustedPeers("198.51.100.3")).toBeTypeOf("function");
+    expect(compileTrustedPeers("198.51.100.3, 172.31.240.0/24")).toBeTypeOf("function");
     expect(compileTrustedPeers("loopback")).toBeTypeOf("function");
   });
 
@@ -45,8 +45,17 @@ describe("peer validation", () => {
   });
 
   it("rejects one outside it", () => {
-    expect(isTrustedPeer(trust, "172.31.241.5")).toBe(false);
     expect(isTrustedPeer(trust, "203.0.113.9")).toBe(false);
+  });
+
+  /**
+   * The prefix length is honoured, not just the network: half a documentation
+   * range, so the boundary is tested without a private address (§7).
+   */
+  it("rejects an address past the prefix, in the same network", () => {
+    const half = compileTrustedPeers("192.0.2.0/25");
+    expect(isTrustedPeer(half, "192.0.2.5")).toBe(true);
+    expect(isTrustedPeer(half, "192.0.2.200")).toBe(false);
   });
 
   it("rejects everything when nothing is trusted", () => {
@@ -81,7 +90,7 @@ describe("resolving the client IP", () => {
       resolveClientIp({
         trust,
         remoteAddress: "198.51.100.7",
-        cfConnectingIp: "10.0.0.1",
+        cfConnectingIp: "198.51.100.1",
         fallback: "198.51.100.7",
       }),
     ).toBe("198.51.100.7");
@@ -110,7 +119,7 @@ describe("resolving the client IP", () => {
   });
 
   it("refuses a header that is not a bare IP", () => {
-    for (const value of ["not-an-ip", "203.0.113.9, 10.0.0.1", "", "  "]) {
+    for (const value of ["not-an-ip", "203.0.113.9, 198.51.100.1", "", "  "]) {
       expect(
         resolveClientIp({
           trust,
@@ -127,7 +136,7 @@ describe("resolving the client IP", () => {
       resolveClientIp({
         trust,
         remoteAddress: "172.31.240.5",
-        cfConnectingIp: ["203.0.113.9", "10.0.0.1"],
+        cfConnectingIp: ["203.0.113.9", "198.51.100.1"],
         fallback: "192.0.2.4",
       }),
     ).toBe("203.0.113.9");
