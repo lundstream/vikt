@@ -36,6 +36,8 @@ const restoreCheckSchema = z.object({
   tables: z.number().int().nullable(),
   rows: z.number().int().nullable(),
   migrations: z.number().int().nullable(),
+  /** Photos in the archive beside the dump, every one present (D191). */
+  mediaFiles: z.number().int().nullable(),
   error: z.string().nullable(),
   ageDays: z.number().int(),
   /** Older than thirty-five days, which the screen says in words. */
@@ -51,6 +53,7 @@ const runSchema = z.object({
   destination: z.string(),
   fileName: z.string().nullable(),
   bytes: z.number().nullable(),
+  mediaFiles: z.number().int().nullable(),
   error: z.string().nullable(),
 });
 
@@ -223,7 +226,7 @@ export const backupRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) => {
       const actor = await actorFor(app, request.userId!);
-      const outcome = await runBackup(app.db, app.config, actor);
+      const outcome = await runBackup(app.db, app.config, actor, process.env, app.media);
 
       return outcome.ok
         ? { ok: true, fileName: outcome.fileName, bytes: outcome.bytes, reason: null }

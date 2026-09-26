@@ -146,6 +146,11 @@ services:
       # API proves it at boot before offering the surface.
       LLM_VISION_MODEL: ${LLM_VISION_MODEL:-}
       OLLAMA_VISION_TIMEOUT_MS: ${OLLAMA_VISION_TIMEOUT_MS:-60000}
+      # Meal photos (D191). `directory` keeps them in /media, bound below from
+      # MEDIA_HOST_DIR; `s3` keeps them beside the backups in S3. MEDIA_DIR is
+      # empty, which means /media in production.
+      MEDIA_STORAGE: ${MEDIA_STORAGE:-directory}
+      MEDIA_DIR: ${MEDIA_DIR:-}
     volumes:
       # Where the scheduled backup writes (D103, D168): a directory on the host,
       # bound in at /backups. Choose /backups under Administration, Backup.
@@ -157,6 +162,12 @@ services:
       # on exactly that. The host directory is created and handed to uid 1000
       # before the stack starts (INFRA.md), and it outlives the container.
       - ${BACKUP_HOST_DIR:?set BACKUP_HOST_DIR to a host directory owned by uid 1000, e.g. /var/backups/vikt/app}:/backups
+      # Where the meal photos live (D191), the same kind of bind and for the same
+      # reason: uid 1000 cannot write to a named volume's root-owned mountpoint,
+      # and a directory on the host outlives the container. Created and handed
+      # to uid 1000 before the stack starts (INFRA.md). Backed up by the app's
+      # scheduled backup and by infra/backup.sh.
+      - ${MEDIA_HOST_DIR:?set MEDIA_HOST_DIR to a host directory owned by uid 1000, e.g. /var/lib/vikt/media}:/media
     networks:
       - backend
       # `edge` so nginx can reach it, and so the food-database lookups have

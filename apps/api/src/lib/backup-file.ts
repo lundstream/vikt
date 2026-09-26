@@ -1,4 +1,4 @@
-import { createDecipheriv, hkdfSync } from "node:crypto";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 
 /**
  * The app's encrypted backup file, in one place (D103, D168).
@@ -23,6 +23,23 @@ export function backupKey(secret: string): Buffer {
   return Buffer.from(
     hkdfSync("sha256", Buffer.from(secret, "utf8"), BACKUP_FILE_SALT, BACKUP_FILE_USE, 32),
   );
+}
+
+/**
+ * Bytes already in memory, in the same format as the dump (D191): the photo
+ * archive written beside it. Small enough to hold, and one format means one
+ * decrypt path, one restore check and one host script for both.
+ */
+export function encryptBackup(plain: Buffer, secret: string): Buffer {
+  const iv = randomBytes(BACKUP_IV_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", backupKey(secret), iv);
+  const body = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([Buffer.from(BACKUP_MAGIC), iv, body, cipher.getAuthTag()]);
+}
+
+/** The photo archive that belongs to a dump: the same time, `.media.enc`. */
+export function mediaArchiveName(dumpName: string): string {
+  return dumpName.replace(/\.dump\.enc$/, ".media.enc");
 }
 
 export type DecryptedBackup =

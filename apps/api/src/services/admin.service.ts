@@ -164,14 +164,17 @@ export async function previewDeletion(
     foodEntries: await count("food_entries"),
     dailyLogs: await count("daily_log"),
     /**
-     * The rows exist; the files do not yet (phase 7 is not built).
-     *
-     * Counted anyway and named in the preview, because D10 puts the files on a
-     * volume **outside the database**: the cascade removes these rows and will
-     * not remove a single file. Whoever builds that feature has to delete them
-     * here, and this line is where they will look.
+     * The meal photos (D191), the files this preview has been waiting for
+     * since D10: they live outside the database, so the cascade removes the
+     * rows and the delete paths remove the folder. Counted from the rows that
+     * point at one.
      */
-    photos: await count("photos"),
+    photos: await (async () => {
+      const result = await db.execute(
+        sql`select count(*)::int as n from meals where user_id = ${userId} and photo_key is not null`,
+      );
+      return (result as unknown as { n: number }[])[0]?.n ?? 0;
+    })(),
   };
 }
 

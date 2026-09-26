@@ -1,4 +1,6 @@
 import { Readable } from "node:stream";
+import { strToU8, zipSync } from "fflate";
+import { userMediaPrefix } from "../lib/media.js";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { errorResponseSchema } from "shared";
@@ -103,6 +105,45 @@ export const exportRoutes: FastifyPluginAsyncZod = async (app) => {
         .header("content-type", XLSX_CONTENT_TYPE)
         .header("content-disposition", `attachment; filename="vikt-${asOf}.xlsx"`)
         .send(file);
+    },
+  );
+
+  /**
+   * Everything, with the photos (D191): one zip holding the JSON the import
+   * reads, a CSV per table, and every meal photo under `media/`, by the key the
+   * meal names. The photos are the one thing the other formats cannot carry,
+   * and an export that left them behind would not be everything.
+   *
+   * Built in memory, unlike the CSVs: a zip's directory is written at the end
+   * and needs every entry's size, and this account's photos are at most one
+   * per meal at a few hundred kilobytes each.
+   */
+  app.get(
+    "/export/zip",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const userId = request.userId!;
+      const data = await exportUser(userId, app.db);
+      const stamp = data.exportedAt.slice(0, 10);
+
+      const files: Record<string, [Uint8Array, { level: 0 | 6 }]> = {
+        [`vikt-${stamp}.json`]: [strToU8(JSON.stringify(data, null, 2)), { level: 6 }],
+      };
+      for (const table of EXPORTED_TABLES) {
+        let csv = "";
+        for await (const chunk of csvFor(userId, app.db, table)) csv += chunk;
+        files[`csv/${table}.csv`] = [strToU8(csv), { level: 6 }];
+      }
+      for (const key of await app.media.list(userMediaPrefix(userId))) {
+        const bytes = await app.media.get(key);
+        // Stored, not deflated: a JPEG does not get smaller.
+        if (bytes !== null) files[`media/${key}`] = [new Uint8Array(bytes), { level: 0 }];
+      }
+
+      return reply
+        .header("content-type", "application/zip")
+        .header("content-disposition", `attachment; filename="vikt-${stamp}.zip"`)
+        .send(Buffer.from(zipSync(files)));
     },
   );
 

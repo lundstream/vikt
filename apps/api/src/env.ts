@@ -473,6 +473,20 @@ export const envSchema = z.object({
 
   /** Queued generation, where nobody is watching. */
   OLLAMA_JOB_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(180000),
+
+  /**
+   * Where stored images live (D191): the meal photos, the first images this
+   * app keeps. `directory` writes under `MEDIA_DIR`; `s3` uses the backup's own
+   * S3 connection, in a `media` folder beside the backups, so there is no
+   * second set of credentials to hold.
+   */
+  MEDIA_STORAGE: z.enum(["directory", "s3"]).default("directory"),
+  /**
+   * The directory, inside the container. Empty means `/media` in production,
+   * which is where the stack binds `MEDIA_HOST_DIR`, and `.media` beside the
+   * API on a workstation (`lib/media.ts`).
+   */
+  MEDIA_DIR: z.string().trim().default(""),
 });
 
 export type Env = z.infer<typeof envSchema> & { corsOrigins: string[] };

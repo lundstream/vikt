@@ -17,9 +17,19 @@ app starts.
 
 ### What a backup is
 
-One file per run, `vikt-<timestamp>.dump.enc`:
+Two files per run, with the same timestamp:
 
-    VIKTBK1 | 12-byte IV | AES-256-GCM ciphertext of pg_dump -Fc | 16-byte tag
+- `vikt-<timestamp>.dump.enc`, the database:
+
+      VIKTBK1 | 12-byte IV | AES-256-GCM ciphertext of pg_dump -Fc | 16-byte tag
+
+- `vikt-<timestamp>.media.enc`, the meal photos (D191): a zip of every stored
+  photo, named by the key its meal points at, encrypted in the same format with
+  the same key. Written even when there are no photos, so a check can tell "no
+  photos" from "no archive". The photos live outside the database, in the
+  directory the stack binds at `/media` from `MEDIA_HOST_DIR` or in S3 beside
+  the backups (`MEDIA_STORAGE`), so the dump alone would bring meals back
+  without their photos.
 
 **Encrypted before it is written**, so the plaintext archive never exists as a
 file. The key is derived from `SECRET_KEY` (or `SECRET_KEY_FILE`), which means:
@@ -54,6 +64,12 @@ docker compose -f infra/docker-compose.yml exec -T postgres \
 
 # 3. Compare the derived figures before trusting it.
 infra/restore-check.sh vikt.dump
+
+# 4. The photos: decrypt the archive with the same stamp, and unpack it into the
+#    media directory. The paths inside are the keys the meals name.
+node infra/backup-decrypt.mjs vikt-20260906T031700Z.media.enc vikt-media.zip
+sudo unzip -o vikt-media.zip -d /var/lib/vikt/media
+sudo chown -R 1000:1000 /var/lib/vikt/media
 ```
 
 Only once the scratch restore matches should anything touch the live database.
@@ -113,10 +129,10 @@ NTLMv2 is authentication code whose errors are silent. D132 and D133 have the
 account. Mount the share on the host and use a directory destination; the README
 has the fstab and compose lines.
 
-**Uploads are not in it.** The app's backup is the database. Photos live on disk
-outside it by D10, and Phase 7 has not shipped, so there is nothing there yet;
-the shell script below still tars that directory, and until photos exist the two
-cover the same ground.
+**The photos are in it** (D191). Until 1.3 this said they were not, because
+there were none: D10 put photos outside the database and nothing stored one.
+Meal photos are the first, and both backups carry them, the app's as the
+`.media.enc` archive above and the shell script's as `media-<timestamp>.tar.gz`.
 
 ### Checking that a backup restores
 
@@ -127,6 +143,11 @@ database, compares that with the live database, and drops the scratch database.
 Administration, Backup shows the last result as "Senaste återställningstest",
 "Inte än" before the first one, and says so in words when the last is older
 than thirty-five days.
+
+**It checks the photos too** (D191). It opens the `.media.enc` archive with the
+dump's timestamp and fails if any photo the restored database names is missing
+from it or is not a photograph, and the screen shows how many photos it found.
+A dump from before 1.3 has no archive and names no photos, and passes.
 
 The same check from a command, on a file or on the newest backup:
 
@@ -177,11 +198,17 @@ schedule since D103.
 - `vikt-<timestamp>.dump` — the whole database, `pg_dump -Fc`. Compressed, and
   `pg_restore` can read it selectively, so recovering one table does not mean
   replaying the file.
-- `uploads-<timestamp>.tar.gz` — the uploads volume, when it exists. Photos live
-  on disk outside the database by D10, so a database-only backup restores an app
-  whose every photo is a broken link. Phase 7 has not shipped, so this is
-  currently empty; it runs anyway, because a script that starts covering a
-  directory only once somebody remembers is a script that misses the first month.
+- `media-<timestamp>.tar.gz` — the meal photos (D191), the directory at
+  `MEDIA_HOST_DIR` (default `/var/lib/vikt/media`), with paths relative to it so
+  the archive unpacks straight back into a fresh one. Photos live on disk outside
+  the database by D10, so a database-only backup restores meals whose every
+  photo is a broken link. A stack that keeps its photos in S3 has no directory
+  here, and the script says so and carries on; the app's own backup archives
+  those.
+
+`infra/restore-check.sh <dump>` finds the `media-` archive with the dump's
+timestamp (or takes it as a second argument) and fails when the restored
+database names a photo the archive does not hold.
 
 The dump is taken **through the running container**, so `pg_dump` always matches
 the server version. A host `pg_dump` one major version behind refuses outright,

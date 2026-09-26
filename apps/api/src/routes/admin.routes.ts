@@ -1,3 +1,4 @@
+import { userMediaPrefix } from "../lib/media.js";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { errorResponseSchema } from "shared";
@@ -321,6 +322,12 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) => {
       const actor = await actorFor(app, request.userId!);
+      /*
+        The account's photos first, as the account's own delete does (D10,
+        D191): files cannot roll back, and an orphaned folder of somebody's
+        photos on a server they were removed from is the worse failure.
+      */
+      await app.media.deletePrefix(userMediaPrefix(request.params.id)).catch(() => 0);
       const removed = await deleteUser(app.db, actor, request.params.id);
       if (!removed) throw notFound("No such account.");
       return removed;

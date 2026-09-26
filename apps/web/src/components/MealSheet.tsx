@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import type { FoodItem, Meal, MealRowFood } from "shared";
 import { MIN_SEARCH_LENGTH, formatDecimal, formatKcal, mealNutrition } from "shared";
 import {
@@ -6,9 +6,12 @@ import {
   useCreateMeal,
   useDeleteMeal,
   useFoodSearch,
+  useDeleteMealPhoto,
   useLlmHealth,
+  useSetMealPhoto,
   useUpdateMeal,
 } from "../lib/food.js";
+import { preparePhoto } from "../lib/photo.js";
 import { api, ApiError } from "../lib/api.js";
 import { useOnline } from "../lib/queue/useQueue.js";
 import { readRequiredNumber } from "../lib/form-number.js";
@@ -100,6 +103,48 @@ export function MealSheet({
   const llm = useLlmHealth();
   const online = useOnline();
   const lookup = useBarcodeLookup();
+  const setPhoto = useSetMealPhoto();
+  const deletePhoto = useDeleteMealPhoto();
+
+  /**
+   * The photo (D191): the saved one's URL, or a picture chosen for a meal not
+   * saved yet, held in memory until the create returns an id to put it on.
+   */
+  const [photoUrl, setPhotoUrl] = useState<string | null>(meal?.photoUrl ?? null);
+  const [pendingPhoto, setPendingPhoto] = useState<{ base64: string; preview: string } | null>(null);
+  const [photoWorking, setPhotoWorking] = useState(false);
+  useEffect(
+    () => () => {
+      if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.preview);
+    },
+    [pendingPhoto],
+  );
+
+  async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError(null);
+    setPhotoWorking(true);
+    const prepared = await preparePhoto(file);
+    if (!prepared.ok) {
+      setPhotoWorking(false);
+      setError(prepared.reason === "too_large" ? t("photo.tooLarge") : t("photo.unreadable"));
+      return;
+    }
+    try {
+      if (meal) {
+        const saved = await setPhoto.mutateAsync({ mealId: meal.id, image: prepared.base64 });
+        setPhotoUrl(saved.photoUrl);
+      } else {
+        setPendingPhoto({ base64: prepared.base64, preview: URL.createObjectURL(prepared.blob) });
+      }
+    } catch (problem) {
+      setError(problem instanceof ApiError ? problem.message : t("save.failed"));
+    } finally {
+      setPhotoWorking(false);
+    }
+  }
 
   const [name, setName] = useState(meal?.name ?? "");
   const [portions, setPortions] = useState(
@@ -291,12 +336,15 @@ export function MealSheet({
           input: { name: name.trim(), portions: portionCount.value, items },
         });
       } else {
-        await create.mutateAsync({
+        const created = await create.mutateAsync({
           clientUuid: clientUuid(),
           name: name.trim(),
           portions: portionCount.value,
           items: items.map((item) => ({ ...item, foodItemId: item.foodItemId! })),
         });
+        if (pendingPhoto) {
+          await setPhoto.mutateAsync({ mealId: created.id, image: pendingPhoto.base64 });
+        }
       }
       onDone(t("meals.saved", { name: name.trim() }));
     } catch (problem) {
@@ -331,6 +379,50 @@ export function MealSheet({
               onChange={(event) => setPortions(event.target.value)}
             />
           </Field>
+        </div>
+
+        {/*
+          The one photo (D191). "Lägg till foto" is an action and filled, at
+          the size a row holds (D134); removing it asks first, like any delete.
+        */}
+        <div className="mt-4 flex items-center gap-4" data-testid="meal-photo">
+          {pendingPhoto?.preview ?? photoUrl ? (
+            <img
+              src={pendingPhoto?.preview ?? photoUrl ?? ""}
+              alt={t("meals.photoAlt", { name: name || t("meals.sheetNew") })}
+              className="size-24 shrink-0 rounded-lg object-cover"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <label className="btn-small cursor-pointer">
+              {photoWorking
+                ? t("meals.photoWorking")
+                : pendingPhoto || photoUrl
+                  ? t("meals.photoChange")
+                  : t("meals.photoAdd")}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                data-testid="meal-photo-input"
+                disabled={photoWorking}
+                onChange={(event) => void choosePhoto(event)}
+              />
+            </label>
+            {meal && photoUrl ? (
+              <span className="ml-2 inline-block align-middle">
+                <DeleteButton
+                  testId="meal-photo-delete"
+                  label={t("meals.photoRemove")}
+                  onDelete={async () => {
+                    await deletePhoto.mutateAsync(meal.id);
+                    setPhotoUrl(null);
+                  }}
+                />
+              </span>
+            ) : null}
+            <p className="mt-1 max-w-prose text-micro text-muted">{t("meals.photoNote")}</p>
+          </div>
         </div>
 
         <div className="mt-4" data-testid="meal-sheet-figures">

@@ -239,6 +239,13 @@
       "when": 1788310208000,
       "tag": "0033_label_photo",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788310209000,
+      "tag": "0034_media_backup",
+      "breakpoints": true
     }
   ]
 }

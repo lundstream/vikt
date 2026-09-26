@@ -781,6 +781,7 @@ export const sv = {
   "backup.restoreHint":
     "Att lägga tillbaka en backup i den databas som körs är ett kommando, inte en knapp: se docs/backup.md. Det är den enda åtgärden som förstör en databas genom att lyckas, och den ska kräva att någon skriver den. Återställningstestet ovan rör aldrig den databasen.",
   "backup.restoreCheck": "Senaste återställningstest",
+  "backup.photos": "{count} foton",
   "backup.restoreCheckOk": "{date}, gick att läsa in: {tables} tabeller, {rows} rader",
   "backup.restoreCheckFailed": "{date}, gick inte att läsa in",
   "backup.restoreCheckRunning": "pågår, startade {date}",
@@ -943,7 +944,9 @@ export const sv = {
     "En tom ruta är något som inte är ifyllt, aldrig en nolla. Underhållet är det appen visade den dagen, med sin källa.",
   // ------------------------------------------------------------- the export
   "export.heading": "Ta med din data",
-  "export.intro": "Allt du loggat går att ta ut, när du vill och i tre format.",
+  "export.intro": "Allt du loggat går att ta ut, när du vill, i de format som passar.",
+  "export.zip": "Allt, med foton, som zip",
+  "export.zipHint": "JSON-filen, en CSV per tabell och fotona på dina måltider, i en fil.",
   "export.xlsx": "Exportera till Excel",
   "export.xlsxHint":
     "Dagtabellen på första fliken och en flik per tabell, med svenska rubriker, riktiga tal och riktiga datum.",
@@ -1362,6 +1365,12 @@ export const sv = {
   "meals.saved": "{name} sparad",
   "meals.removed": "{name} borttagen",
   "meals.removeNote": "Dagar du redan har loggat den på ändras inte.",
+  "meals.photoAdd": "Lägg till foto",
+  "meals.photoChange": "Byt foto",
+  "meals.photoRemove": "fotot",
+  "meals.photoAlt": "Foto av {name}",
+  "meals.photoWorking": "Förbereder fotot…",
+  "meals.photoNote": "Fotot förminskas och rensas från plats och tid i telefonen innan det sparas. Bara du ser det.",
   "meals.saveAsMeal": "Spara som måltid",
   "meals.savedAsMeal": "Sparad som måltid: {name}",
   "meals.savedAsMealWithout": "Sparad som måltid: {name}. {count} rader utan träff i matdatabasen kom inte med.",

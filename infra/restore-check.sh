@@ -2,6 +2,12 @@
 # Restores a backup into a scratch database and checks it (D96).
 #
 #   ./restore-check.sh /var/backups/vikt/vikt-20260906T030000Z.dump
+#   ./restore-check.sh <dump> <photo archive>   # when it is not beside the dump
+#
+# The photo archive backup.sh writes beside each dump, media-<stamp>.tar.gz, is
+# found by the dump's own stamp and checked too (D191): every photo the restored
+# database names has to be in it, or the backup would bring the meals back
+# without their photos.
 #
 # This is the half of a backup strategy that people skip, and it is the half
 # that decides whether the other half worked. A dump that has never been
@@ -95,6 +101,37 @@ for DB in "$SCRATCH" "$POSTGRES_DB"; do
     from weight_log
     where user_id = (select user_id from weight_log group by user_id order by count(*) desc limit 1);"
 done
+
+echo
+echo "--- the photos (D191) ---"
+STAMP="$(basename "$DUMP" | sed -n 's/^vikt-\(.*\)\.dump$/\1/p')"
+MEDIA_TAR="${2:-$(dirname "$DUMP")/media-$STAMP.tar.gz}"
+NAMED="$(mktemp)"
+LISTED="$(mktemp)"
+run psql -U "$POSTGRES_USER" -d "$SCRATCH" -A -t -c \
+  "select photo_key from meals where photo_key is not null;" > "$NAMED" 2>/dev/null || true
+COUNT="$(grep -c . "$NAMED" || true)"
+if [ -f "$MEDIA_TAR" ]; then
+  tar -tzf "$MEDIA_TAR" | sed 's#^\./##' > "$LISTED"
+  MISSING=0
+  while IFS= read -r KEY; do
+    [ -n "$KEY" ] || continue
+    grep -qxF "$KEY" "$LISTED" || MISSING=$((MISSING + 1))
+  done < "$NAMED"
+  echo "  $COUNT photos named by the restored meals, $MISSING missing from $(basename "$MEDIA_TAR")"
+  rm -f "$NAMED" "$LISTED"
+  if [ "$MISSING" -gt 0 ]; then
+    echo "The photo archive does not hold every photo the dump names." >&2
+    exit 1
+  fi
+elif [ "$COUNT" -gt 0 ]; then
+  rm -f "$NAMED" "$LISTED"
+  echo "The dump names $COUNT photos and there is no photo archive at $MEDIA_TAR." >&2
+  exit 1
+else
+  rm -f "$NAMED" "$LISTED"
+  echo "  no photos named, and no archive needed"
+fi
 
 echo
 echo "If the two blocks above match, this dump restores. If they do not, the"

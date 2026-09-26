@@ -1,3 +1,6 @@
+import { zipSync } from "fflate";
+import { encryptBackup, mediaArchiveName } from "../lib/backup-file.js";
+import type { MediaStore } from "../lib/media.js";
 import { spawn } from "node:child_process";
 import { createCipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { createWriteStream } from "node:fs";
@@ -104,6 +107,8 @@ export type BackupRun = {
   fileName: string | null;
   bytes: number | null;
   error: string | null;
+  /** Photos archived beside the dump (D191). Null: none was written. */
+  mediaFiles: number | null;
 };
 
 export type Actor = { id: string; email: string };
@@ -158,6 +163,24 @@ function targetFrom(settings: BackupSettings, credentials: S3Credentials): S3Tar
     forcePathStyle: settings.s3PathStyle,
     ...credentials,
   };
+}
+
+/**
+ * The backup's own S3 connection, for the meal photos to live beside (D191).
+ *
+ * Null when the backup does not write to S3 or its secret cannot be read. The
+ * photos use the same endpoint, bucket and keys under their own folder, so
+ * choosing S3 for photos adds no second set of credentials to hold.
+ */
+export async function backupS3Target(
+  db: Db,
+  processEnv: NodeJS.ProcessEnv = process.env,
+): Promise<S3Target | null> {
+  const settings = await readBackupSettings(db, processEnv);
+  if (settings.destinationKind !== "s3" || settings.s3Bucket.trim() === "") return null;
+  const row = await settingsRow(db);
+  const credentials = readS3Credentials(row?.credentialsEncrypted ?? "", processEnv);
+  return credentials === null ? null : targetFrom(settings, credentials);
 }
 
 async function settingsRow(db: Db) {
@@ -331,6 +354,7 @@ export async function listBackupRuns(db: Db, limit = 20): Promise<BackupRun[]> {
     destination: row.destination,
     fileName: row.fileName,
     bytes: row.bytes,
+    mediaFiles: row.mediaFiles,
     error: row.error,
   }));
 }
@@ -352,7 +376,8 @@ export function nextRunAt(scheduleMinute: number | null, now = new Date()): Date
 }
 
 export type BackupOutcome =
-  | { ok: true; fileName: string; bytes: number }
+  /** `mediaFiles`: photos archived beside the dump, null when none was written (D191). */
+  | { ok: true; fileName: string; bytes: number; mediaFiles: number | null }
   | { ok: false; reason: string };
 
 /**
@@ -367,6 +392,11 @@ export async function runBackup(
   env: Env,
   actor: Actor | null,
   processEnv: NodeJS.ProcessEnv = process.env,
+  /**
+   * The meal photos (D191), archived beside the dump. Null only where there is
+   * no store to read, which is a test that is not about photos.
+   */
+  media: MediaStore | null = null,
 ): Promise<BackupOutcome> {
   const settings = await readBackupSettings(db);
 
@@ -385,7 +415,9 @@ export async function runBackup(
       .set({
         finishedAt: new Date(),
         status: outcome.ok ? "ok" : "failed",
-        ...(outcome.ok ? { fileName: outcome.fileName, bytes: outcome.bytes } : { error: outcome.reason }),
+        ...(outcome.ok
+          ? { fileName: outcome.fileName, bytes: outcome.bytes, mediaFiles: outcome.mediaFiles }
+          : { error: outcome.reason }),
       })
       .where(eq(backupRuns.id, run!.id));
 
@@ -431,8 +463,8 @@ export async function runBackup(
   backupInFlight(run!.id, describeDestination(settings), db);
 
   try {
-    const bytes = await writeBackup(db, settings, env, fileName, processEnv);
-    return finish({ ok: true, fileName, bytes });
+    const written = await writeBackup(db, settings, env, fileName, processEnv, media);
+    return finish({ ok: true, fileName, bytes: written.bytes, mediaFiles: written.mediaFiles });
   } catch (error) {
     return finish({ ok: false, reason: (error as Error).message.slice(0, 500) });
   } finally {
@@ -475,7 +507,8 @@ async function writeBackup(
   env: Env,
   fileName: string,
   processEnv: NodeJS.ProcessEnv,
-): Promise<number> {
+  media: MediaStore | null,
+): Promise<{ bytes: number; mediaFiles: number | null }> {
   if (settings.destinationKind === "s3") {
     const row = await settingsRow(db);
     const credentials = readS3Credentials(row?.credentialsEncrypted ?? "", processEnv);
@@ -497,13 +530,17 @@ async function writeBackup(
        */
       const body = await collect(dumpStream(env.DATABASE_URL, processEnv));
       const bytes = await putObject(client, target, fileName, body);
+      const archive = media ? await encryptedMediaArchive(media, processEnv) : null;
+      if (archive) await putObject(client, target, mediaArchiveName(fileName), archive.body);
       await pruneOnS3(client, target, settings.retainDays);
-      return bytes;
+      await pruneOnS3(client, target, settings.retainDays, /^vikt-.*\.media\.enc$/);
+      return { bytes, mediaFiles: archive?.files ?? null };
     } catch (error) {
       // A partial object is worse than none: it has a plausible name and
       // cannot be restored. S3 has no partial PUT, but a failed prune or a
       // half-written multipart would, so the delete is attempted regardless.
       await deleteObject(client, target, fileName).catch(() => {});
+      await deleteObject(client, target, mediaArchiveName(fileName)).catch(() => {});
       throw new Error(explainS3Error(error));
     } finally {
       // The SDK keeps sockets alive for reuse; a long-lived API that never
@@ -520,10 +557,17 @@ async function writeBackup(
   try {
     await mkdir(settings.destinationPath, { recursive: true });
     const bytes = await dumpEncrypted(env.DATABASE_URL, createWriteStream(target), processEnv);
+    const archive = media ? await encryptedMediaArchive(media, processEnv) : null;
+    if (archive) {
+      await writeFile(path.join(settings.destinationPath, mediaArchiveName(fileName)), archive.body);
+    }
     await pruneOldBackups(settings.destinationPath, settings.retainDays);
-    return bytes;
+    return { bytes, mediaFiles: archive?.files ?? null };
   } catch (error) {
     await rm(target, { force: true }).catch(() => {});
+    await rm(path.join(settings.destinationPath, mediaArchiveName(fileName)), { force: true }).catch(
+      () => {},
+    );
     throw error;
   }
 }
@@ -637,6 +681,30 @@ async function dumpEncrypted(
 }
 
 /**
+ * Every stored photo, in one zip, encrypted like the dump (D191).
+ *
+ * Stored rather than compressed: a JPEG does not get smaller, and deflating
+ * it again costs time for nothing. Named by key, so a restore puts each file
+ * back where the database says it is. Written even when there are no photos,
+ * so the restore check can tell "no photos" from "no archive".
+ */
+export async function encryptedMediaArchive(
+  media: MediaStore,
+  processEnv: NodeJS.ProcessEnv,
+): Promise<{ body: Buffer; files: number }> {
+  const secret = readSecretKey(processEnv);
+  if (secret === null) throw new Error("SECRET_KEY is not set");
+  const keys = await media.list("users/");
+  const entries: Record<string, [Uint8Array, { level: 0 }]> = {};
+  for (const key of keys) {
+    const bytes = await media.get(key);
+    if (bytes !== null) entries[key] = [new Uint8Array(bytes), { level: 0 }];
+  }
+  const zip = zipSync(entries);
+  return { body: encryptBackup(Buffer.from(zip), secret), files: Object.keys(entries).length };
+}
+
+/**
  * Deletes objects older than the retention window.
  *
  * The local version's twin, and deliberately the same rule: by age rather than
@@ -653,11 +721,12 @@ async function pruneOnS3(
   client: ReturnType<typeof s3ClientFor>,
   target: S3Target,
   retainDays: number,
+  pattern?: RegExp,
 ): Promise<void> {
   if (retainDays <= 0) return;
   const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
 
-  const objects = await listBackups(client, target);
+  const objects = await listBackups(client, target, pattern);
   // Oldest first, so dropping the tail keeps the newest whatever its date.
   const candidates = objects.slice(0, -1);
 
@@ -795,7 +864,7 @@ async function pruneOldBackups(directory: string, retainDays: number): Promise<v
   const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
 
   for (const entry of await readdir(directory)) {
-    if (!/^vikt-.*\.dump\.enc$/.test(entry)) continue;
+    if (!/^vikt-.*\.(dump|media)\.enc$/.test(entry)) continue;
     const full = path.join(directory, entry);
     const info = await stat(full).catch(() => null);
     if (info && info.mtimeMs < cutoff) await rm(full, { force: true });

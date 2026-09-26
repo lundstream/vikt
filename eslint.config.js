@@ -212,6 +212,16 @@ export default tseslint.config(
              */
             "runRestoreCheck",
             "latestRestoreCheck",
+            /**
+             * The meal photos in the backups (D191), installation-wide for the
+             * same reason as the rest of this block: the backup's S3
+             * connection is one setting, the photo archive holds every
+             * account's photos because the dump holds every account's rows,
+             * and the archive check compares a file with keys it is handed.
+             */
+            "backupS3Target",
+            "encryptedMediaArchive",
+            "checkMediaArchive",
 
             /**
              * Announcements are per installation (D108): one notice, everybody

@@ -2,6 +2,10 @@
  * Decrypts a backup written by the app (D103).
  *
  *   node infra/backup-decrypt.mjs vikt-20260906T031700Z.dump.enc vikt.dump
+ *   node infra/backup-decrypt.mjs vikt-20260906T031700Z.media.enc vikt-media.zip
+ *
+ * The second is the meal photos written beside each dump since 1.3 (D191), in
+ * the same format: a zip whose paths are the keys the meals name.
  *
  * Reads `SECRET_KEY`, or the file named by `SECRET_KEY_FILE`, exactly as the
  * app does. The output is an ordinary `pg_dump -Fc` archive, so the restore is
@@ -38,7 +42,7 @@ const USE = "vikt.backup.file";
 
 const [input, output] = process.argv.slice(2);
 if (!input || !output) {
-  process.stderr.write("Usage: backup-decrypt.mjs <file.dump.enc> <file.dump>\n");
+  process.stderr.write("Usage: backup-decrypt.mjs <file.dump.enc|file.media.enc> <output>\n");
   process.exit(2);
 }
 

@@ -92,3 +92,6 @@ scripts/.probe-selftest.png
 # Photographs and other things handed to a verification pass. Never committed:
 # a plate is a picture of somebody's kitchen.
 scratch/
+
+# Meal photos on a workstation (D191). Production keeps them in MEDIA_HOST_DIR.
+.media/

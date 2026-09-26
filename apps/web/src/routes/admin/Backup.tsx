@@ -43,6 +43,8 @@ type Run = {
   destination: string;
   fileName: string | null;
   bytes: number | null;
+  /** Photos archived beside the dump (D191). */
+  mediaFiles?: number | null;
   error: string | null;
 };
 
@@ -53,6 +55,8 @@ type RestoreCheck = {
   fileName: string | null;
   tables: number | null;
   rows: number | null;
+  /** Photos in the archive beside it, every one present (D191). */
+  mediaFiles?: number | null;
   error: string | null;
   ageDays: number;
   old: boolean;
@@ -79,11 +83,14 @@ function restoreCheckLine(check: RestoreCheck | null): string {
   const date = formatLongDay(check.startedAt.slice(0, 10), LOCALE);
   if (check.status === "running") return t("backup.restoreCheckRunning", { date });
   if (check.status === "failed") return t("backup.restoreCheckFailed", { date });
-  return t("backup.restoreCheckOk", {
+  const line = t("backup.restoreCheckOk", {
     date,
     tables: check.tables ?? 0,
     rows: formatDecimal(check.rows ?? 0, { decimals: 0 }),
   });
+  return typeof check.mediaFiles === "number"
+    ? `${line}, ${t("backup.photos", { count: formatDecimal(check.mediaFiles, { decimals: 0 }) })}`
+    : line;
 }
 
 /** `480` becomes `08:00`. The stored form is minutes, the shown form is a clock. */
@@ -299,7 +306,13 @@ export function Backup() {
         <dd className="num text-right text-ink" data-testid="backup-last">
           {last
             ? `${formatLongDay(last.startedAt.slice(0, 10), LOCALE)}${
-                last.status === "ok" ? ` · ${formatBytes(last.bytes)}` : ` · ${t("backup.failed")}`
+                last.status === "ok"
+                  ? ` · ${formatBytes(last.bytes)}${
+                      typeof last.mediaFiles === "number"
+                        ? ` · ${t("backup.photos", { count: formatDecimal(last.mediaFiles, { decimals: 0 }) })}`
+                        : ""
+                    }`
+                  : ` · ${t("backup.failed")}`
               }`
             : t("stat.notYet")}
         </dd>

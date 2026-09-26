@@ -1,3 +1,5 @@
+import { createMediaStore, type MediaStore } from "./lib/media.js";
+import { backupS3Target } from "./services/backup.service.js";
 import Fastify from "fastify";
 import type {
   FastifyBaseLogger,
@@ -76,6 +78,8 @@ declare module "fastify" {
      */
     llm: LlmClient;
     mailer: Mailer;
+    /** Where stored images live (D191): a directory or the backup's S3. */
+    media: MediaStore;
   }
 }
 
@@ -115,6 +119,8 @@ export type BuildAppOptions = {
    * disabled unless SMTP is configured.
    */
   mailer?: Mailer;
+  /** Replace the media store. Tests pass a directory in a temporary folder. */
+  media?: MediaStore;
   /**
    * Send logs here instead of stdout. A testing seam: the client-IP resolution
    * is only observable through what gets logged, and it has been wrong there
@@ -174,6 +180,10 @@ export async function buildApp(env: Env, options: BuildAppOptions = {}): Promise
     options.foodAdapters ?? [new OpenFoodFactsAdapter(), new LivsmedelsverketAdapter()],
   );
   app.decorate("foodRemoteTimeoutMs", options.foodRemoteTimeoutMs ?? null);
+  app.decorate(
+    "media",
+    options.media ?? createMediaStore(env, (db) => backupS3Target(db), () => app.db),
+  );
 
   /**
    * `request.clientIp` is the address to attribute a request to. Prefer it over

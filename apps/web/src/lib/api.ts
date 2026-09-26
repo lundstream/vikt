@@ -259,6 +259,16 @@ export const api = {
   deleteMeal: (mealId: string) =>
     request<void>(`/meals/${encodeURIComponent(mealId)}`, { method: "DELETE" }),
 
+  /** A meal's one photo (D191), already resized and stripped by `preparePhoto`. */
+  setMealPhoto: (mealId: string, image: string) =>
+    request<Meal>(`/meals/${encodeURIComponent(mealId)}/photo`, {
+      method: "PUT",
+      body: JSON.stringify({ image }),
+    }),
+
+  deleteMealPhoto: (mealId: string) =>
+    request<Meal>(`/meals/${encodeURIComponent(mealId)}/photo`, { method: "DELETE" }),
+
   // ------------------------------------------------- the optional LLM layer
   /**
    * Asked before any of it is offered. A switched-off workstation is an

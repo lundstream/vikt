@@ -394,3 +394,32 @@ describe("the backup directory", () => {
     }
   });
 });
+
+/**
+ * Where the meal photos live (D191): the same shape as the backup directory
+ * and held the same way, a required bind from `MEDIA_HOST_DIR` at /media,
+ * documented, and no named volume, because uid 1000 cannot write to one.
+ */
+describe("the media directory", () => {
+  const text = readFileSync(COMPOSE, "utf8").replace(/\r\n/g, "\n");
+  const apiBlock = (() => {
+    const start = text.indexOf("\n  api:");
+    const rest = text.slice(start + 1);
+    const end = rest.search(/\n {2}[a-z][a-z0-9_-]*:\n/);
+    return end === -1 ? rest : rest.slice(0, end);
+  })();
+
+  it("binds a required host directory at /media", () => {
+    expect(apiBlock).toMatch(/^ {6}- \$\{MEDIA_HOST_DIR:\?[^}]*\}:\/media\s*$/m);
+  });
+
+  it("mounts no named volume at /media", () => {
+    expect(apiBlock).not.toMatch(/- [a-z_]+:\/media/);
+  });
+
+  it("documents MEDIA_HOST_DIR with the commands that make it", () => {
+    expect(documented().has("MEDIA_HOST_DIR")).toBe(true);
+    const example = readFileSync(path.join(ROOT, "infra/.env.example"), "utf8");
+    expect(example).toMatch(/chown 1000:1000 \/var\/lib\/vikt\/media/);
+  });
+});

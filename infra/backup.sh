@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scheduled backup of the database and the uploads volume (D96).
+# Scheduled backup of the database and the meal photos (D96, D191).
 #
 #   ./backup.sh                 # one run, reads infra/.env
 #   BACKUP_DIR=/mnt/nas/vikt ./backup.sh
@@ -68,19 +68,27 @@ run pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$DUMP.partial"
 mv "$DUMP.partial" "$DUMP"
 echo "  database: $(du -h "$DUMP" | cut -f1)  $DUMP"
 
-# --- the uploads volume ----------------------------------------------------
+# --- the meal photos -------------------------------------------------------
 #
-# Photos live on disk outside the database by D10, so the dump does not contain
-# them and a database-only backup would restore an app whose every photo is a
-# broken link. Phase 7 has not shipped, so this is usually empty — it runs
-# anyway, because a backup script that starts covering a directory only after
-# someone remembers to add it is a script that misses the first month.
-UPLOADS="${UPLOADS_DIR:-$HERE/data/uploads}"
-if [ -d "$UPLOADS" ]; then
-  tar -czf "$BACKUP_DIR/uploads-$STAMP.tar.gz" -C "$(dirname "$UPLOADS")" "$(basename "$UPLOADS")"
-  echo "  uploads:  $(du -h "$BACKUP_DIR/uploads-$STAMP.tar.gz" | cut -f1)"
+# Photos live on disk outside the database (D10), in the directory the stack
+# binds at /media (MEDIA_HOST_DIR, D191), so the dump does not contain them and
+# a database-only backup would restore meals whose every photo is a broken
+# link. Archived with the same stamp as the dump, so restore-check.sh finds the
+# pair, and paths relative to the directory, so the archive unpacks straight
+# back into a fresh one: users/<id>/meals/<meal>-<random>.jpg, which is the key
+# each meal names.
+#
+# A missing directory is said out loud and not an error: a stack that stores
+# photos in S3 (MEDIA_STORAGE=s3) has none here, and the app's own backup
+# archives those beside its dumps.
+MEDIA="${MEDIA_HOST_DIR:-/var/lib/vikt/media}"
+if [ -d "$MEDIA" ]; then
+  tar -czf "$BACKUP_DIR/media-$STAMP.tar.gz.partial" -C "$MEDIA" .
+  mv "$BACKUP_DIR/media-$STAMP.tar.gz.partial" "$BACKUP_DIR/media-$STAMP.tar.gz"
+  PHOTOS="$(tar -tzf "$BACKUP_DIR/media-$STAMP.tar.gz" | grep -c '\.jpg$' || true)"
+  echo "  photos:   $PHOTOS in $(du -h "$BACKUP_DIR/media-$STAMP.tar.gz" | cut -f1)  $BACKUP_DIR/media-$STAMP.tar.gz"
 else
-  echo "  uploads:  $UPLOADS does not exist yet, skipped"
+  echo "  photos:   $MEDIA does not exist, skipped (MEDIA_HOST_DIR, or photos kept in S3)"
 fi
 
 # --- retention -------------------------------------------------------------
@@ -94,7 +102,7 @@ fi
 # window -- was on a thirty day timer nobody had set. `releases/` is the
 # subdirectory that convention uses.
 find "$BACKUP_DIR" -maxdepth 1 -name 'vikt-*.dump' -mtime "+$RETAIN_DAYS" -delete
-find "$BACKUP_DIR" -maxdepth 1 -name 'uploads-*.tar.gz' -mtime "+$RETAIN_DAYS" -delete
+find "$BACKUP_DIR" -maxdepth 1 -name 'media-*.tar.gz' -mtime "+$RETAIN_DAYS" -delete
 
 REMAINING="$(find "$BACKUP_DIR" -maxdepth 1 -name 'vikt-*.dump' | wc -l | tr -d ' ')"
 echo "[$(date -u +%FT%TZ)] done. $REMAINING dumps kept, retention ${RETAIN_DAYS}d"

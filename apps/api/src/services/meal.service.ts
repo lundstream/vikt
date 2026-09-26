@@ -28,6 +28,14 @@ import { toEntry } from "./food.service.js";
 import { deriveUuid } from "../lib/derive-uuid.js";
 import { assertDateSource, serverDate } from "../lib/date-source.js";
 import { notFound, unprocessable } from "../lib/errors.js";
+import { mealPhotoKey, MediaUnavailable, type MediaStore } from "../lib/media.js";
+import {
+  PHOTO_MAX_BYTES,
+  PHOTO_MAX_EDGE,
+  jpegDimensions,
+  readJpegOrientation,
+  stripJpegMetadata,
+} from "shared";
 
 /**
  * Måltider (Phase 14, D186).
@@ -326,4 +334,97 @@ export async function logMeal(
     entries: await Promise.all(rows.map((row) => toEntry(userId, db, row))),
     skipped,
   };
+}
+
+/* ------------------------------------------------------------ the photo */
+
+/**
+ * A meal's one photo (D191), checked and cleaned before it is stored.
+ *
+ * The phone already resized it, turned it upright and dropped its EXIF (D190,
+ * `lib/photo.ts`). The server does not take that on trust, because a client
+ * that is not this one could send the original: **a JPEG only, no longer than
+ * 1 280 px on either side, upright, and stored with every metadata segment
+ * removed**, so no photograph kept here carries a location, a time or a phone
+ * model whatever sent it. A picture tagged as turned is refused rather than
+ * stripped, because stripping the tag would store it sideways.
+ *
+ * Stored under a new key each time and the old one removed after the meal
+ * points at the new, so a reader never gets a key that has gone.
+ */
+export async function setMealPhoto(
+  userId: string,
+  db: Db,
+  media: MediaStore,
+  mealId: string,
+  base64: string,
+): Promise<Meal> {
+  const meal = await findMeal(userId, db, mealId);
+  if (!meal) throw notFound("Det finns ingen sådan måltid.");
+
+  const bytes = new Uint8Array(Buffer.from(base64, "base64"));
+  if (bytes.length > PHOTO_MAX_BYTES) {
+    throw unprocessable("photo_too_large", "Bilden är för stor. Ta den igen.");
+  }
+  const size = jpegDimensions(bytes);
+  const clean = size === null ? null : stripJpegMetadata(bytes);
+  if (size === null || clean === null) {
+    throw unprocessable("not_a_photo", "Det där är inte en JPEG-bild appen kan läsa.");
+  }
+  if (Math.max(size.width, size.height) > PHOTO_MAX_EDGE) {
+    throw unprocessable(
+      "photo_too_large",
+      `Bilden är större än ${PHOTO_MAX_EDGE} px. Välj den från appen, så förminskas den först.`,
+    );
+  }
+  if (readJpegOrientation(bytes) !== 1) {
+    throw unprocessable(
+      "photo_not_upright",
+      "Bilden är märkt som vriden. Välj den från appen, så vänds den rätt först.",
+    );
+  }
+
+  const key = mealPhotoKey(userId, mealId);
+  try {
+    await media.put(key, Buffer.from(clean));
+  } catch (error) {
+    if (error instanceof MediaUnavailable) throw unprocessable("media_unavailable", error.message);
+    throw error;
+  }
+  await updateMeal(userId, db, mealId, { photoKey: key, photoUpdatedAt: new Date() });
+  if (meal.photoKey !== null) await media.delete(meal.photoKey).catch(() => {});
+  return getMeal(userId, db, mealId);
+}
+
+export async function removeMealPhoto(
+  userId: string,
+  db: Db,
+  media: MediaStore,
+  mealId: string,
+): Promise<Meal> {
+  const meal = await findMeal(userId, db, mealId);
+  if (!meal) throw notFound("Det finns ingen sådan måltid.");
+  if (meal.photoKey !== null) {
+    await updateMeal(userId, db, mealId, { photoKey: null, photoUpdatedAt: new Date() });
+    await media.delete(meal.photoKey).catch(() => {});
+  }
+  return getMeal(userId, db, mealId);
+}
+
+/**
+ * A meal's photo, for the person whose meal it is (§3). A stranger's request
+ * is the same 404 as a meal with no photo: whether a photo exists is itself
+ * something only its owner learns.
+ */
+export async function readMealPhoto(
+  userId: string,
+  db: Db,
+  media: MediaStore,
+  mealId: string,
+): Promise<Buffer> {
+  const meal = await findMeal(userId, db, mealId);
+  if (!meal || meal.photoKey === null) throw notFound("Det finns inget foto.");
+  const bytes = await media.get(meal.photoKey);
+  if (bytes === null) throw notFound("Det finns inget foto.");
+  return bytes;
 }

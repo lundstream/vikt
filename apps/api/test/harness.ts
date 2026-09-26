@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import postgres from "postgres";
@@ -92,6 +94,13 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     OLLAMA_TIMEOUT_MS: 20000,
     OLLAMA_VISION_TIMEOUT_MS: 60000,
     OLLAMA_JOB_TIMEOUT_MS: 180000,
+    /**
+     * A folder of this test process's own, under the system's temporary
+     * directory, so a test that stores a photo never writes into the working
+     * tree and two workers never share one (D191).
+     */
+    MEDIA_STORAGE: "directory",
+    MEDIA_DIR: path.join(tmpdir(), `vikt-media-test-${process.pid}`),
     LOG_LEVEL: "silent" as Env["LOG_LEVEL"],
     corsOrigins: [],
     ...overrides,

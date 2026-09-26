@@ -39,6 +39,16 @@ export function ExportData() {
         <li>
           <a
             className="text-note text-ink underline underline-offset-4"
+            href="/api/export/zip"
+            data-testid="export-zip"
+          >
+            {t("export.zip")}
+          </a>
+          <p className="mt-1 max-w-prose text-micro text-muted">{t("export.zipHint")}</p>
+        </li>
+        <li>
+          <a
+            className="text-note text-ink underline underline-offset-4"
             href="/api/export/json"
             data-testid="export-json"
           >

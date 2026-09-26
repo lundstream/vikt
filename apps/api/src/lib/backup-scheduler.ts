@@ -47,7 +47,7 @@ export function startBackupScheduler(app: FastifyInstance): () => void {
 
       running = true;
       lastRunOn = today;
-      const outcome = await runBackup(app.db, app.config, null);
+      const outcome = await runBackup(app.db, app.config, null, process.env, app.media);
       app.log.info({ outcome }, "scheduled backup");
 
       /**

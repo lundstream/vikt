@@ -19,6 +19,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const REPO = path.resolve(__dirname, "../../..");
 
+/** A photo key's two ids: the shape `lib/media.ts` writes. */
+const KEY_USER = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const KEY_MEAL = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+
 function hasSh(): boolean {
   return spawnSync("sh", ["-c", "exit 0"]).status === 0;
 }
@@ -38,6 +42,7 @@ printf '%s' "$*" | tr '\\n' ' ' >> "$DOCKER_LOG"
 echo >> "$DOCKER_LOG"
 case "$*" in
   *pg_dump*) printf 'PGDMP-fake' ;;
+  *photo_key*) [ -n "\${FAKE_PHOTO_KEY:-}" ] && echo "$FAKE_PHOTO_KEY" ;;
   *psql*) echo "users 1" ;;
 esac
 exit 0
@@ -76,8 +81,12 @@ describe.skipIf(!hasSh())("host-side scripts without a compose file", () => {
     const { dir, infra, log, env } = setup("backup.sh");
     const backups = path.join(dir, "backups");
 
+    const media = path.join(dir, "media");
+    const photo = `users/${KEY_USER}/meals/${KEY_MEAL}-0a1b2c3d.jpg`;
+    execFileSync("sh", ["-c", `mkdir -p "$1" && printf 'jpeg' > "$2"`, "sh", path.dirname(path.join(media, photo)), path.join(media, photo)]);
+
     const result = spawnSync("sh", [path.join(infra, "backup.sh")], {
-      env: { ...env, BACKUP_DIR: backups, UPLOADS_DIR: path.join(dir, "no-uploads") },
+      env: { ...env, BACKUP_DIR: backups, MEDIA_HOST_DIR: media },
       encoding: "utf8",
     });
 
@@ -90,6 +99,39 @@ describe.skipIf(!hasSh())("host-side scripts without a compose file", () => {
     const dumps = execFileSync("sh", ["-c", `ls "$1"`, "sh", backups], { encoding: "utf8" });
     expect(dumps).toMatch(/^vikt-\d{8}T\d{6}Z\.dump$/m);
     expect(dumps).not.toMatch(/\.partial/);
+
+    // The photos, beside the dump with the same stamp, by the key each meal names (D191).
+    const stamp = dumps.match(/^vikt-(\d{8}T\d{6}Z)\.dump$/m)![1];
+    expect(dumps).toMatch(new RegExp(`^media-${stamp}\\.tar\\.gz$`, "m"));
+    const listed = execFileSync("sh", ["-c", `tar -tzf "$1"`, "sh", path.join(backups, `media-${stamp}.tar.gz`)], {
+      encoding: "utf8",
+    });
+    expect(listed.split("\n").map((line) => line.replace(/^\.\//, ""))).toContain(photo);
+    expect(result.stdout).toMatch(/photos: +1 in/);
+  });
+
+  it("restore-check.sh fails a dump whose photos are not in the archive beside it", () => {
+    const { dir, infra, env } = setup("restore-check.sh");
+    const photo = `users/${KEY_USER}/meals/${KEY_MEAL}-0a1b2c3d.jpg`;
+    const dump = path.join(dir, "vikt-20260926T030000Z.dump");
+    writeFileSync(dump, "PGDMP-fake");
+
+    const noArchive = spawnSync("sh", [path.join(infra, "restore-check.sh"), dump], {
+      env: { ...env, FAKE_PHOTO_KEY: photo },
+      encoding: "utf8",
+    });
+    expect(noArchive.status).toBe(1);
+    expect(noArchive.stderr).toMatch(/names 1 photos and there is no photo archive/);
+
+    const media = path.join(dir, "media");
+    execFileSync("sh", ["-c", `mkdir -p "$1" && printf 'jpeg' > "$2" && tar -czf "$3" -C "$4" .`, "sh",
+      path.dirname(path.join(media, photo)), path.join(media, photo), path.join(dir, "media-20260926T030000Z.tar.gz"), media]);
+    const withArchive = spawnSync("sh", [path.join(infra, "restore-check.sh"), dump], {
+      env: { ...env, FAKE_PHOTO_KEY: photo },
+      encoding: "utf8",
+    });
+    expect(withArchive.status).toBe(0);
+    expect(withArchive.stdout).toMatch(/1 photos named by the restored meals, 0 missing/);
   });
 
   it("restore-check.sh restores and compares through the named container", () => {

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
+  PHOTO_MAX_BASE64,
   createMealSchema,
   errorResponseSchema,
   logMealSchema,
@@ -15,7 +16,10 @@ import {
   getMeal,
   getMeals,
   logMeal,
+  readMealPhoto,
   removeMeal,
+  removeMealPhoto,
+  setMealPhoto,
 } from "../services/meal.service.js";
 
 /**
@@ -93,8 +97,64 @@ export const mealRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      await removeMeal(request.userId!, app.db, request.params.mealId);
+      const removed = await removeMeal(request.userId!, app.db, request.params.mealId);
+      // The photo goes with the meal (D191). After the row, so a failed delete
+      // of the row cannot leave a meal pointing at a file that is gone.
+      if (removed.photoKey !== null) await app.media.delete(removed.photoKey).catch(() => {});
       return reply.code(204).send(null);
+    },
+  );
+
+  /**
+   * The photo (D191). Put replaces, delete removes, get serves, all scoped to
+   * the session's user; the image never passes through a public URL.
+   */
+  app.put(
+    "/meals/:mealId/photo",
+    {
+      preHandler: app.requireAuth,
+      bodyLimit: PHOTO_MAX_BASE64 + 4096,
+      schema: {
+        params,
+        body: z.object({ image: z.string().min(32).max(PHOTO_MAX_BASE64) }),
+        response: {
+          200: mealSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+          422: errorResponseSchema,
+        },
+      },
+    },
+    async (request) =>
+      setMealPhoto(request.userId!, app.db, app.media, request.params.mealId, request.body.image),
+  );
+
+  app.delete(
+    "/meals/:mealId/photo",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params,
+        response: { 200: mealSchema, 401: errorResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => removeMealPhoto(request.userId!, app.db, app.media, request.params.mealId),
+  );
+
+  app.get(
+    "/meals/:mealId/photo",
+    {
+      preHandler: app.requireAuth,
+      schema: { params },
+    },
+    async (request, reply) => {
+      const bytes = await readMealPhoto(request.userId!, app.db, app.media, request.params.mealId);
+      return reply
+        .header("content-type", "image/jpeg")
+        // Private: the URL carries a version, so a day is safe, and nothing
+        // between here and the browser may keep a copy.
+        .header("cache-control", "private, max-age=86400")
+        .send(bytes);
     },
   );
 

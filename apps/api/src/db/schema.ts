@@ -1434,6 +1434,8 @@ export const backupRuns = pgTable(
     destination: text("destination").notNull().default(""),
     fileName: text("file_name"),
     bytes: integer("bytes"),
+    /** Photos in the archive written beside the dump (D191). */
+    mediaFiles: integer("media_files"),
     error: text("error"),
   },
   (t) => [index("backup_runs_started_idx").on(t.startedAt)],
@@ -1459,6 +1461,8 @@ export const restoreChecks = pgTable(
     tables: integer("tables"),
     rows: integer("rows"),
     migrations: integer("migrations"),
+    /** Photos in the archive beside the dump, all present (D191). Null: none. */
+    mediaFiles: integer("media_files"),
     error: text("error"),
   },
   (t) => [index("restore_checks_started_idx").on(t.startedAt)],

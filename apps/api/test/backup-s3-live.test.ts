@@ -1,4 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { unzipSync } from "fflate";
+import { decryptBackup, mediaArchiveName } from "../src/lib/backup-file.js";
+import { directoryStore, mealPhotoKey } from "../src/lib/media.js";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import {
@@ -20,6 +27,7 @@ import {
 import {
   deleteObject,
   explainS3Error,
+  getObjectBytes,
   listBackups,
   objectKey,
   putObject,
@@ -281,8 +289,11 @@ withDump("a backup run to S3", () => {
   /**
    * The whole path: pg_dump, encrypt, upload, and a row that says it worked.
    * Requires `pg_dump` on PATH, which CI has and the API image installs.
+   *
+   * And the photos beside it (D191): one stored photo, archived as
+   * `.media.enc` with the dump's timestamp, decrypting to a zip that holds it.
    */
-  it("writes an encrypted dump to the bucket", async () => {
+  it("writes an encrypted dump to the bucket, and the photos beside it", async () => {
     const { app, db } = ctx();
     await ensureBucket();
     await clearPrefix("run/");
@@ -290,22 +301,39 @@ withDump("a backup run to S3", () => {
     const actor = await admin();
     await configure(actor, "run");
 
-    const outcome = await runBackup(db, dumpableConfig(app.config), actor, KEY);
-    expect(outcome.ok ? "" : outcome.reason).toBe("");
-    expect(outcome.ok).toBe(true);
+    const mediaDir = mkdtempSync(path.join(tmpdir(), "vikt-s3-media-"));
+    const media = directoryStore(mediaDir);
+    const photo = mealPhotoKey(actor.id, randomUUID());
+    await media.put(photo, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
 
-    const client = s3ClientFor(target({ prefix: "run" }));
     try {
-      const objects = await listBackups(client, target({ prefix: "run" }));
-      expect(objects).toHaveLength(1);
-      expect(objects[0]!.name).toMatch(/^vikt-.*\.dump\.enc$/);
-    } finally {
-      client.destroy();
-    }
+      const outcome = await runBackup(db, dumpableConfig(app.config), actor, KEY, media);
+      expect(outcome.ok ? "" : outcome.reason).toBe("");
+      expect(outcome.ok).toBe(true);
 
-    const [run] = await listBackupRuns(db, 1);
-    expect(run!.status).toBe("ok");
-    expect(run!.bytes).toBeGreaterThan(0);
+      const client = s3ClientFor(target({ prefix: "run" }));
+      try {
+        const objects = await listBackups(client, target({ prefix: "run" }));
+        expect(objects).toHaveLength(1);
+        expect(objects[0]!.name).toMatch(/^vikt-.*\.dump\.enc$/);
+
+        const archives = await listBackups(client, target({ prefix: "run" }), /^vikt-.*\.media\.enc$/);
+        expect(archives.map((archive) => archive.name)).toEqual([mediaArchiveName(objects[0]!.name)]);
+        const bytes = await getObjectBytes(client, target({ prefix: "run" }), archives[0]!.name);
+        const plain = decryptBackup(bytes!, KEY.SECRET_KEY!);
+        expect(plain.ok).toBe(true);
+        expect(Object.keys(unzipSync(new Uint8Array((plain as { archive: Buffer }).archive)))).toEqual([photo]);
+      } finally {
+        client.destroy();
+      }
+
+      const [run] = await listBackupRuns(db, 1);
+      expect(run!.status).toBe("ok");
+      expect(run!.bytes).toBeGreaterThan(0);
+      expect(run!.mediaFiles).toBe(1);
+    } finally {
+      rmSync(mediaDir, { recursive: true, force: true });
+    }
   }, 60_000);
 
   /**

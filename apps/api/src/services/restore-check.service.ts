@@ -6,7 +6,8 @@ import { desc, eq } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { restoreChecks } from "../db/schema.js";
 import type { Env } from "../env.js";
-import { decryptBackup } from "../lib/backup-file.js";
+import { unzipSync } from "fflate";
+import { decryptBackup, mediaArchiveName } from "../lib/backup-file.js";
 import {
   judgeRestore,
   restoreCheckAgeDays,
@@ -26,6 +27,8 @@ import { readBackupSettings } from "./backup.service.js";
  * 2. decrypted with `SECRET_KEY`, the GCM tag verified before anything is used;
  * 3. `pg_restore` into a **scratch database** with a generated name;
  * 4. judged against the live database by `judgeRestore`;
+ * 4b. the photo archive beside the dump opened, and every photo the restored
+ *     database points at found in it (D191);
  * 5. the scratch database dropped, whatever happened;
  * 6. one `restore_checks` row, whatever happened.
  *
@@ -42,7 +45,15 @@ import { readBackupSettings } from "./backup.service.js";
 export type RestoreCheckTrigger = "schedule" | "command";
 
 export type RestoreCheckOutcome =
-  | { ok: true; fileName: string; tables: number; rows: number; migrations: number }
+  | {
+      ok: true;
+      fileName: string;
+      tables: number;
+      rows: number;
+      migrations: number;
+      /** Photos in the archive, every one the database names present. Null: no archive, none needed. */
+      mediaFiles: number | null;
+    }
   | { ok: false; fileName: string | null; reason: string };
 
 export type RestoreCheckSummary = {
@@ -55,6 +66,7 @@ export type RestoreCheckSummary = {
   tables: number | null;
   rows: number | null;
   migrations: number | null;
+  mediaFiles: number | null;
   error: string | null;
   /** Whole days since it started. */
   ageDays: number;
@@ -87,6 +99,7 @@ export async function latestRestoreCheck(
     tables: row.tables,
     rows: row.rows,
     migrations: row.migrations,
+    mediaFiles: row.mediaFiles,
     error: row.error,
     ageDays,
     old: ageDays > RESTORE_CHECK_OLD_AFTER_DAYS,
@@ -127,6 +140,60 @@ async function shapeOf(client: postgres.Sql): Promise<DatabaseShape> {
     : 0;
 
   return { tables, rows, migrations, weightRows };
+}
+
+/**
+ * The photos a restored database points at, found in the archive beside the
+ * dump (D191).
+ *
+ * The archive is written in the same run, right after the dump, so it holds at
+ * least every photo the dump names; a photo uploaded between the two is in the
+ * archive and not the dump, which is harmless. Every key the restored `meals`
+ * names has to be there and be a JPEG. A dump from before 1.3 has no archive
+ * and no photos, and is fine; a dump that names photos with no archive beside
+ * it is a backup that would come back without them, and fails.
+ */
+export async function checkMediaArchive(
+  dumpPath: string,
+  secret: string,
+  /** The photo keys the restored database's meals point at. */
+  keys: readonly string[],
+): Promise<{ ok: true; files: number | null } | { ok: false; reason: string }> {
+  const archivePath = path.join(path.dirname(dumpPath), mediaArchiveName(path.basename(dumpPath)));
+  const blob = await readFile(archivePath).catch(() => null);
+  if (blob === null) {
+    return keys.length === 0
+      ? { ok: true, files: null }
+      : {
+          ok: false,
+          reason: `the backup names ${keys.length} photos and there is no photo archive beside it (${path.basename(archivePath)})`,
+        };
+  }
+
+  const decrypted = decryptBackup(blob, secret);
+  if (!decrypted.ok) {
+    return { ok: false, reason: "the photo archive could not be decrypted with SECRET_KEY" };
+  }
+
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(new Uint8Array(decrypted.archive));
+  } catch {
+    return { ok: false, reason: "the photo archive is not a readable zip" };
+  }
+
+  const missing = keys.filter((key) => !(key in entries));
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      reason: `the photo archive lacks ${missing.length} of the ${keys.length} photos the backup names`,
+    };
+  }
+  const notJpeg = Object.values(entries).filter((bytes) => bytes[0] !== 0xff || bytes[1] !== 0xd8);
+  if (notJpeg.length > 0) {
+    return { ok: false, reason: `${notJpeg.length} files in the photo archive are not photographs` };
+  }
+  return { ok: true, files: Object.keys(entries).length };
 }
 
 /** `pg_restore --no-owner` from memory into the scratch database. */
@@ -189,7 +256,12 @@ export async function runRestoreCheck(
         status: outcome.ok ? "ok" : "failed",
         fileName: outcome.fileName,
         ...(outcome.ok
-          ? { tables: outcome.tables, rows: outcome.rows, migrations: outcome.migrations }
+          ? {
+              tables: outcome.tables,
+              rows: outcome.rows,
+              migrations: outcome.migrations,
+              mediaFiles: outcome.mediaFiles,
+            }
           : { error: outcome.reason.slice(0, 1000) }),
       })
       .where(eq(restoreChecks.id, row!.id));
@@ -273,18 +345,24 @@ export async function runRestoreCheck(
     scratchClient = postgres(scratchUrl, { max: 1, onnotice: () => {} });
     const [live, restored] = await Promise.all([shapeOf(admin), shapeOf(scratchClient)]);
     const verdict = judgeRestore(live, restored);
+    if (!verdict.ok) return finish({ ok: false, fileName, reason: verdict.reason });
 
-    return finish(
-      verdict.ok
-        ? {
-            ok: true,
-            fileName,
-            tables: restored.tables.length,
-            rows: restored.rows,
-            migrations: restored.migrations,
-          }
-        : { ok: false, fileName, reason: verdict.reason },
-    );
+    const keys = await scratchClient<{ photo_key: string }[]>`
+        select photo_key from meals where photo_key is not null`
+      .then((rows) => rows.map((row) => row.photo_key))
+      // A dump from before meals existed has no table to ask, and no photos.
+      .catch(() => [] as string[]);
+    const media = await checkMediaArchive(filePath, secret, keys);
+    if (!media.ok) return finish({ ok: false, fileName, reason: media.reason });
+
+    return finish({
+      ok: true,
+      fileName,
+      tables: restored.tables.length,
+      rows: restored.rows,
+      migrations: restored.migrations,
+      mediaFiles: media.files,
+    });
   } catch (error) {
     return finish({ ok: false, fileName, reason: redact((error as Error).message) });
   } finally {

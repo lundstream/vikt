@@ -29,6 +29,11 @@ try {
   if (outcome.ok) {
     console.log(`restored: ${outcome.fileName}`);
     console.log(`${outcome.tables} tables, ${outcome.rows} rows, ${outcome.migrations} migrations`);
+    console.log(
+      outcome.mediaFiles === null
+        ? "no photo archive beside it, and the backup names no photos"
+        : `${outcome.mediaFiles} photos in the archive beside it, every one the backup names`,
+    );
     console.log("the scratch database was dropped; the result is under Administration, Backup");
   } else {
     console.error(`did not restore: ${outcome.fileName ?? "(no file)"}`);

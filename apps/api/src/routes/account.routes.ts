@@ -1,3 +1,4 @@
+import { userMediaPrefix } from "../lib/media.js";
 import { z } from "zod";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { errorResponseSchema } from "shared";
@@ -87,12 +88,12 @@ export const accountRoutes: FastifyPluginAsyncZod = async (app) => {
         app.db,
         request.body.password,
         /**
-         * No photo storage to clear yet: Phase 7 has not shipped, and
-         * `previewDeletion` reports zero photos for every account. The
-         * parameter exists so the file that adds photos has one obvious place
-         * to hook into rather than a delete path to remember (D10).
+         * The meal photos, the first images this app stores (D191): the
+         * account's whole folder, before the rows, as D10 always planned.
          */
-        async () => {},
+        async (userId) => {
+          await app.media.deletePrefix(userMediaPrefix(userId));
+        },
       );
 
       if (!outcome.ok) {

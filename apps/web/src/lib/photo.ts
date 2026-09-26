@@ -1,4 +1,4 @@
-import { PHOTO_MAX_BYTES, PHOTO_MAX_EDGE, PHOTO_QUALITY } from "shared";
+import { PHOTO_MAX_BYTES, PHOTO_MAX_EDGE, PHOTO_QUALITY, readJpegOrientation } from "shared";
 
 /**
  * Getting a photograph small enough to send, before it is sent (D143).
@@ -124,47 +124,11 @@ export async function preparePhoto(file: Blob): Promise<PreparedPhoto> {
 /* ------------------------------------------------------------ orientation */
 
 /**
- * The EXIF orientation of a JPEG, 1 to 8, or 1 when it has none.
- *
- * Read from the APP1 segment by hand: the tag is one short in IFD0 and a
- * library for it would be larger than this function. Anything that is not a
- * JPEG, or not the shape expected, is orientation 1, which draws the pixels as
- * stored: the wrong way up is recoverable by a person, a thrown error is not.
+ * The EXIF orientation, read by the same function the server uses to refuse a
+ * sideways upload (`shared/jpeg.ts`, D191). Re-exported so the tests of this
+ * file can hold the pair together.
  */
-export function readJpegOrientation(bytes: Uint8Array): number {
-  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let offset = 2;
-  while (offset + 4 <= bytes.length) {
-    if (bytes[offset] !== 0xff) return 1;
-    const marker = bytes[offset + 1]!;
-    // Start of scan: the metadata is over.
-    if (marker === 0xda) return 1;
-    const length = view.getUint16(offset + 2);
-    if (marker === 0xe1 && length >= 8) {
-      const start = offset + 4;
-      const header = String.fromCharCode(...bytes.slice(start, start + 4));
-      if (header === "Exif") {
-        const tiff = start + 6;
-        const little = view.getUint16(tiff) === 0x4949;
-        const ifd = tiff + view.getUint32(tiff + 4, little);
-        if (ifd + 2 > bytes.length) return 1;
-        const entries = view.getUint16(ifd, little);
-        for (let i = 0; i < entries; i += 1) {
-          const entry = ifd + 2 + i * 12;
-          if (entry + 12 > bytes.length) return 1;
-          if (view.getUint16(entry, little) === 0x0112) {
-            const value = view.getUint16(entry + 8, little);
-            return value >= 1 && value <= 8 ? value : 1;
-          }
-        }
-        return 1;
-      }
-    }
-    offset += 2 + length;
-  }
-  return 1;
-}
+export { readJpegOrientation };
 
 /** The upright size of a picture stored `width` by `height` under `orientation`. */
 export function orientedSize(

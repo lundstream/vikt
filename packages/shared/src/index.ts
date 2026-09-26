@@ -2,6 +2,7 @@ export * from "./parse.js";
 export * from "./numbers.js";
 export * from "./food.js";
 export * from "./label.js";
+export * from "./jpeg.js";
 export * from "./portions.js";
 export * from "./guardrails.js";
 export * from "./markdown.js";

@@ -1,6 +1,7 @@
 import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -119,6 +120,51 @@ export async function deleteObject(
   );
 }
 
+/** One object's bytes, or null when there is no such object (D191). */
+export async function getObjectBytes(
+  client: S3Client,
+  target: S3Target,
+  name: string,
+): Promise<Buffer | null> {
+  try {
+    const response = await client.send(
+      new GetObjectCommand({ Bucket: target.bucket, Key: objectKey(target.prefix, name) }),
+    );
+    if (!response.Body) return null;
+    return Buffer.from(await response.Body.transformToByteArray());
+  } catch (error) {
+    const name = (error as { name?: string } | null)?.name;
+    if (name === "NoSuchKey" || name === "NotFound") return null;
+    throw error;
+  }
+}
+
+/** Every key under `prefix/start`, as names relative to the target's prefix. */
+export async function listNames(
+  client: S3Client,
+  target: S3Target,
+  start: string,
+): Promise<string[]> {
+  const base = objectKey(target.prefix, "");
+  const names: string[] = [];
+  let token: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: target.bucket,
+        Prefix: objectKey(target.prefix, start),
+        ContinuationToken: token,
+      }),
+    );
+    for (const object of page.Contents ?? []) {
+      if (object.Key === undefined) continue;
+      names.push(base === "" ? object.Key : object.Key.slice(base.length + (base.endsWith("/") ? 0 : 1)));
+    }
+    token = page.IsTruncated === true ? page.NextContinuationToken : undefined;
+  } while (token !== undefined);
+  return names;
+}
+
 export type RemoteBackup = { key: string; name: string; lastModified: Date | null };
 
 /**
@@ -131,6 +177,8 @@ export type RemoteBackup = { key: string; name: string; lastModified: Date | nul
 export async function listBackups(
   client: S3Client,
   target: S3Target,
+  /** Which kind: the dumps by default, or the photo archives beside them (D191). */
+  pattern: RegExp = /^vikt-.*\.dump\.enc$/,
 ): Promise<RemoteBackup[]> {
   const found: RemoteBackup[] = [];
   let token: string | undefined;
@@ -148,7 +196,7 @@ export async function listBackups(
       const key = object.Key;
       if (key === undefined) continue;
       const name = key.slice(key.lastIndexOf("/") + 1);
-      if (!/^vikt-.*\.dump\.enc$/.test(name)) continue;
+      if (!pattern.test(name)) continue;
       found.push({ key, name, lastModified: object.LastModified ?? null });
     }
 

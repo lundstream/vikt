@@ -295,6 +295,24 @@ export function useLogMeal(timezone = "Europe/Stockholm") {
   });
 }
 
+/** The meal's photo (D191): not queued, like every photograph. */
+export function useSetMealPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mealId, image }: { mealId: string; image: string }) =>
+      api.setMealPhoto(mealId, image),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
+  });
+}
+
+export function useDeleteMealPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mealId: string) => api.deleteMealPhoto(mealId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: MEALS_KEY }),
+  });
+}
+
 export function useDeleteMeal() {
   const queryClient = useQueryClient();
   return useMutation({
