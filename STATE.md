@@ -580,7 +580,7 @@ dem mot förpackningen. Varan sparas som din egen, märkt "från etikett", och
 nästa gång du skannar den hittas den direkt. Bilden sparas inte.
 
 **Foto på måltiden.** En måltid kan ha ett foto. Det förminskas i telefonen,
-rensas från plats och tid och visas bara för dig.
+rensas från plats och tid och visas bara för dig, om du inte delar måltiden.
 
 **Dela en måltid.** Anger du ett visningsnamn under Profil kan du dela en
 måltid med alla som har konto här, aldrig med någon utanför. Andras delade

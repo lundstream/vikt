@@ -870,13 +870,13 @@ a commit on `main` is a commit that the next redeploy ships.
     oversight: those tags are moved by the action authors on their own
     repositories and the failure mode is a step changing behaviour, not an image
     disappearing from under a build.
-- **Harness scripts clean up after themselves.** Every script that drives a browser deletes its profile directory on exit, and every script that writes screenshots keeps only the last three sets, pruning older ones as it starts. The scratchpad reached 5.4 GB of abandoned Edge profiles because forty scripts each made one and none removed it; a stale profile is also a stale service worker waiting to mislead the next verification pass. `scratchpad/harness.mjs` does both in one call.
+- **Harness scripts clean up after themselves.** Every script that drives a browser deletes its profile directory on exit, and every script that writes screenshots keeps only the last three sets, pruning older ones as it starts. The scratchpad reached 5.4 GB of abandoned Edge profiles because forty scripts each made one and none removed it; a stale profile is also a stale service worker waiting to mislead the next verification pass. **The harness is tracked, in `scripts/harness/`**: `pnpm harness:sweep` is the closing sweep at 360 px and desktop, `pnpm harness:hero` measures the landing page's motion on the production build, and `lib/` holds the browser (a temporary profile removed on exit), the account (`SEED_EMAIL` and `SEED_PASSWORD` by name, never a value in a tracked file), the verdict file and the interface driver an item's exercise uses. Output goes to `scratch/shots/`, and only the last three sets are kept. It lived in a temporary folder until that folder was cleared.
 - **A harness script's verdict lives in a file, not in its output.** Every check
   it makes is appended to `verdict.txt` in the same directory as whatever it
   produced, as it makes them, and the exit code is computed by **reading that
   file back** rather than from a counter in memory. Printing as well is fine;
   relying on the print is not.
-  - Run in the background with stdout piped, `shoot2.mjs` once produced all
+  - Run in the background with stdout piped, the sweep (then `shoot2.mjs`) once produced all
     forty screenshots and none of its forty verdict lines, so a sweep that had
     genuinely checked every screen could prove nothing. The reaction was to
     write a second script asking the same questions, which is how one check
