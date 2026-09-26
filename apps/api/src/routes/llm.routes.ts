@@ -13,6 +13,8 @@ import {
   PHOTO_MAX_BASE64,
   readLabelRequestSchema,
   readLabelResponseSchema,
+  readRecipeRequestSchema,
+  readRecipeResponseSchema,
   recipeRequestSchema,
   recipeResponseSchema,
 } from "shared";
@@ -23,6 +25,7 @@ import {
   parseFoodPhoto,
   parseFoodText,
   readNutritionLabel,
+  readRecipePhoto,
 } from "../services/llm.service.js";
 import { saveFoodEntry } from "../services/food.service.js";
 
@@ -132,6 +135,25 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) =>
       readNutritionLabel(request.userId!, app.config, app.llm, request.body, app.log),
+  );
+
+  /**
+   * A recipe's ingredient list, photographed and read into rows (D195). The
+   * same body limit and transport as the plate and the label; it writes
+   * nothing, and the rows go to the meal sheet for a person to keep or remove.
+   */
+  app.post(
+    "/llm/read-recipe",
+    {
+      preHandler: app.requireAuth,
+      bodyLimit: PHOTO_MAX_BASE64 + 4096,
+      schema: {
+        body: readRecipeRequestSchema,
+        response: { 200: readRecipeResponseSchema, 401: errorResponseSchema },
+      },
+    },
+    async (request) =>
+      readRecipePhoto(request.userId!, app.db, app.config, app.llm, request.body, app.log),
   );
 
   /**

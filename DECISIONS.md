@@ -11047,3 +11047,166 @@ by-hand command ignored, the backtick case, two blocks, an unreadable line not
 quoted, a name twice, an unclosed block, near-miss fences, a block outside the
 section), the stop before step 1 with no call made, and the dry run's step 9.
 CLAUDE.md §7's release rule and INFRA.md say the same.
+
+### D195 — A recipe photographed: the model copies lines, the app reads them
+
+**Item 8 of the Phase 14 brief, built after 1.3.0.** A new way in the meal
+sheet, "Recept från foto": photograph a recipe's ingredient list, in a
+cookbook, on a card or on a screen, and its rows join the proposal list the
+sentence and the plate photo already use, each beside its printed line, for a
+person to keep or remove before any is added. The model returns no nutrition
+(D5): it transcribes, and the database prices.
+
+#### The probe
+
+Two photographs in `scratch/vision/recipes/`, the expected rows written first
+into `expected.md` beside them (outside the repository). A cookbook page:
+yield "1 PIZZA", seven ingredient rows, **two amount sets** (a second amount in
+parentheses after the first), one of them "0,39 g (50 g) mozzarella", most
+likely a misprint for 39 g but correctly transcribed as 0,39. A recipe website
+photographed off a screen, with moiré and its method column cut off at the
+right edge: yield "4 portioner", two headings, sixteen rows, one amount set.
+The gate, set before the probe: the model reads every row and both amount sets
+of the cookbook page as printed, three runs of three, or the item stops. The
+screen photo does not gate.
+
+`qwen3-vl:8b` on the workstation, each photo as the phone sends it (upright,
+at most 1 280 px, JPEG quality 80), temperature 0, the shape enforced by a JSON
+schema passed as Ollama's `format`, and **no example in the prompt**: D190
+found this model handing back a transcription prompt's example as its answer.
+Five prompts, three runs each per photo:
+
+| prompt | asked for | what came back |
+|---|---|---|
+| a | amount, unit, second amount and unit, name, note per row; the number of sets first | every figure read right, filed wrong: the second amount under `unit` on all five two-amount rows, "gula lökar" as a unit; sets 1 for the book and 2 for the screen, both wrong |
+| b | the amount with its unit, the second amount, name, note; sets after the rows | sets right for both; the second amount folded into the first on four rows ("20 g (25 g)"), the unit dropped into the name on the screen ("msk olja") |
+| c | the line and its heading only; sets after the rows | **all seven book rows and both sets as printed, 3 of 3**, sixteen screen rows 3 of 3; sets 1 for the book, wrong |
+| d | as c, with a yes or no for two sets | yes for both, wrong for the screen |
+| e | as c, with no question about sets | the gate passed, 3 of 3 |
+
+**So the model copies lines and the app reads them.** Asking the model to split
+a line put correct figures in wrong fields in every variant that tried; the
+lines themselves were right every time. Splitting them is `parseRecipeLine` in
+`shared/recipe-photo.ts`, deterministic and held by tests built on the model's
+own lines. **Whether a recipe has two sets is counted from the lines** (two or
+more rows with a second amount directly after the first), because the model's
+own answer to that question was wrong for one photo or the other in all four
+prompts that asked it. The model still returns both amounts and never chooses
+between them.
+
+**What prompt e returned, row by row** (ingredient rows only; the book's
+introduction and steps are not recorded here, and the model returned none of
+them):
+
+The cookbook page. Title "PECORINO & PAN CETTA" (run 1), "PECORINO & PANcETTA"
+(runs 2 and 3); yield "1 PIZZA"; no section.
+
+| # | returned | wrong |
+|---|---|---|
+| 1 | 1 pizzaboll, se sidan 110 | |
+| 2 | 0,39 g (50 g) mozzarella di bufala DOP, i bitar | |
+| 3 | 20 g (25 g) lardo alt pancetta eller bacon, finskuren | |
+| 4 | 3 g (3,5 g) vitlök, finskvad (ca 1 vitlöksklyfta) | "finskvad" for "finskivad", 3 of 3 |
+| 5 | 3-5 färsk basilikablad | "färsk" for "färska", 3 of 3; a hyphen for the printed dash |
+| 6 | 12 g (15 g) pecorino romano DOP, finriven | "finrinven" in run 1 |
+| 7 | 3 g + 5 g (3 g + 7 g) olivolja | |
+
+Every amount right in every run, 0,39 included. The three words hyphenated at
+the ends of printed lines (moz-zarella, pancet-ta, vitlöks-klyfta) came back
+whole. 1,1 to 1,7 s, 221 or 222 tokens.
+
+The screen photo, identical in all three runs. Title "Köttfärsås" (the page's
+own title is out of frame; this is the first heading, misspelt); yield
+"4 portioner".
+
+| # | section | returned | wrong |
+|---|---|---|---|
+| 1 | Köttfärsås | 2 gula lökar | section: "Köttfärsås" for "Köttfärssås", every row under it |
+| 2 | Köttfärsås | 2 vitlökskyftor | "vitlökskyftor" for "vitlöksklyftor" |
+| 3 | Köttfärsås | 500 g nötfärs eller hushållsfärs (ärt- och nötfärs) | |
+| 4 | Köttfärsås | 1 msk olja | |
+| 5 | Köttfärsås | 4 msk tomatpuré | |
+| 6 | Köttfärsås | 1 tsk torkad timjan | |
+| 7 | Köttfärsås | 1 tsk torkad rosmarin | |
+| 8 | Köttfärsås | 1 förp krossade tomater (å 390 g) | "å" for "à" |
+| 9 | Köttfärsås | 1 köttbuljongtärning | |
+| 10 | Köttfärsås | salt | |
+| 11 | Köttfärsås | peppar | |
+| 12 | Ostsås | 6 msk smör (6 msk motsvarar ca 90 g) | |
+| 13 | Ostsås | 6 msk vetemjöl | |
+| 14 | Ostsås | 10 dl mjölk | |
+| 15 | Ostsås | 2 dl riven parmesan | |
+| 16 | Ostsås | 9 torkade lasagneplattor | |
+
+Both headings as sections and not as rows; nothing from the cut-off column (no
+checkbox, no method fragment, no timer). 2,0 to 2,4 s, 411 tokens.
+
+#### The rules, as built
+
+- **Yield**: a number with portioner, personer or port. fills the meal's
+  portion count; anything else ("1 PIZZA") empties the field and is shown
+  beside it as printed, with "inte än" until a count is typed. Only for a new
+  meal: an existing one keeps its own name and count.
+- **Headings are not rows.** They come back as each row's section.
+- **Two sets**: one question above the list, "Receptet anger två mängder.
+  Vilken vill du använda?", the first chosen by default. Every row carries its
+  grams for both sets from the server, so switching needs no second request. A
+  row that prints one amount has it in both sets.
+- **"kontrollera mot sidan"**: with two sets, a row whose ratio of second to
+  first amount is off the median ratio by more than a factor of two. The chip
+  is on its own line under the name and does not stop the row. The mozzarella
+  row (50 over 0,39, against about 1,25 for the rest) is the one it marks.
+- **A range stays a range**: shown as printed, the amount empty and "inte än"
+  until the person picks.
+- **"3 g + 5 g"** is one row with the sum, 8 g, the printed line beside it.
+- **Alternatives** ("lardo alt pancetta eller bacon") search for the first one
+  named; the others stay visible in the printed line.
+- **A printed weight wins** over a volume or a count on the same line: "à 390
+  g" times the count (the model's "å" accepted), "motsvarar ca 90 g" over
+  "6 msk", "3 g" over "ca 1 vitlöksklyfta". Without two sets, a weight in
+  parentheses right after a count ("1 förp (400 g)") is that count's weight.
+- **A row with no amount** (salt, peppar) stays "inte än" and can be removed; a
+  cross-reference ("se sidan 110") is not searched and stays unmatched.
+- **Units convert as the plate photo's do**, through `photoAmount`: grams and
+  kilograms directly, household units through the food's hints, and anything
+  else "inte än" until grams are given. Nothing is estimated.
+- **Every row shows its printed line** beside the proposal.
+
+#### Exercised through the interface, 2026-09-26
+
+Both photographs, from the meal sheet on the development server, the real model
+behind it. The cookbook page: seven rows, every printed line beside its
+proposal, the choice between sets asked once with the first chosen,
+"kontrollera mot sidan" on the mozzarella row and on no other, 0,39 in its
+field and 8 for the olive oil, 50 and 10 after choosing the other set, the
+range empty with "inte än", the cross-reference not takeable, "Receptet:
+1 PIZZA" beside an empty portion field with "inte än". The flagged row was
+given 39 g, as a person reading the page would, and the rows added: saved as a
+meal of one portion. The screen: sixteen rows, no question about sets, salt and
+peppar "inte än", 390 and 90 from the printed weights, nothing marked, "4
+portioner" filling the count; saved as a meal of four portions. 22 of 22. The
+browser's resize gave the model different bytes from the probe's, and its lines
+differed in two words ("färska" right this time, "vitlökskyftar").
+
+**Found by it, and fixed**: after "Lägg till", the meal sheet closed the tool,
+so every row it could not add (no amount yet, or no match) disappeared unseen,
+against D143's rule that they stay until a person fills them in or removes
+them. The sentence and plate tools inside the sheet had the same gap since
+D186; a recipe, which leaves several rows at "inte än", is where it showed. The
+tool now stays open and the list closes itself when nothing is left: 3 of 16
+screen rows added, 13 still listed with their printed lines and the reason, one
+unticked, nothing saved. 7 of 7. And at 360 px the chip beside the name
+squeezed "mozzarella di bufala DOP" to "m."; it is on its own line now, and an
+unmatched row in the sheet says only that it cannot be taken, where it also
+said "sparas utan energivärde", which is untrue there. Checked again at both
+widths: 10 of 11, the eleventh being my own check asking for a long name in
+full at 360 px, which the list truncates with an ellipsis by design, the
+printed line underneath carrying it whole.
+
+**Found by it, and not fixed here**, because it is the matcher every tool uses
+and not this item's: `matchRow` took "Mjölkchoklad" for "mjölk", "Pepparrot"
+for "peppar" and "Lasagne nötfärs" for "nötfärs". The printed line beside each
+proposal is what makes that visible, and the person unticks it; the matcher
+itself is a separate pass. Most spoon and decilitre rows stayed "inte än" in the
+development database, because the foods they matched carry no category and so
+no household measure: the rule working, not a gap in it.

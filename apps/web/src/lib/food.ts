@@ -14,6 +14,7 @@ import type {
   CreateMeal,
   CreateLabelFood,
   ReadLabelRequest,
+  ReadRecipeRequest,
   LogMeal,
   UpdateFoodEntry,
   UpdateMeal,
@@ -430,6 +431,12 @@ export function useReadLabel() {
 export function useCreateLabelFood() {
   return useMutation({
     mutationFn: (body: CreateLabelFood) => api.createLabelFood(body),
+  });
+}
+
+export function useReadRecipe() {
+  return useMutation({
+    mutationFn: (body: ReadRecipeRequest) => api.readRecipe(body),
   });
 }
 

@@ -1380,6 +1380,7 @@ export const sv = {
   "meals.search": "Sök",
   "meals.sentence": "En mening",
   "meals.photo": "Foto",
+  "meals.recipePhoto": "Recept från foto",
   "meals.amount": "Mängd",
   "meals.amountIn": "Mängd i {unit}",
   "meals.amountPositive": "Mängden behöver vara mer än noll.",
@@ -1433,6 +1434,20 @@ export const sv = {
   "meals.savedAsMealWithoutOne":
     "Sparad som måltid: {name}. 1 rad utan träff i matdatabasen kom inte med.",
   "meals.cannotTake": "Ingen träff i matdatabasen, så raden kan inte bli en del av en måltid.",
+
+  // A recipe photographed (D195). The model copies the lines; the list says
+  // what was printed beside every proposal, and the person decides.
+  "recipePhoto.intro":
+    "Fotografera ingredienslistan i ett recept, i en kokbok, på ett kort eller på en skärm. Raderna skrivs av, och du jämför var och en med receptet innan den läggs till.",
+  "recipePhoto.shutter": "Fotografera receptet",
+  "recipePhoto.nothingFound": "Ingen ingredienslista syntes på bilden. Ta en ny bild där hela listan syns.",
+  "recipePhoto.checkBeforeAdding":
+    "Jämför varje rad med receptet. En rad utan mängd eller utan träff i matdatabasen följer inte med.",
+  "recipePhoto.twoSets": "Receptet anger två mängder. Vilken vill du använda?",
+  "recipePhoto.firstSet": "Den första",
+  "recipePhoto.secondSet": "Den inom parentes",
+  "recipePhoto.checkPage": "kontrollera mot sidan",
+  "recipePhoto.yieldPrinted": "Receptet: {printed}",
   "meals.noneMatched": "Ingen av raderna har en träff i matdatabasen att räkna på.",
   "meals.unmatchedLeft": "{count} rader utan träff ligger kvar. De kan inte tas med i en måltid.",
   "meals.unmatchedLeftOne": "1 rad utan träff ligger kvar. Den kan inte tas med i en måltid.",

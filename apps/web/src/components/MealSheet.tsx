@@ -26,6 +26,7 @@ import { DeleteButton } from "./DeleteButton.js";
 import { Field, fieldAria } from "./Field.js";
 import { FoodPhotoEntry } from "./FoodPhotoEntry.js";
 import { FoodTextEntry } from "./FoodTextEntry.js";
+import { RecipePhotoEntry, type RecipeFacts } from "./RecipePhotoEntry.js";
 import { FoodTags } from "./FoodTags.js";
 import { MealFigures } from "./MealFigures.js";
 import type { ProposalItem } from "./ParsedProposal.js";
@@ -34,6 +35,7 @@ import {
   ActionButton,
   barcodeIcon,
   cameraIcon,
+  recipeIcon,
   searchIcon,
   speechIcon,
   type QuickAction,
@@ -160,7 +162,9 @@ export function MealSheet({
     formatDecimal(meal?.portions ?? 1, { decimals: Number.isInteger(meal?.portions ?? 1) ? 0 : 2 }),
   );
   const [rows, setRows] = useState<Row[]>(() => rowsOf(meal));
-  const [tool, setTool] = useState<"search" | "text" | "photo" | null>(null);
+  const [tool, setTool] = useState<"search" | "text" | "photo" | "recipe" | null>(null);
+  /** A recipe's yield that is not a number of portions, shown beside the field (D195). */
+  const [yieldNote, setYieldNote] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [picking, setPicking] = useState<FoodItem | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -219,6 +223,13 @@ export function MealSheet({
             onClick: () => setTool(tool === "photo" ? null : "photo"),
             testId: "meal-tool-photo",
           },
+          {
+            key: "recipe",
+            label: "meals.recipePhoto",
+            icon: recipeIcon,
+            onClick: () => setTool(tool === "recipe" ? null : "recipe"),
+            testId: "meal-tool-recipe",
+          },
         ] satisfies QuickAction[])
       : []),
   ];
@@ -245,6 +256,12 @@ export function MealSheet({
    * Rows from a sentence or a photograph arrive as an id, a name and grams.
    * The per-100 g figures are fetched so the running figure can price them
    * with the same calc; a food that cannot be read is left out and said so.
+   *
+   * **The tool stays open.** The list keeps the rows it could not add, with no
+   * amount yet or no match, until a person fills them in or removes them
+   * (D143), and closes itself when none are left. Closing the tool here threw
+   * those rows away unseen; a recipe, which leaves several at "inte än", is
+   * where that showed (D195).
    */
   async function addProposed(proposed: ProposalItem[]) {
     const matched = proposed.filter((row) => row.foodItemId !== null);
@@ -271,8 +288,28 @@ export function MealSheet({
         isEstimate: item!.isEstimate,
       })),
     ]);
-    setTool(null);
     setNote(plural(added.length, "meals.rowsAddedOne", "meals.rowsAdded"));
+  }
+
+  /**
+   * A recipe's rows, and for a new meal what the recipe says it is (D195).
+   *
+   * A yield in portions fills the count; any other yield ("1 PIZZA") empties
+   * the field and is shown beside it as printed with "inte än", because one
+   * pizza is not a number of helpings and the person knows how many it feeds.
+   * The title fills an empty name. A meal that already exists keeps its own.
+   */
+  async function addRecipe(proposed: ProposalItem[], recipe: RecipeFacts) {
+    await addProposed(proposed);
+    if (meal) return;
+    if (name.trim() === "" && recipe.title) setName(recipe.title.slice(0, 80));
+    if (recipe.yield.portions !== null) {
+      setPortions(String(recipe.yield.portions));
+      setYieldNote(null);
+    } else if (recipe.yield.printed !== null) {
+      setPortions("");
+      setYieldNote(recipe.yield.printed);
+    }
   }
 
   async function onBarcode(code: string) {
@@ -387,6 +424,12 @@ export function MealSheet({
               value={portions}
               onChange={(event) => setPortions(event.target.value)}
             />
+            {yieldNote ? (
+              <p className="mt-1 text-micro text-muted" data-testid="meal-yield-printed">
+                {t("recipePhoto.yieldPrinted", { printed: yieldNote })}
+                {portions.trim() === "" ? ` · ${t("llm.amountUnknown")}` : ""}
+              </p>
+            ) : null}
           </Field>
         </div>
 
@@ -646,6 +689,12 @@ export function MealSheet({
                 onRows: addProposed,
               }}
             />
+          </div>
+        ) : null}
+
+        {tool === "recipe" ? (
+          <div className="mt-4">
+            <RecipePhotoEntry onRows={addRecipe} />
           </div>
         ) : null}
 

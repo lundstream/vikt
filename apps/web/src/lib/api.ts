@@ -72,6 +72,8 @@ import type {
   CreateLabelFood,
   ReadLabelRequest,
   ReadLabelResponse,
+  ReadRecipeRequest,
+  ReadRecipeResponse,
   Plan,
   RegisterRequest,
   UpdatePlan,
@@ -333,6 +335,13 @@ export const api = {
   /** A nutrition declaration, transcribed for the person to confirm (D190). */
   readLabel: (body: ReadLabelRequest) =>
     request<ReadLabelResponse>("/llm/read-label", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** A recipe's ingredient list, read into rows for the meal sheet (D195). */
+  readRecipe: (body: ReadRecipeRequest) =>
+    request<ReadRecipeResponse>("/llm/read-recipe", {
       method: "POST",
       body: JSON.stringify(body),
     }),

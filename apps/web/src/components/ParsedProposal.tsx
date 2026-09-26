@@ -45,7 +45,15 @@ import { plural, t } from "../i18n/index.js";
  * *collect* mode: the button adds rows to the meal being built rather than
  * logging them, and an unmatched row says it cannot be taken rather than
  * asking for a calorie figure the meal could not keep.
+ *
+ * **A row read off a recipe says what was printed** (D195). Its `printed`
+ * line stands where the portion would, so the proposal is always read beside
+ * the page's own words, and `check` puts "kontrollera mot sidan" on a row
+ * whose two amount sets disagree with the rest. Neither stops the row.
  */
+
+/** One row of the list: a priced match, and for a recipe, the line it came from. */
+export type ProposalRow = FoodMatch & { printed?: string; check?: boolean };
 
 export type ProposalItem = {
   clientUuid: string;
@@ -69,7 +77,7 @@ export function ParsedProposal({
   onSaveAsMeal,
   mealName = "",
 }: {
-  items: FoodMatch[];
+  items: ProposalRow[];
   /** True for a photograph: every amount is an estimate by origin. */
   uncertain?: boolean;
   intro: string;
@@ -94,7 +102,7 @@ export function ParsedProposal({
    * The rows still on screen. Saved rows leave; rows that could not be saved
    * stay, which is what makes a partial save legible rather than a silent one.
    */
-  const [rows, setRows] = useState<FoodMatch[]>(items);
+  const [rows, setRows] = useState<ProposalRow[]>(items);
   const [grams, setGrams] = useState<Record<number, string>>(() => initialGrams(items));
   const [keep, setKeep] = useState<Set<number>>(() => new Set(items.map((_, i) => i)));
   /** What the user says an unmatched row is worth, by row (D74). */
@@ -271,21 +279,46 @@ export function ParsedProposal({
                 hint or a guess or from nowhere at all, and which one is stated
                 rather than left to be inferred from a confidence figure.
               */}
-              <span className="num block text-micro text-muted">
-                {item.portion ? `${formatPortion(item.portion)} · ` : ""}
-                {item.portionSource === "unknown"
-                  ? t("llm.amountUnknown")
-                  : item.portionSource === "estimate"
-                    ? t("portion.estimated")
-                    : t("portion.fromHint")}
-              </span>
-              <span className="num block text-micro text-muted">
-                {item.match === null
-                  ? t("llm.noMatch")
-                  : item.match.kcal === null
+              {/*
+                On its own line, never beside the name: beside it, a long name
+                was truncated to "m." to make room, and the name is what the
+                check is about.
+              */}
+              {item.check ? (
+                <span className="mb-0.5 mt-1 flex">
+                  <span className="tag tag-estimate" data-testid={`proposal-check-${index}`}>
+                    {t("recipePhoto.checkPage")}
+                  </span>
+                </span>
+              ) : null}
+              {item.printed !== undefined ? (
+                <span className="block text-micro text-muted" data-testid={`proposal-printed-${index}`}>
+                  {item.printed}
+                </span>
+              ) : (
+                <span className="num block text-micro text-muted">
+                  {item.portion ? `${formatPortion(item.portion)} · ` : ""}
+                  {item.portionSource === "unknown"
                     ? t("llm.amountUnknown")
-                    : t("llm.matched", { kcal: formatKcal(item.match.kcal) })}
-              </span>
+                    : item.portionSource === "estimate"
+                      ? t("portion.estimated")
+                      : t("portion.fromHint")}
+                </span>
+              )}
+              {/*
+                In collect mode an unmatched row gets one sentence, the one
+                under it saying it cannot be taken; "sparas utan energivärde"
+                beside it was untrue there.
+              */}
+              {item.match === null && requireMatch ? null : (
+                <span className="num block text-micro text-muted">
+                  {item.match === null
+                    ? t("llm.noMatch")
+                    : item.match.kcal === null
+                      ? t("llm.amountUnknown")
+                      : t("llm.matched", { kcal: formatKcal(item.match.kcal) })}
+                </span>
+              )}
             </span>
 
             <span className="relative w-24">
@@ -423,14 +456,18 @@ export function ParsedProposal({
   );
 }
 
-/** The amount field's starting value. Empty when nobody knows it yet (D143). */
+/**
+ * The amount field's starting value. Empty when nobody knows it yet (D143).
+ * Up to two decimals, unpadded: a page that prints "0,39 g" is shown 0,39 and
+ * not 0, which would hide the very figure "kontrollera mot sidan" is about.
+ */
 function initialGrams(items: FoodMatch[]): Record<number, string> {
   return Object.fromEntries(
     items.map((item, index) => [
       index,
       item.estimatedGrams === null
         ? ""
-        : formatDecimal(item.estimatedGrams, { decimals: 0 }),
+        : formatDecimal(item.estimatedGrams, { maxDecimals: 2 }),
     ]),
   );
 }

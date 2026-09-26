@@ -77,6 +77,22 @@ development server**, item by item, each with its own verdict file. Released as
   measurements.md`, seventh pass); the raw phone screenshots taken again with
   the current date format, 3 of 3; §7 names error class ten and the release
   rule.
+- **After 1.3.0, the recipe photo** (D195), 2026-09-26, on the development
+  server with the real vision model. The probe first: five prompts, three runs
+  per photograph; the cookbook page read with every row and both amount sets
+  as printed, 3 of 3, once the model was asked for lines alone. Then through
+  the meal sheet: the cookbook page (seven rows beside their printed lines,
+  the choice between sets asked once, "kontrollera mot sidan" on the mozzarella
+  row only, the range and the cross-reference left, "Receptet: 1 PIZZA" with
+  "inte än" beside an empty portion field) saved as a meal of one portion; the
+  screen photo (sixteen rows, no question, printed weights winning, "4
+  portioner" filling the count) saved as a meal of four. 22 of 22. Rows that
+  could not be added now stay in the list: 7 of 7. The list at both widths
+  after moving the chip to its own line: 10 of 11, the eleventh my own check
+  being stricter than the list's truncation of long names. Shot at 360 px and
+  desktop.
+- **The release block** (D194) is held by `release.test.ts`, each new case seen
+  failing before it passed; it has no screen.
 - **The closing sweep**: `shoot2.mjs` over every finished screen at 360 px and
   desktop, now with Måltider and Anmälningar, **44 of 44**; both landing rows
   `landing-ok=sentence15/meta13/gap64`, 6 796 px at 360 and 5 206 at desktop.
@@ -535,16 +551,29 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ## Inför nästa deploy
 
-**Nothing is prepared yet.** Production runs `1.3.0` (above), released from
-`392b618`; everything on `dev` after that commit goes into the next deploy. It
-takes a number here, with its handover, once there is something to release:
-`1.4.0` if it carries the recipe photo import, a patch release if not.
+**The next deploy is `1.4.0`**: the recipe photo (D195), built after 1.3.0,
+and the release command's two fixes (D194). Production runs `1.3.0` (above).
 
-#### Carried over from 1.3.0
+**No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
+release commit is named once the `v1.4.0` tag exists, and before that the
+release follows `dev`'s tip, whose CI run has to have finished green before the
+command is started. Push nothing between starting it and step 7.
 
-**Import from a photo of a recipe** (item 8 of the Phase 14 brief): **not
-built.** It starts with a probe of the vision model on real recipe pages, and
-the rows are gated on what the model reads.
+#### What 1.4.0 changes
+
+| | what a user sees |
+|---|---|
+| **Recept från foto** (D195) | a new way in the meal sheet: photograph a recipe's ingredient list, in a book, on a card or on a screen, and its rows join the list with the printed line beside each. A yield in portions fills the count; a book with two amount sets asks once which to use; a row whose sets disagree says "kontrollera mot sidan"; a row with no amount says "inte än" and waits |
+| **Rows that were not added stay** (D195) | in the meal sheet, rows from a sentence, a photo or a recipe that have no amount yet or no match stay in the list after "Lägg till", where before they disappeared |
+
+**What the deploy needs that 1.3.0 did not: nothing.** No migration, no new
+variable, no host change. The recipe photo uses `LLM_VISION_MODEL`, which
+production already sets to `qwen3-vl:8b`.
+
+**Not fixed, and worth knowing before the post goes out**: the food matcher
+every tool shares takes "Mjölkchoklad" for "mjölk" and "Pepparrot" for
+"peppar" (D195). The printed line beside each row makes it visible, and the
+person unticks it; the matcher is a separate pass.
 
 #### How the next release is told what to set
 
@@ -561,6 +590,9 @@ the command before step 1 (D194).
 - **The release block** and **the dry run's step 9** (D194): the release
   command, not the app; nothing a user sees. A dry run no longer stops on the
   release's own images, which it cannot have built.
+- **Recept från foto** (D195), exercised through the interface with both probe
+  photographs and saved as two meals; the list's rows that could not be added
+  now stay. Details under "Current state".
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -569,6 +601,29 @@ until it has been read.
 
 **Färdig text, klistra in som den är** under Administration, Meddelanden. Inga
 tankstreck (§5), och registret är appens eget: du, inte "användaren".
+
+<details>
+<summary>1.4.0</summary>
+
+```markdown
+## Vikt 1.4
+
+**Recept från foto.** När du gör en måltid kan du fotografera
+ingredienslistan i ett recept, i en kokbok, på ett kort eller på en skärm.
+Raderna skrivs av och hamnar i samma lista som när du skriver en mening, och
+bredvid varje rad står det som var tryckt, så att du kan jämföra. Står det hur
+många portioner receptet räcker till fylls antalet i. Har kokboken två mängder
+på varje rad väljer du vilken du vill använda, och en rad där mängderna inte
+stämmer med de andra märks "kontrollera mot sidan". En rad utan mängd, som salt
+och peppar, väntar på dig i stället för att få en gissad siffra. Bilden sparas
+inte.
+
+**Rader som inte kom med ligger kvar.** Lägger du till rader i en måltid från
+en mening, ett foto eller ett recept, ligger de som saknar mängd eller träff kvar
+i listan tills du fyller i dem eller tar bort dem.
+```
+
+</details>
 
 <details>
 <summary>1.3.0</summary>
@@ -881,10 +936,8 @@ Windows and the kill has to be by port.
 Eight items of nine done, each exercised through the interface and recorded
 (D185 to D193). **Open:**
 
-- **Item 8, import from a photo of a recipe, not started.** Its first step is
-  a probe on one real recipe page or card, and there is none among the
-  photographs in `scratch/vision`. Put one in `scratch/vision/recipes/` and the
-  item starts with the probe, as D143 and D190 did.
+- **Item 8, import from a photo of a recipe: built after 1.3.0** (D195), for
+  `1.4.0`.
 - **The three framed phone portraits** are Fredrik's: the raw screenshots in
   `docs/screens/raw/` carry the current date format; reframe them, replace the
   three portraits, and `node scripts/landing-screens.mjs` picks them up.

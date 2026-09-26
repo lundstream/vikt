@@ -26,7 +26,9 @@ import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
 import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
 import { LABEL_SCHEMA, readLabel, readLabelMessages } from "../llm/read-label.js";
-import type { ReadLabelResponse } from "shared";
+import { RECIPE_SCHEMA, readRecipe, readRecipeMessages } from "../llm/read-recipe.js";
+import type { ReadLabelResponse, ReadRecipeResponse, RecipeRow } from "shared";
+import { hasTwoSets, parseRecipeLine, parseYield, ratioChecks, recipeSets } from "shared";
 import { RateLimiter } from "../lib/rate-limit.js";
 import { visionAvailable } from "../lib/vision-watch.js";
 import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
@@ -255,6 +257,118 @@ export async function readNutritionLabel(
   );
 
   return { available: true, label: parsed.label, model: reply.model, ms: reply.ms };
+}
+
+/**
+ * A photograph of a recipe's ingredient list, read into rows (D195).
+ *
+ * The model copies lines; `shared/recipe-photo.ts` reads them; the database
+ * prices them. The same transport and allowance as the label and the plate,
+ * because it is the same kind of request to the same GPU: the image is handed
+ * to Ollama and dropped, never written to a table, a file or a log line.
+ *
+ * Every row comes back with its grams **for each amount set the recipe
+ * prints**, so choosing a set on screen needs no second request and the model
+ * is never asked which one was meant. It writes nothing: the rows go into the
+ * meal sheet, where a person keeps or removes each one.
+ */
+export async function readRecipePhoto(
+  userId: string,
+  db: Db,
+  env: Env,
+  client: LlmClient,
+  input: { image: string },
+  log?: { info: (data: object, message: string) => void },
+): Promise<ReadRecipeResponse> {
+  const model = env.LLM_VISION_MODEL.trim();
+  if (model === "") return { available: false, reason: "not_configured" };
+
+  const limit = photoLimiter.check(`photo:${userId}`);
+  if (!limit.allowed) {
+    return { available: false, reason: "rate_limited", retryAfterSeconds: limit.retryAfterSeconds };
+  }
+
+  const reply = await client.chat({
+    model,
+    messages: readRecipeMessages(input.image),
+    schema: RECIPE_SCHEMA,
+    temperature: 0,
+    timeoutMs: env.OLLAMA_VISION_TIMEOUT_MS,
+  });
+  if (!reply.ok) return { available: false, reason: reply.reason };
+
+  const read = readRecipe(reply.content);
+  if (!read.ok) return { available: false, reason: read.reason };
+
+  const lines = read.recipe.rows.map((row) => parseRecipeLine(row.line));
+  const twoSets = hasTwoSets(lines);
+  const checks = twoSets ? ratioChecks(lines) : lines.map(() => false);
+
+  const found = await Promise.all(
+    lines.map((line) => (line.searchName === null ? null : matchRow(userId, db, line.searchName))),
+  );
+  const ids = found.filter((row) => row !== null).map((row) => row!.id);
+  const userHints = await userHintsFor(userId, db, ids);
+
+  const rows: RecipeRow[] = lines.map((line, index) => {
+    const row = found[index] ?? null;
+    const packet = (row?.servingHints as ServingHints | null) ?? null;
+    const own = row ? (userHints.get(row.id) ?? null) : null;
+    const household = householdHints(row?.category);
+    const hints = packet || household ? { ...(household ?? {}), ...(packet ?? {}) } : null;
+
+    /* The photo path's own conversion, so a recipe converts what a plate does. */
+    const convert = (count: number, unit: string) =>
+      row === null ? null : photoAmount({ count, unit }, hints, own).grams;
+    const sets = recipeSets(line, twoSets, convert);
+    const priced = sets.map((set) => ({
+      ...set,
+      kcal: row === null || set.grams === null ? null : priceRow(row, set.grams, hints, own).kcal,
+    }));
+    const match = row === null ? null : priceRow(row, null, hints, own);
+
+    return {
+      line: line.printed,
+      section: read.recipe.rows[index]!.section,
+      name: line.searchName ?? line.name,
+      reference: line.reference,
+      check: checks[index] ?? false,
+      sets: priced,
+      match: match === null
+        ? null
+        : {
+            foodItemId: match.foodItemId,
+            name: match.name,
+            brand: match.brand,
+            kcalPer100: match.kcalPer100,
+            servingHints: match.servingHints,
+          },
+    };
+  });
+
+  /** Counts only: no line, no name, no bytes. */
+  log?.info(
+    {
+      model: reply.model,
+      ms: reply.ms,
+      kb: Math.round((input.image.length * 3) / 4 / 1024),
+      rows: rows.length,
+      matched: rows.filter((row) => row.match !== null).length,
+      twoSets,
+      checks: checks.filter(Boolean).length,
+    },
+    "recipe read",
+  );
+
+  return {
+    available: true,
+    title: read.recipe.title,
+    yield: parseYield(read.recipe.yield),
+    twoSets,
+    rows,
+    model: reply.model,
+    ms: reply.ms,
+  };
 }
 
 /**
