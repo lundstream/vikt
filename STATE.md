@@ -443,7 +443,75 @@ phase 3.
   built, and so is the coach (8b). What is left in that phase is the milestone
   messages the persona was also meant to deliver.
 
-## Production runs 1.4.0
+## Production runs 1.4.1
+
+**Deployed 2026-09-26 from `da88d0d`, tagged `v1.4.1`**, by `node scripts/release.mjs
+1.4.1`. All thirteen steps ran. What the owner found on a phone the evening
+1.4.0 went out: the sentence tool read again (D199), "Välj bild" in every photo
+tool (D200), and the meal photo's privacy line (D201).
+
+**Before the command**, each read rather than assumed:
+
+- **CI green for `da88d0d`**, the exact commit, before the command started.
+- **Every model production uses answers** on the workstation's Ollama, each
+  asked a question under a JSON schema and each answering `{"svar": "ja"}`:
+  gemma4:e4b, the sentence tool (156 ms); qwen3.6:27b, the coach (27,6 s, with
+  loading); qwen3-vl:8b, the photos (11,4 s, with loading). The first two are
+  the defaults, not set in the stack; the third is `LLM_VISION_MODEL`, read
+  from the stack by name. The production host reaches Ollama (200).
+- **The host scripts** equal to `da88d0d`; `VIKT_HOST`, `PORTAINER_TOKEN` and
+  `PORTAINER_URL` present.
+- **The dry run, green**, exit 0, ending "every check passed and nothing was
+  changed. 1.4.1 is not live."
+
+| step | evidence |
+|---|---|
+| 1 workstation | `VIKT_HOST`, `PORTAINER_TOKEN`, `PORTAINER_URL` set, gh authenticated |
+| 2 tree | clean, on `dev`, pushed, at `da88d0d` |
+| 3 CI | success for `da88d0d` |
+| 4 backup | `/var/backups/vikt/vikt-20260926T185624Z.dump`, 328K; beside it `media-20260926T185624Z.tar.gz`, 121 KB, now holding the first meal photo production has |
+| 5 restore | `daily_log 73, food_entries 313, plans 2, users 4, weight_log 108`, restored copy and live database agree |
+| 6 main | fast-forwarded 6 commits to `da88d0d` |
+| 7 tag | `v1.4.1` on `da88d0d` |
+| 8 workflow | run `36264308998` (release, `v1.4.1`) green |
+| 9 plan | nothing blocks this deploy; `IMAGE_TAG 1.4.0 -> 1.4.1`, no variable set |
+| 10 deploy | both containers on the new image, the API healthy; `the vision model can see` in 1 710 ms |
+| 11 API log | `version 1.4.1, commit da88d0d`; **`Migrations: none to apply, 36 already recorded`**; VAPID silent, so the key is unchanged |
+| 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200; and `/app/` 200, read after |
+| 13 Nyheter | **`published "Vikt 1.4.1" as 354abaf8-0df7-4441-9c73-ccdffaf3385f, 839 characters, not mailed`** |
+
+**Lighthouse was not run**: no landing page file changed between 1.4.0 and
+1.4.1 (§7).
+
+**Not yet confirmed through the interface in production**, because this
+session does not sign in there. For Fredrik, on the phone:
+
+- **Reload first**: the "En ny version finns" banner, so the phone runs 1.4.1
+  and not a cached 1.3.0 or 1.4.0.
+- Mat, "En mening": **"ett glas mjölk"** proposes milk, about 250 g.
+- Måltider, Ny måltid, "Recept från foto": **"Välj bild"** beside the camera
+  opens the gallery; a screenshot of a recipe from the web is read into rows.
+- A meal's sheet: under the photo, "Bara du ser det, om du inte delar
+  måltiden."
+- Nyheter: "Vikt 1.4.1" at the top.
+
+**Rollback**: no migration ran, so `node scripts/stack.mjs deploy 1.4.0
+--keep-file --yes` brings 1.4.0 back on the same data; the dump from step 4 is
+there if anything else is needed.
+
+#### What 1.4.1 changed
+
+| | what a user sees |
+|---|---|
+| **The sentence is read** (D199) | "Ett glas mjölk" said "Tolkningen är inte igång just nu" while the model had answered every time, in a shape the app could not read. The shape is now asked for with a schema: over twenty everyday sentences, refusals went from seven to none. A sentence the model still cannot turn into foods says "Tolkningen förstod inte meningen", not that it is not running |
+| **Välj bild** (D200) | the plate photo, the recipe photo and the label photo each have "Välj bild" beside the camera, for a picture already on the phone; it is resized and stripped of location and time in the phone like a new one |
+| **Screenshots of recipes** (D200) | the recipe photo's intro says a screenshot works, and often best; a yield printed as "4 portioner · 30 min" fills the portion count |
+| **The meal photo's line** (D201) | "Bara du ser det, om du inte delar måltiden.", the privacy page's own promise, where it said only "Bara du ser det." |
+
+
+---
+
+## Production ran 1.4.0 before it
 
 **Deployed 2026-09-26 from `c6b435f`, tagged `v1.4.0`**, by `node scripts/release.mjs
 1.4.0`. All thirteen steps ran. The recipe photo (D195), the matcher every
@@ -510,7 +578,7 @@ there if anything else is needed (docs/backup.md, "Restoring").
 
 ---
 
-## Production ran 1.3.0 before it
+## Production ran 1.3.0 before that
 
 **Deployed 2026-09-26 from `392b618`, tagged `v1.3.0`**, by `node scripts/release.mjs
 1.3.0`. All thirteen steps ran. Phase 14, Måltider, with the label photo, meal
@@ -590,7 +658,7 @@ brief), carried under "Inför nästa deploy".
 
 ---
 
-## Production ran 1.2.1 before that
+## Production ran 1.2.1 earlier
 
 **Deployed 2026-09-17 from `bc06167`**, by `node scripts/release.mjs 1.2.1`.
 **All thirteen steps ran**, which had never happened before.
@@ -655,28 +723,10 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ## Inför nästa deploy
 
-**The next deploy is `1.4.1`**: what the owner found on a phone the evening
-1.4.0 went out. Production runs `1.4.0` (above).
-
-**No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
-release commit is named once the `v1.4.1` tag exists, and before that the
-release follows `dev`'s tip, whose CI run has to have finished green before the
-command is started. Push nothing between starting it and step 7.
-
-#### What 1.4.1 changes
-
-| | what a user sees |
-|---|---|
-| **The sentence is read** (D199) | "Ett glas mjölk" said "Tolkningen är inte igång just nu" while the model had answered every time, in a shape the app could not read. The shape is now asked for with a schema: over twenty everyday sentences, refusals went from seven to none. A sentence the model still cannot turn into foods says "Tolkningen förstod inte meningen", not that it is not running |
-| **Välj bild** (D200) | the plate photo, the recipe photo and the label photo each have "Välj bild" beside the camera, for a picture already on the phone; it is resized and stripped of location and time in the phone like a new one |
-| **Screenshots of recipes** (D200) | the recipe photo's intro says a screenshot works, and often best; a yield printed as "4 portioner · 30 min" fills the portion count |
-| **The meal photo's line** (D201) | "Bara du ser det, om du inte delar måltiden.", the privacy page's own promise, where it said only "Bara du ser det." |
-
-**What the deploy needs that 1.4.0 did not: nothing.** No migration, no stack
-variable, no host change, so there is no `release` block below. The models are
-the ones production already uses: gemma4:e4b for the sentence and qwen3.6:27b
-for the coach (both the defaults, not set in the stack), and qwen3-vl:8b for
-the photos (`LLM_VISION_MODEL`).
+**Nothing is prepared yet.** Production runs `1.4.1` (above), released from
+`da88d0d`; everything on `dev` after that commit goes into the next deploy,
+which takes a number here, with its handover, once there is something to
+release.
 
 #### How the next release is told what to set
 
@@ -688,14 +738,13 @@ mention `--set` without setting anything. **There is no block yet, so the next
 release sets no variables.** Two blocks, or a line that is neither form, stop
 the command before step 1 (D194).
 
-#### On `dev` since 1.4.0
+#### On `dev` since 1.4.1
 
-- **A dry run no longer says the version is live** (`release.mjs`, with a
-  test): it ends "every check passed and nothing was changed", where 1.4.0's
-  said "1.4.0 is live" while production ran 1.3.0. The release command only;
-  nothing a user sees.
-- **The sentence tool** (D199), **Välj bild** (D200) and **the meal photo's
-  line** (D201): the table above, and "Current state".
+Nothing yet.
+
+**Known, and not changed**: the plate photo still asks the vision model in
+free JSON mode, the mode that failed the sentence tool (D199). It has not been
+seen failing this way; a schema for it needs its own probe on the vision model.
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -1048,14 +1097,13 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. **`main` is `c6b435f`, the `v1.4.0`
+between what is built and what is running. **`main` is `da88d0d`, the `v1.4.1`
 tag, and production runs it.** Everything on `dev` after it goes into the next
 deploy:
 
 | | |
 |---|---|
-| (this record) | The session's report |
-| `3fe7f05` | Production runs 1.4.0, and a dry run no longer says it is live |
+| (this record) | Production runs 1.4.1, and the session's report |
 
 ### Before the next redeploy
 
@@ -1092,7 +1140,9 @@ through Måltider on a phone.
 
 ### The 2026-09-26 evening brief: the phone test, and 1.4.1
 
-Items 1 to 3 done on `dev` (D199, D200, D201); 1.4.1 prepared above.
+All four items done: D199, D200 and D201 on `dev`, and `1.4.1` deployed with
+all thirteen steps ("Production runs 1.4.1"). **Open:** Fredrik's checks in
+production, listed there, "ett glas mjölk" after a reload first among them.
 ### The second landing brief: the page's polish, Sten, and three defects
 
 **All four items are done on `dev`**, and nothing inside one was left half
