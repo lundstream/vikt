@@ -32,6 +32,13 @@ export type Step = {
 /** What STATE.md's "Inför nästa deploy" says this version needs. */
 export function readHandover(state: string, version: string): Handover;
 
+/** The stack variables in a section's one `release` block (D194). */
+export function readReleaseBlock(
+  text: string,
+):
+  | { ok: false; why: string }
+  | { ok: true; sets: { name: string; value: string }[]; fromEnv: string[] };
+
 /** The version's Nyheter post, as a `# Title` and a body, or null. */
 export function readNewsPost(state: string, version: string): string | null;
 
@@ -46,6 +53,7 @@ export function buildSteps(options: {
   version: string;
   runner: StepRunner;
   root?: string;
+  handover?: Handover | null;
 }): Step[];
 
 export function release(options: {

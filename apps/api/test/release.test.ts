@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { execFileSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import {
   buildSteps,
   readHandover,
   readNewsPost,
+  readReleaseBlock,
   release,
   stackArgs,
 } from "../../../scripts/release.mjs";
@@ -256,50 +258,22 @@ describe("what STATE.md says the release needs", () => {
   });
 
   /**
-   * The `--set` list is read out of the documented command rather than kept a
-   * second time in a config file. D156 is what happens when the thing that runs
-   * and the thing that is written down are two copies: a variable was set in a
-   * panel that the deployed compose never read.
+   * Whatever the real handover's block lists reaches `stack.mjs`, once each,
+   * and nothing else does. D156 is what happens when the thing that runs and
+   * the thing that is written down are two copies.
    */
-  it("reads the same --set list the documented command uses", () => {
+  it("hands stack.mjs exactly what the real handover's block lists", () => {
     const handover = readHandover(STATE, VERSION);
     expect(handover.ok).toBe(true);
     if (!handover.ok) return;
 
     const args = stackArgs(VERSION, handover, "plan");
     expect(args.slice(0, 3)).toEqual(["plan", VERSION, "--release-file"]);
-
-    /*
-      Whatever the section lists, once each. 1.2.0 needed BACKUP_HOST_DIR and
-      1.2.1 needs nothing, so what is asserted is the correspondence rather than
-      a variable name that belongs to one release.
-    */
-    for (const entry of handover.sets) {
-      expect(args.join(" ")).toContain(`--set ${entry.name}=${entry.value}`);
-    }
-    expect(new Set(handover.sets.map((entry) => entry.name)).size).toBe(handover.sets.length);
-  });
-
-  /**
-   * A value stops at a backtick (D193). The 1.3.0 handover's prose mentioned
-   * "`--set MEDIA_STORAGE=s3`" to say when not to set it, and the parser read
-   * the sentence as an instruction with the value "s3`".
-   */
-  it("does not take inline code's closing backtick as part of a value", () => {
-    const text = [
-      "## Inför nästa deploy",
-      "",
-      "The next deploy is `9.9.9`. Only if the backup is S3 would `--set MEDIA_STORAGE=s3` apply.",
-      "",
-      "```sh",
-      "node scripts/stack.mjs plan 9.9.9 --release-file --set MEDIA_HOST_DIR=/var/lib/vikt/media",
-      "```",
-    ].join("\n");
-    const handover = readHandover(text, "9.9.9");
-    expect(handover.ok).toBe(true);
-    if (!handover.ok) return;
-    expect(handover.sets).toContainEqual({ name: "MEDIA_STORAGE", value: "s3" });
-    expect(handover.sets.every((entry) => !entry.value.includes("`"))).toBe(true);
+    const expected = [
+      ...handover.sets.flatMap((entry) => ["--set", `${entry.name}=${entry.value}`]),
+      ...handover.fromEnv.flatMap((name) => ["--set-from-env", name]),
+    ];
+    expect(args.slice(3)).toEqual(expected);
   });
 
   /** Anything sensitive is named, never valued, on the command line (§7). */
@@ -330,6 +304,157 @@ describe("what STATE.md says the release needs", () => {
   it("does not hand back another version's post", () => {
     expect(readNewsPost(STATE, "9.9.9")).toBeNull();
   });
+});
+
+/* ------------------------------------------------------ the release block -- */
+
+/**
+ * The release's stack variables come from one fenced block with the info
+ * string `release`, and from nothing else in the section (D194).
+ */
+describe("the release block", () => {
+  const section = (...body: string[]) =>
+    ["## Inför nästa deploy", "", "The next deploy is `9.9.9`.", "", ...body, ""].join("\n");
+  const fence = "```";
+
+  it("reads NAME=value as a value and a NAME alone as a secret", () => {
+    const handover = readHandover(
+      section(`${fence}release`, "MEDIA_HOST_DIR=/var/lib/vikt/media", "", "SMTP_PASSWORD", fence),
+      "9.9.9",
+    );
+    expect(handover).toMatchObject({
+      ok: true,
+      sets: [{ name: "MEDIA_HOST_DIR", value: "/var/lib/vikt/media" }],
+      fromEnv: ["SMTP_PASSWORD"],
+    });
+    if (!handover.ok) return;
+    const args = stackArgs("9.9.9", handover, "deploy");
+    expect(args.join(" ")).toContain("--set MEDIA_HOST_DIR=/var/lib/vikt/media");
+    expect(args.join(" ")).toContain("--set-from-env SMTP_PASSWORD");
+    expect(args.join(" ")).not.toMatch(/SMTP_PASSWORD=/);
+  });
+
+  it("means no variables when there is no block", () => {
+    expect(readHandover(section("Nothing to set this time."), "9.9.9")).toMatchObject({
+      ok: true,
+      sets: [],
+      fromEnv: [],
+    });
+  });
+
+  /**
+   * Prose is for people. The old reader took every `--set NAME=value` in the
+   * section, so a sentence about when *not* to set a variable set it, and the
+   * by-hand command a person copies was read a second time (D193).
+   */
+  it("ignores --set in prose, in inline code and in a by-hand command", () => {
+    const handover = readHandover(
+      section(
+        "Only if the backup is S3 would `--set MEDIA_STORAGE=s3` apply, and --set OTHER=1 neither.",
+        "",
+        `${fence}sh`,
+        "node scripts/stack.mjs plan 9.9.9 --release-file --set BY_HAND=yes --set-from-env HAND_SECRET",
+        fence,
+        "",
+        `${fence}release`,
+        "MEDIA_HOST_DIR=/var/lib/vikt/media",
+        fence,
+      ),
+      "9.9.9",
+    );
+    expect(handover).toMatchObject({
+      ok: true,
+      sets: [{ name: "MEDIA_HOST_DIR", value: "/var/lib/vikt/media" }],
+      fromEnv: [],
+    });
+  });
+
+  /** The backtick that became part of a value in D193, now inside the block. */
+  it("refuses a value with a backtick in it rather than setting it", () => {
+    const handover = readHandover(section(`${fence}release`, "MEDIA_STORAGE=s3`", fence), "9.9.9");
+    expect(handover.ok).toBe(false);
+    if (handover.ok) return;
+    expect(handover.why).toMatch(/line \d+ of the `release` block/);
+  });
+
+  it("stops on two blocks", () => {
+    const handover = readHandover(
+      section(`${fence}release`, "A_ONE=1", fence, "", `${fence}release`, "B_TWO=2", fence),
+      "9.9.9",
+    );
+    expect(handover.ok).toBe(false);
+    if (handover.ok) return;
+    expect(handover.why).toMatch(/2 `release` blocks/);
+  });
+
+  /** Named by its number, never quoted: the line may hold a value (§7). */
+  it("stops on a line it cannot read, without printing it", () => {
+    const handover = readHandover(
+      section(`${fence}release`, "GOOD_ONE=1", "PORTAINER_TOKEN = not-a-real-token-value", fence),
+      "9.9.9",
+    );
+    expect(handover.ok).toBe(false);
+    if (handover.ok) return;
+    expect(handover.why).toMatch(/line 7 of the `release` block is neither NAME=value nor a NAME alone/);
+    expect(handover.why).not.toContain("not-a-real-token-value");
+  });
+
+  it("stops on one name twice, an unclosed block and a fence that nearly says release", () => {
+    const twice = readHandover(section(`${fence}release`, "A_ONE=1", "A_ONE=2", fence), "9.9.9");
+    expect(twice).toMatchObject({ ok: false });
+    expect(twice.ok ? "" : twice.why).toContain("A_ONE is in the `release` block twice");
+
+    const unclosed = readHandover(section(`${fence}release`, "A_ONE=1"), "9.9.9");
+    expect(unclosed.ok ? "" : unclosed.why).toMatch(/never closed/);
+
+    for (const info of ["Release", "release-vars", "releases"]) {
+      const near = readHandover(section(`${fence}${info}`, "A_ONE=1", fence), "9.9.9");
+      expect(near.ok ? "" : near.why, info).toMatch(/which is not `release`/);
+    }
+  });
+
+  it("reads only the handover section, not a block kept as a record elsewhere", () => {
+    const state = [
+      "## Production runs 9.9.8",
+      "",
+      `${fence}release`,
+      "OLD_ONE=1",
+      fence,
+      "",
+      section(`${fence}release`, "NEW_ONE=2", fence),
+    ].join("\n");
+    expect(readReleaseBlock("no fences at all")).toEqual({ ok: true, sets: [], fromEnv: [] });
+    expect(readHandover(state, "9.9.9")).toMatchObject({
+      ok: true,
+      sets: [{ name: "NEW_ONE", value: "2" }],
+    });
+  });
+
+  /**
+   * Before step 1, with nothing asked of anyone: two blocks and an unreadable
+   * line are both found before the workstation is even looked at.
+   */
+  for (const [label, body] of [
+    ["two blocks", [`${fence}release`, "A_ONE=1", fence, `${fence}release`, "B_TWO=2", fence]],
+    ["an unreadable line", [`${fence}release`, "not a variable", fence]],
+  ] as const) {
+    it(`stops the command before step 1 on ${label}`, async () => {
+      const root = mkdtempSync(path.join(os.tmpdir(), "vikt-release-"));
+      try {
+        writeFileSync(path.join(root, "STATE.md"), section(...body));
+        const runner = new FakeRunner();
+        const out = sink();
+        const result = await withEnv({}, () => release({ version: "9.9.9", runner, out, root }));
+
+        expect(result).toMatchObject({ ok: false, stoppedAt: 0 });
+        expect(out.text()).toContain("stopped before step 1. Nothing was attempted.");
+        expect(out.text()).not.toContain("1/13");
+        expect(runner.calls).toEqual([]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
 });
 
 /* ------------------------------------------------------------- every step -- */
@@ -496,6 +621,59 @@ describe("a release that stops", () => {
 
     expect(result).toMatchObject({ ok: false, stoppedAt: 9 });
     expect(out.text()).toContain("the plan is blocked");
+  });
+
+  /**
+   * The 1.3.0 dry run stopped here on the release's own images, which a dry
+   * run cannot have built: it skips the tag and the build and then asked for
+   * their result (D194). Those two lines, and only those, are expected.
+   */
+  it("lets a dry run through the release's own unbuilt images, and nothing wider", async () => {
+    const unbuilt = [
+      `blocked: ghcr.io/lundstream/vikt-api:${VERSION}: the manifest for :${VERSION} answered 404`,
+      `blocked: ghcr.io/lundstream/vikt-web:${VERSION}: the manifest for :${VERSION} answered 404`,
+    ];
+    const dry = new FakeRunner({
+      ...healthyWorld(),
+      "node .*stack.mjs plan": {
+        code: 1,
+        out: ["setting: MEDIA_HOST_DIR (new)", `IMAGE_TAG  1.2.1 -> ${VERSION}`, "", ...unbuilt].join("\n"),
+      },
+    });
+    dry.dryRun = true;
+    const out = sink();
+    const passed = await withEnv({}, () => release({ version: VERSION, runner: dry, out, root: ROOT }));
+    expect(passed, out.text()).toMatchObject({ ok: true });
+    expect(out.text()).toContain(`the 2 image(s) for ${VERSION} do not exist yet`);
+    expect(out.text()).toContain("setting: MEDIA_HOST_DIR (new)");
+
+    /* The same lines in a real run are a real block. */
+    const real = new FakeRunner({
+      ...healthyWorld(),
+      "node .*stack.mjs plan": { code: 1, out: unbuilt.join("\n") },
+    });
+    const stopped = await withEnv({}, () =>
+      release({ version: VERSION, runner: real, out: sink(), root: ROOT }),
+    );
+    expect(stopped).toMatchObject({ ok: false, stoppedAt: 9 });
+
+    /* And in a dry run, anything else still blocks: another version, another block. */
+    for (const other of [
+      `blocked: ghcr.io/lundstream/vikt-api:9.9.9: the manifest for :9.9.9 answered 404`,
+      "blocked: set BACKUP_HOST_DIR first",
+    ]) {
+      const wider = new FakeRunner({
+        ...healthyWorld(),
+        "node .*stack.mjs plan": { code: 1, out: [...unbuilt, other].join("\n") },
+      });
+      wider.dryRun = true;
+      const text = sink();
+      const result = await withEnv({}, () =>
+        release({ version: VERSION, runner: wider, out: text, root: ROOT }),
+      );
+      expect(result, other).toMatchObject({ ok: false, stoppedAt: 9 });
+      expect(text.text()).toContain(other);
+    }
   });
 
   /**

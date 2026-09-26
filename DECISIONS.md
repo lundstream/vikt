@@ -10990,3 +10990,60 @@ backtick now, the sentence no longer uses the command's syntax, and a test
 holds both. It is recurring error class ten, a check answering the question
 next to the one it was asked: "which variables does the handover set" answered
 by "which strings in it look like a setting".
+
+### D194 — A release's variables are one fenced block, and a dry run expects its own images to be missing
+
+**The stack variables a release sets are written in one fenced block with the
+info string `release`**, under STATE.md "Inför nästa deploy":
+
+````md
+```release
+MEDIA_HOST_DIR=/var/lib/vikt/media
+SMTP_PASSWORD
+```
+````
+
+One variable a line. `NAME=value` becomes `--set NAME=value`; a name alone is a
+secret and becomes `--set-from-env NAME`, its value read from the workstation's
+environment and never written into a repository that is public. `release.mjs`
+reads that block and **nothing else** in the section.
+
+D193 fixed the symptom: a regular expression over the whole section had read a
+sentence about when *not* to set `MEDIA_STORAGE` as an instruction to set it,
+with a backtick in the value, and the fix made the pattern stop at a backtick.
+That still left the design that produced it: prose and the thing that runs were
+the same text, so every sentence written for a person was also a possible
+instruction, and the by-hand command shown for a self-hoster was read a second
+time. Now prose may say `--set` as often as it needs to.
+
+**What stops the command, before step 1 asks anything of anyone:** two
+`release` blocks, a block that is never closed, a fence whose info string
+nearly says `release` (`Release`, `release-vars`, `releases`: a block meant to
+carry variables and silently skipped is the failure this is about), one name
+twice, or a line that is neither form, including a value with a space or a
+backtick in it. The unreadable line is named by its number and never quoted,
+because it may hold a value. **No block means no variables**, which is what
+most releases need, rather than an error. Only the "Inför nästa deploy"
+section is read, so a block kept elsewhere as a record is not a second one.
+The handover is now read by `release()` before the steps are built, not inside
+step 1, so "stopped before step 1. Nothing was attempted." is literally true.
+
+**The 1.3.0 dry run stopped at step 9, and should not have.** The plan was
+clean except for two `blocked:` lines, the `vikt-api` and `vikt-web` images for
+`:1.3.0` answering 404, and those cannot exist during a dry run: it skips step
+7's tag and step 8's build and then asked step 9 whether they had happened. It
+was recurring error class ten again, the same as the checks D183 recorded. The
+real run was started on that reading (nothing else was blocked, and step 9 asks
+again after step 8) and passed step 9 cleanly. A dry run now accepts exactly
+those lines, for its own version and nothing wider; a real run still stops on
+them, and a dry run still stops on any other block, including the same 404 for
+another version.
+
+**Held by tests, each seen failing before it passed:** removing the dry-run
+exception, reading the handover inside step 1 again, letting a near-miss fence
+through, and letting two blocks through each fail their test. `release.test.ts`
+covers the block read (value and secret, no block, prose and inline code and a
+by-hand command ignored, the backtick case, two blocks, an unreadable line not
+quoted, a name twice, an unclosed block, near-miss fences, a block outside the
+section), the stop before step 1 with no call made, and the dry run's step 9.
+CLAUDE.md §7's release rule and INFRA.md say the same.

@@ -111,14 +111,111 @@ const env = (name) => {
 /* ---------------------------------------------------------------- STATE.md -- */
 
 /**
+ * The stack variables a release sets, out of the one fenced block with the
+ * info string `release` (D194).
+ *
+ *     ```release
+ *     MEDIA_HOST_DIR=/var/lib/vikt/media
+ *     SOME_SECRET
+ *     ```
+ *
+ * One variable a line: `NAME=value` is set as written, and a name alone is a
+ * secret, passed by name with `--set-from-env` so its value never reaches a
+ * command line or this file. Blank lines are allowed and nothing else is.
+ *
+ * **Read from that block and from nothing else.** The previous reader took
+ * every `--set NAME=value` anywhere in the section, prose included, and a
+ * sentence explaining when *not* to set `MEDIA_STORAGE` would have set it to
+ * "s3`" (D193). Prose is for people; the block is what runs. So:
+ *
+ *  - no block: no variables, which is what most releases need;
+ *  - two blocks, an unclosed one, a fence that nearly says `release`, a line
+ *    that is neither form, or one name twice: the command stops before step 1,
+ *    because a release that guesses which of two lists was meant has already
+ *    done the wrong thing.
+ *
+ * A line that cannot be read is named by its number and never quoted: if it
+ * held a value, the value is not printed (§7).
+ */
+export function readReleaseBlock(text) {
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  let open = null;
+
+  for (const [index, line] of lines.entries()) {
+    const fence = line.match(/^\s*(`{3,}|~{3,})\s*(.*?)\s*$/);
+    if (open !== null) {
+      if (fence && fence[1][0] === open.marker[0] && fence[1].length >= open.marker.length && fence[2] === "") {
+        if (open.release) blocks.push(open);
+        open = null;
+      } else if (open.release) {
+        open.body.push({ number: index + 1, line });
+      }
+      continue;
+    }
+    if (!fence) continue;
+    const info = fence[2];
+    if (info !== "release" && /^release/i.test(info)) {
+      return {
+        ok: false,
+        why: `line ${index + 1} opens a fence "${fence[1]}${info.slice(0, 20)}", which is not \`release\`; ` +
+          "a block meant to carry the release's variables would be skipped",
+      };
+    }
+    open = { marker: fence[1], release: info === "release", start: index + 1, body: [] };
+  }
+
+  if (open?.release) {
+    return { ok: false, why: `the \`release\` block opened on line ${open.start} is never closed` };
+  }
+  if (blocks.length === 0) return { ok: true, sets: [], fromEnv: [] };
+  if (blocks.length > 1) {
+    return {
+      ok: false,
+      why: `there are ${blocks.length} \`release\` blocks (lines ${blocks.map((b) => b.start).join(", ")}); ` +
+        "there has to be one, or none",
+    };
+  }
+
+  const sets = [];
+  const fromEnv = [];
+  const seen = new Set();
+  for (const { number, line } of blocks[0].body) {
+    const entry = line.trim();
+    if (entry === "") continue;
+    /* A value ends nowhere but the line's end, and holds no space and no backtick. */
+    const assignment = entry.match(/^([A-Z][A-Z0-9_]*)=([^\s`]+)$/);
+    const secret = entry.match(/^([A-Z][A-Z0-9_]*)$/);
+    const name = assignment?.[1] ?? secret?.[1];
+    if (name === undefined) {
+      return {
+        ok: false,
+        why: `line ${number} of the \`release\` block is neither NAME=value nor a NAME alone`,
+      };
+    }
+    if (seen.has(name)) {
+      return { ok: false, why: `${name} is in the \`release\` block twice (line ${number})` };
+    }
+    seen.add(name);
+    if (assignment) sets.push({ name, value: assignment[2] });
+    else fromEnv.push(name);
+  }
+  return { ok: true, sets, fromEnv };
+}
+
+/**
  * What STATE.md says this version needs.
  *
  * The handover is already written there in a form a person reads, and this
- * reads the same words rather than a second copy in a config file: the two
- * cannot then disagree, which is the failure D156 is about one level up.
+ * reads the same document rather than a second copy in a config file: the two
+ * cannot then disagree, which is the failure D156 is about one level up. The
+ * variables come from its one `release` block (`readReleaseBlock`); the rest
+ * of the section is prose.
  */
 export function readHandover(state, version) {
-  const section = state.slice(state.indexOf("## Inför nästa deploy"));
+  const at = state.indexOf("## Inför nästa deploy");
+  if (at < 0) return { ok: false, why: `STATE.md has no "Inför nästa deploy" section` };
+  const section = state.slice(at);
   const end = section.indexOf("\n## ", 4);
   const text = end < 0 ? section : section.slice(0, end);
 
@@ -126,40 +223,10 @@ export function readHandover(state, version) {
     return { ok: false, why: `STATE.md's "Inför nästa deploy" does not mention ${version}` };
   }
 
-  /*
-    Every `--set NAME=value` the section gives, once each.
+  const block = readReleaseBlock(text);
+  if (!block.ok) return { ok: false, why: `STATE.md's "Inför nästa deploy": ${block.why}` };
+  const { sets, fromEnv } = block;
 
-    The section shows the command twice, as one line and as the by-hand
-    equivalent, so a plain scan hands the same variable to `stack.mjs` twice.
-    Harmless there and confusing to read, and a duplicate that disagreed with
-    itself would be worse than either.
-  */
-  const sets = [
-    ...new Map(
-      /*
-        A value ends at whitespace or at a backtick. STATE.md is prose with
-        inline code in it, and `(\S+)` took the closing backtick of
-        "`--set MEDIA_STORAGE=s3`" as part of the value: a sentence explaining
-        when *not* to set a variable would have set it to "s3`" (D193).
-      */
-      [...text.matchAll(/--set\s+([A-Z][A-Z0-9_]*)=([^\s`]+)/g)].map((m) => [
-        m[1],
-        { name: m[1], value: m[2] },
-      ]),
-    ).values(),
-  ];
-
-  /* And every `--set-from-env NAME`, whose value is never written down. */
-  const fromEnv = [...text.matchAll(/--set-from-env\s+([A-Z][A-Z0-9_]*)/g)].map((m) => m[1]);
-
-  /**
-   * The commit `main` should be at.
-   *
-   * Named only when `dev` has moved past the release; when the whole of `dev`
-   * is the release, `main` fast-forwards to its head and there is nothing to
-   * name. Both are legitimate and they need different handling, so the absence
-   * is a value rather than a missing one.
-   */
   /*
     Whitespace rather than a space, because STATE.md is prose and prose wraps:
     the first version of this missed the line it was written for, because "For"
@@ -214,7 +281,7 @@ export function readNewsPost(state, version) {
  * earlier steps learned. Nothing in here writes to the host or to Portainer
  * when `runner.dryRun` is set, and every step says which of the two it is.
  */
-export function buildSteps({ version, runner, root = ROOT }) {
+export function buildSteps({ version, runner, root = ROOT, handover: given = null }) {
   const context = {};
 
   return [
@@ -244,12 +311,15 @@ export function buildSteps({ version, runner, root = ROOT }) {
         }
 
         /*
-          The handover, read here rather than at step 6, because **which commit
-          is being released** decides what step 3 should ask CI about. When dev
-          has moved past the release those are different commits, and checking
-          the tip would be checking something that is not going into production.
+          The handover, known here rather than at step 6, because **which
+          commit is being released** decides what step 3 should ask CI about.
+          When dev has moved past the release those are different commits, and
+          checking the tip would be checking something that is not going into
+          production. `release()` reads it before this step runs (D194); it is
+          read here only when the steps are built on their own.
         */
-        const handover = readHandover(readFileSync(path.join(root, "STATE.md"), "utf8"), version);
+        const handover =
+          given ?? readHandover(readFileSync(path.join(root, "STATE.md"), "utf8"), version);
         if (!handover.ok) return fail(handover.why);
 
         context.host = host;
@@ -593,18 +663,33 @@ export function buildSteps({ version, runner, root = ROOT }) {
         const args = stackArgs(version, context.handover, "plan");
         const plan = runner.local("node", [path.join(root, "scripts/stack.mjs"), ...args]);
 
-        if (plan.code !== 0) return fail(`plan exited ${plan.code}:\n${plan.out}`);
-
         const blocked = plan.out
           .split("\n")
           .map((line) => line.trim())
           .filter((line) => line.startsWith("blocked:"));
-        if (blocked.length > 0) {
-          return fail(`the plan is blocked:\n${blocked.join("\n")}\n\n${plan.out}`);
-        }
 
-        if (!/nothing blocks this deploy/i.test(plan.out)) {
-          return fail(`the plan did not end "nothing blocks this deploy":\n${plan.out}`);
+        /*
+          A dry run skips step 7's tag and step 8's build and then asks this
+          step whether the release's images exist, which they cannot yet: the
+          1.3.0 dry run stopped here on exactly those two lines and nothing
+          else (D194). Those two lines, for this version and nothing wider, are
+          what a dry run expects to see; any other block still stops it.
+        */
+        const escaped = version.replace(/\./g, "\\.");
+        const ownImage = new RegExp(
+          `^blocked: \\S+/vikt-(api|web):${escaped}: the manifest for :${escaped} answered 404$`,
+        );
+        const unbuilt = runner.dryRun ? blocked.filter((line) => ownImage.test(line)) : [];
+        const rest = blocked.filter((line) => !unbuilt.includes(line));
+
+        if (rest.length > 0) {
+          return fail(`the plan is blocked:\n${rest.join("\n")}\n\n${plan.out}`);
+        }
+        if (unbuilt.length === 0) {
+          if (plan.code !== 0) return fail(`plan exited ${plan.code}:\n${plan.out}`);
+          if (!/nothing blocks this deploy/i.test(plan.out)) {
+            return fail(`the plan did not end "nothing blocks this deploy":\n${plan.out}`);
+          }
         }
 
         /* What it says it will change, which is the evidence worth keeping. */
@@ -612,7 +697,12 @@ export function buildSteps({ version, runner, root = ROOT }) {
           .split("\n")
           .map((line) => line.trim())
           .filter((line) => /^(setting:|unsetting:|IMAGE_TAG|IMAGE_REPO)/.test(line));
-        return ok(["nothing blocks this deploy", ...changes].join("\n"));
+        const verdict =
+          unbuilt.length === 0
+            ? "nothing blocks this deploy"
+            : `nothing else blocks this deploy; the ${unbuilt.length} image(s) for ${version} ` +
+              "do not exist yet, which is right: step 7 tags the release and step 8 builds them";
+        return ok([verdict, ...changes].join("\n"));
       },
     },
 
@@ -788,8 +878,28 @@ export function stackArgs(version, handover, command) {
 /* ------------------------------------------------------------------- main -- */
 
 export async function release({ version, runner, out = process.stdout, root = ROOT }) {
-  const steps = buildSteps({ version, runner, root });
   out.write(`releasing ${version}${runner.dryRun ? " (dry run)" : ""}\n\n`);
+
+  /*
+    What STATE.md says the release needs, before step 1 asks anything of
+    anyone (D194). A `release` block that cannot be read is a release that
+    does not know what to set, and learning that after the backup and the tag
+    is learning it too late.
+  */
+  let handover;
+  try {
+    handover = readHandover(readFileSync(path.join(root, "STATE.md"), "utf8"), version);
+  } catch (error) {
+    handover = { ok: false, why: `STATE.md cannot be read: ${error?.message ?? error}` };
+  }
+  if (!handover.ok) {
+    out.write(`FAIL before step 1: what STATE.md says the release needs\n`);
+    for (const line of String(handover.why).split("\n")) out.write(`       ${line}\n`);
+    out.write(`\nstopped before step 1. Nothing was attempted.\n`);
+    return { ok: false, stoppedAt: 0, step: "what STATE.md says the release needs" };
+  }
+
+  const steps = buildSteps({ version, runner, root, handover });
 
   for (const [index, step] of steps.entries()) {
     const number = `${index + 1}/${steps.length}`;

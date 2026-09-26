@@ -414,7 +414,8 @@ photos and sharing (D186 to D192).
   which cannot exist before step 7 tags the release and step 8 builds it: a
   dry run skips both and then asks for their result. The real run was started
   on that reading, because nothing else was blocked and step 9 asks again after
-  step 8. The dry run is fixed on `dev` under "Inför nästa deploy".
+  step 8. Fixed on `dev` afterwards: a dry run now expects exactly those two
+  lines (D194).
 
 | step | evidence |
 |---|---|
@@ -544,6 +545,22 @@ takes a number here, with its handover, once there is something to release:
 **Import from a photo of a recipe** (item 8 of the Phase 14 brief): **not
 built.** It starts with a probe of the vision model on real recipe pages, and
 the rows are gated on what the model reads.
+
+#### How the next release is told what to set
+
+**Stack variables go in one block in this section**, fenced with the info
+string `release`, one a line: `NAME=value`, or a secret's name alone, whose
+value then comes from the workstation's environment and is never written here.
+`release.mjs` reads that block and nothing else, so the sentences around it can
+mention `--set` without setting anything. **There is no block yet, so the next
+release sets no variables.** Two blocks, or a line that is neither form, stop
+the command before step 1 (D194).
+
+#### On `dev` since 1.3.0
+
+- **The release block** and **the dry run's step 9** (D194): the release
+  command, not the app; nothing a user sees. A dry run no longer stops on the
+  release's own images, which it cannot have built.
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.

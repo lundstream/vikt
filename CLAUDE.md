@@ -828,6 +828,12 @@ a commit on `main` is a commit that the next redeploy ships.
     few minutes of being pushed has no verdict at all, only a cancelled run; and
     once the tag exists, the tip is no longer the release, because the next fix
     lands after it. 1.2.1 needed both halves to get out (STATE.md, D183).
+  - **A release's stack variables are the one fenced `release` block** under
+    STATE.md "Inför nästa deploy": `NAME=value` a line, a secret as its name
+    alone (passed with `--set-from-env`, its value never written down). The
+    command reads that block and nothing else, so prose may mention `--set`
+    freely. No block means no variables; two blocks, or a line it cannot read,
+    stop it before step 1 (D194).
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
