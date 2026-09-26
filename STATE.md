@@ -106,11 +106,11 @@ development server**, item by item, each with its own verdict file. Released as
 - **No private address in a tracked file** (D197) has no screen: the helper's
   refusal and release step 1 are held by tests, and the address test failed on
   `scripts/portainer.mjs:35` before it passed.
-- **The closing sweep, 2026-09-26, after 1.4.0's work**: `pnpm harness:sweep`
-  (the tracked `shoot2.mjs`) over every finished screen at 360 px and desktop,
-  **45 of 45** with the sign-in; both landing rows
-  `landing-ok=sentence15/meta13/gap64`, 6 796 px at 360 and 5 206 at desktop,
-  unchanged. CI green on `dev` at `626dbf6`.
+- **The closing sweep, 2026-09-26, after the matcher pass**: `pnpm
+  harness:sweep` over every finished screen at 360 px and desktop, **45 of 45**
+  with the sign-in; both landing rows `landing-ok=sentence15/meta13/gap64`,
+  6 796 px at 360 and 5 206 at desktop, unchanged. CI green on `dev` at
+  `54e0e16`.
 
 - **Phases 0 to 6 are built and used daily**: invite-only auth, the weight log
   and trend line, adaptive TDEE and projections, the food database with barcode
@@ -951,6 +951,11 @@ deploy:
 
 | | |
 |---|---|
+| `54e0e16` | 1.4.0 prepared again: the recipe photos seen with the new matcher |
+| `c224343` | No private address in a tracked file; PORTAINER_URL has no default |
+| `ff55a74` | The matcher reads Swedish: compounds are other foods, qualifiers are counted |
+| `ad85670` | §7: a red check is not passed on a reading, and no LAN address is tracked |
+| `487eb3f` | The session's report, and STATE.md closed for the pass |
 | `626dbf6` | A recipe photographed: the model copies lines, the app reads them |
 | `b417005` | A release's variables are one fenced block; a dry run expects its images missing |
 | `829daf5` | Production runs 1.3.0, and all thirteen steps ran |
