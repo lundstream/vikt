@@ -112,7 +112,7 @@ run psql -U "$POSTGRES_USER" -d "$SCRATCH" -A -t -c \
   "select photo_key from meals where photo_key is not null;" > "$NAMED" 2>/dev/null || true
 COUNT="$(grep -c . "$NAMED" || true)"
 if [ -f "$MEDIA_TAR" ]; then
-  tar -tzf "$MEDIA_TAR" | sed 's#^\./##' > "$LISTED"
+  tar -tzf - < "$MEDIA_TAR" | sed 's#^\./##' > "$LISTED"
   MISSING=0
   while IFS= read -r KEY; do
     [ -n "$KEY" ] || continue

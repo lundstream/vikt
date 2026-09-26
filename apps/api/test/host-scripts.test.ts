@@ -103,7 +103,7 @@ describe.skipIf(!hasSh())("host-side scripts without a compose file", () => {
     // The photos, beside the dump with the same stamp, by the key each meal names (D191).
     const stamp = dumps.match(/^vikt-(\d{8}T\d{6}Z)\.dump$/m)![1];
     expect(dumps).toMatch(new RegExp(`^media-${stamp}\\.tar\\.gz$`, "m"));
-    const listed = execFileSync("sh", ["-c", `tar -tzf "$1"`, "sh", path.join(backups, `media-${stamp}.tar.gz`)], {
+    const listed = execFileSync("sh", ["-c", `tar -tzf - < "$1"`, "sh", path.join(backups, `media-${stamp}.tar.gz`)], {
       encoding: "utf8",
     });
     expect(listed.split("\n").map((line) => line.replace(/^\.\//, ""))).toContain(photo);
@@ -124,7 +124,7 @@ describe.skipIf(!hasSh())("host-side scripts without a compose file", () => {
     expect(noArchive.stderr).toMatch(/names 1 photos and there is no photo archive/);
 
     const media = path.join(dir, "media");
-    execFileSync("sh", ["-c", `mkdir -p "$1" && printf 'jpeg' > "$2" && tar -czf "$3" -C "$4" .`, "sh",
+    execFileSync("sh", ["-c", `mkdir -p "$1" && printf 'jpeg' > "$2" && tar -czf - -C "$4" . > "$3"`, "sh",
       path.dirname(path.join(media, photo)), path.join(media, photo), path.join(dir, "media-20260926T030000Z.tar.gz"), media]);
     const withArchive = spawnSync("sh", [path.join(infra, "restore-check.sh"), dump], {
       env: { ...env, FAKE_PHOTO_KEY: photo },

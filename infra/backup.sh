@@ -83,9 +83,11 @@ echo "  database: $(du -h "$DUMP" | cut -f1)  $DUMP"
 # archives those beside its dumps.
 MEDIA="${MEDIA_HOST_DIR:-/var/lib/vikt/media}"
 if [ -d "$MEDIA" ]; then
-  tar -czf "$BACKUP_DIR/media-$STAMP.tar.gz.partial" -C "$MEDIA" .
+  # Through stdout and stdin rather than -f, so no tar reads a path with a
+  # colon in it as a remote host.
+  tar -czf - -C "$MEDIA" . > "$BACKUP_DIR/media-$STAMP.tar.gz.partial"
   mv "$BACKUP_DIR/media-$STAMP.tar.gz.partial" "$BACKUP_DIR/media-$STAMP.tar.gz"
-  PHOTOS="$(tar -tzf "$BACKUP_DIR/media-$STAMP.tar.gz" | grep -c '\.jpg$' || true)"
+  PHOTOS="$(tar -tzf - < "$BACKUP_DIR/media-$STAMP.tar.gz" | grep -c '\.jpg$' || true)"
   echo "  photos:   $PHOTOS in $(du -h "$BACKUP_DIR/media-$STAMP.tar.gz" | cut -f1)  $BACKUP_DIR/media-$STAMP.tar.gz"
 else
   echo "  photos:   $MEDIA does not exist, skipped (MEDIA_HOST_DIR, or photos kept in S3)"
