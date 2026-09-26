@@ -129,6 +129,26 @@ describe("the translation layer", () => {
  * hand when this was written; the ones that can be one ("Spara {count} rader",
  * "Potten räcker om {days} dagar") go through `plural()` as well.
  */
+/**
+ * A meal's photo is seen only by its owner until the meal is shared (D192), and
+ * that exception has been left out twice: in the 1.3.0 Nyheter post and in the
+ * sheet's own line, "Bara du ser det." (D201). Every string, and every
+ * paragraph of the privacy page, that promises a photo is the person's alone
+ * says so with the exception, in the privacy page's words.
+ */
+describe("the promise about a photo", () => {
+  it("always carries the exception for a shared meal", () => {
+    const privacy = readFileSync(path.join(WEB_SRC, "landing", "Privacy.tsx"), "utf8")
+      .split("<P>")
+      .map((paragraph) => paragraph.replace(/\s+/g, " "));
+    const promises = [...Object.values(sv), ...privacy].filter(
+      (text) => /foto/i.test(text) && /bara du ser|bara för dig/i.test(text),
+    );
+    expect(promises.length).toBeGreaterThanOrEqual(2);
+    for (const text of promises) expect(text, text.slice(0, 90)).toMatch(/om du inte delar måltiden/);
+  });
+});
+
 describe("counts", () => {
   const OPENS_WITH_COUNT = /^\{(n|count|days)\} (?!av )\p{L}/u;
   const counted = (Object.entries(sv) as [string, string][])

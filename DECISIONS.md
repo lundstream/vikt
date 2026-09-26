@@ -11844,3 +11844,23 @@ component but `PhotoInputs` writes `capture`, and all three tools use it (both
 seen failing on the old plate photo, after a first version of the `capture`
 check had deleted the line it was looking for by reading `image/*` as the start
 of a comment); and `parseYield` with a separator, seen failing on the old one.
+
+### D201 — A meal's photo is the owner's alone until the meal is shared, everywhere it is said
+
+*2026-09-26, for 1.4.1.*
+
+The meal sheet said of the photo "Bara du ser det.", which stops being true
+once the meal is shared (D192): the same slip the 1.3.0 Nyheter post made and
+had to have corrected. It now says "Bara du ser det, om du inte delar
+måltiden.", the privacy page's own promise ("visas bara för dig, om du inte
+delar måltiden"). Every string and page was searched for a promise about who
+sees a photo: the privacy page's photo paragraph already had the exception;
+its sharing paragraph says a shared meal's photo is seen by everyone on the
+installation; the sharing sheet says the same; the plate, label and recipe
+photos are never stored and say so; the landing page promises nothing about
+who sees a photo. The sheet's line was the only one that disagreed.
+
+`i18n.test.ts` now holds it: every Swedish string, and every paragraph of the
+privacy page, that mentions a photo and promises "bara du ser" or "bara för
+dig" must carry "om du inte delar måltiden". Seen failing on the old line. The
+sheet shows the new line at 360 px and desktop, 4 of 4.

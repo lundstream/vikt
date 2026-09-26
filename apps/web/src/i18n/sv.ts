@@ -1429,7 +1429,10 @@ export const sv = {
   "meals.photoRemove": "fotot",
   "meals.photoAlt": "Foto av {name}",
   "meals.photoWorking": "Förbereder fotot…",
-  "meals.photoNote": "Fotot förminskas och rensas från plats och tid i telefonen innan det sparas. Bara du ser det.",
+  // The privacy page's own promise, word for word where it can be (D201): a
+  // shared meal's photo is seen by everyone on this installation.
+  "meals.photoNote":
+    "Fotot förminskas och rensas från plats och tid i telefonen innan det sparas. Bara du ser det, om du inte delar måltiden.",
   "meals.saveAsMeal": "Spara som måltid",
   "meals.savedAsMeal": "Sparad som måltid: {name}",
   "meals.savedAsMealWithout": "Sparad som måltid: {name}. {count} rader utan träff i matdatabasen kom inte med.",
