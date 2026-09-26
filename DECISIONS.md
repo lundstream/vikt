@@ -10588,3 +10588,42 @@ mock D133 exists to avoid); SeaweedFS and Garage (both need an identity or
 layout file written before the first request, which is setup the step would
 have to get right before it could test anything); a community mirror of MinIO
 (the fourth copy of an image somebody else can withdraw).
+
+---
+
+### D189 — Logging a meal from Mat: the most used, a portion field, and the day reads the meal
+
+*2026-09-26. Phase 14, item 4.*
+
+**A row "Måltider" at the top of Mat**, above the search box, shows the four
+most used meals: loggings in the last ninety days, then the last logging, the
+server's order (D186), so this row and the Måltider list agree about "the
+usual". Four fit above the search on a phone without pushing it off the first
+screen; "alla måltider" beside the heading is the rest.
+
+**One tap opens a portion field**, starting at 1 and taking decimals, with a
+filled "Logga" beside it and "Avbryt" as a link. A meal is whatever the pot was
+divided into, and somebody who had one and a half of it should be able to say
+so without arithmetic. One field open at a time; the list owns that, as it
+does for the day's rows (D125). The field and the tap cost one more tap than
+the template's one-tap log, and that is the trade: a template logged the same
+grams every time, which was right only for the meals that never vary.
+
+**The day reads "Kycklinggryta · 1,5 portioner" with the rows underneath.**
+Grouped by the logging (`meal_log_uuid`), so the same breakfast logged twice
+is two groups, and placed where the logging's first row falls, keeping the
+server's order. The heading is the snapshot the rows carry, so it reads the
+same after the meal is edited, renamed or removed. Each row underneath is the
+ordinary row it is, with its own disclosure, edit and delete; an edited row
+stays in its group, and the day's totals and D55's coverage count the rows
+exactly as they count any others, because they are any others.
+
+**Exercised through the interface**, the brief's own sequence: a meal of four
+portions made in the sheet, 1,5 portions logged from the top of Mat (rows at
+three eighths of each ingredient, 225 g and 112,5 g), the day showing the
+meal above its rows and the header total including them, one logged row
+edited from 225 to 200 g and still in its meal, the meal itself unchanged and
+its logging counted once. 17 of 17, shot at 360 px and desktop.
+
+**Found on the way:** the line under the day's rows printed its date raw,
+"Gäller 2026-09-26". It uses the app's long date now.

@@ -21,8 +21,6 @@ import {
   useRecentFoods,
   useSaveFoodEntry,
   useUpdateFoodEntry,
-  useUpdateMeal,
-  useDeleteMeal,
   useMeals,
   useCreateMeal,
   useDeleteFoodEntry,
@@ -43,6 +41,7 @@ import { FoodTextEntry } from "../components/FoodTextEntry.js";
 import { FoodPhotoEntry } from "../components/FoodPhotoEntry.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
+import { formatPortions } from "../components/MealFigures.js";
 import {
   ActionButton,
   barcodeIcon,
@@ -78,6 +77,16 @@ import {
  * list below, and anything older is a search away.
  */
 const RECENT_ON_SCREEN = 6;
+
+/**
+ * How many meals the row at the top of Mat shows (D189).
+ *
+ * The most used, by loggings in ninety days and then by the last one, which is
+ * the server's order. Four is what fits above the search box on a phone
+ * without pushing it off the first screen; the rest are one tap away under
+ * "alla måltider".
+ */
+const MEALS_ON_MAT = 4;
 
 /**
  * The estimate marker (profile, page 6).
@@ -227,6 +236,8 @@ export function FoodLog() {
 
   /** True while a whole day is being copied forward (D124). */
   const [copyingDay, setCopyingDay] = useState(false);
+  /** The meal whose portion field is open, one at a time (D189). */
+  const [openMealId, setOpenMealId] = useState<string | null>(null);
 
   /**
    * Picking a food ends the search (D122).
@@ -435,18 +446,26 @@ export function FoodLog() {
     }
   }
 
-  async function logSavedMeal(meal: Meal) {
+  /**
+   * Logs `portions` of a meal onto the day being viewed (D189).
+   *
+   * One mutation through the queue for the whole meal (D186): offline it is
+   * stored and sent whole, and a replay writes the same rows.
+   */
+  async function logSavedMeal(meal: Meal, portions: number) {
     setSavingId(meal.id);
     try {
       await logMeal.mutateAsync({
         mealId: meal.id,
         clientUuid: clientUuid(),
         localDate: today,
-        portions: 1,
+        portions,
       });
-      announce(t("food.loggedMeal", { name: meal.name }));
+      announce(t("food.loggedMealPortions", { name: meal.name, portions: formatPortions(portions) }));
+      return true;
     } catch (error) {
       announce(saveProblem(error), true);
+      return false;
     } finally {
       setSavingId(null);
     }
@@ -547,11 +566,15 @@ export function FoodLog() {
           </div>
           {meals.data && meals.data.length > 0 ? (
             <ul className="divide-y divide-edge border-y border-edge">
-              {meals.data.map((meal) => (
-                <TemplateRow
+              {meals.data.slice(0, MEALS_ON_MAT).map((meal) => (
+                <MealLogRow
                   key={meal.id}
-                  template={meal}
-                  onLog={() => void logSavedMeal(meal)}
+                  meal={meal}
+                  open={openMealId === meal.id}
+                  onToggle={() => setOpenMealId((current) => (current === meal.id ? null : meal.id))}
+                  onLog={async (portions) => {
+                    if (await logSavedMeal(meal, portions)) setOpenMealId(null);
+                  }}
                   logging={savingId === meal.id}
                 />
               ))}
@@ -988,30 +1011,62 @@ function TodaySection({
         </button>
       ) : null}
 
-      <ul className="divide-y divide-edge border-y border-edge">
-        {entries.map((entry) => (
-          <EntryRow
-            key={entry.id}
-            entry={entry}
-            onCopyToToday={onCopyToToday}
-            open={openId === entry.id}
-            onToggleOpen={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
-            selectable={saving}
-            selected={selected.has(entry.id)}
-            onToggle={() =>
-              setSelected((current) => {
-                const next = new Set(current);
-                if (next.has(entry.id)) next.delete(entry.id);
-                else next.add(entry.id);
-                return next;
-              })
-            }
-            onDelete={() => deleteEntry.mutateAsync(entry.id)}
-          />
-        ))}
+      <ul className="divide-y divide-edge border-y border-edge" data-testid="day-entries">
+        {groupByMealLog(entries).map((group) => {
+          const row = (entry: FoodEntry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              onCopyToToday={onCopyToToday}
+              open={openId === entry.id}
+              onToggleOpen={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
+              selectable={saving}
+              selected={selected.has(entry.id)}
+              onToggle={() =>
+                setSelected((current) => {
+                  const next = new Set(current);
+                  if (next.has(entry.id)) next.delete(entry.id);
+                  else next.add(entry.id);
+                  return next;
+                })
+              }
+              onDelete={() => deleteEntry.mutateAsync(entry.id)}
+            />
+          );
+          if (group.kind === "single") return row(group.entry);
+
+          /*
+            A logged meal (D189): its name and the portions eaten as a heading,
+            and its rows underneath, each still the ordinary row it is, with
+            its own edit and delete. The heading is the snapshot the rows
+            carry, so it reads the same after the meal is edited or removed.
+          */
+          return (
+            <li key={group.key} className="py-2.5" data-testid="logged-meal">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate text-note text-ink" data-testid="logged-meal-heading">
+                  {group.name}
+                  <span className="text-muted">
+                    {" · "}
+                    {group.portions === null ? "" : formatPortions(group.portions)}
+                  </span>
+                </span>
+                <span className="num shrink-0 text-micro text-muted">
+                  {formatKcal(group.entries.reduce((sum, entry) => sum + entry.kcal, 0))} kcal
+                </span>
+              </div>
+              <ul className="mt-1 divide-y divide-edge border-l border-edge pl-3">
+                {group.entries.map(row)}
+              </ul>
+            </li>
+          );
+        })}
       </ul>
 
-      <p className="num mt-2 text-micro text-muted">{t("food.dayOn", { date: today })}</p>
+      {/* The day in words, like every other date the app shows; this one was printed raw. */}
+      <p className="num mt-2 text-micro text-muted">
+        {t("food.dayOn", { date: formatLongDay(today, LOCALE) })}
+      </p>
 
       {saving ? (
         <form onSubmit={save} className="mt-4">
@@ -1578,88 +1633,133 @@ function PortionSheet({
   );
 }
 
+type DayGroup =
+  | { kind: "single"; entry: FoodEntry }
+  | {
+      kind: "meal";
+      key: string;
+      name: string;
+      portions: number | null;
+      entries: FoodEntry[];
+    };
+
 /**
- * One saved meal: log it, rename it, remove it.
+ * The day's rows, with each logged meal's rows gathered under it (D189).
  *
- * §3 says every user-created row ships with an edit and a delete in the phase
- * that creates it (D56). A template had neither, so a meal saved with a typo in
- * its name, or one whose contents stopped matching what you eat, was permanent.
- *
- * Renaming is the whole of the edit. Changing what is *in* a meal is
- * `replaceTemplateItems` under a form that would have to re-pick rows from a
- * day, and the honest way to do that is to log the meal, adjust the day, and
- * save it again — which the row selection on the day's list now supports.
+ * Grouped by the logging, not by the meal: the same breakfast logged twice is
+ * two groups, and a row of a logging stays in it after it is edited. Placed
+ * where the logging's first row falls, so the day keeps the server's order.
  */
-function TemplateRow({
-  template,
+function groupByMealLog(entries: readonly FoodEntry[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  const byLog = new Map<string, Extract<DayGroup, { kind: "meal" }>>();
+  for (const entry of entries) {
+    if (entry.mealLogUuid === null) {
+      groups.push({ kind: "single", entry });
+      continue;
+    }
+    const existing = byLog.get(entry.mealLogUuid);
+    if (existing) {
+      existing.entries.push(entry);
+      continue;
+    }
+    const group = {
+      kind: "meal" as const,
+      key: entry.mealLogUuid,
+      name: entry.mealName ?? "",
+      portions: entry.mealPortions,
+      entries: [entry],
+    };
+    byLog.set(entry.mealLogUuid, group);
+    groups.push(group);
+  }
+  return groups;
+}
+
+/**
+ * One meal in the row at the top of Mat: tap it, say how many portions, log.
+ *
+ * The portion field opens at 1 and takes decimals, because "a portion" is
+ * whatever the pot was divided into and somebody who had one and a half of
+ * them should be able to say so (D189). Editing and removing the meal is in
+ * Måltider, one tap away; this row is for eating it.
+ */
+function MealLogRow({
+  meal,
+  open,
+  onToggle,
   onLog,
   logging,
 }: {
-  template: Meal;
-  onLog: () => void;
+  meal: Meal;
+  open: boolean;
+  onToggle: () => void;
+  onLog: (portions: number) => Promise<void>;
   logging: boolean;
 }) {
-  const update = useUpdateMeal();
-  const remove = useDeleteMeal();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(template.name);
+  const [portions, setPortions] = useState("1");
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (name.trim() === "") return;
-    await update.mutateAsync({ id: template.id, input: { name: name.trim() } });
-    setEditing(false);
+    const parsed = readRequiredNumber(portions);
+    if (!parsed.ok || parsed.value <= 0) {
+      setError(parsed.ok ? t("meals.portionsPositive") : parsed.message);
+      return;
+    }
+    setError(null);
+    await onLog(parsed.value);
+    setPortions("1");
   }
 
   return (
-    <li className="py-1">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2">
-        <button
-          type="button"
-          data-testid="log-template"
-          className="min-w-0 py-3 text-left"
-          onClick={onLog}
-          disabled={logging}
-        >
-          <span className="block truncate text-base text-ink">{template.name}</span>
+    <li className="py-1" data-testid="mat-meal">
+      <button
+        type="button"
+        data-testid={`mat-meal-${meal.id}`}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 py-2.5 text-left"
+        onClick={onToggle}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-base text-ink">{meal.name}</span>
           <span className="num block text-micro text-muted">
-            {template.items.length === 1
-              ? t("food.itemOne")
-              : t("food.itemMany", { count: template.items.length })}
+            {meal.perPortion.kcal === null
+              ? t("stat.notYet")
+              : t(meal.perPortion.kcalComplete ? "meals.perPortion" : "meals.perPortionAtLeast", {
+                  kcal: formatKcal(meal.perPortion.kcal),
+                })}
           </span>
-        </button>
+        </span>
+        <span className="shrink-0 text-note text-muted">{t("food.logIt")}</span>
+      </button>
 
-        <button
-          type="button"
-          data-testid={`edit-template-${template.id}`}
-          className="min-h-11 shrink-0 px-1 text-micro text-muted underline underline-offset-4 hover:text-ink"
-          onClick={() => setEditing((was) => !was)}
-        >
-          {editing ? t("common.cancel") : t("food.editMeal")}
-        </button>
-
-        <DeleteButton
-          testId={`delete-template-${template.id}`}
-          label={template.name}
-          onDelete={() => remove.mutateAsync(template.id)}
-        />
-      </div>
-
-      {editing ? (
-        <form onSubmit={submit} className="mb-2 flex gap-2">
-          <input
-            className="field flex-1"
-            aria-label={t("food.mealNameNew")}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
+      {open ? (
+        <form onSubmit={submit} className="mb-2 flex items-end gap-2" noValidate>
+          <div className="w-28">
+            <Field id={`portions-${meal.id}`} label={t("meals.portions")} error={error ?? undefined}>
+              <input
+                id={`portions-${meal.id}`}
+                className="field num"
+                type="text"
+                inputMode="decimal"
+                autoFocus
+                {...fieldAria(`portions-${meal.id}`, error ?? undefined)}
+                value={portions}
+                onChange={(event) => setPortions(event.target.value)}
+              />
+            </Field>
+          </div>
           <button
             type="submit"
-            data-testid={`save-template-${template.id}`}
+            data-testid={`mat-meal-log-${meal.id}`}
             className="btn w-auto px-4"
-            disabled={update.isPending}
+            disabled={logging}
           >
-            {t("profile.save")}
+            {logging ? t("quick.saving") : t("food.logIt")}
+          </button>
+          <button type="button" className="btn-link" onClick={onToggle}>
+            {t("common.cancel")}
           </button>
         </form>
       ) : null}

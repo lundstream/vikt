@@ -7,6 +7,7 @@ import type { FoodMatch, Meal } from "shared";
 import { mealNutrition } from "shared";
 import { renderRoute } from "./harness.js";
 import { Meals } from "../../src/routes/Meals.js";
+import { FoodLog } from "../../src/routes/FoodLog.js";
 import { ParsedProposal } from "../../src/components/ParsedProposal.js";
 import { sv } from "../../src/i18n/sv.js";
 
@@ -234,5 +235,81 @@ describe("spara som måltid, beside logga", () => {
     );
     expect(screen.queryByTestId("save-as-meal")).toBeNull();
     expect(screen.getByText(sv["meals.cannotTake"])).toBeTruthy();
+  });
+});
+
+describe("logging a meal from Mat (D189)", () => {
+  afterEach(cleanup);
+
+  const INSIGHTS = {
+    asOf: "2026-09-11",
+    maintenance: {
+      tdee: null, source: "none", windowDays: 0, coverage: 0, confidence: 0,
+      missing: [], daysUntilAdaptive: null, blockedBy: null,
+    },
+    trendWeightKg: null, todayIntakeKcal: null, targetIntakeKcal: null,
+    goalWeightKg: null, projections: { onPlan: null, atCurrentPace: null },
+    readingCount: 0, planReview: null, systemFloorKcal: 1200,
+    exerciseAdjustment: { available: false, inForce: false, preference: false, reason: "no_maintenance_figure" },
+    whtr: [], whtrRuleOfThumb: 0.5, bmi: null, macros: null, todayRemainingKcal: null,
+  };
+
+  const row = (id: string, name: string, grams: number, kcal: number, meal: boolean) => ({
+    id,
+    clientUuid: id,
+    localDate: "2026-09-26",
+    loggedAt: "2026-09-26T07:00:00.000Z",
+    mealSlot: "snack",
+    foodItemId: "00000000-0000-0000-0000-0000000000f1",
+    name,
+    brand: null,
+    grams,
+    kcal,
+    proteinG: null,
+    carbsG: null,
+    fatG: null,
+    fiberG: null,
+    confidence: 1,
+    confirmed: true,
+    mealId: meal ? stew().id : null,
+    mealLogUuid: meal ? "00000000-0000-0000-0000-0000000000l1" : null,
+    mealName: meal ? "Köttfärssås" : null,
+    mealPortions: meal ? 1.5 : null,
+  });
+
+  it("shows the most used meals with a portion field, and the day reads the meal above its rows", async () => {
+    renderRoute(<FoodLog />, {
+      responses: [
+        { match: "/api/me", body: ME },
+        { match: "/api/insights", body: INSIGHTS },
+        { match: "/api/llm/health", body: { enabled: false, reachable: false, vision: false } },
+      ],
+      stateful: [
+        { match: "/api/food-entry/recent", get: () => ({ entries: [] }) },
+        {
+          match: "/api/food-entry",
+          get: () => ({
+            entries: [
+              row("00000000-0000-0000-0000-0000000000e1", "Köttfärs", 300, 600, true),
+              row("00000000-0000-0000-0000-0000000000e2", "Krossade tomater", 150, 38, true),
+              row("00000000-0000-0000-0000-0000000000e3", "Äpple", 150, 78, false),
+            ],
+          }),
+        },
+        { match: "/api/meals", get: () => ({ meals: [stew()] }) },
+      ],
+    });
+
+    const heading = await screen.findByTestId("logged-meal-heading");
+    expect(heading.textContent).toBe("Köttfärssås · 1,5 portioner");
+    const group = screen.getByTestId("logged-meal");
+    expect(group.textContent).toContain("Köttfärs");
+    expect(group.textContent).toContain("Krossade tomater");
+    expect(group.textContent).not.toContain("Äpple");
+
+    fireEvent.click(screen.getByTestId(`mat-meal-${stew().id}`));
+    const field = screen.getByLabelText(sv["meals.portions"]) as HTMLInputElement;
+    expect(field.value).toBe("1");
+    expect(screen.getByTestId(`mat-meal-log-${stew().id}`)).toBeTruthy();
   });
 });
