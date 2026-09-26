@@ -707,6 +707,30 @@ The best onboarding this app can offer is not a tour. It is somebody's four year
 
 ---
 
+### Phase 14 — Måltider
+
+**Done when:** a dish somebody cooks every week is one tap from logged, at whatever share of the pot they ate, and a friend on the same installation can cook it too.
+
+§1 promises fast re-logging, "repeat a previous meal in one tap", and Phase 3 built it as a meal template: a named set of rows logged again at the same grams. What a template cannot say is how many people the pot fed. A meal here is a dish with a portion count, and logging it asks how much of it you had. Everything else in the phase follows from making that one entity, and the one place it breaks an older rule (the label photo, which amends D5) is named as the exception it is.
+
+> **One entity, one table per user.** A meal has a name, a portion count (default 1, decimals allowed), ingredient rows that reference foods with an amount and a unit, and timestamps. A "måltid" saved from Mat today is this entity with one portion: the existing `meal_templates` migrate into it without loss, and the old storage is removed. Per-portion energy and macros come from the shared calc with D55's "minst" rule and are computed nowhere else. Edit and remove ship with the create (§3, D56). Photo, sharing and import are later items in this phase; the schema leaves room for them where that is cheap, so they need no second migration of the same table.
+>
+> **Reached from Mer and from the top of Mat, not a fifth tab.** The section lists the person's own meals with per-portion kcal and macros and opens a create and edit sheet whose ingredient rows are built with the tools Mat already has: search, barcode, a sentence, a plate photo. "Vad kan jag laga" moves here from Mat with its behaviour unchanged, and a suggestion becomes a saved meal in one tap. The proposal list from a sentence or a plate photo gains "spara som måltid" beside "logga".
+>
+> **Logging writes ordinary food rows, as a snapshot.** A row "Måltider" at the top of Mat shows the most used meals, by logging frequency over the last ninety days and then by recency. One tap opens a portion field (default 1, decimals allowed), and logging writes food rows scaled from the meal's ingredients per portion, carrying the meal's name so the day reads "Frukost · 1 portion" with the rows beneath it. A later edit to the meal changes no logged day. The rows stay editable and removable like any row, and coverage counts them as usual.
+>
+> **The label photo is the one place the model returns nutrition figures.** When a barcode finds nothing, or from "Skriv in själv", the person can photograph the nutrition declaration and the model **transcribes** it: the name as printed, the per 100 g (or per 100 ml) column, energy in kcal, fat, carbohydrate, fibre, protein and salt where printed, polyols and alcohol when listed, and the serving size if printed, saying which column it read and whether it saw more than one. D5 is amended to say exactly that, transcription of a printed declaration and never estimation, and the amendment names its three guards. **The figures must agree with each other**: the EU conversion factors (protein 4, carbohydrate 4, fat 9, fibre 2, polyols 2,4, alcohol 7 kcal per gram, carbohydrate excluding fibre) must land within 15 % of the transcribed energy, or the sheet says so and nothing is saved until corrected. **The person confirms each figure** beside the photo. **The saved row is an ordinary user food** with source `label_photo`, the chip "från etikett", no estimate marker, and the scanned barcode attached so the next scan finds it. The photo is handled like the plate photo, with one addition: the EXIF orientation is applied before EXIF is stripped.
+>
+> **A meal may have one photo, and it is the first image this app stores.** One storage interface, two backends: a directory bound into the container (`MEDIA_HOST_DIR`, like the backup directory) and S3 with the backup's own settings. Resized to at most 1 280 px, orientation applied and EXIF stripped, stored under a per-user path, served only through an authenticated endpoint under the isolation rule, removed with the meal and with the account, in the export as a zip beside the data files, and in both backups, with restore-check verifying it.
+>
+> **Sharing reaches this installation and never beyond it.** It needs a display name, a new Profil field that is empty by default; without one the share control is absent rather than greyed. The sharer confirms they may share the recipe, because a cookbook's text belongs to its author. "Delade måltider" lists name, display name, per-portion figures and photo. Logging or saving a shared meal copies it into the reader's own meals as a snapshot, so the author's later edits change nobody else's history. A reader can report a shared meal and Administration can unshare it. Deleting an account removes its shares; copies others already made remain theirs. The privacy page states what sharing shows to whom.
+>
+> **Import from a photo of a recipe** reads a recipe page or card into the same proposal list as a plate photo: ingredient rows with amounts and units, and the portion count when it is printed, otherwise "inte än". No nutrition figures from the model here: the database prices the rows, as D5 has always said.
+>
+> Every model path is probed before it is built, with real photographs, and what the model read is recorded verbatim (D143's rule: a capability flag is not a test).
+
+---
+
 ### Backlog, unscheduled
 
 Not phases. Each is a good idea with no deadline and no dependency on the others, written down so it is remembered and so that remembering it does not mean scheduling it.
