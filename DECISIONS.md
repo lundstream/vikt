@@ -11800,3 +11800,47 @@ refused as `unusable_output`; an empty unit is read as "st".
 **Not changed here**: the plate photo still asks in free JSON mode, and its
 reader is more forgiving (D143). It has not been seen failing this way; a
 schema for it would need its own probe on the vision model.
+
+### D200 — Every photo tool takes a picture or chooses one
+
+*2026-09-26, for 1.4.1.*
+
+The plate photo, the recipe photo and the label photo each had one file input,
+with `capture="environment"`, which on Android opens the camera and nothing
+else. A recipe on a web page, a label photographed earlier or a plate from lunch
+could not be used at all. **Each tool now has two actions side by side**: the
+camera, as before, and "Välj bild", an input with no `capture` and
+`accept="image/*"`, which opens the phone's gallery or files. Both are one
+shared control, `PhotoInputs`, so the three cannot drift apart, and both hand
+the file to the tool's own handler and through `preparePhoto`: resized, and
+re-encoded as JPEG, which drops location and camera data, in the phone; the same
+size check; and "photo.unreadable" for anything the browser cannot decode. A
+screenshot is a PNG and takes the same path. Both are filled buttons, because
+each starts an action (D134). The meal's own photo ("Lägg till foto", "Byt
+foto") never had `capture` and already chose from the gallery; it is unchanged.
+
+**The recipe photo's intro says a screenshot works**, and often best: a
+screenshot has no moiré and no column cut off at the edge of a phone.
+
+**Found by exercising it**: a screenshot of a recipe page reads its yield as
+"4 portioner · 30 min", with the time on the same line, and `parseYield` took
+only a bare count, so the count was left empty with the line shown beside it.
+A count followed by a separator and something else now fills the portions;
+without a separator ("4 portioner pizza") it still does not.
+
+**Exercised through the interface**, 2026-09-26, at 360 px and desktop, with
+the real models: the plate photo given a picked JPEG, read into rows; the label
+photo given a picked JPEG, transcribed; the recipe photo given a PNG screenshot
+of a recipe page (made for the test, a pancake recipe in our own words), read
+into its five rows with "4 portioner" filling the count, the amounts the
+catalogue cannot convert typed in, and saved as a meal of four portions; a text
+file named `.png` given to the recipe tool, answered with "Bilden gick inte att
+läsa. Ta en ny." inside the sheet; and the meal's own photo input confirmed to
+have no `capture`. 30 of 30, no sideways scroll at either width.
+
+Held by tests: the control's camera input has `capture` and its gallery input
+does not, both call the one handler, and both wait while a picture is read; no
+component but `PhotoInputs` writes `capture`, and all three tools use it (both
+seen failing on the old plate photo, after a first version of the `capture`
+check had deleted the line it was looking for by reading `image/*` as the start
+of a comment); and `parseYield` with a separator, seen failing on the old one.

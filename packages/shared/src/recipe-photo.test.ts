@@ -147,6 +147,10 @@ describe("the recipe", () => {
     expect(parseYield("4 port.").portions).toBe(4);
     expect(parseYield("1 PIZZA")).toEqual({ printed: "1 PIZZA", portions: null });
     expect(parseYield("4–6 portioner").portions).toBeNull();
+    // A web recipe prints the time beside the count (D200), after a separator.
+    expect(parseYield("4 portioner · 30 min")).toEqual({ printed: "4 portioner · 30 min", portions: 4 });
+    expect(parseYield("6 personer | 45 minuter").portions).toBe(6);
+    expect(parseYield("4 portioner pizza").portions).toBeNull();
     expect(parseYield(null)).toEqual({ printed: null, portions: null });
   });
 });

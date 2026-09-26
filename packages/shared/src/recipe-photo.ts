@@ -234,8 +234,14 @@ function ratioOf(first: RecipeAmount | null, second: RecipeAmount | null): numbe
 export function parseYield(printed: string | null): { printed: string | null; portions: number | null } {
   if (printed === null || printed.trim() === "") return { printed: null, portions: null };
   const text = printed.replace(/\s+/g, " ").trim();
+  /*
+    The count may be followed by something else the page prints on the same
+    line, after a separator: a recipe site writes "4 portioner · 30 min", and a
+    screenshot of one was read with its yield shown and the count left empty
+    (D200). Only after a separator: "4 portioner pizza" is not four helpings.
+  */
   const match = text.match(
-    /^(?:(?:för|till|ger|räcker till)\s+)?(\d+)\s*(?:portioner|portion|personer|person|pers\.?|port\.?)$/iu,
+    /^(?:(?:för|till|ger|räcker till)\s+)?(\d+)\s*(?:portioner|portion|personer|person|pers\.?|port\.?)(?:\s*[·•|,;/–—-]\s*.*)?$/iu,
   );
   const portions = match ? Number(match[1]) : null;
   return { printed: text, portions: portions !== null && portions > 0 ? portions : null };

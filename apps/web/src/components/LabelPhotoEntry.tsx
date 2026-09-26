@@ -3,6 +3,7 @@ import type { FoodItem, LabelTranscription } from "shared";
 import { checkLabel, formatDecimal, formatKcal } from "shared";
 import { useCreateLabelFood, useReadLabel } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
+import { PhotoInputs } from "./PhotoInputs.js";
 import { readRequiredNumber } from "../lib/form-number.js";
 import { ApiError } from "../lib/api.js";
 import { plural, t, type TranslationKey } from "../i18n/index.js";
@@ -195,19 +196,13 @@ export function LabelPhotoEntry({
           <li>{t("label.howGlare")}</li>
         </ul>
 
-        <label className="btn mt-4 inline-flex w-auto cursor-pointer items-center px-4">
-          {working ? t("photo.working") : t("label.shutter")}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="sr-only"
-            data-testid="label-input"
-            aria-label={t("label.shutter")}
-            disabled={working}
-            onChange={(event) => void chosen(event)}
-          />
-        </label>
+        <PhotoInputs
+          className="mt-4"
+          takeLabel={t("label.shutter")}
+          working={working}
+          testId="label-input"
+          onChosen={(event) => void chosen(event)}
+        />
 
         {working ? (
           <p role="status" className="mt-2 max-w-prose text-micro text-muted">

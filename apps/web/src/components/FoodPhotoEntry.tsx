@@ -4,6 +4,7 @@ import { PHOTO_CONFIDENCE } from "shared";
 import { useConfirmParsedFood, useParseFoodPhoto } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
 import { ParsedProposal } from "./ParsedProposal.js";
+import { PhotoInputs } from "./PhotoInputs.js";
 import { useSaveProposalAsMeal, type CollectRows } from "./FoodTextEntry.js";
 import { plural, t } from "../i18n/index.js";
 
@@ -123,20 +124,12 @@ export function FoodPhotoEntry({
         disabled={working}
       />
 
-      <label className="btn inline-flex w-auto cursor-pointer items-center px-4">
-        {working ? t("photo.working") : t("photo.shutter")}
-        <input
-          type="file"
-          accept="image/*"
-          // The phone's own camera, not a viewfinder this app has to own.
-          capture="environment"
-          className="sr-only"
-          data-testid="photo-input"
-          aria-label={t("photo.shutter")}
-          disabled={working}
-          onChange={(event) => void chosen(event)}
-        />
-      </label>
+      <PhotoInputs
+        takeLabel={t("photo.shutter")}
+        working={working}
+        testId="photo-input"
+        onChosen={(event) => void chosen(event)}
+      />
 
       {working ? (
         <p role="status" className="mt-2 max-w-prose text-micro text-muted">

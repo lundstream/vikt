@@ -3,6 +3,7 @@ import type { ReadRecipeResponse, RecipeRow } from "shared";
 import { useReadRecipe } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
 import { ParsedProposal, type ProposalItem, type ProposalRow } from "./ParsedProposal.js";
+import { PhotoInputs } from "./PhotoInputs.js";
 import { plural, t } from "../i18n/index.js";
 
 type Read = Extract<ReadRecipeResponse, { available: true }>;
@@ -69,19 +70,12 @@ export function RecipePhotoEntry({
     <div data-testid="recipe-entry">
       <p className="mb-3 max-w-prose text-micro text-muted">{t("recipePhoto.intro")}</p>
 
-      <label className="btn inline-flex w-auto cursor-pointer items-center px-4">
-        {working ? t("photo.working") : t("recipePhoto.shutter")}
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          data-testid="recipe-photo-input"
-          aria-label={t("recipePhoto.shutter")}
-          disabled={working}
-          onChange={(event) => void chosen(event)}
-        />
-      </label>
+      <PhotoInputs
+        takeLabel={t("recipePhoto.shutter")}
+        working={working}
+        testId="recipe-photo-input"
+        onChosen={(event) => void chosen(event)}
+      />
 
       {working ? (
         <p role="status" className="mt-2 max-w-prose text-micro text-muted">

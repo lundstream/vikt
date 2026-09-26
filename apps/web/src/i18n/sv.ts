@@ -1191,6 +1191,7 @@ export const sv = {
   // the quick action's name: a heading and the control under it saying the same
   // four words reads as a stutter.
   "photo.shutter": "Ta ett foto",
+  "photo.choose": "Välj bild",
   "photo.working": "Tittar på bilden…",
   // The measured figure, in the app's own register. No spinner metaphor: the
   // honest thing to say to somebody waiting is how long it takes. Two numbers
@@ -1439,7 +1440,7 @@ export const sv = {
   // A recipe photographed (D195). The model copies the lines; the list says
   // what was printed beside every proposal, and the person decides.
   "recipePhoto.intro":
-    "Fotografera ingredienslistan i ett recept, i en kokbok, på ett kort eller på en skärm. Raderna skrivs av, och du jämför var och en med receptet innan den läggs till.",
+    "Fotografera ingredienslistan i ett recept, i en kokbok eller på ett kort, eller välj en bild. En skärmbild av ett recept på webben fungerar också, och ofta bäst. Raderna skrivs av, och du jämför var och en med receptet innan den läggs till.",
   "recipePhoto.shutter": "Fotografera receptet",
   "recipePhoto.nothingFound": "Ingen ingredienslista syntes på bilden. Ta en ny bild där hela listan syns.",
   "recipePhoto.checkBeforeAdding":
