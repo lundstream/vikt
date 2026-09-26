@@ -23,8 +23,8 @@ why, asks before storing it, lets somebody leave with everything, tells people
 when it will be down, and its mail goes out.
 
 **Phase 14, Måltider, 2026-09-26: exercised through the interface on the
-development server**, item by item, each with its own verdict file. Built on
-`dev` and prepared as `1.3.0`; production still runs `1.2.1`.
+development server**, item by item, each with its own verdict file. Released as
+`1.3.0` on 2026-09-26 (below, "Production runs 1.3.0").
 
 - **Måltider, the entity** (D186). The one saved meal in the development
   database ("Frukost", logged 36 times as a template) came through `0032` as a
@@ -390,7 +390,86 @@ phase 3.
   built, and so is the coach (8b). What is left in that phase is the milestone
   messages the persona was also meant to deliver.
 
-## Production runs 1.2.1
+## Production runs 1.3.0
+
+**Deployed 2026-09-26 from `392b618`, tagged `v1.3.0`**, by `node scripts/release.mjs
+1.3.0`. All thirteen steps ran. Phase 14, Måltider, with the label photo, meal
+photos and sharing (D186 to D192).
+
+**Before the command**, each read rather than assumed:
+
+- **The photo directory**, over SSH: `/var/lib/vikt/media` exists, a directory,
+  owned `1000:1000`, mode `700`. The release user is uid 1000 and in the
+  `docker` group, which is what `backup.sh` needs to archive it.
+- **The vision model**: Ollama on 192.168.1.100 lists `qwen3-vl:8b`, and
+  answered a question under a JSON schema with `{"svar": "ja"}` in 8 tokens (in
+  `thinking`, which the client reads when `content` is empty, as D190
+  recorded). The host reaches it: `/api/tags` 200 from 192.168.1.30.
+- **The host scripts**: `host-scripts.mjs check` found `backup.sh` and
+  `restore-check.sh` different from HEAD, `install` wrote both, and `check`
+  read both equal to `392b618`. The cron line stays uninstalled (D103).
+- **The dry run stopped at step 9, and it should not have.** The plan was what
+  it should be (`setting: MEDIA_HOST_DIR (new)`, "required by the release and
+  not set: none") and its only `blocked:` lines were the two `:1.3.0` images,
+  which cannot exist before step 7 tags the release and step 8 builds it: a
+  dry run skips both and then asks for their result. The real run was started
+  on that reading, because nothing else was blocked and step 9 asks again after
+  step 8. The dry run is fixed on `dev` under "Inför nästa deploy".
+
+| step | evidence |
+|---|---|
+| 1 workstation | `VIKT_HOST` set, `PORTAINER_TOKEN` set, gh authenticated |
+| 2 tree | clean, on `dev`, pushed, at `392b618` |
+| 3 CI | success for `392b618` |
+| 4 backup | `/var/backups/vikt/vikt-20260926T133431Z.dump`, 320K; beside it `media-20260926T133431Z.tar.gz`, 111 bytes, one entry: the photo directory, empty, as production had no photos yet |
+| 5 restore | `daily_log 73, food_entries 310, plans 2, users 4, weight_log 108`, restored copy and live database agree |
+| 6 main | fast-forwarded 19 commits to `392b618` |
+| 7 tag | `v1.3.0` on `392b618` |
+| 8 workflow | run `36245630030` (release, `v1.3.0`) green |
+| 9 plan | nothing blocks this deploy; **`setting: MEDIA_HOST_DIR (new)`**; `IMAGE_TAG 1.2.1 -> 1.3.0` |
+| 10 deploy | both containers on the new image, the API healthy; `llm=on (http://192.168.1.100:11434)`, `the vision model can see` in 1 597 ms |
+| 11 API log | `version 1.3.0, commit 392b618`; **`Migrations: 4 applied, 36 recorded in total`** (`0032_meals`, `0033_label_photo`, `0034_media_backup`, `0035_meal_sharing`); VAPID silent, so the key is unchanged; `vision: the vision model can see` |
+| 12 outside | `https://vikt.lundstream.net/api/health` 200, `/` 200; and `/app/` 200 with `<title>Vikt</title>`, read after |
+| 13 Nyheter | **`published "Vikt 1.3" as 0d85a6d2-dcbf-430a-bc27-42bad8e33e48, 1676 characters, not mailed`**, with the photo sentence ending "och visas bara för dig, om du inte delar måltiden." |
+
+**Lighthouse once, on the production landing page** afterwards: 12.8.2, mobile
+preset, performance **98**, accessibility **100**, best practices **100**, SEO
+**100**; largest contentful paint 1,8 s, layout shift 0, blocking time 0 ms,
+speed index 3,7 s. The speed index was 1,7 s on the local preview build
+(2026-09-17); this one crossed the real network and TLS.
+
+**Not yet confirmed through the interface in production**, because this
+session does not sign in there. For Fredrik, signed in as the administrator:
+
+- Administration, Backup, "Kör nu" once: the run line should end in "0 foton".
+- On a phone, Mat: the saved meals at the top, each with "kcal per portion".
+- Nyheter: "Vikt 1.3" at the top.
+
+**Rollback** is `vikt-20260926T133431Z.dump` restored (docs/backup.md,
+"Restoring"; D186) and then `node scripts/stack.mjs deploy 1.2.1 --keep-file
+--yes`. Meals, photos, label foods and shares made since are lost with it; the
+photo directory can stay, 1.2.1 does not read it.
+
+#### What 1.3.0 changed
+
+| | what a user sees |
+|---|---|
+| **Måltider** (D186, D187) | the dishes you cook, with a portion count and figures per portion, in their own section reached from Mer and from the top of Mat. Built with search, barcode, a sentence or a plate photo; edited and removed from the same sheet. "Vad kan jag laga?" lives here now |
+| **Logging a meal** (D189) | the most used meals at the top of Mat; one tap, a portion field (1, decimals allowed), and the day reads "Kycklinggryta · 1,5 portioner" with its rows underneath, each still editable. Later edits to the meal change no logged day |
+| **Your saved meals come with you** (D186) | every "Sparad måltid" becomes a meal of one portion, with everything it had |
+| **The label photo** (D190) | when a barcode finds nothing, or from "Skriv in själv": photograph the nutrition table, check each figure beside the photo, and it becomes your own food, "från etikett", found by the next scan of that barcode. Figures that do not add up cannot be saved |
+| **A photo on a meal** (D191) | one each, kept on the server in your own folder, in the export and in the backups |
+| **Sharing** (D192) | with a display name set in Profil, a meal can be shared with everyone on this installation. "Delade måltider" lists them; saving or logging one makes it your own copy. Reports go to Administration, Anmälningar |
+| **Export** (D191) | "Allt, med foton, som zip" under Inställningar |
+| **One is singular** (D192) | "1 foto", "1 matrad", "1 rad loggad", "Spara 1 rad": every count that opens a sentence, and the ones inside a sentence that can be one, where the deletion sheet said "1 foton" |
+
+Not in 1.3.0: **import from a photo of a recipe** (item 8 of the Phase 14
+brief), carried under "Inför nästa deploy".
+
+
+---
+
+## Production ran 1.2.1 before it
 
 **Deployed 2026-09-17 from `bc06167`**, by `node scripts/release.mjs 1.2.1`.
 **All thirteen steps ran**, which had never happened before.
@@ -437,7 +516,7 @@ Two more findings, both in the tooling and both now held by a test:
 
 ---
 
-## Production ran 1.2.0 before it
+## Production ran 1.2.0 before that
 
 **Deployed 2026-09-17 from `a21224c`**, twelve of thirteen steps. The thirteenth
 could not run: the image had no `dist/news-publish.js`, because the script was
@@ -455,110 +534,19 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 
 ## Inför nästa deploy
 
-**The next deploy is `1.3.0`**: Phase 14, Måltider, with the label photo and
-sharing (D186 to D192). Production runs `1.2.1` (above).
+**Nothing is prepared yet.** Production runs `1.3.0` (above), released from
+`392b618`; everything on `dev` after that commit goes into the next deploy. It
+takes a number here, with its handover, once there is something to release:
+`1.4.0` if it carries the recipe photo import, a patch release if not.
 
-**No commit is named yet, and that is the rule working rather than a gap**
-(CLAUDE.md §7): the release commit is named once the `v1.3.0` tag exists, and
-before that the release follows `dev`'s tip, whose CI run has to have finished
-green before the command is started. Push nothing between starting it and step 7.
+#### Carried over from 1.3.0
 
-#### What 1.3.0 changes
+**Import from a photo of a recipe** (item 8 of the Phase 14 brief): **not
+built.** It starts with a probe of the vision model on real recipe pages, and
+the rows are gated on what the model reads.
 
-| | what a user sees |
-|---|---|
-| **Måltider** (D186, D187) | the dishes you cook, with a portion count and figures per portion, in their own section reached from Mer and from the top of Mat. Built with search, barcode, a sentence or a plate photo; edited and removed from the same sheet. "Vad kan jag laga?" lives here now |
-| **Logging a meal** (D189) | the most used meals at the top of Mat; one tap, a portion field (1, decimals allowed), and the day reads "Kycklinggryta · 1,5 portioner" with its rows underneath, each still editable. Later edits to the meal change no logged day |
-| **Your saved meals come with you** (D186) | every "Sparad måltid" becomes a meal of one portion, with everything it had |
-| **The label photo** (D190) | when a barcode finds nothing, or from "Skriv in själv": photograph the nutrition table, check each figure beside the photo, and it becomes your own food, "från etikett", found by the next scan of that barcode. Figures that do not add up cannot be saved |
-| **A photo on a meal** (D191) | one each, kept on the server in your own folder, in the export and in the backups |
-| **Sharing** (D192) | with a display name set in Profil, a meal can be shared with everyone on this installation. "Delade måltider" lists them; saving or logging one makes it your own copy. Reports go to Administration, Anmälningar |
-| **Export** (D191) | "Allt, med foton, som zip" under Inställningar |
-| **One is singular** (D192) | "1 foto", "1 matrad", "1 rad loggad", "Spara 1 rad": every count that opens a sentence, and the ones inside a sentence that can be one, where the deletion sheet said "1 foton" |
-
-Not in 1.3.0: **import from a photo of a recipe** (item 8 of the brief). It
-starts with a probe on a real recipe page, and there is none among the
-photographs in `scratch/vision`; nothing of it is built.
-
-#### What the deploy needs that 1.2.1 did not
-
-**Four migrations**, `0032` to `0035`, so step 11 reports
-`Migrations: 4 applied, 36 recorded in total`.
-
-- `0032_meals` moves every meal template into `meals` and **drops the two
-  template tables**. The one migration here that is not additive, named as such
-  in D186 and tested from a 1.2 database. **Rolling back to 1.2.1 therefore
-  needs the dump step 2 takes**, restored before the older image is deployed:
-  the 1.2.1 API reads `meal_templates`, which will not exist.
-- `0033_label_photo` adds a value to the `food_source` enum.
-- `0034_media_backup` adds a photo count to `backup_runs` and `restore_checks`.
-- `0035_meal_sharing` adds `profiles.public_name` and the `meal_reports` table.
-
-**One new required stack variable, `MEDIA_HOST_DIR`**, the host directory the
-photos live in, bound at `/media` (D191). The compose refuses to deploy
-without it, and the directory has to exist and belong to uid 1000 first. **On
-the Docker host, as root, before the release** (the release user has no sudo,
-INFRA.md):
-
-```sh
-sudo mkdir -p /var/lib/vikt/media
-sudo chown 1000:1000 /var/lib/vikt/media
-sudo chmod 700 /var/lib/vikt/media
-```
-
-`MEDIA_STORAGE` stays at its default, `directory`, and is not set by this
-release. It would be `s3` only if Administration, Backup wrote to S3 and the
-photos were to live beside the backups; production's backup writes to
-`/backups`, so it does not. (Written without the command's own syntax on
-purpose: the release reads every `--set` in this section as an instruction.) No S3
-setting is new: the S3 backend uses the backup's own connection.
-
-**The backups cover the photos from this release on.** The app's scheduled
-backup writes `vikt-<time>.media.enc` beside each dump in `/backups`, and its
-monthly restore check fails if a photo the dump names is missing from it.
-`infra/backup.sh` and `infra/restore-check.sh` changed too: they archive and
-check `MEDIA_HOST_DIR` as `media-<time>.tar.gz` beside the dump. **Install them
-on the host before the release**, so step 4's pre-deploy backup is taken by the
-new script (it reports "photos: … does not exist, skipped" until the directory
-above exists, and then an empty archive):
-
-```sh
-node scripts/host-scripts.mjs check
-node scripts/host-scripts.mjs install
-```
-
-**The vision model.** The label photo uses `LLM_VISION_MODEL`, which production
-already sets to `qwen3-vl:8b` for the plate photo; nothing new. The Ollama
-workstation has to be running for either to appear, as before.
-
-#### The deploy, as one command
-
-```sh
-node scripts/release.mjs 1.3.0
-```
-
-It reads the stack variables from this section: `--set MEDIA_HOST_DIR=/var/lib/vikt/media`.
-`--dry-run` runs every check and changes nothing. By hand, for a person or a
-self-hoster (INFRA.md, "Deploying a version, in order"):
-
-```sh
-node scripts/stack.mjs plan 1.3.0 --release-file --set MEDIA_HOST_DIR=/var/lib/vikt/media
-node scripts/stack.mjs deploy 1.3.0 --release-file --set MEDIA_HOST_DIR=/var/lib/vikt/media --yes
-```
-
-The plan should show `setting: MEDIA_HOST_DIR (new)` and nothing blocked.
-
-**After the deploy**, in production: Administration, Backup, "Kör nu" once, and
-the run line should end in "0 foton"; and on a phone, Mat shows the saved meals
-at the top, each with "kcal per portion".
-
-**Rollback** is the dump from step 2 restored (docs/backup.md, "Restoring")
-and then `node scripts/stack.mjs deploy 1.2.1 --keep-file --yes`. Meals,
-photos, label foods and shares made in between are lost with it; the photo
-directory can stay, 1.2.1 does not read it.
-
-**Every pass on `dev` still appends to this section**, and nothing merges to
-`main` until it has been read.
+**Every pass on `dev` appends to this section**, and nothing merges to `main`
+until it has been read.
 
 ### Till Nyheter
 
@@ -853,27 +841,13 @@ så att du ser att det fungerar innan nattens körning.
 ## On `dev`, not yet on `main`
 
 Production deploys from `main` (CLAUDE.md §7), so this list is the difference
-between what is built and what is running. **`main` is `bc06167`, the `v1.2.1`
-tag, and production runs it.** Everything below is on `dev` and becomes
-`1.3.0`, with this record's own commit on top:
+between what is built and what is running. **`main` is `392b618`, the `v1.3.0`
+tag, and production runs it.** Everything on `dev` after it goes into the next
+deploy:
 
 | | |
 |---|---|
-| `37f4425` | Sharing a meal within the installation: a display name, a copy, a report |
-| `e9ec03c` | Meal photos: the first stored image, behind one interface, in both backups |
-| `2b1a84a` | Stream the photo archives through tar's stdin and stdout |
-| `908c737` | Meal photos: storage, endpoints, removal, export and both backups (in progress) |
-| `defe2d7` | The label photo: a transcription, three guards, and D5 amended to say so |
-| `69d8c8f` | Log a meal from Mat: the most used, a portion field, the day reads the meal |
-| `ad74b3b` | CI's S3 server is Versity's gateway: MinIO's pinned image now answers 401 |
-| `a00b56e` | Måltider, the section: a list per portion, a sheet built with Mat's tools |
-| `f65aafe` | Måltider: one entity with a portion count, replacing meal templates |
-| `8f9ce9a` | The words at 500 ms, error class ten in §7, and fresh raw phone shots |
-| `134c226` | Name Phase 14, Måltider, in §6 before any of it is built |
-| `7552a41` | Record the closing sweep: 40 of 40, with Gratis in the page's height |
-| `e877134` | Production runs 1.2.1, and all thirteen steps ran |
-| `48158f5` | Name bc06167 as 1.2.1, now that the tag is on it |
-| `dc06745` | A release with no migrations still prints a migrations line |
+| (this record) | Production runs 1.3.0 |
 
 ### Before the next redeploy
 
@@ -897,9 +871,8 @@ Eight items of nine done, each exercised through the interface and recorded
 - **The three framed phone portraits** are Fredrik's: the raw screenshots in
   `docs/screens/raw/` carry the current date format; reframe them, replace the
   three portraits, and `node scripts/landing-screens.mjs` picks them up.
-- **`1.3.0` is prepared, not deployed.** "Inför nästa deploy" has the host
-  commands for `/var/lib/vikt/media` and the host-script install that come
-  first.
+- **`1.3.0` is deployed** (2026-09-26, "Production runs 1.3.0"). What is left
+  of it is Fredrik's three checks in production, listed there.
 
 
 ### The second landing brief: the page's polish, Sten, and three defects
