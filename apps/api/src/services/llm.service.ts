@@ -36,7 +36,7 @@ import { recipeMessages, readGeneratedRecipe } from "../llm/recipe.js";
 import { checkCompleteness, type CompletenessFailure } from "../llm/recipe-completeness.js";
 import { estimateMessages, readDishEstimate } from "../llm/estimate.js";
 import { getInsights } from "./insights.service.js";
-import { searchFoodItems, type FoodItemRow } from "../repositories/food.repo.js";
+import { countLoggedFoods, searchFoodItems, type FoodItemRow } from "../repositories/food.repo.js";
 import { getStaples, userHintsFor } from "./portions.service.js";
 
 /**
@@ -563,7 +563,7 @@ async function priceAll(
  * user can search for it or leave it as freetext. Guessing at a near-miss to
  * avoid an empty field is how the wrong food's calories end up in the series.
  */
-async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemRow | null> {
+export async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemRow | null> {
   /**
    * A handful of candidates rather than one, and the first *plausible* one.
    *
@@ -577,8 +577,50 @@ async function matchRow(userId: string, db: Db, name: string): Promise<FoodItemR
    * the candidates, and the ranking puts compounds that merely start with the
    * word ("Mjölkchoklad" for "mjölk") ahead of it often enough.
    */
-  const rows = await searchFoodItems(userId, db, name, MATCH_CANDIDATES);
-  return rows.find((candidate) => isPlausibleMatch(name, candidate.name)) ?? null;
+  const first = await searchFoodItems(userId, db, name, MATCH_CANDIDATES);
+
+  /*
+    A compound the catalogue writes apart is not in the search's twenty: the
+    search cannot see "nötfärs" in "Nöt färs rå fett 10%". So when nothing
+    matches fully, the query is searched again with each compound split in two
+    ("nöt färs"), and those rows are judged by the same rule against the query
+    as asked, which still needs every half (D198).
+  */
+  let rows = first;
+  if (!first.some((row) => matchStrength(name, row.name) === "full")) {
+    const seen = new Set(first.map((row) => row.id));
+    rows = [...first];
+    for (const alternative of compoundSplits(name)) {
+      for (const row of await searchFoodItems(userId, db, alternative, MATCH_CANDIDATES)) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          rows.push(row);
+        }
+      }
+    }
+  }
+
+  /*
+    A row that names the part asked for beats one that does not (D198), and
+    only when none does is the food without it taken: "Kyckling bröstfilé"
+    for "kycklingbröst", "Vitlök" for "vitlöksklyftor".
+  */
+  const strengths = rows.map((row) => matchStrength(name, row.name));
+  const wanted = strengths.includes("full") ? "full" : strengths.includes("part") ? "part" : null;
+  if (wanted === null) return null;
+  const plausible = rows.filter((_, index) => strengths[index] === wanted);
+  if (plausible.length === 1) return plausible[0]!;
+
+  /*
+    Among rows the rule accepts, the one this person has logged most, then the
+    search's order, which is total (Livsmedelsverket first among equals, then
+    id), so the same person asking the same thing gets the same food (D198).
+    History only chooses among accepted rows; it never makes a refused one
+    plausible, because the refused ones are not in this list.
+  */
+  const logged = await countLoggedFoods(userId, db, plausible.map((row) => row.id));
+  // Array.prototype.sort is stable, so equals keep the search's order.
+  return [...plausible].sort((a, b) => (logged.get(b.id) ?? 0) - (logged.get(a.id) ?? 0))[0]!;
 }
 
 /**
@@ -635,44 +677,54 @@ function priceRow(
 export const MATCH_CANDIDATES = 20;
 
 /**
- * Whether a database row is actually the food that was named.
+ * Whether a database row is the food that was named, and how closely.
  *
  * Each rule exists because of a specific wrong answer from a live run against
- * the real database (D72, then D196).
+ * the real database (D72, D196, D198).
  *
- * **A row is only its head.** Food names in this database mark the "contains"
- * relation explicitly — "Grekisk sallad m. fetaost", "Fatteh m. kyckling",
- * "Pannkaka med ägg" — and everything after that connector is an ingredient of
- * something else, not the thing itself. Matching against the part before it is
- * what separates "Kyckling med curry", which is chicken, from "Fatteh m.
- * kyckling", which is not. Stripping "med" as a filler word, which is the
- * obvious thing to do, deletes exactly the signal that tells them apart.
+ * **A row is its head and a tail.** Food names in this database mark the
+ * "contains" relation explicitly — "Grekisk sallad m. fetaost", "Fatteh m.
+ * kyckling", "Pannkaka med ägg" — and the words asked for are looked for only
+ * in the part before that connector, which is what separates "Kyckling kokt
+ * m. salt", which is chicken, from "Fatteh m. kyckling", which is not. **The
+ * tail must still describe the food** (D198): after "m." the catalogue puts
+ * either a preparation medium ("m. salt", "m. lag", "m. skinn") or another food
+ * ("m. köttfärs", "m. curry"), and the second makes the row a dish, a variety
+ * of whatever the head names. "Pizza m. ost restaurang" is not "pizza".
  *
  * **The head's first word is one of the words asked for.** These names put the
- * food first and what describes it after ("Ägg rått", "Spenat färsk", "Timjan
- * torkad", "Lök gul rå"), so a name that starts with something else is a dish
- * or a product that contains the food: "Lasagne nötfärs" is lasagne. The query
- * may give its words in any order; "gula lökar" reaches "Lök gul rå".
+ * food first and what describes it after ("Ägg rått", "Spenat färsk", "Lök
+ * gul"), so a name that starts with something else is a dish or a product that
+ * contains the food: "Lasagne nötfärs" is lasagne. The query may give its words
+ * in any order; "gula lökar" reaches "Lök gul".
  *
- * **Every word asked for has to be there, as itself or inflected.** An
- * inflection is the same stem with a short ending from a closed set (tomat,
- * tomater; lök, lökar; gul, gula; ris, riset; klyfta, klyftor), in either
- * direction. Anything else after the stem is another word: Swedish compounds
- * put the head last, so "mjölkchoklad" is a chocolate, "pepparrot" a root and
- * "kycklingkorv" a sausage, whatever they start with. The length rule this
- * replaces let all three through, and turned "mjöl" into "Mjölk".
+ * **Every word asked for is there, as itself or inflected**: the same stem with
+ * a short ending from a closed set, in either direction (tomat, tomater; lök,
+ * lökar; klyfta, klyftor). Any other remainder is another word: Swedish
+ * compounds put the head last, so "mjölkchoklad" is a chocolate and
+ * "pepparrot" a root. Two kinds of compound are read further (D198):
  *
- * **What is left must describe the food, not name another one.** Numbers, fat
- * content, preparation, state and colour are free, as many as the name has
- * ("Smör osaltat fett ca 80%" is butter, "Lök gul rå" is an onion, "Kaffe
- * bryggt" is coffee); the qualifier list is the set of those words that follow
- * the first word of a Livsmedelsverket name in this catalogue, counted rather
- * than guessed (D196). **Any other word is another food, or a guess about which
- * one**: "Kyckling mage rå" is a gizzard, "Ris avorio okokt" a particular rice
- * uncooked, "Yoghurt vanilje" a flavour, and "Salta pinnar", which starts with
- * "salt" plus an ending, is a pretzel. The rule this replaces allowed one such
- * word and counted qualifiers against it, so it let the gizzard through and
- * turned plain butter away.
+ *  - **A part of a food**: when the second half names a part or a portion of
+ *    the first ("basilikablad", "vitlöksklyftor", "kycklingbröst"), the food is
+ *    the first half and the part is a qualifier, present or not. A row that
+ *    names the part ("Kyckling bröstfilé") is preferred to one that does not
+ *    ("Vitlök" for "vitlöksklyftor"), which is taken only when none does.
+ *  - **A compound written apart**: the catalogue writes some compounds as two
+ *    words ("Nöt färs" for nötfärs), so a query compound matches a head that
+ *    has **all** of its halves as separate words, and only all of them:
+ *    "pepparrot" can never become "Peppar".
+ *
+ *   Neither applies to a half that changes what the food is: a
+ *   köttbuljongtärning is a concentrate, and "Köttbuljong tärning ätf." is
+ *   broth, so "tärning" is neither a part nor a half (D198).
+ *
+ * **Everything else in the name describes the food, or the row is refused.**
+ * Qualifiers name preparation, state, measure (fat, salt, alcohol), colour and
+ * nothing else, as many as the name has ("Smör osaltat fett ca 80%" is
+ * butter). A variety, a flavour or a dish word is not one: "Pizza veg.
+ * hemlagad", "Yoghurt vanilje" and "Kyckling mage rå" are each a guess about
+ * which pizza, yoghurt or part was meant. The lists were counted from the
+ * catalogue, not guessed (D196, D198).
  *
  * Failing any of them leaves `match` null, which is a first-class outcome
  * everywhere this is used: the row keeps its name, shows no energy, and says
@@ -684,43 +736,69 @@ const CONTAINS_CONNECTOR = /\s(?:m\.|med|innehåller)\s|[,&+/]/i;
 const INFLECTIONS = ["", "a", "e", "n", "t", "en", "et", "er", "ar", "or", "na", "erna", "arna", "orna"];
 
 /**
- * Words that describe a food rather than name one: those that follow the first
- * word of a Livsmedelsverket name in the development catalogue at least once,
- * and are a preparation, a state, a fat content or a measure (D196).
+ * Words that describe a food rather than name one: preparation, state, measure
+ * and colour, each found after the first word of a Livsmedelsverket name in
+ * the development catalogue at least once (D196). Varieties, flavours and
+ * dish words were taken out (D198): "veg.", "fullkorn", "smaksatt", "kryddad",
+ * sweetening ("sötad", "lättsockrad"), the free-from variants ("glutenfri",
+ * "laktosfri"), provenance ("hemlagad", "restaurang", "storhushåll"), texture
+ * that names a kind ("grovt", "mjukt", "fylld") and "blandad". What stays is
+ * what could be said of any one food without making it another.
  */
 const QUALIFIERS = new Set([
-  // measure and fat content
+  // measure: fat, salt and alcohol content
   "fett", "fetthalt", "vol", "ca", "light", "lätt", "lätta", "mager",
+  "osaltat", "saltad", "saltade", "lågsalt", "extrasaltad", "extrasaltat",
   // raw, cooked and how
   "rå", "rått", "råa", "stekt", "stekta", "ugnsstekt", "ugnsstekta", "råstekt", "kokt", "kokta",
   "okokt", "okokta", "inkokt", "ångkokt", "ångprep", "tillagad", "tillagat", "tillagade",
-  "hemlagad", "hemlagade", "hembakad", "hembakade", "butiksbakad", "bakad", "gräddad",
-  "brungräddat", "normalgräddat", "grillad", "grillat", "friterad", "friterade", "friterat",
-  "panerad", "panerade", "panerat", "wokad", "wokade", "brynt", "fräst", "gratinerad", "stuvad",
-  "stuvade", "råstuvad", "värmd", "värmda", "förvälld", "förvällda", "bryggt", "rostad",
-  "rostade", "rostat", "ugnsrostad", "rökt", "varmrökt", "kallrökt", "lättrökt", "flatrökt",
-  "rundrökt", "orökt", "gravad", "rimmad", "rimmat", "inlagd", "syltade", "marinerad",
-  "marinerade", "kryddad", "kryddat", "smaksatt", "smaksatta", "urvattnad", "lufttorkad",
-  "torkad", "torkade", "torkat", "fermenterad", "fermenterat", "fermenterade", "pastöriserad",
-  "färskpressad", "kallpressad", "vispad", "puffat", "mald", "krossad", "krossade", "riven",
-  "skivad", "skivade", "strimlad", "tärnad", "putsad", "bortskuret", "avfettat", "renat",
-  // sweetened, salted, free of
-  "osötad", "osötat", "osötade", "sötad", "lättsötad", "lättsockrad", "sockrad", "sockerfritt",
-  "osaltat", "saltad", "saltade", "lågsalt", "extrasaltad", "extrasaltat", "glutenfri",
-  "glutenfritt", "mjölkfri", "laktosfri", "koffeinfritt", "berikad",
-  // state and texture
+  "bakad", "gräddad", "brungräddat", "normalgräddat", "grillad", "grillat", "friterad",
+  "friterade", "friterat", "panerad", "panerade", "panerat", "wokad", "wokade", "brynt", "fräst",
+  "gratinerad", "stuvad", "stuvade", "råstuvad", "värmd", "värmda", "förvälld", "förvällda",
+  "bryggt", "rostad", "rostade", "rostat", "ugnsrostad", "rökt", "varmrökt", "kallrökt",
+  "lättrökt", "flatrökt", "rundrökt", "orökt", "gravad", "rimmad", "rimmat", "inlagd", "syltade",
+  "marinerad", "marinerade", "urvattnad", "lufttorkad", "torkad", "torkade", "torkat",
+  "fermenterad", "fermenterat", "fermenterade", "pastöriserad", "färskpressad", "kallpressad",
+  "vispad", "puffat", "mald", "krossad", "krossade", "riven", "skivad", "skivade", "strimlad",
+  "tärnad", "putsad", "bortskuret", "avfettat", "renat", "berikad",
+  // unflavoured and unsweetened: the plain food, not a kind of it
+  "naturell", "naturella", "osötad", "osötat", "osötade",
+  // state
   "färsk", "färska", "fryst", "frysvara", "kylvara", "kyld", "konserv", "pulver", "konc",
-  "drickf", "ätf", "helfabrikat", "förpackad", "flytande", "bredbart", "mjukt", "grovt", "slätt",
-  "fast", "fylld", "ofylld", "ojäst", "kolsyrad", "hel", "hela", "tunn", "blandad", "blandade",
-  "naturell", "naturella", "mild", "milda", "söt", "eko", "odlad", "vildfångad", "veg",
-  "fullkorn", "glacerade", "kanderade", "storhushåll", "restaurang",
+  "drickf", "ätf", "förpackad", "flytande", "hel", "hela", "eko", "odlad", "vildfångad",
   // colour, which tells varieties of one food apart
   "vit", "vitt", "vita", "röd", "rött", "röda", "gul", "gult", "svart", "svarta", "grönt",
   "brunt", "mörkt",
 ]);
 
-/** Words after which the next one qualifies: "u. salt", "typ ringar", "i olja", "el. grillad". */
-const QUALIFYING_MARKERS = new Set(["u", "utan", "typ", "i", "el", "eller"]);
+/**
+ * What may follow "m." and leave the row the food itself (D198): a preparation
+ * medium, the skin, peel or bone a cut keeps, or a fortification. Counted from
+ * the words after " m. " in the catalogue: "salt" 111, "skinn" 19, "vatten" 15,
+ * "lag" 11, "olja" and "rapsolja" 12, "skal" 6. Everything else there is a food
+ * ("mjölk" 20, "frukt" 17, "ost" 11, "köttfärs" 9) and makes the row a dish.
+ */
+const MEDIA = new Set(["salt", "vatten", "lag", "olja", "rapsolja", "skinn", "skal", "ben", "jod"]);
+
+/**
+ * Words after which the next one qualifies: "u. salt", "i olja", "el. grillad".
+ * Not "typ": what follows it names a type, which is a variety (D198).
+ */
+const QUALIFYING_MARKERS = new Set(["u", "utan", "i", "el", "eller"]);
+
+/** The connector's own words, which a tail may contain. */
+const CONNECTOR_WORDS = new Set(["m", "med", "innehåller"]);
+
+/**
+ * Parts and portions of a food, from the catalogue ("filé" 19, "bog" 11,
+ * "bitar" 9, "bröstfilé" 7, "kotlett" 5, "lägg" 5, "blad" 3, "lår" 3, "skiva"
+ * 3, "vinge" 1) and the two recipe photos ("blad", "klyftor"). Skin, bone and
+ * the organs are left out, because each is a different food (D198).
+ */
+const PARTS = ["blad", "klyfta", "bröst", "bröstfilé", "filé", "lår", "skiva", "vinge", "klubba", "bit", "kotlett", "lägg", "bog"];
+
+/** Halves that change what the food is: neither a part nor a compound written apart (D198). */
+const FORMS = ["tärning", "pulver", "koncentrat"];
 
 function significantWords(text: string): string[] {
   return text
@@ -742,35 +820,134 @@ function sameWord(asked: string, candidate: string): boolean {
   return false;
 }
 
-export function isPlausibleMatch(query: string, name: string): boolean {
-  // Only the head of the row's name. A query may still be several words.
-  const head = name.split(CONTAINS_CONNECTOR)[0] ?? name;
+const inList = (word: string, list: string[]) => list.some((entry) => sameWord(entry, word));
+
+/**
+ * The ways one asked word can be present in a name: as itself; as a compound
+ * written apart (every half required); or as a food and a part of it (the food
+ * required, the part only preferred).
+ */
+type Reading = { required: string[]; part: string | null };
+
+function readings(word: string): Reading[] {
+  const found: Reading[] = [{ required: [word], part: null }];
+  for (let cut = 3; cut <= word.length - 3; cut += 1) {
+    const second = word.slice(cut);
+    if (inList(second, FORMS)) continue;
+    const firsts = [word.slice(0, cut)];
+    // A linking s ("vitlöks-klyftor") belongs to neither half.
+    if (firsts[0]!.endsWith("s") && cut - 1 >= 3) firsts.push(word.slice(0, cut - 1));
+    for (const first of firsts) {
+      found.push({ required: [first, second], part: null });
+      if (inList(second, PARTS)) found.push({ required: [first], part: second });
+    }
+  }
+  return found;
+}
+
+/** A word of the name that is only what describes the food. */
+function describes(words: string[], index: number, extra: Set<string> = new Set()): boolean {
+  const word = words[index]!;
+  return (
+    /\d/.test(word) ||
+    QUALIFIERS.has(word) ||
+    QUALIFYING_MARKERS.has(word) ||
+    extra.has(word) ||
+    (index > 0 && QUALIFYING_MARKERS.has(words[index - 1]!))
+  );
+}
+
+/**
+ * "full" when the row is the food named, with every part named present;
+ * "part" when it is the food and a part the query named is not in the name;
+ * null when it is not the food (D198).
+ */
+export function matchStrength(query: string, name: string): "full" | "part" | null {
+  const connector = name.search(CONTAINS_CONNECTOR);
+  const head = connector < 0 ? name : name.slice(0, connector);
+  const tail = connector < 0 ? "" : name.slice(connector);
 
   const asked = significantWords(query);
   const found = significantWords(head);
-  if (asked.length === 0 || found.length === 0) return false;
+  if (asked.length === 0 || found.length === 0) return null;
 
-  // The food is named first.
-  if (!asked.some((word) => sameWord(word, found[0]!))) return false;
-
-  // Every word asked for, somewhere in the head.
-  const covered = new Set<number>();
-  for (const word of asked) {
-    const index = found.findIndex((candidate) => sameWord(word, candidate));
-    if (index < 0) return false;
-    covered.add(index);
+  // The tail describes the food, or the row is a dish.
+  const after = significantWords(tail);
+  if (!after.every((_, index) => describes(after, index, new Set([...MEDIA, ...CONNECTOR_WORDS])))) {
+    return null;
   }
 
-  // The rest describes it, or it is another food.
-  const unexplained = found.filter(
-    (word, index) =>
-      !covered.has(index) &&
-      !/\d/.test(word) &&
-      !QUALIFIERS.has(word) &&
-      !QUALIFYING_MARKERS.has(word) &&
-      !(index > 0 && QUALIFYING_MARKERS.has(found[index - 1]!)),
-  ).length;
-  return unexplained === 0;
+  // Each asked word's readings that could be present at all in this head.
+  const options = asked.map((word) =>
+    readings(word).filter((reading) =>
+      reading.required.every((need) => found.some((candidate) => sameWord(need, candidate))),
+    ),
+  );
+  if (options.some((list) => list.length === 0)) return null;
+
+  let best: "full" | "part" | null = null;
+  const choose = (at: number, taken: Set<number>, lead: boolean, dropped: number): void => {
+    if (best === "full") return;
+    if (at === asked.length) {
+      // The food is named first, and the rest describes it.
+      if (!lead) return;
+      if (!found.every((_, index) => taken.has(index) || describes(found, index))) return;
+      const strength = dropped === 0 ? "full" : "part";
+      if (best === null || strength === "full") best = strength;
+      return;
+    }
+    for (const reading of options[at]!) {
+      const next = new Set(taken);
+      let first = lead;
+      let ok = true;
+      for (const need of reading.required) {
+        const index = found.findIndex((candidate, i) => !next.has(i) && sameWord(need, candidate));
+        if (index < 0) {
+          ok = false;
+          break;
+        }
+        next.add(index);
+        if (index === 0) first = true;
+      }
+      if (!ok) continue;
+      let missing = 0;
+      if (reading.part !== null) {
+        const part = reading.part;
+        const index = found.findIndex(
+          (candidate, i) => !next.has(i) && (sameWord(part, candidate) || candidate.startsWith(part)),
+        );
+        if (index < 0) missing = 1;
+        else next.add(index);
+      }
+      choose(at + 1, next, first, dropped + missing);
+    }
+  };
+  choose(0, new Set(), false, 0);
+  return best;
+}
+
+/**
+ * The query again with one compound written apart, for each way a compound in
+ * it splits into two halves of three letters or more (D198): "nötfärs" gives
+ * "nöt färs" and "nötf ärs". Only for the search; the rule still judges every
+ * row against the query as asked.
+ */
+export function compoundSplits(query: string): string[] {
+  const words = significantWords(query);
+  const alternatives = new Set<string>();
+  words.forEach((word, at) => {
+    for (const reading of readings(word)) {
+      if (reading.required.length !== 2) continue;
+      const replaced = [...words.slice(0, at), ...reading.required, ...words.slice(at + 1)];
+      alternatives.add(replaced.join(" "));
+    }
+  });
+  return [...alternatives];
+}
+
+/** Whether the row is the food named at all, at either strength. */
+export function isPlausibleMatch(query: string, name: string): boolean {
+  return matchStrength(query, name) !== null;
 }
 
 /* ----------------------------------------------------------------- recipes */

@@ -89,12 +89,15 @@ export default tseslint.config(
             "hostOf",
 
             /**
-             * Pure functions of their arguments. Neither touches the database,
-             * so there is no row to scope: `isPlausibleMatch` compares two
-             * strings, and `estimateDish` asks the model about a dish name and
-             * returns a proposal that nothing has written yet.
+             * Pure functions of their arguments. None touches the database,
+             * so there is no row to scope: `isPlausibleMatch` and
+             * `matchStrength` compare two strings, `compoundSplits` rewrites a
+             * query string (D198), and `estimateDish` asks the model about a
+             * dish name and returns a proposal that nothing has written yet.
              */
             "isPlausibleMatch",
+            "matchStrength",
+            "compoundSplits",
             "estimateDish",
 
             /**

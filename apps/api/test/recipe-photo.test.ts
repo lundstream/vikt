@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import type { ReadRecipeResponse } from "shared";
 import type { ChatMessage, ChatOptions, ChatResult, LlmClient } from "../src/llm/client.js";
 import type { Db } from "../src/db/index.js";
-import { foodItems } from "../src/db/schema.js";
+import { foodEntries, foodItems } from "../src/db/schema.js";
 import { RECIPE_SCHEMA, readRecipe } from "../src/llm/read-recipe.js";
-import { auth, createUser } from "./factories.js";
+import { auth, createUser, localDate, type TestUser } from "./factories.js";
 import { useTestApp } from "./harness.js";
 
 /**
@@ -234,6 +234,108 @@ describe("the matcher reads far enough down the search", () => {
     });
     const body = response.json() as Read;
     expect(body.rows[0]!.match).toMatchObject({ name: "Mjölk fett 3% berikad", kcalPer100: 60 });
+  });
+});
+
+/**
+ * Which of several accepted rows the matcher proposes (D198): the one this
+ * person has logged most, then the search's order, which is now total, so the
+ * same person asking the same thing always gets the same food.
+ */
+describe("the matcher chooses among the rows it accepts", () => {
+  const CHEESE = { title: null, yield: null, rows: [{ line: "100 g ost", section: null }] };
+  const MILK = { title: null, yield: null, rows: [{ line: "10 dl mjölk", section: null }] };
+  const MINCE = { title: null, yield: null, rows: [{ line: "500 g nötfärs", section: null }] };
+
+  async function row(db: Db, name: string, source: "livsmedelsverket" | "openfoodfacts", kcal: number) {
+    const [item] = await db
+      .insert(foodItems)
+      .values({ source, name, kcalPer100: String(kcal), visibility: "shared" })
+      .returning({ id: foodItems.id });
+    return item!.id;
+  }
+
+  async function logged(db: Db, userId: string, foodItemId: string, times: number) {
+    await db.insert(foodEntries).values(
+      [...Array(times).keys()].map(() => ({
+        userId,
+        clientUuid: randomUUID(),
+        localDate: localDate(),
+        mealSlot: "lunch" as const,
+        foodItemId,
+        grams: "100.0",
+        kcal: "100.0",
+        confirmed: true,
+      })),
+    );
+  }
+
+  const read = async (app: ReturnType<ReturnType<typeof useTestApp>>["app"], user: TestUser) => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/llm/read-recipe",
+      headers: auth(user),
+      payload: { image: markedImage().image },
+    });
+    return (response.json() as Read).rows[0]!.match;
+  };
+
+  describe("with no history", () => {
+    const ctx = useTestApp({ LLM_VISION_MODEL: "qwen3-vl:8b" }, { llm: stubLlm(CHEESE) });
+
+    it("takes Livsmedelsverket's row among equals, and the same one every time", async () => {
+      const { app, db } = ctx();
+      const user = await createUser(app, db);
+      await row(db, "Ost", "openfoodfacts", 252);
+      await row(db, "Ost", "livsmedelsverket", 354);
+      await row(db, "Ost", "openfoodfacts", 351);
+      const answers = [await read(app, user), await read(app, user), await read(app, user)];
+      expect(answers.map((match) => match?.kcalPer100)).toEqual([354, 354, 354]);
+    });
+  });
+
+  describe("with history", () => {
+    const ctx = useTestApp({ LLM_VISION_MODEL: "qwen3-vl:8b" }, { llm: stubLlm(CHEESE) });
+
+    it("takes the row this person has logged most", async () => {
+      const { app, db } = ctx();
+      const user = await createUser(app, db);
+      await row(db, "Ost", "livsmedelsverket", 354);
+      const theirs = await row(db, "Ost", "openfoodfacts", 252);
+      await logged(db, user.userId, theirs, 3);
+      expect((await read(app, user))?.kcalPer100).toBe(252);
+
+      // Another person, who has logged nothing, still gets the stable order.
+      const other = await createUser(app, db);
+      expect((await read(app, other))?.kcalPer100).toBe(354);
+    });
+  });
+
+  describe("history and a refused row", () => {
+    const ctx = useTestApp({ LLM_VISION_MODEL: "qwen3-vl:8b" }, { llm: stubLlm(MILK) });
+
+    it("never makes a refused row plausible, however often it was logged", async () => {
+      const { app, db } = ctx();
+      const user = await createUser(app, db);
+      const chocolate = await row(db, "Mjölkchoklad", "livsmedelsverket", 535);
+      await row(db, "Mjölk fett 3% berikad", "livsmedelsverket", 60);
+      await logged(db, user.userId, chocolate, 10);
+      expect((await read(app, user))?.name).toBe("Mjölk fett 3% berikad");
+    });
+  });
+
+  /** "nötfärs" is not in the search's twenty when the catalogue writes it apart. */
+  describe("a compound written apart", () => {
+    const ctx = useTestApp({ LLM_VISION_MODEL: "qwen3-vl:8b" }, { llm: stubLlm(MINCE) });
+
+    it("is found by searching the halves, and needs both", async () => {
+      const { app, db } = ctx();
+      const user = await createUser(app, db);
+      await row(db, "Lasagne nötfärs", "livsmedelsverket", 137);
+      await row(db, "Nöt kött rå", "livsmedelsverket", 150);
+      await row(db, "Nöt färs rå fett 10%", "livsmedelsverket", 182);
+      expect((await read(app, user))?.name).toBe("Nöt färs rå fett 10%");
+    });
   });
 });
 

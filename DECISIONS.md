@@ -11492,3 +11492,248 @@ helper test fail against the old `portainer.mjs` sent one request, with a dummy
 key, to the owner's Portainer: the test removed `PORTAINER_URL`, and the old
 script fell back to the real address. Such a check now runs with the network
 cut or with every address pointing at a documentation range.
+
+### D198 — The matcher refined: parts of a food, compounds written apart, no varieties, and one answer per person
+
+*2026-09-26, after the owner reviewed D196's table, before 1.4.0 ships.*
+
+Three refinements to `isPlausibleMatch` and `matchRow`, all asked for in the
+review, and one that the first two turned out to need.
+
+#### (a) Part-of compounds, and compounds written apart
+
+D196 read every compound as another word, which lost "färska basilikablad",
+"vitlöksklyftor" and "Kycklingbröst". In those the first half is the food and
+the second names a part or a portion of it, so **the food is the first half
+and the part is a qualifier**: present in the row or not. A row that names the
+part ("Kyckling bröstfilé" for "kycklingbröst") is preferred; only when no
+candidate does is the food without it taken ("Vitlök" for "vitlöksklyftor"),
+and `matchStrength` says which of the two it was, "full" or "part".
+
+**The part list was counted**, the way D196's qualifiers were: part words that
+follow the first word of a Livsmedelsverket name ("filé" 19 and 15 more as the
+tail of a compound, "bog" 11, "bitar" 9, "bröstfilé" 7, "kotlett" 5, "lägg" 5,
+"blad" 3, "lår" 3 and 9 as a tail, "skiva" 3, "vinge" 1, "klubba" as a tail),
+and the two recipe photos ("blad", "klyftor"). Left out because each is a
+different food: "skinn" (26), "ben", the organs ("lever" 15, "hjärta",
+"njure", "tunga"), and **the forms that change what a food is**, "tärning" and
+"pulver": a köttbuljongtärning is a concentrate, and the catalogue's "Köttbuljong
+tärning ätf." is the broth made from one, so "tärning" is neither a part nor a
+half and "köttbuljongtärning" stays unmatched.
+
+**The catalogue writes some compounds apart**: plain beef mince is "Nöt färs rå
+fett 10%". A query compound now matches a head that has all of its halves as
+separate words, with the first word one of them, and only all of them, so
+"pepparrot" can never become "Peppar". Such a row is not among the search's
+twenty, because the search cannot see "nötfärs" in "nöt färs"; so when no
+candidate matches fully, `matchRow` searches the query again with each compound
+split in two ("nöt färs") and judges those rows by the same rule against the
+query as asked. Checked against the catalogue: **nötfärs** reaches "Nöt färs rå
+fett 10%"; **fetaost** has no row but dishes ("Grekisk sallad m. fetaost"), so
+no match; **parmesan** is "Ost hårdost parmesan …", led by "Ost", so no match
+for "parmesan" or "riven parmesan"; **salladblad** reaches nothing, because
+every "Sallad …" row is a dish.
+
+#### (b) Qualifiers never name a variety
+
+Qualifiers name preparation, state, measure and colour. D196's list, gone
+through word by word with that test, lost every variety, flavour and dish
+word: "veg.", "fullkorn", "smaksatt", "kryddad", the sweetening words
+("sötad", "lättsötad", "lättsockrad", "sockrad", "sockerfritt"), the free-from
+variants ("glutenfri", "laktosfri", "mjölkfri", "koffeinfritt"), provenance
+("hemlagad", "hembakad", "butiksbakad", "restaurang", "storhushåll",
+"helfabrikat"), texture that names a kind ("grovt", "mjukt", "slätt", "fast",
+"fylld", "ofylld", "ojäst", "tunn", "bredbart", "kolsyrad"), "mild", "söt",
+"blandad", "glacerade", "kanderade", and the marker "typ", whose next word
+names a type. Kept, with the reason: fat, salt and alcohol levels ("fett",
+"lätt", "osaltat", "lågsalt", "vol") are measures of a component the database
+already prices; "naturell" and "osötad" name the plain food rather than a kind
+of it; colour stays because the rule allows it.
+
+**The tail had to follow.** With "veg." gone, "Pizza" did not become no match:
+it reached "Pizza m. ost restaurang", because D72 looks for the asked words
+only in the head and "m." cuts the name to "Pizza". But what follows "m." in
+this catalogue is either a preparation medium or another food. Counted: "salt"
+111, "skinn" 19, "vatten" 15, "lag" 11, "olja" and "rapsolja" 12, "skal" 6,
+against "mjölk" 20, "frukt" 17, "grönsaker" 15, "ost" 11, "köttfärs" 9. The
+second makes the row a dish, a variety of what the head names. So **the tail
+must describe the food too**: qualifiers, those media, the skin, peel or bone
+a cut keeps, and "jod", a fortification like "berikad". "Kyckling kokt m. salt",
+"Potatis kokt m. salt", "Tomat krossad konserv. m. lag" and "Salt m. jod" still
+match; "Pizza m. ost restaurang" and D72's own example "Kyckling med curry",
+a chicken curry, do not. That test in `llm-parse.test.ts` now expects the
+curry refused, with the reason.
+
+#### (c) One answer per person
+
+The same query could show "Ost" at 252 or 354 kcal, depending on which of five
+rows named "Ost" the database returned first. Now, among the rows the rule
+accepts (the full ones, or the part ones when there are no full ones): **the
+food this person has logged most, then the search's ranking, then a total
+order**, Livsmedelsverket before Open Food Facts and then id, which the search
+query itself now ends with. History only chooses among accepted rows; a refused
+row is not in the list, however often it was logged.
+
+#### The tests
+
+`llm-parse.test.ts`, a D198 block: part-of compounds at "part" and at "full"
+strength; kept from dishes and other foods ("Sallad m. grönsallat …",
+"Salladsost", "Vitlökssås"); forms never a part or a half; a compound written
+apart, only with every half; varieties, flavours, dish words and a type
+refused; and what was right at ff55a74 still right. **The three that test new
+behaviour fail on the ff55a74 rule**, run against a verbatim copy of it; the
+three guards pass on both, as they should. `recipe-photo.test.ts`: without
+history, Livsmedelsverket's row among equals, the same one three times; with
+history, the logged row, and another person still the stable one; a refused
+row logged ten times still refused; and "nötfärs" found through its halves.
+The history test fails with the history step removed and the split test fails
+with the split search removed.
+
+#### Before and after, three rules
+
+The same 94 queries as D196. All three columns read the same search, which now
+ends in a total order, as **a user with no history and no foods of their own**:
+487eb3f's rule over five rows, ff55a74's over twenty, and this one over twenty
+with history (none) and the split search. Rows marked "changed" differ from
+ff55a74. This rule was run three times; every query gave the same food each
+time. A few rows in the two older columns differ from the table the owner
+reviewed, for the reasons in this setup and not in any rule: "Ost" is now the
+row with the lowest id among five equals (354), "Präst" likewise (277), "ägg"
+"Ägg kokt", and "kebabpizza" and, at 487eb3f, "Filmjölk 3%" are no match
+because those rows are the seeded account's own.
+
+| source | query | 487eb3f (5) | ff55a74 (20) | this rule (20) | changed against ff55a74 |
+|---|---|---|---|---|---|
+| recipe, book | 1 pizzaboll, se sidan 110 (a cross-reference, not searched) | no match | no match | no match | |
+| recipe, book | mozzarella di bufala DOP (0,39 g (50 g) mozzarella di bufala DOP, i bitar) | no match | no match | no match |  |
+| recipe, book | lardo (20 g (25 g) lardo alt pancetta eller bacon, finskuren) | no match | no match | no match |  |
+| recipe, book | vitlök (3 g (3,5 g) vitlök, finskivad (ca 1 vitlöksklyfta)) | Vitlök, 128 | Vitlök, 128 | Vitlök, 128 |  |
+| recipe, book | färska basilikablad (3–5 färska basilikablad) | Basilika färsk, 25 | no match | Basilika färsk, 25 | **changed** |
+| recipe, book | pecorino romano DOP (12 g (15 g) pecorino romano DOP, finriven) | no match | no match | no match |  |
+| recipe, book | olivolja (3 g + 5 g (3 g + 7 g) olivolja) | Olivolja, 884 | Olivolja, 884 | Olivolja, 884 |  |
+| recipe, screen | gula lökar (2 gula lökar) | no match | Lök gul, 39 | Lök gul, 39 |  |
+| recipe, screen | vitlöksklyftor (2 vitlöksklyftor) | Vitlök, 128 | no match | Vitlök, 128 | **changed** |
+| recipe, screen | nötfärs (500 g nötfärs eller hushållsfärs (ärt- och nötfärs)) | Lasagne nötfärs, 137 | no match | Nöt färs rå fett 10%, 182 | **changed** |
+| recipe, screen | olja (1 msk olja) | no match | no match | no match |  |
+| recipe, screen | tomatpuré (4 msk tomatpuré) | Tomat, 17 | Tomatpuré konc. konserv., 84 | Tomatpuré konc. konserv., 84 |  |
+| recipe, screen | torkad timjan (1 tsk torkad timjan) | no match | no match | no match |  |
+| recipe, screen | torkad rosmarin (1 tsk torkad rosmarin) | no match | no match | no match |  |
+| recipe, screen | krossade tomater (1 förp krossade tomater (à 390 g)) | Tomat krossad konserv. m. lag, 22 | Tomat krossad konserv. m. lag, 22 | Tomat krossad konserv. m. lag, 22 |  |
+| recipe, screen | köttbuljongtärning (1 köttbuljongtärning) | Köttbuljong ätf., 8 | no match | no match |  |
+| recipe, screen | salt (salt) | Salt örtsalt, 18 | Salt m. jod, 0 | Salt m. jod, 0 |  |
+| recipe, screen | peppar (peppar) | Pepparrot, 70 | no match | no match |  |
+| recipe, screen | smör (6 msk smör (6 msk motsvarar ca 90 g)) | Smör Mindre, 381 | Smör fett 80%, 766 | Smör fett 80%, 766 |  |
+| recipe, screen | vetemjöl (6 msk vetemjöl) | Vetemjöl, 352 | Vetemjöl, 352 | Vetemjöl, 352 |  |
+| recipe, screen | mjölk (10 dl mjölk) | Mjölkchoklad, 535 | Mjölk fett 3% berikad, 60 | Mjölk fett 3% berikad, 60 |  |
+| recipe, screen | riven parmesan (2 dl riven parmesan) | no match | no match | no match |  |
+| recipe, screen | torkade lasagneplattor (9 torkade lasagneplattor) | no match | no match | no match |  |
+| tools | mjölk | Mjölkchoklad, 535 | Mjölk fett 3% berikad, 60 | Mjölk fett 3% berikad, 60 |  |
+| tools | peppar | Pepparrot, 70 | no match | no match |  |
+| tools | nötfärs | Lasagne nötfärs, 137 | no match | Nöt färs rå fett 10%, 182 | **changed** |
+| tools | kycklingfilé | Kycklingfilé, 100 | Kycklingfilé, 100 | Kycklingfilé, 100 |  |
+| tools | fetaost | no match | no match | no match |  |
+| tools | ägg | Ägg kokt, 136 | Ägg kokt, 136 | Ägg kokt, 136 |  |
+| tools | spenat | Spenat färsk, 24 | Spenat färsk, 24 | Spenat färsk, 24 |  |
+| tools | tomat | Tomat, 17 | Tomat, 17 | Tomat, 17 |  |
+| tools | ris | no match | no match | no match |  |
+| tools | kyckling | no match | Kyckling kokt m. salt, 171 | Kyckling kokt m. salt, 171 |  |
+| tools | keso naturell | no match | no match | no match |  |
+| tools | yoghurt | Yoghurt vanilje, 81 | Yoghurt naturell fett 10%, 109 | Yoghurt naturell fett 10%, 109 |  |
+| tools | rågbröd | no match | no match | no match |  |
+| tools | salt | Salt örtsalt, 18 | Salt m. jod, 0 | Salt m. jod, 0 |  |
+| tools | friterad potatis | no match | no match | no match |  |
+| tools | kokt potatis | Potatis kokt m. salt, 83 | Potatis kokt m. salt, 83 | Potatis kokt m. salt, 83 |  |
+| tools | krämig dressing | no match | no match | no match |  |
+| tools | kebabpizza | no match | no match | no match |  |
+| tools | Mammas köttbullar | no match | no match | no match |  |
+| tools | smör | Smör Mindre, 381 | Smör fett 80%, 766 | Smör fett 80%, 766 |  |
+| tools | kaffe | Kaffe bryggt, 2 | Kaffe bryggt, 2 | Kaffe bryggt, 2 |  |
+| tools | havregrynsgröt | Havregrynsgröt fullkorn, 66 | Havregrynsgröt fullkorn, 66 | no match | **changed** |
+| tools | lingonsylt | Lingonsylt, 148 | Lingonsylt, 148 | Lingonsylt, 148 |  |
+| tools | banan | Banan, 95 | Banan, 95 | Banan, 95 |  |
+| tools | ostmacka | no match | no match | no match |  |
+| tools | filmjölk | Filmjölk, 60 | Filmjölk, 60 | Filmjölk, 60 |  |
+| tools | müsli | no match | no match | no match |  |
+| tools | Kött | Köttfärslåda, 124 | no match | no match |  |
+| tools | Gurksallad med tomater och feta | no match | no match | no match |  |
+| tools | Krämig sås | no match | no match | no match |  |
+| tools | Grillad köttfarsbiff | no match | no match | no match |  |
+| tools | Potatismat | Barnmat potatis m. nötköttsgryta konserv., 79 | no match | no match |  |
+| tools | Vit krämsås | no match | no match | no match |  |
+| tools | Salladblad | Grekisk sallad m. fetaost, 77 | no match | no match |  |
+| tools | Smörstekta bacon | no match | no match | no match |  |
+| tools | Kycklingbröst | Kyckling bröstfilé m. skinn stekt m. salt, 187 | no match | Kyckling bröstfilé rå u. skinn, 104 | **changed** |
+| tools | Tomater | Tomat, 17 | Tomat, 17 | Tomat, 17 |  |
+| tools | Croutons | no match | no match | no match |  |
+| tools | Ost | Ost, 354 | Ost, 354 | Ost, 354 |  |
+| tools | Parmesan | no match | no match | no match |  |
+| tools | Pizza | Pizza orientalisk, 208 | Pizza veg. hemlagad, 179 | no match | **changed** |
+| logged ×68 | Filmjölk 3% | no match | Filmjölk fett 3% berikad, 57 | Filmjölk fett 3% berikad, 57 |  |
+| logged ×10 | Kycklingfilé | Kycklingfilé, 100 | Kycklingfilé, 100 | Kycklingfilé, 100 |  |
+| logged ×10 | Rotfruktsgratäng | no match | no match | no match |  |
+| logged ×8 | Havregrynsgröt | Havregrynsgröt fullkorn, 66 | Havregrynsgröt fullkorn, 66 | no match | **changed** |
+| logged ×8 | Laxfilé med potatis | no match | no match | no match |  |
+| logged ×7 | Havrekli | Havrekli, 357 | Havrekli, 357 | Havrekli, 357 |  |
+| logged ×7 | Präst | Präst, 277 | Präst, 277 | Präst, 277 |  |
+| logged ×6 | Grekisk yoghurt | no match | no match | no match |  |
+| logged ×5 | Banan | Banan, 95 | Banan, 95 | Banan, 95 |  |
+| logged ×5 | Bregott Normalsaltat | Bregott Normalsaltat, 678 | Bregott Normalsaltat, 678 | Bregott Normalsaltat, 678 |  |
+| logged ×5 | Gris skinka skivad rökt fett 1-3% | Gris skinka skivad rökt fett 1-3%, 99 | Gris skinka skivad rökt fett 1-3%, 99 | Gris skinka skivad rökt fett 1-3%, 99 |  |
+| logged ×5 | Hårt bröd fullkorn råg fibrer 15,5% typ Husman | no match | no match | no match |  |
+| logged ×4 | Blåbär frysvara | Blåbär frysvara, 43 | Blåbär frysvara, 43 | Blåbär frysvara, 43 |  |
+| logged ×4 | Mild Kvarg - Vanilj | Mild Kvarg - Vanilj, 59 | Mild Kvarg - Vanilj, 59 | Mild Kvarg - Vanilj, 59 |  |
+| logged ×4 | Ägg kokt | Ägg kokt, 136 | Ägg kokt, 136 | Ägg kokt, 136 |  |
+| logged ×2 | Gräddost | Gräddost, 420 | Gräddost, 420 | Gräddost, 420 |  |
+| logged ×2 | Pastagratäng Rossini m. kycklingfärs ananas paprika squash tomat purjolök | no match | no match | no match |  |
+| logged ×2 | Ris avorio okokt | Ris avorio okokt, 358 | Ris avorio okokt, 358 | Ris avorio okokt, 358 |  |
+| logged ×2 | Surdegs Bröd | Surdegs Bröd, 220 | Surdegs Bröd, 220 | Surdegs Bröd, 220 |  |
+| logged ×1 | Amerikanske pannekaker | Amerikanske pannekaker, 295 | Amerikanske pannekaker, 295 | Amerikanske pannekaker, 295 |  |
+| logged ×1 | Babybel Mini | Babybel Mini, 295 | Babybel Mini, 295 | Babybel Mini, 295 |  |
+| logged ×1 | Bröd vitt typ levain | Bröd vitt typ levain, 249 | Bröd vitt typ levain, 249 | Bröd vitt typ levain, 249 |  |
+| logged ×1 | DORITOS sweet chili pepper | DORITOS sweet chili pepper, 477 | DORITOS sweet chili pepper, 477 | DORITOS sweet chili pepper, 477 |  |
+| logged ×1 | Doritos nacho cheese | Doritos nacho cheese, 480 | Doritos nacho cheese, 480 | Doritos nacho cheese, 480 |  |
+| logged ×1 | Ferrari Salt Persika | Ferrari Salt Persika, 351 | Ferrari Salt Persika, 351 | Ferrari Salt Persika, 351 |  |
+| logged ×1 | Filmjölk A-fil fett 3% berikad | Filmjölk A-fil fett 3% berikad, 60 | Filmjölk A-fil fett 3% berikad, 60 | Filmjölk A-fil fett 3% berikad, 60 |  |
+| logged ×1 | Filmjölk långfil fett 3% berikad | Filmjölk långfil fett 3% berikad, 60 | Filmjölk långfil fett 3% berikad, 60 | Filmjölk långfil fett 3% berikad, 60 |  |
+| logged ×1 | Fruktyoghurt fett 3,6% berikad | no match | no match | no match |  |
+| logged ×1 | Gelégodis | Gelégodis, 350 | Gelégodis, 350 | Gelégodis, 350 |  |
+| logged ×1 | Grillad Kyckling | Kyckling grillad m. skinn, 214 | Kyckling grillad m. skinn, 214 | Kyckling grillad m. skinn, 214 |  |
+
+94 queries: 8 changed against ff55a74; 0 gave different foods across three runs.
+
+The development database's own user, where history or its own foods give a different food:
+
+| query | no history | the seeded user |
+|---|---|---|
+| kebabpizza | no match | Kebabpizza, 240 |
+| filmjölk | Filmjölk, 60 | Filmjölk 3%, 56 |
+| Filmjölk 3% | Filmjölk fett 3% berikad, 57 | Filmjölk 3%, 56 |
+
+**The reading, row by row, from the table.** Eight rows changed against
+ff55a74, six queries:
+
+- "färska basilikablad": no match → "Basilika färsk", at "part" strength, the
+  blad not in the row.
+- "vitlöksklyftor": no match → "Vitlök", at "part" strength.
+- "nötfärs", as a recipe row and as a tools query: no match → "Nöt färs rå fett
+  10%", plain beef mince, found through the split search.
+- "Kycklingbröst": no match → "Kyckling bröstfilé rå u. skinn", a breast row
+  naming the part.
+- "havregrynsgröt", as a tools query and as the logged "Havregrynsgröt":
+  "Havregrynsgröt fullkorn" → no match. **A loss**: "fullkorn" names a variety.
+  The catalogue's other shared porridge row is "Havregrynsgröt kokt m. mjölk",
+  made with milk, which is a food and not a medium; the two rows named plainly
+  "Havregrynsgröt" are another development account's own, which nobody else
+  can match.
+- "Pizza": "Pizza veg. hemlagad" → no match. Every pizza row is a variety or a
+  dish, now that "veg." is out and the tail must describe the food.
+
+Every other row is the same food as at ff55a74, the other 86 of 94: among them
+"mjölk" "Mjölk fett 3% berikad", "smör" "Smör fett 80%", "tomatpuré"
+"Tomatpuré konc. konserv.", "salt" "Salt m. jod", "gula lökar" "Lök gul", and
+no match for "köttbuljongtärning", "peppar", "Salladblad", "Kött", "Potatismat"
+and "fetaost".
+
+**The seeded user, with history and its own foods**, differs on three: "kebabpizza"
+reaches its own "Kebabpizza"; "filmjölk" and "Filmjölk 3%" reach "Filmjölk 3%",
+the row it has logged 68 times.

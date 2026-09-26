@@ -160,11 +160,43 @@ export async function searchFoodItems(
         + ts_rank(${foodItems.searchVector}, ${tsQuery}, 1) * 8
         + word_similarity(${q}, ${foodItems.searchName}) * 4
         + CASE WHEN ${foodItems.brand} IS NULL THEN ${genericBonus} ELSE 0 END
-      ) DESC, length(${foodItems.name}) ASC`,
+      ) DESC, length(${foodItems.name}) ASC,
+      CASE WHEN ${foodItems.source} = 'livsmedelsverket' THEN 0 ELSE 1 END, ${foodItems.id} ASC`,
+      /*
+        The last two keys make the order total (D198). Five Open Food Facts
+        rows are named "Ost", from 252 to 354 kcal, and without them the
+        database returned whichever its plan reached first, so the same query
+        could propose a different food on another day or at another limit.
+        Livsmedelsverket's row comes first among equals, then the id.
+      */
     )
     .limit(limit);
 
   return rows;
+}
+
+/**
+ * How many times this person has logged each of these foods (D198).
+ *
+ * The matcher's first preference among rows it already accepts: a person who
+ * logs one of five rows named "Ost" means that one. Scoped by the user like
+ * every read of `food_entries` (§3); a food nobody here has logged is absent
+ * from the map rather than zero.
+ */
+export async function countLoggedFoods(
+  userId: string,
+  db: Db,
+  foodItemIds: string[],
+): Promise<Map<string, number>> {
+  if (foodItemIds.length === 0) return new Map();
+  const rows = await db
+    .select({ foodItemId: foodEntries.foodItemId, count: sql<number>`count(*)::int` })
+    .from(foodEntries)
+    .where(and(eq(foodEntries.userId, userId), inArray(foodEntries.foodItemId, foodItemIds)))
+    .groupBy(foodEntries.foodItemId);
+  const counts = new Map<string, number>();
+  for (const row of rows) if (row.foodItemId !== null) counts.set(row.foodItemId, row.count);
+  return counts;
 }
 
 

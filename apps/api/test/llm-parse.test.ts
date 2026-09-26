@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readParsedFood, PARSE_SYSTEM_PROMPT } from "../src/llm/parse-food.js";
 import { describeBudget, readGeneratedRecipe, RECIPE_SYSTEM_PROMPT } from "../src/llm/recipe.js";
 import { COACH_RULES, TONE_BLOCKS } from "../src/llm/prompts/coach.js";
-import { isPlausibleMatch } from "../src/services/llm.service.js";
+import { compoundSplits, isPlausibleMatch, matchStrength } from "../src/services/llm.service.js";
 
 /**
  * The rule the whole phase rests on: **the model names things, the database
@@ -324,12 +324,15 @@ describe("deciding whether a database row is the food that was named", () => {
   });
 
   /**
-   * The other side of the connector rule. "Kyckling med curry" is chicken;
-   * what follows "med" is what has been done to it, not what it belongs to.
+   * The other side of the connector rule, narrowed by D198. What follows "m."
+   * is either how the food was prepared ("Kyckling kokt m. salt" is chicken)
+   * or another food, and then the row is a dish: "Kyckling med curry" is a
+   * chicken curry, which a bare "kyckling" would only be guessing at.
    */
-  it("accepts a food that has something added to it", () => {
-    expect(isPlausibleMatch("kyckling", "Kyckling med curry")).toBe(true);
+  it("accepts a food prepared in something, and refuses one made into a dish", () => {
+    expect(isPlausibleMatch("kyckling", "Kyckling kokt m. salt")).toBe(true);
     expect(isPlausibleMatch("yoghurt", "Yoghurt, naturell")).toBe(true);
+    expect(isPlausibleMatch("kyckling", "Kyckling med curry")).toBe(false);
   });
 
   it("refuses a longer word that merely starts with a short one", () => {
@@ -381,10 +384,14 @@ describe("the matcher: Swedish compounds, inflections and qualifiers (D196)", ()
     }
   });
 
-  /** The same rule the other way: the query is the compound, the name its first part. */
+  /**
+   * The same rule the other way, where the second half is not a part of the
+   * first: a query compound does not reach its first half. (A part-of compound
+   * does, D198, below.)
+   */
   it("refuses in the other direction too", () => {
-    expect(match("basilikablad", "Basilika färsk")).toBe(false);
-    expect(match("vitlöksklyftor", "Vitlök")).toBe(false);
+    expect(match("pepparrot", "Peppar")).toBe(false);
+    expect(match("mjölkchoklad", "Mjölk fett 3% berikad")).toBe(false);
   });
 
   it("accepts the plain food the length rule missed or ranked behind a compound", () => {
@@ -447,5 +454,68 @@ describe("the parse prompt asks for the portion as stated", () => {
 
   it("says what to do when the text states no amount", () => {
     expect(PARSE_SYSTEM_PROMPT).toMatch(/portion till null/);
+  });
+});
+
+/**
+ * The matcher refined (D198): part-of compounds, compounds written apart,
+ * qualifiers without varieties, and a tail that must describe the food. Every
+ * real name exists in the development catalogue.
+ */
+describe("the matcher: parts, split compounds and varieties (D198)", () => {
+  const match = (query: string, name: string) => isPlausibleMatch(query, name);
+
+  it("reads a part of a food as the food, and says the part was not named", () => {
+    expect(matchStrength("färska basilikablad", "Basilika färsk")).toBe("part");
+    expect(matchStrength("vitlöksklyftor", "Vitlök")).toBe("part");
+    // Named in the row, so the match is full: "bröstfilé" is the part asked for.
+    expect(matchStrength("kycklingbröst", "Kyckling bröstfilé rå u. skinn")).toBe("full");
+    expect(matchStrength("kycklingbröst", "Kyckling bröstfilé m. skinn stekt m. salt")).toBe("full");
+  });
+
+  it("keeps a part-of compound away from dishes and other foods", () => {
+    expect(match("salladblad", "Sallad m. grönsallat gurka tomat u. dressing")).toBe(false);
+    expect(match("salladblad", "Salladsost fett 22%")).toBe(false);
+    expect(match("vitlöksklyftor", "Vitlökssås fetthalt ca 10%")).toBe(false);
+  });
+
+  /** A half that changes what the food is: a concentrate is not broth. */
+  it("never reads a form as a part or a half", () => {
+    expect(match("köttbuljongtärning", "Köttbuljong ätf.")).toBe(false);
+    expect(match("köttbuljongtärning", "Köttbuljong tärning ätf.")).toBe(false);
+    expect(match("köttbuljongtärning", "Köttbuljong pulver tärning")).toBe(false);
+  });
+
+  it("matches a compound the catalogue writes apart, only with every half", () => {
+    expect(matchStrength("nötfärs", "Nöt färs rå fett 10%")).toBe("full");
+    expect(match("nötfärs", "Nöt kött rå")).toBe(false);
+    expect(match("nötfärs", "Nöt färs stekt tacokryddad hemlagad kryddning")).toBe(false);
+    expect(match("pepparrot", "Peppar")).toBe(false);
+    expect(compoundSplits("nötfärs")).toContain("nöt färs");
+    expect(compoundSplits("köttbuljongtärning")).not.toContain("köttbuljong tärning");
+  });
+
+  /** Qualifiers name preparation, state, measure and colour, never a kind. */
+  it("refuses a variety, a flavour or a dish word, and a type", () => {
+    for (const [query, name] of [
+      ["pizza", "Pizza veg. hemlagad"],
+      ["pizza", "Pizza orientalisk"],
+      ["pizza", "Pizza m. ost restaurang"],
+      ["havregrynsgröt", "Havregrynsgröt fullkorn"],
+      ["frukostflingor", "Frukostflingor fullkorn typ ringar"],
+      ["kvarg", "Kvarg smaksatt m. socker"],
+    ] as [string, string][]) {
+      expect(match(query, name), `${query} / ${name}`).toBe(false);
+    }
+  });
+
+  it("still accepts what was right at ff55a74", () => {
+    expect(match("mjölk", "Mjölk fett 3% berikad")).toBe(true);
+    expect(match("smör", "Smör fett 80%")).toBe(true);
+    expect(match("tomatpuré", "Tomatpuré konc. konserv.")).toBe(true);
+    expect(match("salt", "Salt m. jod")).toBe(true);
+    expect(match("gula lökar", "Lök gul")).toBe(true);
+    expect(match("krossade tomater", "Tomat krossad konserv. m. lag")).toBe(true);
+    expect(match("kokt potatis", "Potatis kokt m. salt")).toBe(true);
   });
 });
