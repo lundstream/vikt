@@ -11,6 +11,37 @@ the only way a marketing number stays honest.
 
 ---
 
+## The landing page, seventh pass
+
+2026-09-26, after D185: the words 500 ms apart instead of 700. Measured
+against the production build (`vite preview`), 1 280 px, by the same
+`requestAnimationFrame` watcher as the fifth pass, so a thing is recorded on the
+first frame it crosses 2 % opacity.
+
+| | nominal | measured |
+|---|---|---|
+| the line completes | 2 300 ms | 2 340 ms |
+| the ring starts | 2 300 ms | 2 426 ms |
+| the ring has gone | 2 800 ms | 2 868 ms |
+| "Gör" | 3 100 ms | **3 230 ms** |
+| "det" | 3 600 ms | **3 730 ms** |
+| "lättare." | 4 100 ms | **4 230 ms** |
+| the sentence | 4 600 ms | **4 730 ms** |
+
+**The intervals are exact**: 500 ms between the words, twice, and 500 ms from
+the last word to the sentence. The whole sequence ends 640 ms sooner than it
+did at 700, which is the point: the reader was waiting for the page. The first
+word still arrives 362 ms after the ring has gone, so the beat of stillness
+after the line (D180) is untouched.
+
+Unchanged and re-read in the same run: the phone frame at +22,0°, +9,8°, 0,0°
+through the middle band, -9,8°, -22,0°, `box-shadow: none`; the daily card
+cycling 84,6 / 84,4 and holding still off screen; under reduced motion the ring
+`display: none`, the line drawn and all three words at full opacity 900 ms after
+load. Desktop 5 206 px tall, 360 px 6 756 px with no horizontal overflow.
+
+---
+
 ## The landing page, sixth pass
 
 2026-09-17, after D181.

@@ -76,15 +76,16 @@
 
   /**
    * How far apart the three words arrive, and how long after the last one the
-   * sentence follows (D180).
+   * sentence follows (D180, D185).
    *
-   * 700 ms, not 120. At 120 the three words read as one movement with a stutter
-   * in it, which is a transition dressed up as a sentence; at 700 each word is
-   * long enough to be read before the next arrives, which is the pace somebody
-   * actually says "gör det lättare" at. The page is explaining rather than
-   * revealing, and the tempo is part of that.
+   * 500 ms. At 120 the three words read as one movement with a stutter in it,
+   * which is a transition dressed up as a sentence. At 700 each word was long
+   * enough to be read before the next arrived, and the three together took
+   * long enough that the reader was waiting for the page rather than reading
+   * it. 500 is still one word at a time, at the pace somebody says "gör det
+   * lättare" when they mean it, and the sentence follows on the same beat.
    */
-  --hero-word-gap: 700ms;
+  --hero-word-gap: 500ms;
 
   /**
    * The ring at the end of the line, and the beat of silence after it (D180).

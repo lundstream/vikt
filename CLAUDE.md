@@ -822,6 +822,12 @@ a commit on `main` is a commit that the next redeploy ships.
   that ends early is a report of where production actually is. Never work around
   a step that cannot run: say what is missing and where it is set, so the next
   attempt runs unattended. `INFRA.md` carries the same steps for a person.
+  - **Name the release commit once the tag exists; before that, let the last
+    commit's CI run finish before deploying.** CI runs under
+    `cancel-in-progress`, so a commit that stopped being `dev`'s tip within a
+    few minutes of being pushed has no verdict at all, only a cancelled run; and
+    once the tag exists, the tip is no longer the release, because the next fix
+    lands after it. 1.2.1 needed both halves to get out (STATE.md, D183).
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
@@ -879,4 +885,22 @@ a commit on `main` is a commit that the next redeploy ships.
     "this did not finish".
   - **`process.exitCode`, never `process.exit()`.** The second ends the process
     immediately and takes unflushed output with it.
+- **Recurring error class ten: a check that answers the question adjacent to
+  the one it was asked.** It passes, it is green, and it is about something
+  next to the thing that mattered, so nothing looks wrong until the real world
+  asks the real question. (Numbered as the owner counts them; one to nine are not
+  written into this file.) The seven cases D183 found in one release:
+  - *this tag's workflow run*, answered by the newest run of that workflow;
+  - *CI for the commit being released*, answered by CI for `dev`'s tip;
+  - *is `a21224c` green*, answered by whether `a21224c` equals a forty-character sha;
+  - *will this variable be set*, answered by whether it is set already;
+  - *is the plan blocked*, answered by whether the words "not set" appear in it;
+  - *did the API come up*, answered by whether it printed every diagnostic it has;
+  - *does the publish script run in production*, answered by whether it runs on
+    this workstation, where `tsx` exists and the image has none.
+
+  The defence is to write the question down in the check's own words before
+  writing the check, and to test it against a world that differs from the
+  fixture in the way the adjacent answer would miss: a tag whose run has not
+  registered yet, a tip that moved, a short sha, a label containing the word.
 - Before implementing a phase, re-read section 3 and section 4. The math and the isolation rules are where this project can quietly go wrong.

@@ -10335,3 +10335,71 @@ substitutions silently, and nothing stops at step 8 to say so.
 
 The cost is on the record: seven attempts, six commits of repair, and a
 production deploy that was correct from the first attempt that reached it.
+
+---
+
+### D184 — Gratis, said once, above Din data
+
+*2026-09-17, written down 2026-09-26.* The section shipped in 1.2.1 and the
+code, STATE.md and D173's section table all cite this entry; it was never
+written. It is written now so that the reference resolves, with the reasoning
+that went into the commit that built it (`1f1738f`).
+
+**What it answers.** "Is there a catch" is the question a stranger asks second,
+after "what is this", and the page had no answer anywhere. A reader who
+wondered had to infer it from the AGPL paragraph three sections down, which is
+an answer about licensing rather than about money.
+
+**Two paragraphs, verbatim from the brief**: there is no paid version, no
+subscription and nothing locked behind an upgrade, and none is coming, because
+the code is open and today's version can always be run; and that is possible
+because the app costs nothing to run.
+
+**Text only, no figure and no accent.** Nothing in it is a number, and a
+section about not charging that shouted would be doing the thing it says it
+does not do.
+
+**Directly above Din data**, because the two are the same promise from
+different directions: nothing is sold, and nothing about you is the product.
+**The licence stays in Din data**, said there as a right the reader has over
+their own installation; a second telling here would be the page making its
+strongest claim twice, which is D179's finding about the fortnight, in prose.
+
+**Rejected:** folding it into Din data (it is a different question, and a
+reader scanning headings for it would not find it under "data"), and a price
+table with one column reading 0 kr (a table is a shape that says "choose", and
+there is nothing to choose).
+
+---
+
+### D185 — The words at 500 ms, and the tenth error class written down
+
+*2026-09-26. Phase 14's first item.*
+
+**The tagline's words arrive 500 ms apart, and the sentence 500 ms after the
+last.** D180 moved them from 120 ms to 700 because at 120 three words read as
+one movement with a stutter in it. At 700 each word could be read before the
+next arrived, and the three together were slow enough that the reader waited
+for the page. 500 keeps one word at a time and gives back 640 ms. The sentence
+already followed on the same beat (`--hero-words-start + 3 × gap`), so one
+variable changed and the rest followed; `docs/measurements.md`, seventh pass,
+has the frames: 3 230, 3 730, 4 230 and the sentence at 4 730.
+
+**CLAUDE.md §7 now names recurring error class ten: a check that answers the
+question adjacent to the one it was asked**, with the seven cases D183 found in
+one release as its examples. D183 called the seventh "a different mistake", a
+script that could only run where it was not; written as a question it is the
+same one, "does it run in production" answered by "does it run here", so the
+class takes all seven. Written into §7 rather than left in D183 because a
+decision record is read when somebody is changing that decision, and this is a
+habit to hold while writing any check at all.
+
+**And the release rule D183's aftermath produced**, in §7 beside "uppdatera
+prod": name the release commit once the tag exists; before that, let the last
+commit's CI run finish before deploying. The two halves are the two ways 1.2.1
+nearly shipped the wrong thing: a named commit whose run was cancelled by the
+next push, and a tip that moved past the tag.
+
+**One thing this could not do.** The brief numbers the class ten, and nothing
+in the repository lists one to nine. §7 says so in a parenthesis rather than
+inventing them.
