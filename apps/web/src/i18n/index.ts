@@ -41,6 +41,11 @@ export function t(
  * fixed by hand in one string while the next screen reintroduced it.
  *
  *   plural(1, "progress.dayCountOne", "progress.dayCount")  ->  "1 dag"
+ *
+ * A value the caller passes wins over the bare number, so a figure formatted
+ * for display ("1,5", "1 234") can stand in the sentence while the number
+ * still chooses the form. `i18n.test.ts` fails a count sentence that is
+ * handed to `t()` directly.
  */
 export function plural(
   count: number,
@@ -48,7 +53,7 @@ export function plural(
   many: TranslationKey,
   values: Record<string, string | number> = {},
 ): string {
-  return t(count === 1 ? one : many, { ...values, days: count, count });
+  return t(count === 1 ? one : many, { days: count, count, n: count, ...values });
 }
 
 /** Every key, for the completeness test. */

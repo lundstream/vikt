@@ -3,7 +3,7 @@ import type { InsightsResponse, Maintenance, ProjectionDto } from "shared";
 import { formatKcal, formatKg, MIN_WINDOW_DAYS } from "shared";
 import { formatLongDay } from "../lib/dates.js";
 import { Tooltip } from "./Tooltip.js";
-import { LOCALE, t, type TranslationKey } from "../i18n/index.js";
+import { LOCALE, plural, t, type TranslationKey } from "../i18n/index.js";
 
 /**
  * Maintenance, the daily target, and the two projections.
@@ -332,7 +332,7 @@ function ProjectionFigure({
             {formatLongDay(projection.targetDate, LOCALE)}
           </p>
           <p className="num mt-0.5 text-micro text-muted">
-            {t("insights.daysCount", { days: projection.daysToGoal })}
+            {plural(projection.daysToGoal, "insights.daysCountOne", "insights.daysCount")}
           </p>
         </>
       )}

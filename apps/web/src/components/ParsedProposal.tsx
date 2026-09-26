@@ -4,7 +4,7 @@ import { formatDecimal, formatKcal, formatPortion } from "shared";
 import { fieldAria } from "./Field.js";
 import { clientUuid } from "../lib/uuid.js";
 import { readRequiredNumber } from "../lib/form-number.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * The list a parse produces, before any of it is saved.
@@ -186,8 +186,8 @@ export function ParsedProposal({
     setKcals({});
     setNote(
       found.unmatched.length > 0 && requireMatch
-        ? t("meals.unmatchedLeft", { count: found.unmatched.length })
-        : t("llm.someWithoutAmount", { count: withoutAmount.length }),
+        ? plural(found.unmatched.length, "meals.unmatchedLeftOne", "meals.unmatchedLeft")
+        : plural(withoutAmount.length, "llm.someWithoutAmountOne", "llm.someWithoutAmount"),
     );
   }
 
@@ -208,7 +208,7 @@ export function ParsedProposal({
       setNaming(false);
       setNote(
         found.unmatched.length > 0
-          ? t("meals.savedAsMealWithout", { name: name.trim(), count: found.unmatched.length })
+          ? plural(found.unmatched.length, "meals.savedAsMealWithoutOne", "meals.savedAsMealWithout", { name: name.trim() })
           : t("meals.savedAsMeal", { name: name.trim() }),
       );
     } finally {
@@ -388,7 +388,7 @@ export function ParsedProposal({
           onClick={() => void save()}
           disabled={saving || keep.size === 0}
         >
-          {confirmLabel ? confirmLabel(keep.size) : t("llm.saveRows", { count: keep.size })}
+          {confirmLabel ? confirmLabel(keep.size) : plural(keep.size, "llm.saveRowsOne", "llm.saveRows")}
         </button>
         {onSaveAsMeal && !naming ? (
           <button

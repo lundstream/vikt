@@ -498,7 +498,7 @@ function MilestoneRow({
           ) : milestone.rewardAffordable === false &&
             milestone.daysUntilAffordable !== null ? (
             <span className="num text-micro text-muted">
-              {t("progress.potIn", { days: milestone.daysUntilAffordable })}
+              {plural(milestone.daysUntilAffordable, "progress.potInOne", "progress.potIn")}
             </span>
           ) : milestone.rewardAffordable ? (
             <span className="text-micro text-muted">{t("progress.potCovers")}</span>

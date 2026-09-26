@@ -60,9 +60,19 @@ development server**, item by item, each with its own verdict file. Built on
   account under Delade måltider with its photo and "från Testkocken" and no
   e-mail, logged at one portion (which copied it, photo included, and wrote the
   day from the copy), reported; Administration, Anmälningar, listed it and
-  stopped sharing it; the reader's copy stayed. 32 of 32. The deletion path is
-  held by the API suite and was not run against this database, whose rows this
-  project does not delete.
+  stopped sharing it; the reader's copy stayed. 32 of 32.
+- **Sharing, the deletion path** (D192), 2026-09-26, with two throwaway
+  accounts made for it from administrator invites: the author shared a meal
+  with a photo, the reader saved a copy, logged it once and reported the
+  original, and the author deleted their account from Inställningar with the
+  password and the address typed out. The share left the reader's "Delade
+  måltider"; the copy stayed with its photo and "från Raderakocken"; the
+  reader's day was unchanged row for row; the report went with the meal. The
+  reader was then deleted the same way and neither could sign in. 30 of 30,
+  run twice, the second time after the fix below. Nothing else was deleted.
+  It found "1 foton" and "1 matrader" on the deletion sheet: every sentence
+  that opens with its count now goes through `plural()`, held by
+  `i18n.test.ts`.
 - **Small items**: the tagline's words 500 ms apart, measured (`docs/
   measurements.md`, seventh pass); the raw phone screenshots taken again with
   the current date format, 3 of 3; §7 names error class ten and the release
@@ -464,6 +474,7 @@ green before the command is started. Push nothing between starting it and step 7
 | **A photo on a meal** (D191) | one each, kept on the server in your own folder, in the export and in the backups |
 | **Sharing** (D192) | with a display name set in Profil, a meal can be shared with everyone on this installation. "Delade måltider" lists them; saving or logging one makes it your own copy. Reports go to Administration, Anmälningar |
 | **Export** (D191) | "Allt, med foton, som zip" under Inställningar |
+| **One is singular** (D192) | "1 foto", "1 matrad", "1 rad loggad", "Spara 1 rad": every count that opens a sentence, and the ones inside a sentence that can be one, where the deletion sheet said "1 foton" |
 
 Not in 1.3.0: **import from a photo of a recipe** (item 8 of the brief). It
 starts with a probe on a real recipe page, and there is none among the

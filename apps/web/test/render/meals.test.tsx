@@ -217,7 +217,7 @@ describe("spara som måltid, beside logga", () => {
     expect(saved[0]!.rows).toEqual([
       expect.objectContaining({ foodItemId: "00000000-0000-0000-0000-0000000000f2", grams: 40 }),
     ]);
-    expect(screen.getByRole("status").textContent).toContain("1 rader utan träff");
+    expect(screen.getByRole("status").textContent).toContain("1 rad utan träff");
   });
 
   it("is absent in collect mode, where the rows join a meal already being made", () => {

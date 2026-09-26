@@ -9,7 +9,7 @@ import {
   useUpdateSavingsRule,
 } from "../lib/progress.js";
 import { ApiError } from "../lib/api.js";
-import { t, type TranslationKey } from "../i18n/index.js";
+import { plural, t, type TranslationKey } from "../i18n/index.js";
 
 /**
  * The rules behind the pot, editable and deletable.
@@ -132,7 +132,7 @@ function RuleRow({ rule, today }: { rule: SavingsRuleDto; today: string }) {
         <span className="min-w-0">
           <span className="block truncate text-note text-ink">{rule.label}</span>
           <span className="num block text-micro text-muted">
-            {t("pot.ruleSummary", {
+            {plural(rule.eligibleDays, "pot.ruleSummaryOne", "pot.ruleSummary", {
               amount: formatSek(rule.amountSek),
               cadence: t(`cadence.${rule.cadence}` as TranslationKey),
               days: rule.eligibleDays,

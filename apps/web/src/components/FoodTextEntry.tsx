@@ -9,7 +9,7 @@ import {
 import { clientUuid } from "../lib/uuid.js";
 import { EstimateEntry } from "./EstimateEntry.js";
 import { ParsedProposal, type ProposalItem } from "./ParsedProposal.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * The meal sheet's use of this entry (D186): the confirm button adds the
@@ -204,7 +204,7 @@ export function FoodTextEntry({
               return;
             }
             await confirm.mutateAsync({ localDate, mealSlot: "snack", items: rows });
-            onLogged(t("llm.logged", { count: rows.length }));
+            onLogged(plural(rows.length, "llm.loggedOne", "llm.logged"));
           }}
           onCancel={reset}
           onReject={() => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Sheet } from "./Sheet.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * Leaving, from Inställningar (D107).
@@ -123,10 +123,10 @@ export function DeleteAccount() {
           <>
             <p className="text-body text-ink">{t("account.deleteRows")}</p>
             <ul className="num mt-3 space-y-1 text-note text-muted">
-              <li>{t("account.deleteWeights", { n: preview.weights })}</li>
-              <li>{t("account.deleteFood", { n: preview.foodEntries })}</li>
-              <li>{t("account.deleteDays", { n: preview.dailyLogs })}</li>
-              <li>{t("account.deletePhotos", { n: preview.photos })}</li>
+              <li>{plural(preview.weights, "account.deleteWeightsOne", "account.deleteWeights")}</li>
+              <li>{plural(preview.foodEntries, "account.deleteFoodOne", "account.deleteFood")}</li>
+              <li>{plural(preview.dailyLogs, "account.deleteDaysOne", "account.deleteDays")}</li>
+              <li>{plural(preview.photos, "account.deletePhotosOne", "account.deletePhotos")}</li>
             </ul>
 
             <label className="mt-6 block text-micro text-muted">

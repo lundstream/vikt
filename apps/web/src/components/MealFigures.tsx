@@ -1,6 +1,6 @@
 import type { MealNutritionResponse } from "shared";
 import { formatDecimal, formatKcal } from "shared";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 const KEYS = ["protein", "carbs", "fat", "fiber"] as const;
 
@@ -15,7 +15,7 @@ const LABEL = {
 export function formatPortions(portions: number): string {
   const decimals = Number.isInteger(portions) ? 0 : Number.isInteger(portions * 10) ? 1 : 2;
   const figure = formatDecimal(portions, { decimals });
-  return portions === 1 ? t("meals.portionOne") : t("meals.portionMany", { count: figure });
+  return plural(portions, "meals.portionOne", "meals.portionMany", { count: figure });
 }
 
 /**

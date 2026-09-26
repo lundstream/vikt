@@ -58,9 +58,13 @@ export const sv = {
   "account.deleteStart": "Radera kontot",
   "account.deleteRows": "Det här tas bort",
   "account.deleteWeights": "{n} vägningar",
+  "account.deleteWeightsOne": "1 vägning",
   "account.deleteFood": "{n} matrader",
+  "account.deleteFoodOne": "1 matrad",
   "account.deleteDays": "{n} dagar",
+  "account.deleteDaysOne": "1 dag",
   "account.deletePhotos": "{n} foton",
+  "account.deletePhotosOne": "1 foto",
   "account.passwordToConfirm": "Ditt lösenord",
   "account.typeEmailToConfirm": "Skriv din mejladress för att bekräfta",
   "admin.revokeConfirmBody":
@@ -366,6 +370,7 @@ export const sv = {
   "progress.claimed": "Uttagen",
   "progress.potCovers": "Potten räcker",
   "progress.potIn": "Potten räcker om {days} dagar",
+  "progress.potInOne": "Potten räcker om 1 dag",
   "progress.projected": "Beräknat {date}",
   "progress.achievedOn": "Nådd {date}",
   "progress.remaining": "{remaining} kvar",
@@ -479,6 +484,7 @@ export const sv = {
     "Samtalen sparas på ditt konto, visas bara för dig och används inte till något annat. De följer med i exporten och försvinner med kontot.",
   "coach.noHistory": "Inga samtal än.",
   "coach.turns": "{count} rader, senast {date}",
+  "coach.turnsOne": "1 rad, senast {date}",
   "coach.forget": "Ta bort",
   "coach.forgetAll": "Ta bort alla samtal",
   "coach.forgetAllTitle": "Ta bort alla samtal?",
@@ -552,7 +558,9 @@ export const sv = {
   "push.timeWeekend": "Tid på helgen",
   "push.test": "Skicka en testnotis",
   "push.testing": "Skickar…",
-  "push.testSent": "Skickad till {count} enhet. Kommer den inte fram är det enheten som blockerar den.",
+  "push.testSent": "Skickad till {count} enheter. Kommer den inte fram är det enheten som blockerar den.",
+  "push.testSentOne":
+    "Skickad till 1 enhet. Kommer den inte fram är det enheten som blockerar den.",
   "push.testNone": "Ingen enhet tog emot den. Anslut den här enheten först.",
   "push.testFailed": "Det gick inte att skicka just nu.",
   "push.forget": "Ta bort",
@@ -654,9 +662,13 @@ export const sv = {
   "admin.deleteUser": "Ta bort konto",
   "admin.deleteWhat": "Det här tas bort för {email}",
   "admin.deleteWeights": "{n} vägningar",
+  "admin.deleteWeightsOne": "1 vägning",
   "admin.deleteFood": "{n} matrader",
+  "admin.deleteFoodOne": "1 matrad",
   "admin.deleteDays": "{n} dagar",
+  "admin.deleteDaysOne": "1 dag",
   "admin.deletePhotos": "{n} foton",
+  "admin.deletePhotosOne": "1 foto",
   "admin.deleteConfirm": "Ta bort för alltid",
   "admin.deleteDone": "{email} är borttaget.",
   "admin.adminCannotDeleteSelf": "Du kan inte ta bort ditt eget konto här.",
@@ -677,6 +689,8 @@ export const sv = {
   "admin.workerSent": "Skickade sedan starten",
   "admin.workerStalled":
     "Ingenting tömmer kön just nu, och {n} meddelanden väntar. Kontrollera att API:t kör och att MAIL_WORKER_IN_PROCESS inte är avstängt.",
+  "admin.workerStalledOne":
+    "Ingenting tömmer kön just nu, och 1 meddelande väntar. Kontrollera att API:t kör och att MAIL_WORKER_IN_PROCESS inte är avstängt.",
 
   /* --- admin: the audit log ----------------------------------------------- */
   "admin.noLog": "Inget loggat än.",
@@ -794,6 +808,7 @@ export const sv = {
     "Att lägga tillbaka en backup i den databas som körs är ett kommando, inte en knapp: se docs/backup.md. Det är den enda åtgärden som förstör en databas genom att lyckas, och den ska kräva att någon skriver den. Återställningstestet ovan rör aldrig den databasen.",
   "backup.restoreCheck": "Senaste återställningstest",
   "backup.photos": "{count} foton",
+  "backup.photosOne": "1 foto",
   "backup.restoreCheckOk": "{date}, gick att läsa in: {tables} tabeller, {rows} rader",
   "backup.restoreCheckFailed": "{date}, gick inte att läsa in",
   "backup.restoreCheckRunning": "pågår, startade {date}",
@@ -1006,6 +1021,7 @@ export const sv = {
   "corr.moreDays": "{days} dagar till innan det är värt att titta på.",
   "corr.oneMoreDay": "En dag till innan det är värt att titta på.",
   "corr.halfLogged": "{days} dagar har bara det ena värdet och räknas inte med.",
+  "corr.halfLoggedOne": "1 dag har bara det ena värdet och räknas inte med.",
   "corr.startLogging": "Börja med att fylla i dagen, så byggs det här upp av sig självt.",
   // The standing caveat. Not a warning about these charts; a statement of what
   // any chart of this kind can and cannot show.
@@ -1108,6 +1124,7 @@ export const sv = {
   "insights.noMovement": "Trendlinjen har inte rört sig tillräckligt för att räkna fram en takt.",
   "insights.alreadyThere": "Redan framme.",
   "insights.daysCount": "{days} dagar",
+  "insights.daysCountOne": "1 dag",
 
   // ---------------------------------------------------------- plan review
   "review.title": "Din plan bygger på en siffra som ändrats",
@@ -1156,12 +1173,16 @@ export const sv = {
   // screen. Saying how many is more use than naming them all in a toast.
   "llm.someWithoutAmount":
     "{count} rader saknar mängd och sparades inte. Fyll i mängden, eller ta bort raden.",
+  "llm.someWithoutAmountOne":
+    "1 rad saknar mängd och sparades inte. Fyll i mängden, eller ta bort raden.",
   "llm.noneWithAmount": "Ingen rad har någon mängd än. Fyll i minst en.",
   "llm.include": "Ta med {name}",
   "llm.saveRows": "Spara {count} rader",
+  "llm.saveRowsOne": "Spara 1 rad",
   "llm.nothingFound": "Hittade ingen mat i texten. Skriv om den, eller sök upp maten själv.",
   "llm.unavailableNow": "Tolkningen är inte igång just nu. Sök upp maten själv så länge.",
   "llm.logged": "{count} rader loggade",
+  "llm.loggedOne": "1 rad loggad",
 
   // ------------------------------------------------ maten som fotografi (D143)
   "photo.take": "Fotografera maten",
@@ -1264,6 +1285,7 @@ export const sv = {
   "food.copyingDay": "Loggar…",
   "food.copiedToToday": "{name} loggad i dag.",
   "food.copiedDay": "{n} rader loggade i dag.",
+  "food.copiedDayOne": "1 rad loggad i dag.",
   "food.copiedDayPartial": "{n} av {total} rader loggades i dag. Resten ligger kvar på dagen du tittar på.",
   "food.again": "Igen",
   "food.allMeals": "alla måltider",
@@ -1326,6 +1348,7 @@ export const sv = {
   "label.needMacros": "Fett, kolhydrat och protein står på alla etiketter. Skriv av dem från förpackningen.",
   "label.notANumber": "En av siffrorna är inte ett tal.",
   "label.stillToConfirm": "{count} siffror kvar att bekräfta.",
+  "label.stillToConfirmOne": "1 siffra kvar att bekräfta.",
   "label.save": "Spara livsmedlet",
   "label.again": "Ta en ny bild",
   "label.saved": "{name} sparad från etiketten",
@@ -1365,8 +1388,10 @@ export const sv = {
   "meals.comesTo": "blir {grams} g, {kcal} kcal",
   "meals.addRow": "Lägg till",
   "meals.addRows": "Lägg till {count} rader",
+  "meals.addRowsOne": "Lägg till 1 rad",
   "meals.rowAdded": "{name} tillagd",
   "meals.rowsAdded": "{count} rader tillagda",
+  "meals.rowsAddedOne": "1 rad tillagd",
   "meals.rowGone": "livsmedlet finns inte längre, räknas inte",
   "meals.changeAmount": "ändra",
   "meals.removeRow": "ta bort",
@@ -1405,9 +1430,12 @@ export const sv = {
   "meals.saveAsMeal": "Spara som måltid",
   "meals.savedAsMeal": "Sparad som måltid: {name}",
   "meals.savedAsMealWithout": "Sparad som måltid: {name}. {count} rader utan träff i matdatabasen kom inte med.",
+  "meals.savedAsMealWithoutOne":
+    "Sparad som måltid: {name}. 1 rad utan träff i matdatabasen kom inte med.",
   "meals.cannotTake": "Ingen träff i matdatabasen, så raden kan inte bli en del av en måltid.",
   "meals.noneMatched": "Ingen av raderna har en träff i matdatabasen att räkna på.",
   "meals.unmatchedLeft": "{count} rader utan träff ligger kvar. De kan inte tas med i en måltid.",
+  "meals.unmatchedLeftOne": "1 rad utan träff ligger kvar. Den kan inte tas med i en måltid.",
   "food.cameraView": "Kameravy för streckkodsläsning",
   "food.scanHint": "Rikta kameran mot streckkoden",
   "food.cameraStarting": "Startar kameran…",
@@ -1570,6 +1598,7 @@ export const sv = {
   // ------------------------------------------------ savings rules, editing
   "pot.startDate": "Från",
   "pot.ruleSummary": "{amount} {cadence} · {days} dagar",
+  "pot.ruleSummaryOne": "{amount} {cadence} · 1 dag",
   "pot.reviewChange": "Granska ändringen",
   "pot.deleteRule": "Ta bort regeln",
   "pot.confirmEditTitle": "Så här ändras potten",

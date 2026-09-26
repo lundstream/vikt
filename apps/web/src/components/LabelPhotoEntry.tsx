@@ -5,7 +5,7 @@ import { useCreateLabelFood, useReadLabel } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
 import { readRequiredNumber } from "../lib/form-number.js";
 import { ApiError } from "../lib/api.js";
-import { t, type TranslationKey } from "../i18n/index.js";
+import { plural, t, type TranslationKey } from "../i18n/index.js";
 
 /**
  * Photographing a nutrition declaration (Phase 14, D190).
@@ -351,7 +351,7 @@ export function LabelPhotoEntry({
           <p className="mt-1 text-micro text-muted">{t("label.notANumber")}</p>
         ) : check?.ok && unconfirmed.length > 0 ? (
           <p className="mt-1 text-micro text-muted" data-testid="label-unconfirmed">
-            {t("label.stillToConfirm", { count: unconfirmed.length })}
+            {plural(unconfirmed.length, "label.stillToConfirmOne", "label.stillToConfirm")}
           </p>
         ) : null}
         {error ? (

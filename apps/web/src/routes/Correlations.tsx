@@ -406,7 +406,7 @@ function PreData({
       </p>
       {pane.unpairedDays > 0 ? (
         <p className="mt-2 text-micro text-muted">
-          {t("corr.halfLogged", { days: pane.unpairedDays })}
+          {plural(pane.unpairedDays, "corr.halfLoggedOne", "corr.halfLogged")}
         </p>
       ) : null}
       {dailyLogDays === 0 ? (

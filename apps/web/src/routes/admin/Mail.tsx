@@ -1,4 +1,4 @@
-import { LOCALE, t, type TranslationKey } from "../../i18n/index.js";
+import { LOCALE, plural, t, type TranslationKey } from "../../i18n/index.js";
 import { useAdminMail, useRetryMail } from "./api.js";
 
 /**
@@ -62,7 +62,7 @@ export function Mail() {
 
       {stalled && pending > 0 ? (
         <p className="mb-6 max-w-prose text-note text-ink" data-testid="worker-stalled">
-          {t("admin.workerStalled", { n: pending })}
+          {plural(pending, "admin.workerStalledOne", "admin.workerStalled")}
         </p>
       ) : null}
 
@@ -87,7 +87,7 @@ export function Mail() {
                 <span className="flex shrink-0 items-baseline gap-4">
                   <span className="num text-micro text-muted">
                     {t(`admin.mail.${row.status}` as TranslationKey)}
-                    {row.attempts > 0 ? ` · ${t("queue.attempts", { n: row.attempts })}` : ""}
+                    {row.attempts > 0 ? ` · ${plural(row.attempts, "queue.attemptOne", "queue.attempts")}` : ""}
                   </span>
 
                   {/*

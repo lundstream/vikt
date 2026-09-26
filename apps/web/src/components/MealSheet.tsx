@@ -15,7 +15,7 @@ import {
 import { preparePhoto } from "../lib/photo.js";
 import { useMe } from "../lib/session.js";
 import { formatLongDay } from "../lib/dates.js";
-import { LOCALE } from "../i18n/index.js";
+import { LOCALE, plural } from "../i18n/index.js";
 import { api, ApiError } from "../lib/api.js";
 import { useOnline } from "../lib/queue/useQueue.js";
 import { readRequiredNumber } from "../lib/form-number.js";
@@ -272,7 +272,7 @@ export function MealSheet({
       })),
     ]);
     setTool(null);
-    setNote(t("meals.rowsAdded", { count: added.length }));
+    setNote(plural(added.length, "meals.rowsAddedOne", "meals.rowsAdded"));
   }
 
   async function onBarcode(code: string) {
@@ -625,7 +625,7 @@ export function MealSheet({
               localDate=""
               onLogged={setNote}
               collect={{
-                label: (count) => t("meals.addRows", { count }),
+                label: (count) => plural(count, "meals.addRowsOne", "meals.addRows"),
                 onRows: addProposed,
               }}
               onEstimate={(item) => {
@@ -642,7 +642,7 @@ export function MealSheet({
               localDate=""
               onLogged={setNote}
               collect={{
-                label: (count) => t("meals.addRows", { count }),
+                label: (count) => plural(count, "meals.addRowsOne", "meals.addRows"),
                 onRows: addProposed,
               }}
             />

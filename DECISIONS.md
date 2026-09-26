@@ -10918,9 +10918,27 @@ author's own shared meal is "delad" in the neutral state style: sharing is not
 logging, so it does not borrow Gran.
 
 **Deleting an account removes its shares**, because they cascade with its
-meals, and removes nothing a reader copied. Tested in the API suite; not
-exercised against the development database, whose rows this project does not
-delete.
+meals, and removes nothing a reader copied. Tested in the API suite, and
+exercised through the interface on 2026-09-26 with two throwaway accounts
+created for it from administrator invites and deleted the same way afterwards:
+the author set a display name and shared a meal with a photo; the reader saved
+a copy, logged it once from Mat and reported the original. The author deleted
+their account from Inställningar with the password and the address typed out.
+The share was gone from the reader's "Delade måltider"; the reader's copy
+remained, with its photo (its own file in the reader's folder, loading) and
+"från Raderakocken"; the reader's day was unchanged row for row, and Mat still
+read "Raderagryta · 1 portion" above its row. The report went with the meal
+(`meal_reports.meal_id` cascades), so Anmälningar no longer listed it, which is
+right: there is nothing left to unshare. The author's photo folder was gone. The
+reader then deleted their account the same way, and neither could sign in.
+Nothing else in the development database was deleted.
+
+The exercise found "1 foton" and "1 matrader" on the deletion sheet: counts
+handed to `t()` while `plural()` sat beside them (§7, class 2). Every sentence
+that opens with its count now goes through `plural()`, and `i18n.test.ts` fails
+one that does not; the test was seen failing on the old call before it passed.
+A render test had pinned "1 rader utan träff" as expected and now expects
+"1 rad".
 
 **Exercised through the interface** with two accounts: a display name set in
 Profil, a meal shared from its sheet after the confirmation, marked "delad" in

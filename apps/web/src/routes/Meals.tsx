@@ -10,7 +10,7 @@ import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
 import { SharedMealSheet } from "../components/SharedMealSheet.js";
 import { Sheet } from "../components/Sheet.js";
 import { ActionButton, newMealIcon, potIcon, type QuickAction } from "../components/QuickActions.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * Måltider (Phase 14, D187): the person's own dishes, per portion.
@@ -136,9 +136,7 @@ export function Meals() {
                       <span className="num block text-micro text-muted">
                         {formatPortions(meal.portions)}
                         {" · "}
-                        {meal.items.length === 1
-                          ? t("food.itemOne")
-                          : t("food.itemMany", { count: meal.items.length })}
+                        {plural(meal.items.length, "food.itemOne", "food.itemMany")}
                         {meal.copiedFromName
                           ? ` · ${t("meals.fromAuthor", { name: meal.copiedFromName })}`
                           : ""}

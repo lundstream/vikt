@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDecimal } from "shared";
 import { formatLongDay } from "../../lib/dates.js";
-import { LOCALE, t } from "../../i18n/index.js";
+import { LOCALE, plural, t } from "../../i18n/index.js";
 
 /**
  * Backups (D103).
@@ -89,7 +89,7 @@ function restoreCheckLine(check: RestoreCheck | null): string {
     rows: formatDecimal(check.rows ?? 0, { decimals: 0 }),
   });
   return typeof check.mediaFiles === "number"
-    ? `${line}, ${t("backup.photos", { count: formatDecimal(check.mediaFiles, { decimals: 0 }) })}`
+    ? `${line}, ${plural(check.mediaFiles, "backup.photosOne", "backup.photos", { count: formatDecimal(check.mediaFiles, { decimals: 0 }) })}`
     : line;
 }
 
@@ -309,7 +309,7 @@ export function Backup() {
                 last.status === "ok"
                   ? ` · ${formatBytes(last.bytes)}${
                       typeof last.mediaFiles === "number"
-                        ? ` · ${t("backup.photos", { count: formatDecimal(last.mediaFiles, { decimals: 0 }) })}`
+                        ? ` · ${plural(last.mediaFiles, "backup.photosOne", "backup.photos", { count: formatDecimal(last.mediaFiles, { decimals: 0 }) })}`
                         : ""
                     }`
                   : ` · ${t("backup.failed")}`

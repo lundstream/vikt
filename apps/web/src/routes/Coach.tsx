@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { COACH_QUESTION_MAX, LOCALE, type CoachEvent } from "shared";
 import { formatLongDay } from "../lib/dates.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 import { useLlmHealth } from "../lib/food.js";
 import { useMe } from "../lib/session.js";
 import { useLogDate } from "../lib/log-date.js";
@@ -351,7 +351,7 @@ export function Coach() {
                 >
                   <span className="block truncate text-note text-ink">{conversation.title}</span>
                   <span className="num block text-micro text-muted">
-                    {t("coach.turns", {
+                    {plural(conversation.messages, "coach.turnsOne", "coach.turns", {
                       count: String(conversation.messages),
                       date: conversation.lastMessageAt.slice(0, 10),
                     })}

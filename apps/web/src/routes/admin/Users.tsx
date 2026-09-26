@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatLongDay } from "../../lib/dates.js";
-import { LOCALE, t } from "../../i18n/index.js";
+import { LOCALE, plural, t } from "../../i18n/index.js";
 import { useMe } from "../../lib/session.js";
 import { Sheet } from "../../components/Sheet.js";
 import { ConfirmSheet } from "../../components/ConfirmSheet.js";
@@ -240,10 +240,10 @@ function DeleteSheet({
           </p>
 
           <ul className="num mt-3 space-y-1 text-note text-muted">
-            <li>{t("admin.deleteWeights", { n: pending.preview.weights })}</li>
-            <li>{t("admin.deleteFood", { n: pending.preview.foodEntries })}</li>
-            <li>{t("admin.deleteDays", { n: pending.preview.dailyLogs })}</li>
-            <li>{t("admin.deletePhotos", { n: pending.preview.photos })}</li>
+            <li>{plural(pending.preview.weights, "admin.deleteWeightsOne", "admin.deleteWeights")}</li>
+            <li>{plural(pending.preview.foodEntries, "admin.deleteFoodOne", "admin.deleteFood")}</li>
+            <li>{plural(pending.preview.dailyLogs, "admin.deleteDaysOne", "admin.deleteDays")}</li>
+            <li>{plural(pending.preview.photos, "admin.deletePhotosOne", "admin.deletePhotos")}</li>
           </ul>
 
           {/*

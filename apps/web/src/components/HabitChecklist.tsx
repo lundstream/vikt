@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { HabitDay } from "shared";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 import { useCheckHabit, useCreateHabit } from "../lib/habits.js";
 import { useMe } from "../lib/session.js";
 import { HabitIconGlyph } from "./habit-icons.js";
@@ -147,9 +147,7 @@ export function HabitChecklist({
                     </span>
                     {habit.streak.days > 0 ? (
                       <span className="num mt-0.5 block text-micro text-muted">
-                        {habit.streak.days === 1
-                          ? t("habit.streakOne")
-                          : t("habit.streakDays", { days: String(habit.streak.days) })}
+                        {plural(habit.streak.days, "habit.streakOne", "habit.streakDays")}
                       </span>
                     ) : null}
                   </span>

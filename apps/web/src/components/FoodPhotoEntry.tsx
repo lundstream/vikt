@@ -5,7 +5,7 @@ import { useConfirmParsedFood, useParseFoodPhoto } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
 import { ParsedProposal } from "./ParsedProposal.js";
 import { useSaveProposalAsMeal, type CollectRows } from "./FoodTextEntry.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * Logging a meal by photographing it (D143).
@@ -177,7 +177,7 @@ export function FoodPhotoEntry({
               // the coverage counts them; what is less certain is the naming.
               confidence: PHOTO_CONFIDENCE,
             });
-            onLogged(t("llm.logged", { count: rows.length }));
+            onLogged(plural(rows.length, "llm.loggedOne", "llm.logged"));
           }}
           onCancel={() => setProposal(null)}
         />

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { LOCALE, t, translationKeys } from "../src/i18n/index.js";
+import { LOCALE, plural, t, translationKeys } from "../src/i18n/index.js";
 import { habitReminderBody, REMINDER_TEXT } from "shared";
 import { sv, type TranslationKey } from "../src/i18n/sv.js";
 import { ENDPOINTS } from "../src/lib/queue/sync.js";
@@ -115,6 +115,64 @@ describe("the translation layer", () => {
 
   it("formats dates and numbers in the same locale as the copy", () => {
     expect(LOCALE).toBe("sv-SE");
+  });
+});
+
+/**
+ * "1 foton" on the deletion sheet, found exercising 1.3.0 (§7, class 2): a
+ * sentence that opens with its count, handed to `t()` directly while `plural()`
+ * sat unused beside it. Such a sentence goes through `plural()`, and the key it
+ * falls back to for one exists and carries no count.
+ *
+ * Only sentences that **open** with the number. A count inside a sentence is
+ * mostly a window ("över {days} dagar", seven days and up) and was checked by
+ * hand when this was written; the ones that can be one ("Spara {count} rader",
+ * "Potten räcker om {days} dagar") go through `plural()` as well.
+ */
+describe("counts", () => {
+  const OPENS_WITH_COUNT = /^\{(n|count|days)\} (?!av )\p{L}/u;
+  const counted = (Object.entries(sv) as [string, string][])
+    .filter(([, value]) => OPENS_WITH_COUNT.test(value))
+    .map(([key]) => key);
+
+  const pairs: { one: string; many: string; file: string }[] = [];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(/\bplural\(\s*[^,]+,\s*"([^"]+)",\s*"([^"]+)"/g)) {
+      pairs.push({ one: match[1]!, many: match[2]!, file: path.relative(WEB_SRC, file) });
+    }
+  }
+
+  it("finds the sentences it is about", () => {
+    expect(counted).toContain("account.deletePhotos");
+    expect(counted.length).toBeGreaterThan(20);
+  });
+
+  it("never hands a sentence that opens with its count to t() directly", () => {
+    const direct = referencedKeys()
+      .filter((ref) => counted.includes(ref.key))
+      .map((ref) => `${ref.key} (${ref.file})`);
+    expect(direct).toEqual([]);
+  });
+
+  it("gives each of them a singular without the count", () => {
+    const many = new Set(pairs.map((pair) => pair.many));
+    expect(counted.filter((key) => !many.has(key))).toEqual([]);
+    for (const pair of pairs) {
+      expect(sv, `${pair.one} (${pair.file})`).toHaveProperty([pair.one]);
+      expect(sv[pair.one as TranslationKey], pair.one).not.toMatch(/\{(n|count|days)\}/);
+    }
+  });
+
+  it("lets a formatted figure stand in the sentence while the number picks the form", () => {
+    expect(plural(1, "account.deletePhotosOne", "account.deletePhotos")).toBe("1 foto");
+    expect(plural(0, "account.deletePhotosOne", "account.deletePhotos")).toBe("0 foton");
+    expect(plural(1.5, "meals.portionOne", "meals.portionMany", { count: "1,5" })).toBe(
+      "1,5 portioner",
+    );
+    expect(plural(1, "coach.turnsOne", "coach.turns", { date: "2026-09-26" })).toBe(
+      "1 rad, senast 2026-09-26",
+    );
   });
 });
 

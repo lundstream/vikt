@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMe } from "../lib/session.js";
 import { useHabits } from "../lib/habits.js";
-import { t } from "../i18n/index.js";
+import { plural, t } from "../i18n/index.js";
 
 /**
  * The two reminders, and the permission they need (D136).
@@ -214,7 +214,7 @@ export function Reminders() {
     onSuccess: (result) => {
       setNotice(
         result.sent > 0
-          ? t("push.testSent", { count: String(result.sent) })
+          ? plural(result.sent, "push.testSentOne", "push.testSent")
           : t("push.testNone"),
       );
       void queryClient.invalidateQueries({ queryKey: ["push", "subscriptions"] });

@@ -53,7 +53,7 @@ import {
   type QuickAction,
 } from "../components/QuickActions.js";
 import {
-  type TranslationKey, LOCALE, t } from "../i18n/index.js";
+  type TranslationKey, LOCALE, plural, t } from "../i18n/index.js";
 
 /**
  * The logging screen.
@@ -442,7 +442,7 @@ export function FoodLog() {
         });
         copied += 1;
       }
-      announce(t("food.copiedDay", { n: copied }));
+      announce(plural(copied, "food.copiedDayOne", "food.copiedDay"));
     } catch (error) {
       announce(
         copied === 0
