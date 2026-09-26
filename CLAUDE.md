@@ -802,6 +802,15 @@ a commit on `main` is a commit that the next redeploy ships.
     asserts the token appears in none of stdout, stderr or any file under the
     directories the helper was given.
 
+- **The owner's network addresses live in `INFRA.md`, which is local, and
+  never in a tracked file.** Not the host, not the workstation, not Portainer,
+  not in prose, a test, a default or an example: the repository is public, and
+  a LAN address in it is a map of somebody's house. Tests and examples use the
+  documentation ranges of RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`,
+  `203.0.113.0/24`), which route nowhere by definition, and a script that needs
+  a real address reads it from the environment by name, like a credential.
+  1.3.0's record put two into STATE.md (`829daf5`); the published history keeps
+  them and is not rewritten.
 - **Restart the development server when a change needs it.** Do not ask first and do
   not work around a stale one. Tailwind resolves its config at boot, Vite resolves its
   dependencies at boot, and neither notices a file it read once. A green `pnpm build`
@@ -834,6 +843,14 @@ a commit on `main` is a commit that the next redeploy ships.
     command reads that block and nothing else, so prose may mention `--set`
     freely. No block means no variables; two blocks, or a line it cannot read,
     stop it before step 1 (D194).
+  - **A red check before a production step is never read as harmless and
+    passed.** Either stop and report it, or fix the check, run it again and get
+    it green before the step it guards. The 1.3.0 dry run stopped at step 9 on
+    the release's own images, which a dry run cannot have built; the session
+    read that correctly and the real run asked the same question again after
+    the build, but whether a red check is harmless is the owner's call, not the
+    session's. The fix it needed (D194) was the second option, done afterwards;
+    done first, the release would have started from a green dry run.
 - Update `STATE.md` with what changed, what is half-done, and the next intended step, before ending a session.
 - **`STATE.md`'s current-state section describes only what was exercised through the interface in that session.** Work that exists as API only is listed under its own heading, **API without a screen**, until a screen calls it. D95 described eight admin capabilities as though they were screens; all eight were endpoints with tests and none of them was reachable by clicking. That is the same failure as the lint claim in D98 — a summary written from what was built rather than from what was checked — and both survived because nothing separated the two.
 - Any architectural choice that took thought goes in `DECISIONS.md` with the reasoning and the rejected alternatives.
