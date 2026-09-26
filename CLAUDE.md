@@ -887,11 +887,45 @@ a commit on `main` is a commit that the next redeploy ships.
     "this did not finish".
   - **`process.exitCode`, never `process.exit()`.** The second ends the process
     immediately and takes unflushed output with it.
+- **Recurring error classes.** Mistakes this project has made more than once,
+  numbered so a review can name one in a word. Each has cost at least one
+  release or one pass, and each has a guard or a rule somewhere in this file;
+  the list is what to look for before those catch it.
+  1. **A numerator and a denominator taken over different spans.** Three
+     arithmetic bugs in §4.1 and §4.2 were one mistake: an unlogged day counted
+     in the denominator and not the numerator, invisible at full daily coverage
+     because every fixture had it (D23).
+  2. **A shared function exists and call sites go around it.** Intake had one
+     definition and four call sites built their own (D44, D47); colours were
+     picked by eye beside the semantic tokens; numbers were formatted with
+     `toFixed` beside the formatter; dates printed raw beside `formatLongDay`,
+     most recently the day line on Mat in 1.3.
+  3. **A test that has never run, or that asks the wrong question.** The SMB
+     destination's eleven tests all hit a refused port and never reached
+     authentication (D133); a skipped test is silent, which is why CI refuses
+     one.
+  4. **A report written from what was built rather than from what was
+     checked.** Eight admin capabilities described as screens that were
+     endpoints (D95), "lint clean" on a commit with 27 errors (D98). The
+     "exercised through the interface" rule below exists for it.
+  5. **A day boundary taken from the machine's clock instead of the person's
+     time zone** (§3). Latest case: `seed:dev` wrote today's rows by UTC, so
+     the seeded account had no "today" in the evening in Stockholm.
+  6. **Secure-context APIs that are missing over http.** `crypto.randomUUID` is
+     undefined on a LAN address without a certificate, which is exactly how a
+     phone first reaches a new install (D18); the camera, the service worker
+     and push are the same kind of thing.
+  7. **A nullable foreign key used as a state flag.** Deleting a user
+     un-burned their invite code and made it valid again (§3, D17).
+  8. **Verification with the wrong client.** curl says 200 where a browser
+     hangs; a desktop headless run passes where a phone's decoder or camera
+     behaves differently. Check with the thing that will actually load it.
+  9. **A new entity shipped without edit and remove.** Four times before §3
+     made it a rule: weight, food and daily logs; savings rules; milestones.
 - **Recurring error class ten: a check that answers the question adjacent to
   the one it was asked.** It passes, it is green, and it is about something
   next to the thing that mattered, so nothing looks wrong until the real world
-  asks the real question. (Numbered as the owner counts them; one to nine are not
-  written into this file.) The seven cases D183 found in one release:
+  asks the real question. The seven cases D183 found in one release:
   - *this tag's workflow run*, answered by the newest run of that workflow;
   - *CI for the commit being released*, answered by CI for `dev`'s tip;
   - *is `a21224c` green*, answered by whether `a21224c` equals a forty-character sha;
@@ -905,4 +939,22 @@ a commit on `main` is a commit that the next redeploy ships.
   writing the check, and to test it against a world that differs from the
   fixture in the way the adjacent answer would miss: a tag whose run has not
   registered yet, a tip that moved, a short sha, a label containing the word.
+- **A candidate, not yet numbered: a script that can only run where it does not
+  exist, and a test against a double that misses the seam with the outside
+  world.** `news:publish` ran through `tsx`, which a production image does not
+  have (D183, the seventh); the browser harness lived in a temporary folder and
+  had to be rebuilt from a transcript when the folder was cleared, which is now
+  `scripts/harness/`. It gets a number when it happens a third time.
+- **Time is spent where the answer is.**
+  - After a screenshot sweep, **read its verdict file**, not the images: every
+    check it made is a line in it (see the harness rules above). Open only the
+    screenshots of screens the current item changed.
+  - **Run Lighthouse only when the landing page's code changed, or at a
+    release.** Its figures move with nothing else, and a run costs minutes.
+- **The session report is a file.** The closing report is also written to
+  `docs/reports/<YYYY-MM-DD>-<short-slug>.md`, with the same text as the reply
+  plus the summary lines of the closing sweep's `verdict.txt`, and committed and
+  pushed as the session's last commit. **The repository is public**, so a
+  report never contains a secret, a token, a password or the contents of an
+  environment, and it names a credential only by its variable name.
 - Before implementing a phase, re-read section 3 and section 4. The math and the isolation rules are where this project can quietly go wrong.
