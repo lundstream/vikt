@@ -130,11 +130,11 @@ development server**, item by item, each with its own verdict file. Released as
   without `capture`. 30 of 30.
 - **The meal photo's line** (D201): "Bara du ser det, om du inte delar
   måltiden." in the sheet at 360 px and desktop, 4 of 4.
-- **The closing sweep, 2026-09-26, after the 1.4.0 release**: `pnpm
+- **The closing sweep, 2026-09-26, after the 1.4.1 release**: `pnpm
   harness:sweep` over every finished screen at 360 px and desktop, **45 of 45**
   with the sign-in; both landing rows `landing-ok=sentence15/meta13/gap64`,
   6 796 px at 360 and 5 206 at desktop, unchanged. CI green on `dev` at
-  `3fe7f05`.
+  `6d5d409`.
 
 - **Phases 0 to 6 are built and used daily**: invite-only auth, the weight log
   and trend line, adaptive TDEE and projections, the food database with barcode
@@ -1103,7 +1103,8 @@ deploy:
 
 | | |
 |---|---|
-| (this record) | Production runs 1.4.1, and the session's report |
+| (this record) | The session's report |
+| `6d5d409` | Production runs 1.4.1, and all thirteen steps ran |
 
 ### Before the next redeploy
 
