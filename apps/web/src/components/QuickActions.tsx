@@ -142,6 +142,26 @@ const mealIcon = (
   </>
 );
 
+/** A magnifier: searching the food databases for a row (D186). */
+export const searchIcon = (
+  <>
+    <circle cx="10.5" cy="10.5" r="6" {...stroke} />
+    <path d="M15 15l5.5 5.5" {...stroke} />
+  </>
+);
+
+/**
+ * A bowl with a plus above it: a new meal (D186). The plus is allowed here
+ * because it is exactly what the control does, add a meal, where the bar's old
+ * plus meant "log" and opened one of three things (D53).
+ */
+export const newMealIcon = (
+  <>
+    <path d="M3 13h18a9 9 0 0 1-9 8 9 9 0 0 1-9-8Z" {...stroke} />
+    <path d="M12 3v6M9 6h6" {...stroke} />
+  </>
+);
+
 export function quickActions(input: { onLogWeight: () => void }): QuickAction[] {
   return [
     {

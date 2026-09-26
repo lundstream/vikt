@@ -41,7 +41,6 @@ import { Disclosure } from "../components/Disclosure.js";
 import { DateSelector } from "../components/DateSelector.js";
 import { FoodTextEntry } from "../components/FoodTextEntry.js";
 import { FoodPhotoEntry } from "../components/FoodPhotoEntry.js";
-import { RecipeSuggestion } from "../components/RecipeSuggestion.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
 import {
@@ -49,7 +48,6 @@ import {
   barcodeIcon,
   cameraIcon,
   penIcon,
-  potIcon,
   speechIcon,
   type QuickAction,
 } from "../components/QuickActions.js";
@@ -141,7 +139,7 @@ export function FoodLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scannerOpen, setScannerOpen] = useState(() => searchParams.has("skanna"));
   /** Which occasional tool is open, if any. */
-  const [tool, setTool] = useState<"text" | "photo" | "recipe" | "estimate" | null>(null);
+  const [tool, setTool] = useState<"text" | "photo" | "estimate" | null>(null);
   /**
    * Whether the optional layer is up, asked once here rather than inside each
    * tool. The two sheets ask for it too and share the query key, so this is the
@@ -218,13 +216,11 @@ export function FoodLog() {
             onClick: () => setTool("text"),
             testId: "open-text-entry",
           },
-          {
-            key: "recipe",
-            label: "recipe.title",
-            icon: potIcon,
-            onClick: () => setTool("recipe"),
-            testId: "open-recipe",
-          },
+          /*
+            "Vad kan jag laga?" moved to Måltider (D187): it arrives at a dish,
+            which is what that section holds, and this screen's doors are for
+            the next thing eaten.
+          */
         ] satisfies QuickAction[])
       : []),
   ];
@@ -532,6 +528,42 @@ export function FoodLog() {
         ) : null}
 
         {/*
+          Måltider at the top (D187): the meals, one tap each, and the way into
+          the section where they are made and changed. Above the search,
+          because repeating a whole dish is the fastest thing this screen does.
+        */}
+        <section aria-labelledby="food-meals" className="mb-8" data-testid="food-meals">
+          <div className="mb-1 flex items-baseline justify-between gap-4">
+            <h2 id="food-meals" className="text-note text-muted">
+              {t("nav.meals")}
+            </h2>
+            <Link
+              to="/maltider"
+              data-testid="to-meals"
+              className="text-note text-muted underline underline-offset-4"
+            >
+              {t("food.allMeals")}
+            </Link>
+          </div>
+          {meals.data && meals.data.length > 0 ? (
+            <ul className="divide-y divide-edge border-y border-edge">
+              {meals.data.map((meal) => (
+                <TemplateRow
+                  key={meal.id}
+                  template={meal}
+                  onLog={() => void logSavedMeal(meal)}
+                  logging={savingId === meal.id}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="max-w-prose border-y border-edge py-3 text-micro text-muted">
+              {t("food.noMealsYet")}
+            </p>
+          )}
+        </section>
+
+        {/*
           Search first, because typing a name is the everyday path for something
           that is not already in the lists below.
 
@@ -674,21 +706,6 @@ export function FoodLog() {
           </div>
         ) : null}
 
-        {meals.data && meals.data.length > 0 ? (
-          <section aria-label={t("food.meals")} className="mb-8">
-            <h2 className="mb-1 text-note text-muted">{t("food.meals")}</h2>
-            <ul className="divide-y divide-edge border-y border-edge">
-              {meals.data.map((meal) => (
-                <TemplateRow
-                  key={meal.id}
-                  template={meal}
-                  onLog={() => void logSavedMeal(meal)}
-                  logging={savingId === meal.id}
-                />
-              ))}
-            </ul>
-          </section>
-        ) : null}
 
         {/*
           Favourites: the estimates and restaurant items that recur (D80).
@@ -793,21 +810,6 @@ export function FoodLog() {
             setPending(item);
           }}
         />
-      </Sheet>
-
-      <Sheet
-        open={tool === "recipe"}
-        onClose={() => setTool(null)}
-        title={t("recipe.title")}
-        testId="recipe-sheet"
-      >
-        {/*
-          Not closed on logging, unlike the sentence parser. A recipe is
-          something someone is reading while cooking, and closing it the moment
-          the food is logged takes the instructions away at the point they are
-          still being followed.
-        */}
-        <RecipeSuggestion localDate={today} onLogged={announce} />
       </Sheet>
 
       {scannerOpen ? (

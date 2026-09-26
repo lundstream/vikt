@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import type { FoodMatch } from "shared";
 import { formatDecimal, formatKcal, formatPortion } from "shared";
 import { fieldAria } from "./Field.js";
@@ -37,6 +37,14 @@ import { t } from "../i18n/index.js";
  * The profile is explicit that uncertainty is not one of the five areas and
  * gets no accent of its own; the dash and the glyph say it as well as a colour
  * would, and the rule is that colour is never alone in saying what a thing is.
+ *
+ * **The same rows can become a meal** (D186). "Spara som måltid" sits beside
+ * the log button and asks for a name; only rows the database matched go in,
+ * because a meal is priced from the database every time it is logged and an
+ * unmatched row has nothing there. Inside the meal sheet the list is in
+ * *collect* mode: the button adds rows to the meal being built rather than
+ * logging them, and an unmatched row says it cannot be taken rather than
+ * asking for a calorie figure the meal could not keep.
  */
 
 export type ProposalItem = {
@@ -56,6 +64,10 @@ export function ParsedProposal({
   onCancel,
   onReject,
   rejectLabel,
+  confirmLabel,
+  requireMatch = false,
+  onSaveAsMeal,
+  mealName = "",
 }: {
   items: FoodMatch[];
   /** True for a photograph: every amount is an estimate by origin. */
@@ -69,6 +81,14 @@ export function ParsedProposal({
   /** The text path's way out to D81's estimate. Absent on the photo path. */
   onReject?: () => void;
   rejectLabel?: string;
+  /** What the confirm button says, by count. "Logga N rader" when absent. */
+  confirmLabel?: (count: number) => string;
+  /** Only matched rows may be confirmed: the meal sheet's collect mode (D186). */
+  requireMatch?: boolean;
+  /** Saves the matched rows as a meal of one portion, under a name (D186). */
+  onSaveAsMeal?: (rows: ProposalItem[], name: string) => Promise<void>;
+  /** The name the meal field starts with: the sentence, or the photo's note. */
+  mealName?: string;
 }) {
   /**
    * The rows still on screen. Saved rows leave; rows that could not be saved
@@ -80,15 +100,29 @@ export function ParsedProposal({
   /** What the user says an unmatched row is worth, by row (D74). */
   const [kcals, setKcals] = useState<Record<number, string>>({});
   const [note, setNote] = useState<string | null>(null);
+  /** Open while a name for the meal is being typed. */
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState(mealName.slice(0, 80));
+  const [savingMeal, setSavingMeal] = useState(false);
 
-  async function save() {
+  /**
+   * The kept rows that can be written, or null after saying why none can.
+   * `matchedOnly` for a meal: an unmatched row has no food to price it from.
+   */
+  function ready(matchedOnly: boolean) {
     const ready: ProposalItem[] = [];
     const readyIndexes = new Set<number>();
     /** Kept rows with nothing in the amount field. Reported, never guessed. */
     const withoutAmount: string[] = [];
+    /** Kept rows the database did not match, left out of a meal. */
+    const unmatched: string[] = [];
 
     for (const [index, item] of rows.entries()) {
       if (!keep.has(index)) continue;
+      if (matchedOnly && item.match === null) {
+        unmatched.push(item.name);
+        continue;
+      }
 
       const typed = (grams[index] ?? "").trim();
       if (typed === "") {
@@ -99,7 +133,7 @@ export function ParsedProposal({
       const amount = readRequiredNumber(typed);
       if (!amount.ok) {
         setNote(amount.message);
-        return;
+        return null;
       }
 
       let kcal: number | null = null;
@@ -107,7 +141,7 @@ export function ParsedProposal({
         const value = readRequiredNumber(kcals[index] ?? "");
         if (!value.ok) {
           setNote(t("llm.needsValue", { name: item.name }));
-          return;
+          return null;
         }
         kcal = value.value;
       }
@@ -123,11 +157,18 @@ export function ParsedProposal({
     }
 
     if (ready.length === 0) {
-      setNote(t("llm.noneWithAmount"));
-      return;
+      setNote(unmatched.length > 0 ? t("meals.noneMatched") : t("llm.noneWithAmount"));
+      return null;
     }
+    return { ready, readyIndexes, withoutAmount, unmatched };
+  }
 
-    await onConfirm(ready);
+  async function save() {
+    const found = ready(requireMatch);
+    if (found === null) return;
+    const { readyIndexes, withoutAmount } = found;
+
+    await onConfirm(found.ready);
 
     const left = rows.filter((_, index) => !readyIndexes.has(index));
     if (left.length === 0) {
@@ -143,7 +184,36 @@ export function ParsedProposal({
     setGrams(initialGrams(left));
     setKeep(new Set(left.map((_, index) => index)));
     setKcals({});
-    setNote(t("llm.someWithoutAmount", { count: withoutAmount.length }));
+    setNote(
+      found.unmatched.length > 0 && requireMatch
+        ? t("meals.unmatchedLeft", { count: found.unmatched.length })
+        : t("llm.someWithoutAmount", { count: withoutAmount.length }),
+    );
+  }
+
+  /** Saves the matched rows as a meal, and leaves the list as it was. */
+  async function saveMeal(event: FormEvent) {
+    event.preventDefault();
+    if (!onSaveAsMeal) return;
+    if (name.trim() === "") {
+      setNote(t("meals.needName"));
+      return;
+    }
+    const found = ready(true);
+    if (found === null) return;
+
+    setSavingMeal(true);
+    try {
+      await onSaveAsMeal(found.ready, name.trim());
+      setNaming(false);
+      setNote(
+        found.unmatched.length > 0
+          ? t("meals.savedAsMealWithout", { name: name.trim(), count: found.unmatched.length })
+          : t("meals.savedAsMeal", { name: name.trim() }),
+      );
+    } finally {
+      setSavingMeal(false);
+    }
   }
 
   return (
@@ -246,7 +316,13 @@ export function ParsedProposal({
               answers: type what it was worth, or say it was nothing, which is
               what a pinch of salt actually is.
             */}
-            {item.match === null && keep.has(index) ? (
+            {item.match === null && keep.has(index) && requireMatch ? (
+              <span className="col-span-3 pl-8 text-micro text-muted">
+                {t("meals.cannotTake")}
+              </span>
+            ) : null}
+
+            {item.match === null && keep.has(index) && !requireMatch ? (
               <span className="col-span-3 flex items-center gap-2 pl-8">
                 <span className="relative w-28">
                   <input
@@ -282,6 +358,28 @@ export function ParsedProposal({
         ))}
       </ul>
 
+      {naming ? (
+        <form onSubmit={saveMeal} className="mt-4 flex gap-2" data-testid="save-as-meal-form">
+          <input
+            className="field flex-1"
+            aria-label={t("food.mealName")}
+            placeholder={t("food.mealName")}
+            value={name}
+            maxLength={80}
+            autoFocus
+            onChange={(event) => setName(event.target.value)}
+          />
+          <button
+            type="submit"
+            data-testid="save-as-meal-confirm"
+            className="btn w-auto px-4"
+            disabled={savingMeal || name.trim() === ""}
+          >
+            {t("profile.save")}
+          </button>
+        </form>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
@@ -290,8 +388,19 @@ export function ParsedProposal({
           onClick={() => void save()}
           disabled={saving || keep.size === 0}
         >
-          {t("llm.saveRows", { count: keep.size })}
+          {confirmLabel ? confirmLabel(keep.size) : t("llm.saveRows", { count: keep.size })}
         </button>
+        {onSaveAsMeal && !naming ? (
+          <button
+            type="button"
+            data-testid="save-as-meal"
+            className="btn w-auto px-4"
+            onClick={() => setNaming(true)}
+            disabled={saving || keep.size === 0}
+          >
+            {t("meals.saveAsMeal")}
+          </button>
+        ) : null}
         {onReject ? (
           <button
             type="button"

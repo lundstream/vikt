@@ -124,6 +124,22 @@ const DESTINATIONS: Destination[] = [
   },
   {
     /**
+     * Måltider (Phase 14, D187). In Mer and the sidebar, and linked from the
+     * top of Mat, **not a fifth tab**: the bar is four because four is what a
+     * thumb can hit across 360 px, and the everyday way into a meal is the row
+     * at the top of Mat rather than this list.
+     */
+    to: "/maltider",
+    label: "nav.meals",
+    icon: (
+      <>
+        <path d="M3 12h18a9 9 0 0 1-9 8 9 9 0 0 1-9-8Z" {...stroke} />
+        <path d="M8 8c0-1.5 1-1.5 1-3M12 8c0-1.5 1-1.5 1-3M16 8c0-1.5 1-1.5 1-3" {...stroke} />
+      </>
+    ),
+  },
+  {
+    /**
      * Not in the bar: it has a place in the sidebar and, on a phone, a place in
      * the Mer sheet (D92). What it must not have is a sixth slot in the bar.
      */

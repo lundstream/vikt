@@ -241,6 +241,9 @@ export const api = {
   // ------------------------------------------------------ Måltider (D186)
   listMeals: () => request<{ meals: Meal[] }>("/meals"),
 
+  /** One food, for pricing a row the meal sheet was handed by id (D186). */
+  getFoodItem: (id: string) => request<FoodItem>(`/food/item/${encodeURIComponent(id)}`),
+
   createMeal: (input: CreateMeal) =>
     request<Meal>("/meals", { method: "POST", body: JSON.stringify(input) }),
 

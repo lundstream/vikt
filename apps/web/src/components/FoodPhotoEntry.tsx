@@ -4,6 +4,7 @@ import { PHOTO_CONFIDENCE } from "shared";
 import { useConfirmParsedFood, useParseFoodPhoto } from "../lib/food.js";
 import { preparePhoto } from "../lib/photo.js";
 import { ParsedProposal } from "./ParsedProposal.js";
+import { useSaveProposalAsMeal, type CollectRows } from "./FoodTextEntry.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -42,12 +43,16 @@ import { t } from "../i18n/index.js";
 export function FoodPhotoEntry({
   localDate,
   onLogged,
+  collect,
 }: {
   localDate: string;
   onLogged: (message: string) => void;
+  /** Inside the meal sheet: add rows rather than log them (D186). */
+  collect?: CollectRows;
 }) {
   const parse = useParseFoodPhoto();
   const confirm = useConfirmParsedFood();
+  const saveAsMeal = useSaveProposalAsMeal();
 
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -156,7 +161,14 @@ export function FoodPhotoEntry({
           uncertain
           intro={t("photo.checkBeforeSaving")}
           saving={confirm.isPending}
+          {...(collect
+            ? { confirmLabel: collect.label, requireMatch: true }
+            : { onSaveAsMeal: saveAsMeal, mealName: note.trim() })}
           onConfirm={async (rows) => {
+            if (collect) {
+              await collect.onRows(rows);
+              return;
+            }
             await confirm.mutateAsync({
               localDate,
               mealSlot: "snack",

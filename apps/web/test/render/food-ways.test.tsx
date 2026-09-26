@@ -5,17 +5,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { renderRoute } from "./harness.js";
 import { FoodLog } from "../../src/routes/FoodLog.js";
+import { Meals } from "../../src/routes/Meals.js";
 import { sv } from "../../src/i18n/sv.js";
 
 /**
  * The ways into the food screen are one row of quick actions (D135).
  *
- * Scanning, typing an estimate, describing a meal and asking for a recipe all
- * open another surface. Three of them were full-width outlined buttons stacked
+ * Scanning, typing an estimate, describing a meal and photographing a plate all
+ * open another surface. Asking for a recipe was the fifth, and moved to
+ * Måltider in Phase 14 (D187); the last test here holds it there. Three of them were full-width outlined buttons stacked
  * down the page, which said "press me" three times for things that only open a
  * sheet; the fourth was already a circle. They are one shape now.
  *
- * The row has to read with **two, three, four or five** items, because the
+ * The row has to read with **two, three or four** items, because the
  * model-backed ones are absent rather than disabled when the box is off, and
  * the photograph has a further condition of its own: some tag has to have been
  * proved able to see, and this device has to be online (D143).
@@ -66,6 +68,7 @@ function mount(llmReachable: boolean, vision = true) {
     stateful: [
       { match: "/api/food-entry/recent", get: () => ({ entries: [] }) },
       { match: "/api/food-entry", get: () => ({ entries: [] }) },
+      { match: "/api/meals", get: () => ({ meals: [] }) },
     ],
   });
 }
@@ -73,8 +76,8 @@ function mount(llmReachable: boolean, vision = true) {
 describe("the ways into the food screen", () => {
   afterEach(cleanup);
 
-  /** All five, when a model is answering and one of them can see. */
-  it("offers five when the model is reachable and can see", async () => {
+  /** All four, when a model is answering and one of them can see. */
+  it("offers four when the model is reachable and can see", async () => {
     mount(true);
     await screen.findByTestId("scan");
 
@@ -83,10 +86,10 @@ describe("the ways into the food screen", () => {
       "open-photo-entry",
       "open-estimate",
       "open-text-entry",
-      "open-recipe",
     ]) {
       expect(screen.getByTestId(id), `missing ${id}`).toBeTruthy();
     }
+    expect(screen.queryByTestId("open-recipe")).toBeNull();
   });
 
   /**
@@ -100,9 +103,8 @@ describe("the ways into the food screen", () => {
     await screen.findByTestId("scan");
 
     expect(screen.queryByTestId("open-photo-entry")).toBeNull();
-    // The other three model-backed doors are unaffected.
+    // The other model-backed door is unaffected.
     expect(screen.getByTestId("open-text-entry")).toBeTruthy();
-    expect(screen.getByTestId("open-recipe")).toBeTruthy();
     expect(document.body.textContent ?? "").not.toContain(sv["photo.take"]);
   });
 
@@ -160,7 +162,7 @@ describe("the ways into the food screen", () => {
 
     const row = scan.closest("ul");
     expect(row).not.toBeNull();
-    expect(row!.querySelectorAll("li")).toHaveLength(5);
+    expect(row!.querySelectorAll("li")).toHaveLength(4);
 
     // Every one carries its label as text.
     for (const [id, label] of [
@@ -168,7 +170,6 @@ describe("the ways into the food screen", () => {
       ["open-photo-entry", sv["photo.take"]],
       ["open-estimate", sv["estimate.open"]],
       ["open-text-entry", sv["llm.title"]],
-      ["open-recipe", sv["recipe.title"]],
     ] as const) {
       expect(screen.getByTestId(id).textContent, `${id} has no label`).toContain(label);
     }
@@ -187,7 +188,6 @@ describe("the ways into the food screen", () => {
       "open-photo-entry",
       "open-estimate",
       "open-text-entry",
-      "open-recipe",
     ]) {
       const element = screen.getByTestId(id);
       for (const tier of ["btn", "btn-small", "btn-link", "btn-impact"]) {
@@ -196,5 +196,33 @@ describe("the ways into the food screen", () => {
     }
 
     void scan;
+  });
+
+  /**
+   * "Vad kan jag laga?" is a door on Måltider now (D187), in the same shape,
+   * and still absent rather than greyed when no model answers.
+   */
+  it("offers the recipe on Måltider, and nowhere when no model answers", async () => {
+    renderRoute(<Meals />, {
+      responses: [
+        { match: "/api/me", body: ME },
+        { match: "/api/llm/health", body: { enabled: true, reachable: true, vision: true } },
+      ],
+      stateful: [{ match: "/api/meals", get: () => ({ meals: [] }) }],
+    });
+    const recipe = await screen.findByTestId("open-recipe");
+    expect(recipe.textContent).toContain(sv["recipe.title"]);
+    expect(screen.getByTestId("meal-new").textContent).toContain(sv["meals.new"]);
+    cleanup();
+
+    renderRoute(<Meals />, {
+      responses: [
+        { match: "/api/me", body: ME },
+        { match: "/api/llm/health", body: { enabled: false, reachable: false, vision: false } },
+      ],
+      stateful: [{ match: "/api/meals", get: () => ({ meals: [] }) }],
+    });
+    await screen.findByTestId("meal-new");
+    expect(screen.queryByTestId("open-recipe")).toBeNull();
   });
 });

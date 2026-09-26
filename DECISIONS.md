@@ -10491,3 +10491,63 @@ templates in it, is upgraded on read by the same mapping as 0032.
 storing per-portion figures on the meal (a number the calc did not produce, and
 stale the moment a food is corrected); a join table for loggings (the rows
 already say which logging they belong to).
+
+---
+
+### D187 — Måltider is a section reached from Mer and from Mat, and its sheet uses Mat's tools
+
+*2026-09-26. Phase 14, item 3.*
+
+**Not a fifth tab.** The bar is four because four is what a thumb reaches
+across 360 px (D92), and the everyday way into a meal is the row at the top of
+Mat, where somebody is when they have eaten. The list is where a meal is made
+and changed, which happens far less often, so it sits in Mer and the sidebar
+beside Data and Coachen, and Mat links to it from the top ("alla måltider").
+`navigation.test.tsx` holds the route to the destination list as before.
+
+**The list** shows each meal's name, its portions and rows, and its figures
+per portion from `mealNutrition`, the energy in Blåbär and anything below
+D55's gate in Sten with "minst". `MealFigures` joins the Blåbär file list in
+`colour-meaning.test.ts`: it is the same kind of figure as "Ätit i dag", about
+a dish instead of a day.
+
+**The sheet** has a name, a portion count (decimals allowed) and the rows, with
+the running figure per portion under the count computed by the same function
+on the rows as they stand, so what the sheet says before saving is what the
+list says after. Rows are added with **Mat's four doors, in Mat's shape**:
+search, barcode, a sentence and a plate photograph, as the same quick-action
+circles (D135), each absent rather than greyed when its condition fails. A food
+chosen by search or barcode is sized in an **amount and a unit** from the same
+three layers the portion sheet offers (D85), with the grams it comes to shown
+before it is added. A row can have its amount changed in the same unit, or be
+removed; a row whose food has gone since says so and prices as unknown. Save,
+cancel as a text link, and on an existing meal a delete that names it (§3, the
+button rules of D134).
+
+**A sentence or a photograph inside the sheet collects rather than logs.**
+`ParsedProposal` gained a collect mode: the confirm button says "Lägg till N
+rader", and a row the database did not match says it cannot join a meal instead
+of asking for a calorie figure, because a meal is priced from the database on
+every logging and an unmatched row has nothing there. The rows' per-100 g
+figures are fetched through a new `GET /api/food/item/:id`, visibility-scoped,
+so the running figure prices them with the same calc.
+
+**"Spara som måltid" beside "logga".** On Mat, the proposal from a sentence or
+a plate photo has a second filled action that asks for a name (the sentence, or
+the photo's note, to start with) and saves the matched rows as a meal of one
+portion. The unmatched rows are left out and the note says how many. The list
+stays open, because saving it as a meal and logging it now are different
+decisions and often both are made.
+
+**"Vad kan jag laga?" moved here, unchanged.** It arrives at a dish, which is
+what this section holds; on Mat it was the fifth door on a screen whose job is
+the next thing eaten. Its keep action is now "Spara som måltid" and filled,
+because it writes (a meal with the recipe's text beside it) and it is the one
+tap that turns a suggestion into a meal in this list. `food-ways.test.tsx` now
+holds four doors on Mat and the recipe door on Måltider.
+
+**Rejected:** a separate "meal builder" screen (a second place to build rows
+that Mat already builds); logging from the list (the list is for making;
+logging is on Mat, one tap from the top); letting an unmatched proposal row
+into a meal with a typed calorie figure (it would be a figure the meal carries
+forever that the database never saw, which is D5's line from the other side).

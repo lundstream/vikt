@@ -378,10 +378,15 @@ export function RecipeSuggestion({
             >
               {t("recipe.log")}
             </button>
+            {/*
+              Filled: keeping writes a meal and its recipe, which is an action
+              (D134), and it is the one tap that turns a suggestion into a meal
+              in the Måltider list (D187).
+            */}
             <button
               type="button"
               data-testid="keep-recipe"
-              className="min-h-11 px-1 text-note text-muted underline underline-offset-4"
+              className="btn w-auto px-4"
               onClick={() => void keep()}
               disabled={saveRecipe.isPending}
             >

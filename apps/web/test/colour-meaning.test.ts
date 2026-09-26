@@ -181,11 +181,14 @@ describe("Lingon belongs to the trend line and the wordmark", () => {
 describe("Blåbär belongs to nutrition", () => {
   /**
    * Named files, as with Lingon. Two components that show what was eaten, the
-   * food screen's own figure, and the landing page's card for the area.
+   * food screen's own figure, the landing page's card for the area, and a
+   * meal's energy per portion (D187), which is the same kind of figure about a
+   * dish instead of a day.
    */
   const ALLOWED = [
     "components/DayCard.tsx",
     "components/SeriesPanel.tsx",
+    "components/MealFigures.tsx",
     "routes/FoodLog.tsx",
     "landing/Landing.tsx",
   ];

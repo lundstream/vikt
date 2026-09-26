@@ -17,6 +17,7 @@ import {
 } from "shared";
 import {
   createManualFood,
+  getFoodItem,
   getFoodEntries,
   getRecentFoods,
   lookupBarcode,
@@ -153,6 +154,25 @@ export const foodRoutes: FastifyPluginAsyncZod = async (app) => {
       const item = await createManualFood(request.userId!, app.db, request.body);
       return reply.code(201).send(item);
     },
+  );
+
+  /**
+   * One food, as this user can see it (D186). The meal sheet prices rows that
+   * arrived from a sentence or a photograph with the shared calc, and those
+   * arrive as a name and an id; this is where the per-100 g figures come from.
+   * Visibility-scoped like every read of the shared cache: somebody else's
+   * private food is a 404, not a leak.
+   */
+  app.get(
+    "/food/item/:id",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: foodItemSchema, 401: errorResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => getFoodItem(request.userId!, app.db, request.params.id),
   );
 
   /* ---------------------------------------------------------- food entries */

@@ -1,0 +1,578 @@
+import { useMemo, useState, type FormEvent } from "react";
+import type { FoodItem, Meal, MealRowFood } from "shared";
+import { MIN_SEARCH_LENGTH, formatDecimal, formatKcal, mealNutrition } from "shared";
+import {
+  useBarcodeLookup,
+  useCreateMeal,
+  useDeleteMeal,
+  useFoodSearch,
+  useLlmHealth,
+  useUpdateMeal,
+} from "../lib/food.js";
+import { api, ApiError } from "../lib/api.js";
+import { useOnline } from "../lib/queue/useQueue.js";
+import { readRequiredNumber } from "../lib/form-number.js";
+import { clientUuid } from "../lib/uuid.js";
+import { AmountPicker, type PickedAmount } from "./AmountPicker.js";
+import { BarcodeScanner } from "./BarcodeScanner.js";
+import { DeleteButton } from "./DeleteButton.js";
+import { Field, fieldAria } from "./Field.js";
+import { FoodPhotoEntry } from "./FoodPhotoEntry.js";
+import { FoodTextEntry } from "./FoodTextEntry.js";
+import { MealFigures } from "./MealFigures.js";
+import type { ProposalItem } from "./ParsedProposal.js";
+import { SearchStatus } from "./SearchStatus.js";
+import {
+  ActionButton,
+  barcodeIcon,
+  cameraIcon,
+  searchIcon,
+  speechIcon,
+  type QuickAction,
+} from "./QuickActions.js";
+import { t } from "../i18n/index.js";
+
+/** One ingredient row while the sheet is open. `food` null: the food is gone. */
+type Row = {
+  key: string;
+  foodItemId: string | null;
+  name: string;
+  amount: number;
+  unit: string;
+  grams: number;
+  food: MealRowFood | null;
+  isEstimate: boolean;
+};
+
+function priceOf(item: FoodItem): MealRowFood {
+  return {
+    kcalPer100: item.kcalPer100,
+    proteinPer100: item.proteinPer100,
+    carbsPer100: item.carbsPer100,
+    fatPer100: item.fatPer100,
+    fiberPer100: item.fiberPer100,
+  };
+}
+
+function rowsOf(meal: Meal | undefined): Row[] {
+  return (meal?.items ?? []).map((item) => ({
+    key: item.id,
+    foodItemId: item.foodItemId,
+    name: item.name,
+    amount: item.amount,
+    unit: item.unit,
+    grams: item.grams,
+    food: item.food,
+    isEstimate: item.food?.isEstimate ?? false,
+  }));
+}
+
+/**
+ * Creating and editing a meal (Phase 14, D186).
+ *
+ * The rows are built with the tools Mat already has, in the same shape and in
+ * the same order: search, barcode, a sentence, a photograph of a plate. What
+ * differs is where a chosen food goes. On Mat it is logged; here it is sized
+ * in an amount and a unit and added to the list, and nothing is written until
+ * the meal is saved.
+ *
+ * **The figure under the portions is the one the list will show**, because it
+ * is `mealNutrition` from the shared calc run on the rows as they stand, which
+ * is what the server runs on them once they are saved. A row whose food has
+ * gone since the meal was made keeps its name and prices as unknown, and the
+ * figure says "minst" until it is removed or replaced.
+ *
+ * Edit and remove are here from the first version (§3, D56), and removing the
+ * meal leaves every day it was logged on exactly as it was.
+ */
+export function MealSheet({
+  meal,
+  onDone,
+}: {
+  /** The meal being edited, or nothing for a new one. */
+  meal?: Meal;
+  onDone: (message: string) => void;
+}) {
+  const create = useCreateMeal();
+  const update = useUpdateMeal();
+  const remove = useDeleteMeal();
+  const llm = useLlmHealth();
+  const online = useOnline();
+  const lookup = useBarcodeLookup();
+
+  const [name, setName] = useState(meal?.name ?? "");
+  const [portions, setPortions] = useState(
+    formatDecimal(meal?.portions ?? 1, { decimals: Number.isInteger(meal?.portions ?? 1) ? 0 : 2 }),
+  );
+  const [rows, setRows] = useState<Row[]>(() => rowsOf(meal));
+  const [tool, setTool] = useState<"search" | "text" | "photo" | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [picking, setPicking] = useState<FoodItem | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [searchEnabled, setSearchEnabled] = useState(false);
+  const search = useFoodSearch(query, searchEnabled);
+
+  const portionCount = readRequiredNumber(portions);
+  /** The divisor the running figure uses: one until a count has been typed. */
+  const divisor = portionCount.ok && portionCount.value > 0 ? portionCount.value : 1;
+  const figures = useMemo(
+    () => mealNutrition(rows.map((row) => ({ grams: row.grams, food: row.food })), divisor),
+    [rows, divisor],
+  );
+
+  const ways: QuickAction[] = [
+    {
+      key: "search",
+      label: "meals.search",
+      icon: searchIcon,
+      onClick: () => setTool(tool === "search" ? null : "search"),
+      testId: "meal-tool-search",
+    },
+    {
+      key: "scan",
+      label: "action.scan",
+      icon: barcodeIcon,
+      onClick: () => {
+        setTool(null);
+        setScanning(true);
+      },
+      testId: "meal-tool-scan",
+    },
+    ...(llm.data?.reachable
+      ? ([
+          {
+            key: "text",
+            label: "meals.sentence",
+            icon: speechIcon,
+            onClick: () => setTool(tool === "text" ? null : "text"),
+            testId: "meal-tool-text",
+          },
+        ] satisfies QuickAction[])
+      : []),
+    ...(llm.data?.reachable && llm.data.vision && online
+      ? ([
+          {
+            key: "photo",
+            label: "meals.photo",
+            icon: cameraIcon,
+            onClick: () => setTool(tool === "photo" ? null : "photo"),
+            testId: "meal-tool-photo",
+          },
+        ] satisfies QuickAction[])
+      : []),
+  ];
+
+  function addPicked(item: FoodItem, picked: PickedAmount) {
+    setRows((current) => [
+      ...current,
+      {
+        key: clientUuid(),
+        foodItemId: item.id,
+        name: item.name,
+        amount: picked.amount,
+        unit: picked.unit,
+        grams: picked.grams,
+        food: priceOf(item),
+        isEstimate: item.isEstimate,
+      },
+    ]);
+    setPicking(null);
+    setNote(t("meals.rowAdded", { name: item.name }));
+  }
+
+  /**
+   * Rows from a sentence or a photograph arrive as an id, a name and grams.
+   * The per-100 g figures are fetched so the running figure can price them
+   * with the same calc; a food that cannot be read is left out and said so.
+   */
+  async function addProposed(proposed: ProposalItem[]) {
+    const matched = proposed.filter((row) => row.foodItemId !== null);
+    const found = await Promise.all(
+      matched.map(async (row) => {
+        try {
+          return { row, item: await api.getFoodItem(row.foodItemId!) };
+        } catch {
+          return { row, item: null };
+        }
+      }),
+    );
+    const added = found.filter((entry) => entry.item !== null);
+    setRows((current) => [
+      ...current,
+      ...added.map(({ row, item }) => ({
+        key: clientUuid(),
+        foodItemId: item!.id,
+        name: item!.name,
+        amount: row.grams,
+        unit: "g",
+        grams: row.grams,
+        food: priceOf(item!),
+        isEstimate: item!.isEstimate,
+      })),
+    ]);
+    setTool(null);
+    setNote(t("meals.rowsAdded", { count: added.length }));
+  }
+
+  async function onBarcode(code: string) {
+    setScanning(false);
+    const result = await lookup.mutateAsync(code);
+    if (result.item) {
+      setPicking(result.item);
+      return;
+    }
+    setNote(result.problem?.message ?? result.notice ?? t("food.barcodeMiss"));
+  }
+
+  function startEdit(row: Row) {
+    setEditingKey(row.key);
+    setEditAmount(formatDecimal(row.amount, { decimals: Number.isInteger(row.amount) ? 0 : 2 }));
+  }
+
+  /** A new amount in the same unit: the grams follow in proportion. */
+  function saveEdit(row: Row) {
+    const parsed = readRequiredNumber(editAmount);
+    if (!parsed.ok || parsed.value <= 0) {
+      setError(parsed.ok ? t("meals.amountPositive") : parsed.message);
+      return;
+    }
+    const perUnit = row.amount > 0 ? row.grams / row.amount : 1;
+    setRows((current) =>
+      current.map((candidate) =>
+        candidate.key === row.key
+          ? {
+              ...candidate,
+              amount: parsed.value,
+              grams: Math.round(parsed.value * perUnit * 10) / 10,
+            }
+          : candidate,
+      ),
+    );
+    setEditingKey(null);
+    setError(null);
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (name.trim() === "") {
+      setError(t("meals.needName"));
+      return;
+    }
+    if (!portionCount.ok || portionCount.value <= 0) {
+      setError(portionCount.ok ? t("meals.portionsPositive") : portionCount.message);
+      return;
+    }
+    if (rows.length === 0) {
+      setError(t("meals.needRows"));
+      return;
+    }
+
+    const items = rows.map((row) => ({
+      foodItemId: row.foodItemId,
+      nameSnapshot: row.name,
+      amount: row.amount,
+      unit: row.unit,
+      grams: row.grams,
+    }));
+
+    setSaving(true);
+    try {
+      if (meal) {
+        await update.mutateAsync({
+          id: meal.id,
+          input: { name: name.trim(), portions: portionCount.value, items },
+        });
+      } else {
+        await create.mutateAsync({
+          clientUuid: clientUuid(),
+          name: name.trim(),
+          portions: portionCount.value,
+          items: items.map((item) => ({ ...item, foodItemId: item.foodItemId! })),
+        });
+      }
+      onDone(t("meals.saved", { name: name.trim() }));
+    } catch (problem) {
+      setError(problem instanceof ApiError ? problem.message : t("save.failed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div data-testid="meal-sheet">
+      <form onSubmit={save} noValidate>
+        <div className="space-y-4">
+          <Field id="meal-name" label={t("meals.name")}>
+            <input
+              id="meal-name"
+              className="field"
+              value={name}
+              maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </Field>
+
+          <Field id="meal-portions" label={t("meals.portions")} hint={t("meals.portionsHelp")}>
+            <input
+              id="meal-portions"
+              className="field num w-32"
+              type="text"
+              inputMode="decimal"
+              {...fieldAria("meal-portions", undefined)}
+              value={portions}
+              onChange={(event) => setPortions(event.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-4" data-testid="meal-sheet-figures">
+          <p className="text-micro text-muted">{t("meals.perPortionHeading")}</p>
+          <MealFigures figures={figures} />
+        </div>
+
+        <h3 className="mt-6 text-note text-muted">{t("meals.ingredients")}</h3>
+        {rows.length === 0 ? (
+          <p className="mt-2 max-w-prose text-micro text-muted">{t("meals.noIngredients")}</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-edge border-y border-edge" data-testid="meal-rows">
+            {rows.map((row) => (
+              <li key={row.key} className="py-2.5" data-testid="meal-row">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3">
+                  <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-note text-ink">{row.name}</span>
+                      {row.isEstimate ? (
+                        <span className="tag tag-estimate shrink-0">
+                          <span aria-hidden="true">≈</span>
+                          {t("estimate.badge")}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="num block text-micro text-muted">
+                      {row.unit === "g"
+                        ? `${formatDecimal(row.grams, { decimals: 0 })} g`
+                        : `${formatDecimal(row.amount, { decimals: Number.isInteger(row.amount) ? 0 : 1 })} ${row.unit} · ${formatDecimal(row.grams, { decimals: 0 })} g`}
+                      {" · "}
+                      {row.food === null
+                        ? t("meals.rowGone")
+                        : `${formatKcal((row.food.kcalPer100 * row.grams) / 100)} kcal`}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {row.food !== null ? (
+                      <button
+                        type="button"
+                        className="min-h-11 px-1 text-micro text-muted underline underline-offset-4"
+                        onClick={() => startEdit(row)}
+                      >
+                        {t("meals.changeAmount")}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      data-testid={`meal-row-remove-${row.name}`}
+                      aria-label={t("meals.removeRowLabel", { name: row.name })}
+                      className="min-h-11 px-1 text-micro text-muted underline underline-offset-4"
+                      onClick={() => setRows((current) => current.filter((c) => c.key !== row.key))}
+                    >
+                      {t("meals.removeRow")}
+                    </button>
+                  </span>
+                </div>
+
+                {editingKey === row.key ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      className="field num w-28"
+                      type="text"
+                      inputMode="decimal"
+                      aria-label={t("meals.amountIn", { unit: row.unit })}
+                      value={editAmount}
+                      autoFocus
+                      onChange={(event) => setEditAmount(event.target.value)}
+                    />
+                    <span className="text-micro text-muted">{row.unit}</span>
+                    <button type="button" className="btn-small" onClick={() => saveEdit(row)}>
+                      {t("quick.save")}
+                    </button>
+                    <button type="button" className="btn-link" onClick={() => setEditingKey(null)}>
+                      {t("common.cancel")}
+                    </button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {error ? (
+          <p role="alert" className="mt-3 max-w-prose text-note text-ink">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            data-testid="meal-save"
+            className="btn w-auto px-6"
+            disabled={saving}
+          >
+            {saving ? t("quick.saving") : t("meals.save")}
+          </button>
+          <button type="button" className="btn-link" onClick={() => onDone("")}>
+            {t("common.cancel")}
+          </button>
+        </div>
+      </form>
+
+      {/*
+        The ways a row gets in, below the list so the form reads top to bottom:
+        what it is called, how many it feeds, what is in it, and then how to add
+        more. The same circles as Mat's, because they are the same doors.
+      */}
+      <div className="mt-8 border-t border-edge pt-4">
+        <p className="mb-3 text-micro text-muted">{t("meals.addWays")}</p>
+        <nav aria-label={t("meals.addWays")}>
+          <ul className="flex flex-wrap items-start justify-center gap-x-4 gap-y-4 sm:gap-x-8">
+            {ways.map((action) => (
+              <li key={action.key}>
+                <ActionButton action={action} />
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {note ? (
+          <p role="status" className="mt-3 max-w-prose text-micro text-muted">
+            {note}
+          </p>
+        ) : null}
+
+        {tool === "search" ? (
+          <div className="mt-4" data-testid="meal-search">
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setSearchEnabled(true);
+              }}
+            >
+              <input
+                className="field flex-1"
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                aria-label={t("food.find")}
+                placeholder={t("food.searchPlaceholder")}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSearchEnabled(false);
+                }}
+              />
+              <button
+                type="submit"
+                data-testid="meal-search-submit"
+                className="btn w-auto"
+                disabled={query.trim().length < MIN_SEARCH_LENGTH}
+              >
+                {t("food.searchAction")}
+              </button>
+            </form>
+            {search.items.length > 0 ? (
+              <ul className="mt-3 divide-y divide-edge border-y border-edge">
+                {search.items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-4 py-3 text-left"
+                      onClick={() => {
+                        setPicking(item);
+                        setQuery("");
+                        setSearchEnabled(false);
+                      }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-base text-ink">{item.name}</span>
+                        <span className="num block text-micro text-muted">
+                          {item.brand ? `${item.brand} · ` : ""}
+                          {formatDecimal(item.kcalPer100, { decimals: 0 })} kcal / 100 g
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <SearchStatus state={search} />
+          </div>
+        ) : null}
+
+        {tool === "text" ? (
+          <div className="mt-4">
+            <FoodTextEntry
+              localDate=""
+              onLogged={setNote}
+              collect={{
+                label: (count) => t("meals.addRows", { count }),
+                onRows: addProposed,
+              }}
+              onEstimate={(item) => {
+                setTool(null);
+                setPicking(item);
+              }}
+            />
+          </div>
+        ) : null}
+
+        {tool === "photo" ? (
+          <div className="mt-4">
+            <FoodPhotoEntry
+              localDate=""
+              onLogged={setNote}
+              collect={{
+                label: (count) => t("meals.addRows", { count }),
+                onRows: addProposed,
+              }}
+            />
+          </div>
+        ) : null}
+
+        {picking ? (
+          <AmountPicker
+            item={picking}
+            confirmLabel={t("meals.addRow")}
+            onPick={(picked) => addPicked(picking, picked)}
+            onCancel={() => setPicking(null)}
+          />
+        ) : null}
+      </div>
+
+      {meal ? (
+        <div className="mt-8 border-t border-edge pt-4">
+          <p className="mb-2 max-w-prose text-micro text-muted">{t("meals.removeNote")}</p>
+          <DeleteButton
+            testId="meal-delete"
+            label={meal.name}
+            onDelete={async () => {
+              await remove.mutateAsync(meal.id);
+              onDone(t("meals.removed", { name: meal.name }));
+            }}
+          />
+        </div>
+      ) : null}
+
+      {scanning ? (
+        <BarcodeScanner onResult={(code) => void onBarcode(code)} onClose={() => setScanning(false)} />
+      ) : null}
+    </div>
+  );
+}

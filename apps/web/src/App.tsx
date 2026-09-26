@@ -12,6 +12,7 @@ import { Register } from "./routes/Register.js";
 import { Dashboard } from "./routes/Dashboard.js";
 import { Profile } from "./routes/Profile.js";
 import { FoodLog } from "./routes/FoodLog.js";
+import { Meals } from "./routes/Meals.js";
 import { DailyLog } from "./routes/DailyLog.js";
 import { Data } from "./routes/Data.js";
 import { Admin } from "./routes/Admin.js";
@@ -57,6 +58,7 @@ export function App() {
       <Route path="/nyheter" element={signedIn(me.data, <News />)} />
       <Route path="/profile" element={signedIn(me.data, <Profile />)} />
       <Route path="/food" element={signedIn(me.data, <FoodLog />)} />
+      <Route path="/maltider" element={signedIn(me.data, <Meals />)} />
       <Route path="/dag" element={signedIn(me.data, <DailyLog />)} />
       {/*
         Samband is a tab inside Data now (D92). The old path is kept as a

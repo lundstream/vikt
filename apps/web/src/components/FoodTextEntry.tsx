@@ -1,9 +1,50 @@
 import { useState, type FormEvent } from "react";
-import type { FoodMatch } from "shared";
-import { useConfirmParsedFood, useLlmHealth, useParseFood } from "../lib/food.js";
+import type { FoodItem, FoodMatch } from "shared";
+import {
+  useConfirmParsedFood,
+  useCreateMeal,
+  useLlmHealth,
+  useParseFood,
+} from "../lib/food.js";
+import { clientUuid } from "../lib/uuid.js";
 import { EstimateEntry } from "./EstimateEntry.js";
-import { ParsedProposal } from "./ParsedProposal.js";
+import { ParsedProposal, type ProposalItem } from "./ParsedProposal.js";
 import { t } from "../i18n/index.js";
+
+/**
+ * The meal sheet's use of this entry (D186): the confirm button adds the
+ * matched rows to the meal being built instead of logging them.
+ */
+export type CollectRows = {
+  label: (count: number) => string;
+  onRows: (rows: ProposalItem[]) => Promise<void>;
+};
+
+/**
+ * "Spara som måltid" from a proposal: the matched rows, as a meal of one
+ * portion under the name the person typed (D186). Shared by both entries so
+ * the sentence and the photograph make the same kind of meal.
+ */
+export function useSaveProposalAsMeal() {
+  const create = useCreateMeal();
+  return async (rows: ProposalItem[], name: string) => {
+    await create.mutateAsync({
+      clientUuid: clientUuid(),
+      name,
+      portions: 1,
+      items: rows
+        .filter((row) => row.foodItemId !== null)
+        .map((row) => ({
+          foodItemId: row.foodItemId!,
+          nameSnapshot: row.name,
+          amount: row.grams,
+          unit: "g",
+          grams: row.grams,
+        })),
+    });
+  };
+}
+
 
 /**
  * Logging a meal by describing it (§6 phase 8).
@@ -50,13 +91,20 @@ import { t } from "../i18n/index.js";
 export function FoodTextEntry({
   localDate,
   onLogged,
+  collect,
+  onEstimate,
 }: {
   localDate: string;
   onLogged: (message: string) => void;
+  /** Inside the meal sheet: add rows rather than log them (D186). */
+  collect?: CollectRows;
+  /** Inside the meal sheet: an estimate made here becomes a row to size. */
+  onEstimate?: (item: FoodItem) => void;
 }) {
   const health = useLlmHealth();
   const parse = useParseFood();
   const confirm = useConfirmParsedFood();
+  const saveAsMeal = useSaveProposalAsMeal();
 
   const [text, setText] = useState("");
   const [proposal, setProposal] = useState<FoodMatch[] | null>(null);
@@ -147,7 +195,14 @@ export function FoodTextEntry({
           items={proposal}
           intro={t("llm.checkBeforeSaving")}
           saving={confirm.isPending}
+          {...(collect
+            ? { confirmLabel: collect.label, requireMatch: true }
+            : { onSaveAsMeal: saveAsMeal, mealName: text.trim() })}
           onConfirm={async (rows) => {
+            if (collect) {
+              await collect.onRows(rows);
+              return;
+            }
             await confirm.mutateAsync({ localDate, mealSlot: "snack", items: rows });
             onLogged(t("llm.logged", { count: rows.length }));
           }}
@@ -176,9 +231,13 @@ export function FoodTextEntry({
             <EstimateEntry
               dish={text.trim()}
               after={exhausted}
-              onCreated={() => {
+              onCreated={(item) => {
                 reset();
                 setExhausted(null);
+                if (onEstimate) {
+                  onEstimate(item);
+                  return;
+                }
                 onLogged(t("estimate.saved"));
               }}
             />
