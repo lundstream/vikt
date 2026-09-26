@@ -195,7 +195,13 @@ export function explainS3Error(error: unknown): string {
   if (name === "SignatureDoesNotMatch") {
     return "The secret key is wrong. The access key reached the server and the signature did not match it.";
   }
-  if (name === "InvalidAccessKeyId") {
+  /*
+    `XAdminUserNotFound` is how Versity's S3 gateway says the same thing, where
+    AWS and MinIO say `InvalidAccessKeyId`. It is what CI runs against since
+    MinIO's images stopped being pullable (D188), and a self-hoster can point a
+    backup at one just as well.
+  */
+  if (name === "InvalidAccessKeyId" || name === "XAdminUserNotFound") {
     return "The access key is wrong: the server does not know it.";
   }
   if (name === "NoSuchBucket") {

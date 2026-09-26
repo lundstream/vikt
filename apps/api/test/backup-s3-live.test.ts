@@ -36,7 +36,9 @@ import {
  * exact path that broke in production. A destination is verified against
  * something that can fail the way the real one does, or it is not verified.
  *
- * So: MinIO, with default settings, as a service in CI and a container locally.
+ * So: a real S3 server with default settings, in CI and in a container
+ * locally. MinIO until its images stopped being pullable, Versity's S3 gateway
+ * since (D188); the workflow's step says which, pinned by digest.
  * It signs requests the same way AWS does, which is the part worth exercising:
  * a wrong secret is a real `SignatureDoesNotMatch` from a real signature check,
  * not a mock returning a string somebody typed.
@@ -77,7 +79,7 @@ if (ENDPOINT !== "" && !hasPgDump) {
 if (ENDPOINT === "") {
   console.warn(
     "backup-s3-live: S3_TEST_ENDPOINT is not set, so 9 tests are skipped here and run in CI. " +
-      "Start MinIO and set it to run them locally; see §7.",
+      "Start the S3 gateway the CI workflow starts and set it to run them locally; see §7.",
   );
 }
 

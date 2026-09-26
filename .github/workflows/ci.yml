@@ -11,12 +11,14 @@
 # the cascades, and none of those exist in a fake. The harness creates and
 # migrates `vikt_test` itself, so nothing here needs to run migrations.
 #
-# MinIO is a service container for the same reason, and for a sharper one
+# A real S3 server runs beside it for the same reason, and for a sharper one
 # (D133). The SMB destination it replaces shipped with eleven tests that all
 # connected to `127.0.0.1` and were refused at TCP, so not one of them ever
 # reached authentication: the path that broke in production was the path nothing
-# had run. MinIO signs requests the way S3 does, so a wrong secret here is a
-# real signature failure rather than a mock returning a string somebody typed.
+# had run. The server signs requests the way S3 does, so a wrong secret here is
+# a real signature failure rather than a mock returning a string somebody typed.
+# It was MinIO until MinIO's images stopped being pullable; it is Versity's S3
+# gateway now (D188).
 #
 # `pnpm --filter api contract:food` is deliberately absent. It hits the live
 # Open Food Facts and Livsmedelsverket APIs, and a build that fails because
@@ -110,30 +112,36 @@ jobs:
       # command. Bitnami's image exists to work around exactly that and has
       # since withdrawn its `latest` tag, which is how this was found.
       #
-      # **From quay.io, not Docker Hub.** `minio/minio` on Docker Hub started
-      # answering `pull access denied` with the repository reported as not
-      # existing, which is the second image under this one step to disappear.
-      # quay.io is MinIO's own registry and the one its documentation points at,
-      # and the tag there was pulled, run and health-checked before this was
-      # changed rather than after.
-      - name: Start MinIO
+      # **Versity's S3 gateway, not MinIO (D188).** Three MinIO images have
+      # disappeared from under this one step: Bitnami withdrew its tag,
+      # `minio/minio` on Docker Hub began answering `pull access denied`, and on
+      # 2026-09-26 quay.io began answering 401 to the digest pinned here, which
+      # failed every run on `dev` before a test had started. MinIO no longer
+      # publishes images anyone can pull. `versity/versitygw` is an
+      # Apache-licensed S3 gateway over a plain directory, signs with SigV4 and
+      # refuses a wrong secret with a real `SignatureDoesNotMatch`; it was
+      # pulled by digest, started and run against `backup-s3-live.test.ts` on a
+      # workstation before this was pushed. It listens on 7070, mapped to the
+      # 9000 the tests have always used, and has a health endpoint of its own.
+      - name: Start the S3 test server
         run: |
-          docker run -d --name vikt-minio \
-            -p 9000:9000 \
-            -e MINIO_ROOT_USER=viktaccess \
-            -e MINIO_ROOT_PASSWORD=viktsecret123 \
-            quay.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e server /data
+          docker run -d --name vikt-s3 \
+            -p 9000:7070 \
+            -e ROOT_ACCESS_KEY=viktaccess \
+            -e ROOT_SECRET_KEY=viktsecret123 \
+            versity/versitygw:latest@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499 \
+            --health /health posix /tmp
           # Waited for rather than slept past: a fixed sleep is a race that
           # passes on a fast runner and fails on a slow one.
           for attempt in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:9000/minio/health/live > /dev/null; then
-              echo "MinIO is ready after ${attempt} attempt(s)"
+            if curl -sf http://127.0.0.1:9000/health > /dev/null; then
+              echo "The S3 test server is ready after ${attempt} attempt(s)"
               exit 0
             fi
             sleep 2
           done
-          echo "MinIO did not become ready"
-          docker logs vikt-minio
+          echo "The S3 test server did not become ready"
+          docker logs vikt-s3
           exit 1
 
       - name: Test

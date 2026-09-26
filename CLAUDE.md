@@ -840,22 +840,24 @@ a commit on `main` is a commit that the next redeploy ships.
   nothing finds nothing.
 - **Nine tests are CI-only by configuration, and the local run says so.** The S3
   destination's live suite (`backup-s3-live.test.ts`) needs a real S3 server and
-  `pg_dump`; CI starts MinIO and sets `S3_TEST_ENDPOINT`, a workstation usually
+  `pg_dump`; CI starts an S3 gateway and sets `S3_TEST_ENDPOINT`, a workstation usually
   has neither. They are **skipped rather than faked**, because a suite that goes
   green when its subject is absent is worse than one that says it did not run —
   that is the mistake the whole file exists to correct, and it is the reason the
   local and CI totals differ by exactly nine. The file prints a line naming the
   skip on every local run, and asserts that where the endpoint *is* configured
   nothing is half-skipped, so a CI box that lost `pg_dump` fails instead of
-  quietly covering less. To run them here: start MinIO and set
+  quietly covering less. To run them here: start the gateway the workflow starts and set
   `S3_TEST_ENDPOINT`, `S3_TEST_ACCESS_KEY`, `S3_TEST_SECRET_KEY`.
 - **Every third-party image is pinned by digest, and an image changes only when
   somebody changes the digest.** `postgres:16-alpine@sha256:...` in the compose
   files and the CI service, the same for the Node and nginx bases in
-  `infra/*.Dockerfile` and for MinIO in the workflow. A tag is a name somebody
+  `infra/*.Dockerfile` and for the S3 gateway in the workflow. A tag is a name somebody
   else controls: `bitnami/minio` withdrew its `latest`, `minio/minio` on Docker
   Hub started refusing to be pulled at all, and both arrived as a red build on a
-  branch that had not touched infrastructure. A digest cannot be repointed.
+  branch that had not touched infrastructure. A digest cannot be repointed,
+  though it can be withdrawn: quay.io's MinIO began answering 401 to the pinned
+  digest on 2026-09-26, and the step runs Versity's S3 gateway since (D188).
   - **Changing one is a commit that says so**, with the new digest read from
     `docker buildx imagetools inspect <image>:<tag>` and the image pulled and
     started before the change is pushed, not after.

@@ -17,7 +17,7 @@
  * `pg_dump` and therefore skips on a workstation. It is allowed to skip **only
  * where it is not configured to run**: in CI, where `S3_TEST_ENDPOINT` is set,
  * this script requires it to have run like everything else, so a runner that
- * lost MinIO fails instead of quietly covering less.
+ * lost its S3 server fails instead of quietly covering less.
  *
  * Nothing else, and `todo` counts as a skip. A test somebody meant to write is
  * a note in a file, not a green tick.

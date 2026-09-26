@@ -128,7 +128,7 @@ describe("backup settings", () => {
  * through the encrypted column, that the secret never comes back out of the
  * API, that saving other settings does not wipe it, and that switching away
  * does not leave it lying about. What needs a server is in
- * `backup-s3-live.test.ts`, which runs against a real MinIO.
+ * `backup-s3-live.test.ts`, which runs against a real S3 server (D188).
  */
 describe("an S3 destination", () => {
   const ctx = useTestApp();

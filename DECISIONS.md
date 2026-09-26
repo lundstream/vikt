@@ -10551,3 +10551,40 @@ that Mat already builds); logging from the list (the list is for making;
 logging is on Mat, one tap from the top); letting an unmatched proposal row
 into a meal with a typed calorie figure (it would be a figure the meal carries
 forever that the database never saw, which is D5's line from the other side).
+
+---
+
+### D188 — CI's S3 server is Versity's gateway, because MinIO stopped being pullable
+
+*2026-09-26. Found during Phase 14; not part of it.*
+
+Every CI run on `dev` since 8f9ce9a failed at "Start MinIO", before a test ran:
+`quay.io/minio/minio@sha256:14cea4…` now answers **401 Unauthorized** to the
+manifest request, from CI and from this workstation alike. It is the third
+MinIO image to vanish from under that one step: Bitnami withdrew its tag,
+`minio/minio` on Docker Hub began refusing pulls, and now quay.io. MinIO no
+longer publishes images that can be pulled without an account, and §7's
+digest rule, which exists so an image changes only when somebody changes it,
+cannot protect against the image being taken away.
+
+**Versity's S3 gateway (`versity/versitygw`) replaces it**, pinned by digest
+`sha256:30292fc2…`. It is Apache-licensed, serves S3 over a plain directory,
+and does what D133 needs the server for: it signs with SigV4, so a wrong
+secret is a real `SignatureDoesNotMatch` from a real signature check, and it
+creates buckets and lists, puts and deletes objects the way the backup
+destination does. It was pulled by digest, started, and run against
+`backup-s3-live.test.ts` on this workstation before the workflow was changed:
+seven of the eight tests that can run without `pg_dump` passed at once.
+
+**The eighth found a real difference.** An unknown access key is
+`InvalidAccessKeyId` from AWS and MinIO and `XAdminUserNotFound` from Versity,
+with a 404. `explainS3Error` now reads both as "the access key is wrong",
+because a self-hoster can point a backup at a Versity gateway just as well as
+at MinIO, and the sentence they get should name the field either way. The
+test was left as it was: it asks the right question.
+
+**Rejected:** LocalStack (it accepts any credentials by default, which is the
+mock D133 exists to avoid); SeaweedFS and Garage (both need an identity or
+layout file written before the first request, which is setup the step would
+have to get right before it could test anything); a community mirror of MinIO
+(the fourth copy of an image somebody else can withdraw).
