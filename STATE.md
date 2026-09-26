@@ -93,6 +93,19 @@ development server**, item by item, each with its own verdict file. Released as
   desktop.
 - **The release block** (D194) is held by `release.test.ts`, each new case seen
   failing before it passed; it has no screen.
+- **The matcher, in the flow a person uses** (D196), 2026-09-26: both recipe
+  photos again through the meal sheet with the real model. The cookbook page:
+  "Vitlök" and "Olivolja" matched as themselves, basil leaves now no match (a
+  compound), "kontrollera mot sidan" still on the mozzarella row only; saved as
+  "Pecorinopizza". The screen photo: "mjölk" is "Mjölk fett 3% berikad",
+  "smör" "Smör fett 80%", "gula lökar" "Lök gul", "tomatpuré" "Tomatpuré konc.
+  konserv.", and "peppar" and "nötfärs" no match where they were horseradish and
+  lasagne; "4 portioner" filled the count; saved as "Lasagne med ostsås" of four
+  portions. 19 of 19, no sideways scroll at either width. Both lists shot row by
+  row at 360 px and desktop, every row whole in a shot: 5 of 5.
+- **No private address in a tracked file** (D197) has no screen: the helper's
+  refusal and release step 1 are held by tests, and the address test failed on
+  `scripts/portainer.mjs:35` before it passed.
 - **The closing sweep, 2026-09-26, after 1.4.0's work**: `pnpm harness:sweep`
   (the tracked `shoot2.mjs`) over every finished screen at 360 px and desktop,
   **45 of 45** with the sign-in; both landing rows
@@ -552,7 +565,10 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 ## Inför nästa deploy
 
 **The next deploy is `1.4.0`**: the recipe photo (D195), built after 1.3.0,
-and the release command's two fixes (D194). Production runs `1.3.0` (above).
+the food matcher that every proposing tool uses (D196), and the release
+command's fixes (D194, D197). Production runs `1.3.0` (above). **Not to be
+released before the owner has reviewed the matcher's before and after** (D196's
+table).
 
 **No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
 release commit is named once the `v1.4.0` tag exists, and before that the
@@ -565,15 +581,21 @@ command is started. Push nothing between starting it and step 7.
 |---|---|
 | **Recept från foto** (D195) | a new way in the meal sheet: photograph a recipe's ingredient list, in a book, on a card or on a screen, and its rows join the list with the printed line beside each. A yield in portions fills the count; a book with two amount sets asks once which to use; a row whose sets disagree says "kontrollera mot sidan"; a row with no amount says "inte än" and waits |
 | **Rows that were not added stay** (D195) | in the meal sheet, rows from a sentence, a photo or a recipe that have no amount yet or no match stay in the list after "Lägg till", where before they disappeared |
+| **Better matching** (D196) | in every tool that proposes foods, the sentence, the plate photo and the recipe photo: the food named, not a longer word that starts with it. "mjölk" is milk, not milk chocolate; "smör" plain butter; "gula lökar" reach "Lök gul". A name that would only be a guess ("peppar", "nötfärs" in this catalogue) is no match, and the person searches |
 
-**What the deploy needs that 1.3.0 did not: nothing.** No migration, no new
-variable, no host change. The recipe photo uses `LLM_VISION_MODEL`, which
-production already sets to `qwen3-vl:8b`.
+**What the deploy needs that 1.3.0 did not.** No migration, no stack
+variable, no host change: the recipe photo uses `LLM_VISION_MODEL`, which
+production already sets to `qwen3-vl:8b`, and there is no `release` block
+below because nothing is to be set. **On the workstation, `PORTAINER_URL`**:
+`scripts/portainer.mjs` no longer falls back to a built-in address (D197), so
+the release stops at step 1 until it is set beside `PORTAINER_TOKEN`. INFRA.md,
+"The Portainer token", has the value and the command. It was not set on this
+workstation when this was written.
 
-**Not fixed, and worth knowing before the post goes out**: the food matcher
-every tool shares takes "Mjölkchoklad" for "mjölk" and "Pepparrot" for
-"peppar" (D195). The printed line beside each row makes it visible, and the
-person unticks it; the matcher is a separate pass.
+**Known, and not the matcher's rule**: several rows of one name ("Ost", five
+Open Food Facts rows from 252 to 354 kcal; "Präst", three) tie in the search,
+and which one a proposal shows is the database's order. Both rules accept all
+of them; the energy differs (D196).
 
 #### How the next release is told what to set
 
@@ -593,6 +615,11 @@ the command before step 1 (D194).
 - **Recept från foto** (D195), exercised through the interface with both probe
   photographs and saved as two meals; the list's rows that could not be added
   now stay. Details under "Current state".
+- **The matcher** (D196): compounds are other foods, inflections are not,
+  qualifiers are counted from the catalogue, twenty candidates. Its before and
+  after, 94 queries, is in D196 and in the session report.
+- **No private address in a tracked file** (D197): `PORTAINER_URL` required,
+  a test over every tracked file.
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -621,6 +648,11 @@ inte.
 **Rader som inte kom med ligger kvar.** Lägger du till rader i en måltid från
 en mening, ett foto eller ett recept, ligger de som saknar mängd eller träff kvar
 i listan tills du fyller i dem eller tar bort dem.
+
+**Bättre träffar.** När en mening, ett foto eller ett recept föreslår mat letar
+appen efter just det du skrev. Mjölk blir mjölk och inte mjölkchoklad, och gula
+lökar hittar gul lök. Finns inget som säkert är samma sak föreslås ingenting,
+och du söker själv i stället för att få en gissning.
 ```
 
 </details>
