@@ -94,7 +94,7 @@ export function optionalAmount(value: unknown): number | null {
 
 /** A food normalised to this app's shape, before it is written to `food_items`. */
 export type NormalisedFood = {
-  source: "openfoodfacts" | "livsmedelsverket" | "manual" | "llm_estimate";
+  source: "openfoodfacts" | "livsmedelsverket" | "manual" | "llm_estimate" | "label_photo";
   /** Barcode, Livsmedelsverket id, or null. */
   sourceRef: string | null;
   barcode: string | null;

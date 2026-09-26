@@ -29,12 +29,19 @@ export function Sheet({
   onClose,
   title,
   testId,
+  wide = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   testId?: string;
+  /**
+   * Room for two columns on a desktop (D190): the label photo beside the
+   * figures read from it, where a narrow sheet shrank the photo to a
+   * thumbnail nobody could compare a figure against. Unchanged on a phone.
+   */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -106,10 +113,10 @@ export function Sheet({
           and `focus-visible:outline-none` because the container is a focus
           target of last resort and should never draw a ring when it is.
         */
-        className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl
+        className={`relative max-h-[85dvh] w-full ${wide ? "max-w-lg sm:max-w-4xl" : "max-w-lg"} overflow-y-auto rounded-t-2xl
                    bg-paper px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5
                    outline-none focus-visible:outline-none focus-visible:ring-0
-                   sm:max-h-[80dvh] sm:rounded-2xl"
+                   sm:max-h-[80dvh] sm:rounded-2xl`}
       >
         <div className="mb-4 flex items-baseline justify-between gap-4">
           <h2 className="text-lg font-semibold text-ink">{title}</h2>

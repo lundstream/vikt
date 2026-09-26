@@ -19,6 +19,7 @@ import { DeleteButton } from "./DeleteButton.js";
 import { Field, fieldAria } from "./Field.js";
 import { FoodPhotoEntry } from "./FoodPhotoEntry.js";
 import { FoodTextEntry } from "./FoodTextEntry.js";
+import { FoodTags } from "./FoodTags.js";
 import { MealFigures } from "./MealFigures.js";
 import type { ProposalItem } from "./ParsedProposal.js";
 import { SearchStatus } from "./SearchStatus.js";
@@ -505,6 +506,7 @@ export function MealSheet({
                         <span className="num block text-micro text-muted">
                           {item.brand ? `${item.brand} · ` : ""}
                           {formatDecimal(item.kcalPer100, { decimals: 0 })} kcal / 100 g
+                          <FoodTags item={item} />
                         </span>
                       </span>
                     </button>

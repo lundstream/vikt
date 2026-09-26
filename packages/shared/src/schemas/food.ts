@@ -16,6 +16,7 @@ export const foodSourceSchema = z.enum([
   "livsmedelsverket",
   "manual",
   "llm_estimate",
+  "label_photo",
 ]);
 
 export const foodItemSchema = z.object({

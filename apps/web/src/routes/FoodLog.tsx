@@ -41,6 +41,8 @@ import { FoodTextEntry } from "../components/FoodTextEntry.js";
 import { FoodPhotoEntry } from "../components/FoodPhotoEntry.js";
 import { Sheet } from "../components/Sheet.js";
 import { EstimateEntry } from "../components/EstimateEntry.js";
+import { FoodTags } from "../components/FoodTags.js";
+import { LabelPhotoEntry } from "../components/LabelPhotoEntry.js";
 import { formatPortions } from "../components/MealFigures.js";
 import {
   ActionButton,
@@ -148,7 +150,14 @@ export function FoodLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scannerOpen, setScannerOpen] = useState(() => searchParams.has("skanna"));
   /** Which occasional tool is open, if any. */
-  const [tool, setTool] = useState<"text" | "photo" | "estimate" | null>(null);
+  const [tool, setTool] = useState<"text" | "photo" | "estimate" | "label" | null>(null);
+  /**
+   * The barcode a scan could not find, while the offer to photograph its label
+   * is on screen (D190). Null otherwise, and null when the label is opened from
+   * "Skriv in själv", where there is no code to attach.
+   */
+  const [missedBarcode, setMissedBarcode] = useState<string | null>(null);
+  const [labelBarcode, setLabelBarcode] = useState<string | null>(null);
   /**
    * Whether the optional layer is up, asked once here rather than inside each
    * tool. The two sheets ask for it too and share the query key, so this is the
@@ -477,14 +486,33 @@ export function FoodLog() {
     if (searchParams.has("skanna")) setSearchParams({}, { replace: true });
   }
 
+  /** Whether a photograph can be read here and now: the plate photo's conditions. */
+  const canReadPhotos = Boolean(llm.data?.reachable && llm.data.vision && online);
+
   async function onBarcode(barcode: string) {
     closeScanner();
+    setMissedBarcode(null);
     const result = await lookup.mutateAsync(barcode);
     if (result.item) {
       setPending(result.item);
       return;
     }
+    /*
+      Nothing found: the label is the next thing to try (D190), offered with
+      the code attached so the next scan of it finds what is saved. Only when
+      a photograph can be read; otherwise the miss is said as before.
+    */
+    if (canReadPhotos && !result.problem) {
+      setMissedBarcode(barcode);
+      return;
+    }
     announce(result.problem?.message ?? result.notice ?? t("food.barcodeMiss"));
+  }
+
+  function openLabel(barcode: string | null) {
+    setLabelBarcode(barcode);
+    setMissedBarcode(null);
+    setTool("label");
   }
 
   return (
@@ -544,6 +572,25 @@ export function FoodLog() {
           >
             {flash}
           </p>
+        ) : null}
+
+        {missedBarcode ? (
+          <div className="panel mb-4" data-testid="barcode-miss-label">
+            <p className="max-w-prose text-note text-ink">{t("label.afterMiss")}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                data-testid="open-label-after-miss"
+                className="btn w-auto px-4"
+                onClick={() => openLabel(missedBarcode)}
+              >
+                {t("label.open")}
+              </button>
+              <button type="button" className="btn-link" onClick={() => setMissedBarcode(null)}>
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {/*
@@ -625,7 +672,7 @@ export function FoodLog() {
                       <span className="num block text-micro text-muted">
                         {item.brand ? `${item.brand} · ` : ""}
                         {formatDecimal(item.kcalPer100, { decimals: 0 })} kcal / 100 g
-                        {item.isEstimate ? <EstimateTag /> : null}
+                        <FoodTags item={item} />
                       </span>
                     </span>
                   </button>
@@ -755,7 +802,7 @@ export function FoodLog() {
                       <span className="num block text-micro text-muted">
                         {item.brand ? `${item.brand} · ` : ""}
                         {formatDecimal(item.kcalPer100, { decimals: 0 })} kcal / 100 g
-                        {item.isEstimate ? <EstimateTag /> : null}
+                        <FoodTags item={item} />
                       </span>
                     </span>
                   </button>
@@ -825,11 +872,42 @@ export function FoodLog() {
         title={t("estimate.title")}
         testId="estimate-sheet"
       >
+        {canReadPhotos ? (
+          <p className="mb-4 max-w-prose text-micro text-muted">
+            {t("label.fromEstimate")}{" "}
+            <button
+              type="button"
+              data-testid="open-label-from-estimate"
+              className="text-ink underline underline-offset-4"
+              onClick={() => openLabel(null)}
+            >
+              {t("label.open")}
+            </button>
+          </p>
+        ) : null}
         <EstimateEntry
           onCreated={(item) => {
             setTool(null);
             // Straight to the portion sheet, so the estimate that was just
             // typed can be logged without finding it again.
+            setPending(item);
+          }}
+        />
+      </Sheet>
+
+      <Sheet
+        open={tool === "label"}
+        onClose={() => setTool(null)}
+        title={t("label.title")}
+        testId="label-sheet"
+        wide
+      >
+        <LabelPhotoEntry
+          barcode={labelBarcode}
+          onSaved={(item) => {
+            setTool(null);
+            announce(t("label.saved", { name: item.name }));
+            // Straight to the portion sheet, as an estimate does.
             setPending(item);
           }}
         />
@@ -1463,7 +1541,7 @@ function PortionSheet({
             fact, and this figure goes into the same series the maintenance
             number is computed from.
           */}
-          {item.isEstimate ? <EstimateTag /> : null}
+          <FoodTags item={item} />
         </p>
         {item.isEstimate && item.estimateBasis ? (
           <p className="mt-1 max-w-prose text-micro text-muted">{item.estimateBasis}</p>

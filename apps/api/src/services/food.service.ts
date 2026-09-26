@@ -1,6 +1,7 @@
 import type {
   BarcodeLookup,
   CreateEstimate,
+  CreateLabelFood,
   CreateFoodEntry,
   UpdateFoodEntry,
   FoodEntry,
@@ -8,7 +9,15 @@ import type {
   FoodSearchResult,
   NormalisedFood,
 } from "shared";
-import { scaleToGrams, toNumber, toNumberOrNull, toNumeric, toNumericOrNull } from "shared";
+import {
+  checkLabel,
+  scaleToGrams,
+  statedKcal,
+  toNumber,
+  toNumberOrNull,
+  toNumeric,
+  toNumericOrNull,
+} from "shared";
 import type { Db } from "../db/index.js";
 import { AdapterUnavailable, type FoodAdapter } from "../food/adapter.js";
 import {
@@ -547,6 +556,56 @@ export async function createManualFood(
     fiberPer100: null,
     saltPer100: null,
     servingHints: null,
+  });
+  return toItem(row);
+}
+
+/**
+ * A transcribed label, confirmed figure by figure, as the person's own food
+ * (D190, the third guard).
+ *
+ * **The first guard runs again here.** The sheet will not offer the save while
+ * the figures disagree, and this refuses them anyway, so a client that skipped
+ * the check cannot store a label that does not add up.
+ *
+ * An ordinary food: private to the person who photographed it, `source`
+ * `label_photo` so the screens can say "från etikett", **no estimate marker**,
+ * because a printed declaration is a measurement and not a guess (the
+ * difference D80 made `is_estimate` for). Stored per 100 g; a label read per
+ * 100 ml is stored the same way, which takes a drink's density as one. The
+ * barcode the scan could not find is attached, so the next scan of it finds
+ * this, and a printed serving becomes the food's "portion".
+ */
+export async function createLabelFood(
+  userId: string,
+  db: Db,
+  input: CreateLabelFood,
+): Promise<FoodItem> {
+  const check = checkLabel(input);
+  const kcal = statedKcal(input);
+  if (!check.ok || kcal === null) {
+    throw unprocessable(
+      "label_inconsistent",
+      "Siffrorna stämmer inte inbördes, kontrollera mot förpackningen.",
+    );
+  }
+
+  const row = await upsertFoodItem(userId, db, {
+    source: "label_photo",
+    sourceRef: null,
+    barcode: input.barcode,
+    name: input.name,
+    brand: null,
+    createdBy: userId,
+    visibility: "private",
+    kcalPer100: toNumeric(kcal, 2),
+    proteinPer100: toNumericOrNull(input.protein, 2),
+    carbsPer100: toNumericOrNull(input.carbohydrate, 2),
+    fatPer100: toNumericOrNull(input.fat, 2),
+    fiberPer100: toNumericOrNull(input.fibre, 2),
+    saltPer100: toNumericOrNull(input.salt, 2),
+    servingHints: input.servingSize ? { portion: input.servingSize.amount } : null,
+    isEstimate: false,
   });
   return toItem(row);
 }

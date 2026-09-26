@@ -11,6 +11,8 @@ import {
   parseFoodResponseSchema,
   parsePhotoResponseSchema,
   PHOTO_MAX_BASE64,
+  readLabelRequestSchema,
+  readLabelResponseSchema,
   recipeRequestSchema,
   recipeResponseSchema,
 } from "shared";
@@ -20,6 +22,7 @@ import {
   llmHealth,
   parseFoodPhoto,
   parseFoodText,
+  readNutritionLabel,
 } from "../services/llm.service.js";
 import { saveFoodEntry } from "../services/food.service.js";
 
@@ -111,6 +114,24 @@ export const llmRoutes: FastifyPluginAsyncZod = async (app) => {
          */
         app.log,
       ),
+  );
+
+  /**
+   * A nutrition declaration, transcribed for a person to confirm (D190). The
+   * same body limit and transport as the plate photo; it writes nothing.
+   */
+  app.post(
+    "/llm/read-label",
+    {
+      preHandler: app.requireAuth,
+      bodyLimit: PHOTO_MAX_BASE64 + 4096,
+      schema: {
+        body: readLabelRequestSchema,
+        response: { 200: readLabelResponseSchema, 401: errorResponseSchema },
+      },
+    },
+    async (request) =>
+      readNutritionLabel(request.userId!, app.config, app.llm, request.body, app.log),
   );
 
   /**

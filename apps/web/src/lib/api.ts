@@ -66,6 +66,9 @@ import type {
   FoodEntry,
   FoodItem,
   FoodSearchResult,
+  CreateLabelFood,
+  ReadLabelRequest,
+  ReadLabelResponse,
   Plan,
   RegisterRequest,
   UpdatePlan,
@@ -283,6 +286,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  /** A nutrition declaration, transcribed for the person to confirm (D190). */
+  readLabel: (body: ReadLabelRequest) =>
+    request<ReadLabelResponse>("/llm/read-label", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** The confirmed label, as the person's own food. 422 when it does not add up. */
+  createLabelFood: (body: CreateLabelFood) =>
+    request<FoodItem>("/food/label", { method: "POST", body: JSON.stringify(body) }),
 
   /**
    * A recipe from what is in the fridge, priced by the database.

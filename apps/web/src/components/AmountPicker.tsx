@@ -4,6 +4,7 @@ import { allPortionUnits, formatDecimal, formatKcal, resolveDefaultAmount } from
 import { usePortions } from "../lib/food.js";
 import { readRequiredNumber } from "../lib/form-number.js";
 import { Field, fieldAria } from "./Field.js";
+import { FoodTags } from "./FoodTags.js";
 import { t } from "../i18n/index.js";
 
 /** What an ingredient row came to: what was measured, and what it weighs. */
@@ -73,6 +74,7 @@ export function AmountPicker({
       <p className="num text-micro text-muted">
         {item.brand ? `${item.brand} · ` : ""}
         {formatDecimal(item.kcalPer100, { decimals: 0 })} kcal / 100 g
+        <FoodTags item={item} />
       </p>
 
       <div className="mt-3">

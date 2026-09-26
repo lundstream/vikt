@@ -28,11 +28,17 @@ export async function findFoodByBarcode(
   db: Db,
   barcode: string,
 ): Promise<FoodItemRow | undefined> {
+  /*
+    The person's own food for a barcode first (D190): a label they transcribed
+    for a product the databases did not know is theirs, and a shared row that
+    arrives for the same code later should not quietly replace what they
+    confirmed. Then the newest.
+  */
   const [row] = await db
     .select()
     .from(foodItems)
     .where(and(eq(foodItems.barcode, barcode), visibleTo(userId)))
-    .orderBy(desc(foodItems.fetchedAt))
+    .orderBy(sql`(${foodItems.createdBy} = ${userId}) desc nulls last`, desc(foodItems.fetchedAt))
     .limit(1);
   return row;
 }

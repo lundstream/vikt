@@ -13,10 +13,12 @@ import {
   foodSearchResultSchema,
   updateFoodEntrySchema,
   createEstimateSchema,
+  createLabelFoodSchema,
   favouriteSchema,
 } from "shared";
 import {
   createManualFood,
+  createLabelFood,
   getFoodItem,
   getFoodEntries,
   getRecentFoods,
@@ -152,6 +154,25 @@ export const foodRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request, reply) => {
       const item = await createManualFood(request.userId!, app.db, request.body);
+      return reply.code(201).send(item);
+    },
+  );
+
+  /**
+   * A label, transcribed and confirmed, saved as the person's own food (D190).
+   * 422 when the figures do not add up, whatever the client decided.
+   */
+  app.post(
+    "/food/label",
+    {
+      preHandler: app.requireAuth,
+      schema: {
+        body: createLabelFoodSchema,
+        response: { 201: foodItemSchema, 401: errorResponseSchema, 422: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const item = await createLabelFood(request.userId!, app.db, request.body);
       return reply.code(201).send(item);
     },
   );

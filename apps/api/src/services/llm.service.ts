@@ -25,6 +25,8 @@ import type { Env } from "../env.js";
 import type { LlmClient } from "../llm/client.js";
 import { parseFoodMessages, readParsedFood } from "../llm/parse-food.js";
 import { parsePhotoMessages, readParsedPhoto } from "../llm/parse-photo.js";
+import { LABEL_SCHEMA, readLabel, readLabelMessages } from "../llm/read-label.js";
+import type { ReadLabelResponse } from "shared";
 import { RateLimiter } from "../lib/rate-limit.js";
 import { visionAvailable } from "../lib/vision-watch.js";
 import { COACH_TURNS_PER_HOUR } from "./coach.service.js";
@@ -201,6 +203,58 @@ export async function parseFoodPhoto(
   );
 
   return { available: true, items, model: reply.model, ms: reply.ms };
+}
+
+/**
+ * A photograph of a nutrition declaration, transcribed (D190).
+ *
+ * The same transport rules as the plate photo, and the same allowance, because
+ * it is the same kind of request to the same single GPU: the image is decoded
+ * from the request, handed to Ollama and dropped, never written to a table, a
+ * file or a log line (`photo-transport.test.ts` holds this path too). What
+ * comes back is a **transcription for a person to confirm**, not a food: this
+ * writes nothing, and `createLabelFood` refuses figures that do not add up.
+ */
+export async function readNutritionLabel(
+  userId: string,
+  env: Env,
+  client: LlmClient,
+  input: { image: string },
+  log?: { info: (data: object, message: string) => void },
+): Promise<ReadLabelResponse> {
+  const model = env.LLM_VISION_MODEL.trim();
+  if (model === "") return { available: false, reason: "not_configured" };
+
+  const limit = photoLimiter.check(`photo:${userId}`);
+  if (!limit.allowed) {
+    return { available: false, reason: "rate_limited", retryAfterSeconds: limit.retryAfterSeconds };
+  }
+
+  const reply = await client.chat({
+    model,
+    messages: readLabelMessages(input.image),
+    schema: LABEL_SCHEMA,
+    temperature: 0,
+    timeoutMs: env.OLLAMA_VISION_TIMEOUT_MS,
+  });
+  if (!reply.ok) return { available: false, reason: reply.reason };
+
+  const parsed = readLabel(reply.content);
+  if (!parsed.ok) return { available: false, reason: parsed.reason };
+
+  /** Counts only: no figure, no name, no bytes. */
+  log?.info(
+    {
+      model: reply.model,
+      ms: reply.ms,
+      kb: Math.round((input.image.length * 3) / 4 / 1024),
+      columns: parsed.label.columns,
+      figures: Object.values(parsed.label).filter((value) => typeof value === "number").length,
+    },
+    "label read",
+  );
+
+  return { available: true, label: parsed.label, model: reply.model, ms: reply.ms };
 }
 
 /**

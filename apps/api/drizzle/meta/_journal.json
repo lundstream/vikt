@@ -232,6 +232,13 @@
       "when": 1788310207000,
       "tag": "0032_meals",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788310208000,
+      "tag": "0033_label_photo",
+      "breakpoints": true
     }
   ]
 }

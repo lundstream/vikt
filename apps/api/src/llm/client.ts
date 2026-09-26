@@ -65,6 +65,14 @@ export type ChatOptions = {
   messages: ChatMessage[];
   /** Ask Ollama to constrain the output to JSON. */
   json?: boolean;
+  /**
+   * Constrain the output to this JSON schema instead (D190). Stronger than
+   * `json`: the shape is enforced by the sampler, so the prompt can describe
+   * the fields without an example object, and an example is what a
+   * transcription prompt must not have, because the probe's model transcribed
+   * the example.
+   */
+  schema?: Record<string, unknown>;
   timeoutMs: number;
   /** 0 for anything parsed. Higher only where variety is the point. */
   temperature?: number;
@@ -161,7 +169,7 @@ export function createLlmClient(env: Env, fetchImpl: typeof fetch = fetch): LlmC
            * 27 times the latency for output that does not differ (D71).
            */
           think: false,
-          ...(options.json ? { format: "json" } : {}),
+          ...(options.schema ? { format: options.schema } : options.json ? { format: "json" } : {}),
           // No `num_ctx`: sending it changes the loaded options and forces a
           // model reload. See the file comment.
           options: { temperature: options.temperature ?? 0 },

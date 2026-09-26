@@ -48,6 +48,8 @@ export const foodSourceEnum = pgEnum("food_source", [
   "livsmedelsverket",
   "manual",
   "llm_estimate",
+  /** Transcribed from a photographed nutrition declaration (D190). */
+  "label_photo",
 ]);
 export const planStatusEnum = pgEnum("plan_status", ["active", "archived"]);
 

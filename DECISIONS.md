@@ -44,6 +44,32 @@ The model parses language into `{name, estimatedGrams, confidence}`. The databas
 
 Rejected: letting the model estimate calories directly for unmatched foods. If nothing matches, the user types a number and it is marked as an estimate.
 
+#### Amendment, 2026-09-26: transcription of a printed declaration (D190)
+
+**One exception, and only this one: the model may transcribe the nutrition
+declaration printed on a package the person photographed.** Transcription,
+never estimation: it copies the figures a manufacturer printed, per 100 g or
+100 ml, and returns null for anything it cannot read. It never computes one
+figure from another and never supplies a figure the label does not carry.
+Everywhere else this decision stands as written.
+
+It is held by three guards, and it is not allowed without all three:
+
+1. **The figures must agree with each other.** The EU conversion factors
+   (protein 4, carbohydrate 4, fat 9, fibre 2, polyols 2,4, alcohol 7 kcal per
+   gram; carbohydrate excluding fibre and including polyols) must sum to
+   within 15 % of the transcribed energy, and a kJ figure must agree with the
+   kcal beside it. Otherwise the sheet says "Siffrorna stämmer inte inbördes,
+   kontrollera mot förpackningen" and nothing is saved until corrected. The
+   server runs the same check before it writes (`shared/label.ts`).
+2. **The person confirms or corrects each figure** beside the photograph
+   before the save is offered.
+3. **The saved row is an ordinary food of the person's own**, private, with
+   `source` `label_photo`, the chip "från etikett" in the state-chip style,
+   **no estimate marker**, and the scanned barcode attached when there was
+   one. From there it is priced like any food: the database, not the model,
+   is what a logged row's figures come from.
+
 ---
 
 ### D6 — The LLM layer is strictly optional
@@ -10627,3 +10653,133 @@ its logging counted once. 17 of 17, shot at 360 px and desktop.
 
 **Found on the way:** the line under the day's rows printed its date raw,
 "Gäller 2026-09-26". It uses the app's long date now.
+
+---
+
+### D190 — The label photo: a transcription, three guards, and what the model actually read
+
+*2026-09-26. Phase 14, item 5. Amends D5.*
+
+When a scan finds nothing, or from "Skriv in själv", the person can
+photograph the nutrition declaration. The model transcribes it into a
+structured food; the person confirms it; it is saved as their own food and the
+next scan of the barcode finds it. D5 is amended to allow exactly this and
+names the three guards; this entry is how they were decided and what the
+probe found.
+
+#### The probe, before anything was built
+
+Three photographs in `scratch/vision/labels`, sent the way the client sends
+them (EXIF orientation applied, 1 280 px, JPEG at 0,8, EXIF gone), to the
+vision model in use, `qwen3-vl:8b`, three runs each at temperature 0. What is
+printed, read by a person:
+
+| | printed, per 100 g |
+|---|---|
+| **quark cup**, one column | 248 kJ / 59 kcal · fat 0,2 · saturated 0,1 · carbohydrate 4,4 · sugars 3,8 · protein 8,8 · salt 0,13 |
+| **sugar-free sweets**, blurred, per 100 g and per 50 g | 164 kcal · fat 0 · saturated 0 · carbohydrate 11 · sugars 1,6 · polyols 8,3 · fibre 56 · protein 4,1 · salt 0,07 |
+| **foil bag**, crumpled and sideways, per 100 g, per 25 g and RI | 1 636 kJ / 388 kcal · fat 9,4 · saturated 0,7 · carbohydrate hidden by glare (51,2 by the per 25 g column) · fibre 3,6 · protein 22 · salt 2,69 |
+
+The foil bag is sideways **after** its EXIF orientation (3) is applied: the
+bag was photographed on its side. That is the case the orientation handling
+cannot fix and the model has to read.
+
+**First probe: a prompt with an example object, `format: "json"`.** Verbatim,
+identical across three runs of each:
+
+- quark: `{"name":"Husmans knäcke","column":"per 100 g","basis":"100g","columns":2,"energyKj":2480,"energyKcal":59,"fat":0.2,"saturatedFat":0.1,"carbohydrate":4.4,"sugars":3.8,"polyols":null,"fibre":8.8,"protein":0.13,"salt":0.13,"alcohol":null,"servingSize":{"amount":13,"unit":"g"}}`
+- sweets and foil bag, both: `{"name":"Husmans knäcke","column":"per 100 g","basis":"100g","columns":2,"energyKj":1450,"energyKcal":345,"fat":1.8,"saturatedFat":0.3,"carbohydrate":61,"sugars":1.2,"polyols":null,"fibre":17,"protein":10,"salt":0.95,"alcohol":null,"servingSize":{"amount":13,"unit":"g"}}`
+
+That second line is **the prompt's own example**, every figure of it,
+returned as a reading of two different photographs. On the quark cup it
+borrowed the example's name and serving, wrote 2 480 kJ for 248, and shifted
+two rows down: protein's 8,8 as fibre, salt's 0,13 as protein. **A
+transcription prompt cannot carry numbers, because numbers are what gets
+transcribed.**
+
+**Second probe: no example, the fields described in words, the shape enforced
+by a JSON schema passed as Ollama's `format`.** Verbatim, identical across
+three runs of each:
+
+- quark: `{"name": null, "column": "per 100 g", "basis": "100g", "columns": 1, "energyKj": 248, "energyKcal": 59, "fat": 0.2, "saturatedFat": 0.1, "carbohydrate": 4.4, "sugars": 3.8, "polyols": null, "fibre": null, "protein": 8.8, "salt": 0.13, "alcohol": null, "servingSize": null}`
+  **Every figure right**, fibre null because no fibre is printed, the name
+  null because no name is in the frame, one column. Three of three.
+- sweets: `{"name": null, "column": "per 100 g", "basis": "100g", "columns": 2, "energyKj": 1885, "energyKcal": 450, "fat": 69, "saturatedFat": 69, "carbohydrate": 119, "sugars": 1.69, "polyols": 8.3, "fibre": 56, "protein": 4.1, "salt": 0.07, "alcohol": null, "servingSize": null}`
+  Right: two columns, polyols, the 56 g of fibre, protein, salt. Wrong:
+  energy (450 for 164), fat and saturated fat (69 for 0), carbohydrate (119
+  for 11), sugars (1,69 for 1,6).
+- foil bag: `{"name": null, "column": "per 100 g", "basis": "100g", "columns": 1, "energyKj": 1650, "energyKcal": 388, "fat": 94, "saturatedFat": 24, "carbohydrate": 0, "sugars": 0, "polyols": 0, "fibre": 0, "protein": 55, "salt": 0.57, "alcohol": null, "servingSize": null}`
+  (the first run had protein 0 and salt 0). Right: 388 kcal. Wrong: fat 94
+  for 9,4 (the comma dropped), saturated fat 24 and protein 55 read from the
+  per 25 g column, zeros for the rows it could not read where null was asked
+  for, one column where there are three.
+
+**The single-column case is read reliably**, so the item went ahead; the
+brief's stop condition was not met. The other two are exactly what the guards
+are for, and **the first guard fails both readings as the model returned
+them**: the sweets sum to 1 212 kcal against 450, the foil bag to 2 088
+against 388. Through the app with the real model the foil bag was read again
+(1 650 kJ, fat 94, carbohydrate 269, fibre 55, protein 14) and the sheet said
+"Siffrorna stämmer inte inbördes, kontrollera mot förpackningen. De blir 2 088
+kcal, och etiketten säger 388 kcal." with the save disabled.
+
+#### The first guard, and the fact about EU labels it depends on
+
+`checkLabel` sums the figures with the EU factors and compares with the
+printed energy, within 15 %. **Carbohydrate on an EU label excludes fibre and
+includes polyols**: the regulation defines it as "any carbohydrate which is
+metabolised by humans, and includes polyols", so polyols are a *varav* under
+it and count at 2,4 inside the figure, not on top of it. Counted on top, the
+sweets sum to 192 against 164, 17 % out, and a label read perfectly would be
+refused; counted inside, they sum to 159, 3 % out. The three honest labels
+land at 7,5 %, 3 % and 1 %.
+
+It is also what tells 56 g of fibre from a misread 5,6: on the sweets 56 sums
+to 159 and 5,6 to 58 against 164. And the other way: a label that prints 5,6
+passes and the same label read as 56 fails. Both directions are tests
+(`label.test.ts`, `label-photo.test.ts`), as is a kJ figure that disagrees
+with the kcal beside it (the first probe's 2 480), an alcohol line at 7 kcal
+per gram, and polyols larger than the carbohydrate they belong to.
+
+#### The second and third guards
+
+The confirm screen shows the transcription beside the photograph, which is
+held in memory while the screen is open and nowhere else. Each figure with a
+value has its own confirmation; typing a figure confirms it; the save is
+offered only when every figure is confirmed, the name is filled in and the
+check passes. The column read is named, and more than one column is said out
+loud, because a per 25 g figure in the per 100 g field is the foil bag's
+misreading.
+
+The saved food is private, `source` `label_photo`, `is_estimate` false, stored
+per 100 g (a per 100 ml label is stored the same way, taking a drink's density
+as one), a printed serving kept as its "portion", and the barcode the scan
+could not find attached. The barcode lookup now prefers the person's own food
+for a code, so a shared row arriving later for the same product does not
+quietly replace what they confirmed. The chip is "från etikett", Sten with a
+solid edge (`tag-quiet`), not the estimate's dashed `≈`: a printed
+declaration is a measurement.
+
+#### The photograph
+
+Handled as the plate photo is (D143): resized on the phone, EXIF stripped,
+sent once, never stored or logged (`label-photo.test.ts` looks for a marker in
+every text column and every log line). **With one addition: the orientation is
+applied before EXIF is stripped, as the client's own statement rather than the
+browser's.** `photo.ts` reads the tag itself, asks the browser once whether its
+decoder turns a picture by it (a two-pixel image tagged as a quarter turn),
+and turns the canvas when it does not. `photo-orientation.test.ts` holds the
+reading and the turn against a committed fixture, 64 by 32 stored with EXIF
+orientation 6; in Chrome the same fixture came back 32 by 64 with red on top
+and no EXIF, and the quark cup, a phone JPEG tagged orientation 6, was read by
+the model through the app exactly as printed.
+
+#### Rejected
+
+Letting the model's figures through with an estimate marker (it would be the
+estimate D5 forbids, with a warning on it); a stricter tolerance (the honest
+quark cup is already at 7,5 %); asking the model for the energy only and the
+database for the rest (there is no database row: that is why the label is
+being photographed); keeping the photograph with the food so the figures can
+be re-checked (it is a picture of somebody's kitchen, and D143's promise is
+that it stops existing once read).

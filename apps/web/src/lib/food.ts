@@ -12,6 +12,8 @@ import type {
   UpdateSavedRecipe,
   CreateFoodEntry,
   CreateMeal,
+  CreateLabelFood,
+  ReadLabelRequest,
   LogMeal,
   UpdateFoodEntry,
   UpdateMeal,
@@ -347,6 +349,19 @@ export function useParseFood() {
  * back, and the one promise this feature makes is that the picture stops
  * existing as soon as it has been read.
  */
+/** Never queued: the picture is read and dropped, like the plate photo (D190). */
+export function useReadLabel() {
+  return useMutation({
+    mutationFn: (body: ReadLabelRequest) => api.readLabel(body),
+  });
+}
+
+export function useCreateLabelFood() {
+  return useMutation({
+    mutationFn: (body: CreateLabelFood) => api.createLabelFood(body),
+  });
+}
+
 export function useParseFoodPhoto() {
   return useMutation({
     mutationFn: (body: ParseFoodPhotoRequest) => api.parseFoodPhoto(body),
