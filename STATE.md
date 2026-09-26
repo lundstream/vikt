@@ -103,6 +103,15 @@ development server**, item by item, each with its own verdict file. Released as
   lasagne; "4 portioner" filled the count; saved as "Lasagne med ostsås" of four
   portions. 19 of 19, no sideways scroll at either width. Both lists shot row by
   row at 360 px and desktop, every row whole in a shot: 5 of 5.
+- **The matcher refined, and the 1.4.0 gate** (D198), 2026-09-26: both recipe
+  photos through the meal sheet again with the real model. The cookbook page:
+  basil leaves "Basilika färsk", "Vitlök" and "Olivolja" as themselves; saved as
+  "Pizza med pecorino". The screen photo: "nötfärs" "Nöt färs rå fett 10%" at
+  500 g, "köttbuljongtärning" and "peppar" no match, milk, butter, tomato purée,
+  salt and "Lök gul" as before; the model read the garlic line as "2
+  vitlökskyftar", which matches nothing; saved as "Lasagne med ostsås 1.4". 15
+  of 15, both lists whole in their shots at 360 px and desktop. The matcher's
+  gate lines, 14 of 14, are in the session report.
 - **No private address in a tracked file** (D197) has no screen: the helper's
   refusal and release step 1 are held by tests, and the address test failed on
   `scripts/portainer.mjs:35` before it passed.
@@ -565,10 +574,11 @@ The closing sweep for it: 40 of 40 at 360 px and desktop, none failed.
 ## Inför nästa deploy
 
 **The next deploy is `1.4.0`**: the recipe photo (D195), built after 1.3.0,
-the food matcher that every proposing tool uses (D196), and the release
-command's fixes (D194, D197). Production runs `1.3.0` (above). **Not to be
-released before the owner has reviewed the matcher's before and after** (D196's
-table).
+the food matcher that every proposing tool uses (D196, refined in D198 after
+the owner reviewed D196's table), and the release command's fixes (D194,
+D197). Production runs `1.3.0` (above). **The gate the owner wrote for it
+passed** on 2026-09-26, every line: fourteen for the matcher, fifteen through
+the meal sheet with both recipe photos (the session report of that date).
 
 **No commit is named yet, and that is the rule working** (CLAUDE.md §7): the
 release commit is named once the `v1.4.0` tag exists, and before that the
@@ -581,21 +591,19 @@ command is started. Push nothing between starting it and step 7.
 |---|---|
 | **Recept från foto** (D195) | a new way in the meal sheet: photograph a recipe's ingredient list, in a book, on a card or on a screen, and its rows join the list with the printed line beside each. A yield in portions fills the count; a book with two amount sets asks once which to use; a row whose sets disagree says "kontrollera mot sidan"; a row with no amount says "inte än" and waits |
 | **Rows that were not added stay** (D195) | in the meal sheet, rows from a sentence, a photo or a recipe that have no amount yet or no match stay in the list after "Lägg till", where before they disappeared |
-| **Better matching** (D196) | in every tool that proposes foods, the sentence, the plate photo and the recipe photo: the food named, not a longer word that starts with it. "mjölk" is milk, not milk chocolate; "smör" plain butter; "gula lökar" reach "Lök gul". A name that would only be a guess ("peppar", "nötfärs" in this catalogue) is no match, and the person searches |
+| **Better matching** (D196, D198) | in every tool that proposes foods, the sentence, the plate photo and the recipe photo: the food named, not a longer word that starts with it and not a variety or a dish. "mjölk" is milk, not milk chocolate; "gula lökar" reach "Lök gul"; basil leaves reach basil, garlic cloves garlic, a chicken breast a breast row; "nötfärs" reaches plain beef mince, which the catalogue writes as two words. A bare "pizza" or "peppar" is no match rather than a guess, and the person searches. Among foods that fit, the one this person has logged most, and the same food every time they ask |
 
 **What the deploy needs that 1.3.0 did not.** No migration, no stack
 variable, no host change: the recipe photo uses `LLM_VISION_MODEL`, which
 production already sets to `qwen3-vl:8b`, and there is no `release` block
 below because nothing is to be set. **On the workstation, `PORTAINER_URL`**:
 `scripts/portainer.mjs` no longer falls back to a built-in address (D197), so
-the release stops at step 1 until it is set beside `PORTAINER_TOKEN`. INFRA.md,
-"The Portainer token", has the value and the command. It was not set on this
-workstation when this was written.
+release step 1 needs it beside `PORTAINER_TOKEN`. The owner set it before the
+release session; INFRA.md, "The Portainer token", has the value.
 
-**Known, and not the matcher's rule**: several rows of one name ("Ost", five
-Open Food Facts rows from 252 to 354 kcal; "Präst", three) tie in the search,
-and which one a proposal shows is the database's order. Both rules accept all
-of them; the energy differs (D196).
+**Rows of one name no longer tie** (D198): five Open Food Facts rows are named
+"Ost", from 252 to 354 kcal, and the search now ends in a total order
+(Livsmedelsverket first, then id), after the food the person has logged most.
 
 #### How the next release is told what to set
 
@@ -619,7 +627,10 @@ the command before step 1 (D194).
   qualifiers are counted from the catalogue, twenty candidates. Its before and
   after, 94 queries, is in D196 and in the session report.
 - **No private address in a tracked file** (D197): `PORTAINER_URL` required,
-  a test over every tracked file.
+  a test over every tracked file, the `edge` subnet allowed only where it is
+  defined.
+- **The matcher refined** (D198): parts of a food, compounds written apart, no
+  varieties, a tail that describes the food, and one answer per person.
 
 **Every pass on `dev` appends to this section**, and nothing merges to `main`
 until it has been read.
@@ -650,9 +661,10 @@ en mening, ett foto eller ett recept, ligger de som saknar mängd eller träff k
 i listan tills du fyller i dem eller tar bort dem.
 
 **Bättre träffar.** När en mening, ett foto eller ett recept föreslår mat letar
-appen efter just det du skrev. Mjölk blir mjölk och inte mjölkchoklad, och gula
-lökar hittar gul lök. Finns inget som säkert är samma sak föreslås ingenting,
-och du söker själv i stället för att få en gissning.
+appen efter just det du skrev. Mjölk blir mjölk och inte mjölkchoklad, gula
+lökar hittar gul lök, basilikablad hittar basilika och nötfärs hittar nötfärs.
+Står det bara pizza föreslås ingen särskild pizza, för det vore en gissning, och
+du söker själv. Har du loggat en vara förut är det den som föreslås igen.
 ```
 
 </details>
